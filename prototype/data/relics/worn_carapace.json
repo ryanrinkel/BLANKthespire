@@ -1,0 +1,10 @@
+{
+  "id": "worn_carapace",
+  "name": "Worn Carapace",
+  "tier": "starter",
+  "pool": "starter",
+  "description": "At the start of each combat, gain 4 Block.",
+  "hooks": [
+    { "trigger": "combat_start", "effects": [ { "op": "block", "amount": 4 } ] }
+  ]
+}

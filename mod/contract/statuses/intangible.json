@@ -1,0 +1,6 @@
+{
+  "id": "intangible",
+  "name": "Intangible",
+  "kind": "buff",
+  "decay": "turn"
+}

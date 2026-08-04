@@ -1,0 +1,17 @@
+{
+  "id": "crushing_roll",
+  "name": "Crushing Roll",
+  "type": "attack",
+  "rarity": "uncommon",
+  "character": "armor_dillo",
+  "archetype": "bulwark",
+  "cost": 1,
+  "target": "enemy",
+  "effects": [
+    { "op": "from_state", "emit": "damage", "value": { "state": "block" } }
+  ],
+  "upgrade": { "effects": [
+    { "op": "from_state", "emit": "damage", "value": { "state": "block", "scale": 1.5 } }
+  ]},
+  "flavor": "Roll over them with everything you've stacked. Deal damage equal to your Block."
+}

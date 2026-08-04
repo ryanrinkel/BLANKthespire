@@ -1,0 +1,24 @@
+{
+  "id": "expose",
+  "name": "Expose",
+  "type": "skill",
+  "rarity": "uncommon",
+  "cost": 1,
+  "target": "all_enemies",
+  "effects": [
+    {
+      "op": "apply_status",
+      "status": "vulnerable",
+      "amount": 2
+    }
+  ],
+  "upgrade": {
+    "effects": [
+      {
+        "op": "apply_status",
+        "status": "vulnerable",
+        "amount": 3
+      }
+    ]
+  }
+}

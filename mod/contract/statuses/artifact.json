@@ -1,0 +1,6 @@
+{
+  "id": "artifact",
+  "name": "Artifact",
+  "kind": "buff",
+  "decay": "stack"
+}

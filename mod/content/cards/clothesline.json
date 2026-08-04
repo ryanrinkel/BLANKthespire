@@ -1,0 +1,32 @@
+{
+  "id": "clothesline",
+  "name": "Clothesline",
+  "type": "attack",
+  "rarity": "uncommon",
+  "cost": 2,
+  "target": "enemy",
+  "effects": [
+    {
+      "op": "damage",
+      "amount": 12
+    },
+    {
+      "op": "apply_status",
+      "status": "weak",
+      "amount": 2
+    }
+  ],
+  "upgrade": {
+    "effects": [
+      {
+        "op": "damage",
+        "amount": 14
+      },
+      {
+        "op": "apply_status",
+        "status": "weak",
+        "amount": 3
+      }
+    ]
+  }
+}

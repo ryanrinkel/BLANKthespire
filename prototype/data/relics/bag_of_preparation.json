@@ -1,0 +1,11 @@
+{
+  "id": "bag_of_preparation",
+  "name": "Bag of Preparation",
+  "tier": "common",
+  "pool": "combat",
+  "description": "At the start of combat, draw 2 additional cards.",
+  "source": "authored",
+  "hooks": [
+    { "trigger": "combat_start", "effects": [ { "op": "draw", "amount": 2 } ] }
+  ]
+}

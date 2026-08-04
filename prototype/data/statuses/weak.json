@@ -1,0 +1,8 @@
+{
+  "id": "weak",
+  "name": "Weak",
+  "kind": "debuff",
+  "decay": "end_of_turn_decrement",
+  "stacks": true,
+  "description": "Deals 25% less attack damage. Behavior: core/powers/Weak.gd (on_deal_attack_damage)."
+}

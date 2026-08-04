@@ -1,0 +1,300 @@
+:root {
+  --bg: #14131a; --panel: #1e1c28; --panel2: #262333; --ink: #e9e6f2; --muted: #9b95b3;
+  --accent: #b07cff; --accent2: #7c5cff; --line: #332f43; --danger: #ff6b6b;
+  --basic: #8d8aa0; --common: #d7d4e6; --uncommon: #5fd0a8; --rare: #ffd166;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+.hidden { display: none !important; }
+.muted { color: var(--muted); }
+.spacer { flex: 1; }
+
+header { border-bottom: 1px solid var(--line); padding: 14px 22px; }
+.brand { font-size: 19px; }
+.brand .sub { color: var(--muted); font-size: 13px; margin-left: 6px; }
+nav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.tab {
+  background: none; border: none; color: var(--muted); padding: 6px 12px;
+  border-radius: 8px; cursor: pointer; font-size: 14px;
+}
+.tab.active { background: var(--panel2); color: var(--ink); }
+.who { color: var(--muted); font-size: 13px; margin-right: 8px; }
+.tokens { font-size: 12px; font-weight: 600; color: var(--accent); border: 1px solid var(--accent2);
+          border-radius: 999px; padding: 2px 10px; margin-right: 10px; white-space: nowrap;
+          cursor: pointer; }  /* clickable: jumps to the Account tab (balance + buy) */
+.tokens.empty { color: var(--muted); border-color: var(--panel2); }
+
+main, section.card, #gate { max-width: 760px; margin: 22px auto; padding: 0 18px; }
+.card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  padding: 20px; margin: 18px auto;
+}
+h1 { font-size: 26px; margin: 6px 0 10px; }
+h2 { margin: 0 0 8px; }
+.lbl { display: block; font-weight: 600; margin-bottom: 6px; }
+.lbl.small { font-size: 13px; font-weight: 500; color: var(--muted); margin-top: 14px; }
+
+textarea, .in {
+  width: 100%; background: var(--panel2); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 10px; padding: 11px 13px; font: inherit; resize: vertical;
+}
+.in { margin-bottom: 8px; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+
+.btn, .ghost {
+  display: inline-block; cursor: pointer; border: 1px solid var(--line); background: var(--panel2);
+  color: var(--ink); padding: 10px 18px; border-radius: 10px; font: inherit; text-decoration: none;
+  margin-top: 12px;
+}
+.btn.primary, a.btn.primary {
+  background: linear-gradient(135deg, var(--accent), var(--accent2)); border: none; color: white; font-weight: 600;
+}
+.btn:disabled { opacity: .5; cursor: default; }
+.ghost { background: none; }
+.danger { color: var(--danger); border-color: #4a2630; background: none; }
+
+.settings { margin: 14px 0; border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+.settings summary { cursor: pointer; color: var(--muted); }
+.modes { display: flex; flex-wrap: wrap; gap: 14px; margin: 12px 0; }
+.modes label { font-size: 14px; }
+.hint { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
+.model-row { display: flex; gap: 8px; align-items: stretch; }
+.model-row #model { flex: 1; margin-bottom: 0; }
+.model-row #load-models { margin-top: 0; white-space: nowrap; }
+
+.log {
+  background: #100f16; border: 1px solid var(--line); border-radius: 10px; padding: 12px;
+  max-height: 240px; overflow-y: auto; white-space: pre-wrap; font: 13px/1.5 ui-monospace, monospace;
+  color: #bdb7d6;
+}
+.spin { display: inline-block; animation: spin 1s linear infinite; color: var(--accent); }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* interactive forge: the mid-forge archetype pick panel (inside #progress) */
+.choice { border: 1px solid var(--accent2); border-radius: 10px; padding: 12px 14px; margin: 12px 0; }
+.choice-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; margin: 10px 0; }
+.choice-opt {
+  cursor: pointer; text-align: left; font: inherit; color: var(--ink);
+  background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 10px;
+  display: flex; flex-direction: column; gap: 4px; margin: 0;
+}
+.choice-opt:hover { border-color: var(--accent2); }
+.choice-opt.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.choice-opt strong { font-weight: 700; font-size: 15px; color: var(--accent); }
+.choice-opt em { font-size: 13px; color: var(--muted); font-style: italic; }
+.choice-opt .co-warn { color: var(--rare); font-size: 11px; }
+.choice-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.choice-actions .btn { margin-top: 4px; }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin: 14px 0; }
+.cardchip { position: relative; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 10px; border-left: 3px solid var(--common); }
+.cardchip.r-basic { border-left-color: var(--basic); }
+.cardchip.r-common { border-left-color: var(--common); }
+.cardchip.r-uncommon { border-left-color: var(--uncommon); }
+.cardchip.r-rare { border-left-color: var(--rare); }
+.cc-top { display: flex; justify-content: space-between; font-weight: 600; padding-right: 18px; }
+.cc-cost { color: var(--accent); }
+.cc-meta { font-size: 12px; color: var(--muted); margin: 3px 0; text-transform: capitalize; }
+.cc-eff { font-size: 12px; color: #c8c3df; }
+
+.relic { margin: 14px 0; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--rare);
+  border-left: 4px solid var(--rare);
+  background: linear-gradient(135deg, rgba(255,209,102,0.10), var(--panel2)); }
+.relic-top { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.relic-badge { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--rare); }
+.relic-name { font-weight: 700; font-size: 16px; }
+.relic-desc { font-size: 13px; color: #c8c3df; margin: 6px 0 0; font-style: italic; }
+.relic-eff { margin: 8px 0 0; padding-left: 18px; }
+.relic-eff li { font-size: 12px; color: #c8c3df; margin: 2px 0; }
+
+.codebox { margin-top: 14px; }
+.codebox textarea { font: 12px/1.4 ui-monospace, monospace; word-break: break-all; }
+
+.lib { list-style: none; padding: 0; margin: 0; }
+.lib-row { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between;
+  border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; background: var(--panel2); }
+.lr-name { font-weight: 600; margin-right: 10px; }
+.lr-meta { font-size: 12px; color: var(--muted); }
+.lr-concept { font-size: 13px; margin-top: 4px; max-width: 420px; }
+.lr-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.lr-actions button { font-size: 12px; padding: 6px 10px; margin: 0; border-radius: 8px; cursor: pointer;
+  background: var(--panel); border: 1px solid var(--line); color: var(--ink); }
+
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  background: var(--accent2); color: white; padding: 11px 18px; border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.4); z-index: 50;
+}
+
+/* --- account: donations (pay-what-you-want) + donation history ----------------------------------- */
+.acct-balance-row { margin: 4px 0 2px; }
+.acct-balance { font-size: 34px; font-weight: 700; color: var(--accent); }
+.donate { margin: 12px 0 6px; }
+.donate-presets { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+.donate-presets .donate-preset { min-width: 92px; font-size: 16px; font-weight: 600; }
+.donate-custom { display: flex; gap: 10px; align-items: center; }
+.donate-custom .in { max-width: 220px; margin: 0; }
+.refunded { color: var(--danger); }
+
+/* an inline, link-styled button (e.g. the out-of-tokens "support the forge" CTA inside hint text) */
+.linkish { background: none; border: none; padding: 0; font: inherit; cursor: pointer;
+  color: var(--accent); font-weight: 600; text-decoration: underline; }
+.linkish:hover { color: var(--accent2); }
+
+/* --- footer (terms / privacy / support) ---------------------------------------------------------- */
+.foot { text-align: center; color: var(--muted); font-size: 12px; padding: 26px 18px 30px; }
+.foot a { color: var(--muted); }
+.foot a:hover { color: var(--ink); }
+
+/* --- per-card feedback button + overlay --------------------------------------------------------- */
+.cc-fb {
+  position: absolute; top: 5px; right: 5px; cursor: pointer;
+  background: none; border: none; padding: 1px 3px; border-radius: 6px;
+  font-size: 13px; line-height: 1; opacity: .35; transition: opacity .12s, background .12s;
+}
+.cardchip:hover .cc-fb { opacity: .8; }
+.cc-fb:hover { opacity: 1; background: var(--panel); }
+.cardchip.rated { box-shadow: inset 0 0 0 1px var(--uncommon); }
+/* once rated, the button glyph is swapped to a check (app.js) — recolor it so the state reads at a glance */
+.cardchip.rated .cc-fb { opacity: 1; color: var(--uncommon); font-weight: 700; }
+.cardchip.rated .cc-fb:hover { background: var(--panel); }
+
+.fb-overlay {
+  position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center;
+  background: rgba(8,7,12,.66); padding: 18px;
+}
+.fb-panel {
+  position: relative; width: min(440px, 100%); background: var(--panel); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 14px; padding: 20px 22px; box-shadow: 0 14px 40px rgba(0,0,0,.5);
+}
+.fb-panel h3 { margin: 0 24px 2px 0; }
+.fb-close {
+  position: absolute; top: 10px; right: 12px; cursor: pointer; background: none; border: none;
+  color: var(--muted); font-size: 22px; line-height: 1; padding: 2px 6px;
+}
+.fb-close:hover { color: var(--ink); }
+.fb-cats { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0; }
+.fb-cat {
+  cursor: pointer; background: var(--panel2); border: 1px solid var(--line); color: var(--ink);
+  padding: 8px 12px; border-radius: 9px; font: inherit; font-size: 13px;
+}
+.fb-cat:hover { border-color: var(--accent); }
+.fb-cat.selected { background: linear-gradient(135deg, var(--accent), var(--accent2)); border: none; color: white; font-weight: 600; }
+.fb-panel textarea { width: 100%; background: var(--panel2); color: var(--ink); border: 1px solid var(--line);
+  border-radius: 10px; padding: 9px 11px; font: inherit; resize: vertical; }
+.fb-actions { margin-top: 14px; text-align: right; }
+
+/* the description + effect lines shown in the popout for a non-card element */
+.fb-detail { margin: 10px 0 2px; padding: 10px 12px; background: var(--panel2); border: 1px solid var(--line);
+  border-radius: 10px; }
+.fb-detail-desc { font-size: 13px; color: #c8c3df; font-style: italic; margin: 0 0 6px; }
+.fb-detail-desc:only-child { margin: 0; }
+.fb-detail-eff { margin: 0; padding-left: 18px; }
+.fb-detail-eff li { font-size: 12px; color: #c8c3df; margin: 2px 0; }
+
+/* the relic + mechanic chips reuse the per-card .cc-fb button — reveal on hover, mark when rated */
+.relic { position: relative; }
+.relic:hover .cc-fb, .mech:hover .cc-fb { opacity: .8; }
+.relic.rated, .mech.rated { box-shadow: inset 0 0 0 1px var(--uncommon); }
+.relic.rated .cc-fb, .mech.rated .cc-fb { opacity: 1; color: var(--uncommon); font-weight: 700; }
+
+/* --- forged class mechanics (custom orbs / statuses / summons) ----------------------------------- */
+.archetypes { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px;
+  margin: 14px 0; }
+.arch { background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.mechanics { margin: 14px 0; }
+.mech-head { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.mech-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.mech { position: relative; cursor: pointer; background: var(--panel2); border: 1px solid var(--line);
+  border-radius: 10px; padding: 10px 12px; border-left: 3px solid var(--accent2); transition: border-color .12s; }
+.mech:hover { border-color: var(--accent); }
+.mech-top { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; padding-right: 18px; }
+.mech-badge { font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--accent2); }
+.mech-name { font-weight: 600; }
+.mech-teaser { font-size: 12px; color: #c8c3df; margin-top: 4px; font-style: italic; }
+.mech-eff { list-style: none; padding: 0; margin: 6px 0 0; }
+.mech-eff li { font-size: 12px; color: #c8c3df; margin: 2px 0; padding-left: 12px; position: relative; }
+.mech-eff li::before { content: "›"; position: absolute; left: 0; color: var(--accent2); }
+
+/* --- landing / split-flap splash ---------------------------------------------------------------- */
+body.landing {
+  min-height: 100vh;
+  background: radial-gradient(120% 90% at 50% -10%, #221c34 0%, var(--bg) 60%);
+  overflow-x: hidden;
+}
+.splash {
+  text-align: center; padding: 28px 20px; width: 100%; max-width: 1100px; margin: 0 auto;
+  min-height: 100vh; display: flex; flex-direction: column; justify-content: center;
+}
+
+.board {
+  display: flex; justify-content: center; gap: clamp(6px, 1.6vw, 16px);
+  margin: 0 auto;
+}
+.tile {
+  position: relative;
+  /* FIXED width per tile — do NOT size from content. The board shrink-wraps (margin:0 auto
+     on a flex-column child), so `flex:1 1 0` tiles would collapse to their glyph width and the
+     row would wobble as letters flip. A fixed cell makes layout independent of the letter/font. */
+  flex: 0 0 auto; width: clamp(56px, 14vw, 140px);
+  aspect-ratio: 3 / 4;
+  /* each tile owns its perspective so every flap rotates about ITS OWN centre —
+     a shared board-level perspective skews the off-centre tiles sideways as they flip */
+  perspective: 600px;
+  overflow: hidden;
+  display: grid; place-items: center;
+  background: linear-gradient(#23202f, #16141d);
+  border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 10px 24px rgba(0,0,0,.45);
+  /* fill-in-the-blank underline */
+  border-bottom: 3px solid var(--accent);
+}
+/* the split-flap seam across the middle */
+.tile::after {
+  content: ""; position: absolute; left: 6%; right: 6%; top: 50%; height: 2px;
+  transform: translateY(-1px);
+  background: rgba(0,0,0,.55); box-shadow: 0 1px 0 rgba(255,255,255,.04);
+  pointer-events: none;
+}
+.flap {
+  transform-origin: center top; backface-visibility: hidden;
+  /* monospace so every letter occupies an identical width — no per-letter wobble as the tiles roll */
+  font: 700 clamp(38px, 10vw, 112px)/1 ui-monospace, "Cascadia Mono", Consolas, "SF Mono", Menlo, monospace;
+  color: var(--ink); letter-spacing: 1px; user-select: none;
+  text-shadow: 0 2px 6px rgba(0,0,0,.5);
+}
+
+.splash-sub {
+  margin: 22px 0 0; color: var(--muted);
+  font: 500 clamp(18px, 3vw, 26px)/1 system-ui, sans-serif;
+  letter-spacing: 6px; text-transform: lowercase;
+}
+.splash-go { margin-top: 30px; padding: 13px 38px; font-size: 16px; align-self: center; }
+.splash-tag { margin: 22px 0 0; font-size: 14px; }
+
+/* --- landing: how it works -------------------------------------------------------------------- */
+.how {
+  max-width: 860px; margin: 0 auto; padding: 16px 20px 96px;
+  border-top: 1px solid var(--line);
+}
+.how-title { text-align: center; font-size: clamp(20px, 4vw, 30px); margin: 36px 0 6px; }
+.how-sub { text-align: center; margin: 0 0 32px; font-size: 15px; }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; }
+.step {
+  display: flex; gap: 16px; align-items: flex-start;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  padding: 18px 20px;
+}
+.step-num {
+  flex: none; width: 38px; height: 38px; border-radius: 50%;
+  display: grid; place-items: center; font-weight: 800; font-size: 17px; color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+}
+.step-body h3 { margin: 3px 0 5px; font-size: 17px; line-height: 1.35; }
+.step-body p { margin: 0; color: var(--muted); font-size: 14px; }
+.fill { color: var(--accent); font-weight: 800; border-bottom: 2px solid var(--accent); padding: 0 3px; }
+

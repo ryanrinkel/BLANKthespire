@@ -1,0 +1,8 @@
+{
+  "id": "burrowed",
+  "name": "Burrowed",
+  "kind": "buff",
+  "decay": "start_of_turn_remove",
+  "stacks": false,
+  "description": "Underground: invulnerable to attacks (incoming attack damage x0) until your next turn, but you cannot play Attacks while burrowed. Removed at your next turn start. Behavior: core/powers/Burrowed.gd (incoming_mult 0); the no-Attacks rule is in CombatManager.play_card; removal in CombatManager._clear_start_of_turn."
+}

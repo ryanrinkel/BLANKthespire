@@ -1,0 +1,22 @@
+{
+  "id": "battle_tempo",
+  "name": "Battle Tempo",
+  "tier": "common",
+  "pool": "combat",
+  "description": "At the end of each turn, gain Block equal to the number of cards you played this turn.",
+  "source": "llm",
+  "hooks": [
+    {
+      "trigger": "turn_end",
+      "effects": [
+        {
+          "op": "from_state",
+          "emit": "block",
+          "value": {
+            "state": "cards_played_this_turn"
+          }
+        }
+      ]
+    }
+  ]
+}

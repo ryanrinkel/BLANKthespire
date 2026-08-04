@@ -1,0 +1,14 @@
+{
+  "id": "twin_strike",
+  "name": "Twin Strike",
+  "type": "attack",
+  "rarity": "common",
+  "character": "ironclad",
+  "cost": 1,
+  "target": "enemy",
+  "effects": [
+    { "op": "multi", "times": 2, "effects": [{ "op": "damage", "amount": 5 }] }
+  ],
+  "upgrade": { "effects": [{ "op": "multi", "times": 2, "effects": [{ "op": "damage", "amount": 7 }] }] },
+  "flavor": "Two hits, so Strength applies twice. Exercises the 'multi' combinator."
+}

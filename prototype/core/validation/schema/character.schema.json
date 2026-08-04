@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "slapthespoor:character",
+  "title": "Character",
+  "description": "A playable class. PURE DATA describing the starting configuration of a run: max HP, base energy per turn, the starting relic, and the starting deck (a flat list of card ids drawn from the existing card content). 'signature_cards' flags the class-defining cards (the unique starter attack(s), e.g. Bash for the Ironclad) and must be a subset of starting_deck. This schema is the generation contract: starting_relic and every card id reference existing content -- a character never introduces new cards or relics inline, it composes the published ones.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "max_hp", "starting_relic", "starting_deck"],
+  "properties": {
+    "id":   { "type": "string", "pattern": "^[a-z0-9_]+$", "description": "Unique snake_case id." },
+    "name": { "type": "string", "minLength": 1, "maxLength": 32 },
+    "description": { "type": "string", "maxLength": 200 },
+    "max_hp":     { "type": "integer", "minimum": 1, "maximum": 999 },
+    "max_energy": { "type": "integer", "minimum": 1, "maximum": 6, "default": 3, "description": "Base energy per turn before relic bonuses." },
+    "starting_relic": { "type": "string", "pattern": "^[a-z0-9_]+$", "description": "Relic id granted at run start. Must reference an existing relic." },
+    "starting_deck": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+      "description": "Ordered list of card ids dealt as the opening deck (repeats allowed, e.g. 5x strike). Each must reference an existing card."
+    },
+    "signature_cards": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+      "description": "The class-defining cards (e.g. Bash). Metadata only; must be a subset of starting_deck."
+    },
+    "source": { "enum": ["authored", "llm"], "default": "authored", "description": "Provenance tag. LLM-generated content is quarantined for review before promotion." }
+  }
+}

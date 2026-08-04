@@ -1,0 +1,21 @@
+{
+  "BLANKTHESPIRE-BLANK_THE_SPIRE.title": "BLANK the spire",
+  "BLANKTHESPIRE-BLANK_THE_SPIRE.titleObject": "BLANK the spire",
+  "BLANKTHESPIRE-BLANK_THE_SPIRE.description": "A blank slate. A data-driven hero whose cards, powers, and relics are composed — by hand or by AI — from a closed effect vocabulary.",
+  "BLANKTHESPIRE-BLANK_THE_SPIRE.pronounSubject": "they",
+  "BLANKTHESPIRE-BLANK_THE_SPIRE.pronounObject": "them",
+  "BLANKTHESPIRE-BLANK_THE_SPIRE.pronounPossessive": "theirs",
+  "BLANKTHESPIRE-BLANK_THE_SPIRE.possessiveAdjective": "their",
+  "BLANKTHESPIRE-BLANK_THE_SPIRE.aromaPrinciple": "Smells faintly of fresh JSON.",
+  "BLANKTHESPIRE-BLANK_THE_SPIRE.goldMonologue": "It all adds up.",
+  "BLANKTHESPIRE-BLANK_THE_SPIRE.eventDeathPrevention": "Not yet. There is more to compose.",
+  "BLANKTHESPIRE-BLANK_THE_SPIRE.cardsModifierTitle": "Authored",
+  "BLANKTHESPIRE-BLANK_THE_SPIRE.cardsModifierDescription": "Composed from the effect vocabulary.",
+  "BLANKTHESPIRE-BLANK_THE_SPIRE.banter.alive.endTurnPing": "Your move.",
+  "BLANKTHESPIRE-BLANK_THE_SPIRE.banter.dead.endTurnPing": "...",
+
+  "THE_ARCHITECT.talk.BLANKTHESPIRE-BLANK_THE_SPIRE.0-0r.char": "BLANK the spire",
+  "THE_ARCHITECT.talk.BLANKTHESPIRE-BLANK_THE_SPIRE.0-0r.next": "...",
+  "THE_ARCHITECT.talk.BLANKTHESPIRE-BLANK_THE_SPIRE.0-1r.ancient": "...",
+  "THE_ARCHITECT.talk.BLANKTHESPIRE-BLANK_THE_SPIRE.0-attack": "..."
+}

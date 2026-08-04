@@ -1,0 +1,23 @@
+{
+  "id": "reinforce",
+  "name": "Reinforce",
+  "type": "skill",
+  "rarity": "common",
+  "character": "armor_dillo",
+  "archetype": "bulwark",
+  "cost": 1,
+  "target": "self",
+  "effects": [
+    { "op": "block", "amount": 5 },
+    { "op": "conditional",
+      "if": { "state": "self_has_status", "op": "gte", "value": "armor" },
+      "then": [ { "op": "block", "amount": 5 } ] }
+  ],
+  "upgrade": { "effects": [
+    { "op": "block", "amount": 7 },
+    { "op": "conditional",
+      "if": { "state": "self_has_status", "op": "gte", "value": "armor" },
+      "then": [ { "op": "block", "amount": 7 } ] }
+  ]},
+  "flavor": "Sturdier when there's already plating to build on."
+}

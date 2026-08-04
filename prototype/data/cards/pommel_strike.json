@@ -1,0 +1,17 @@
+{
+  "id": "pommel_strike",
+  "name": "Pommel Strike",
+  "type": "attack",
+  "rarity": "common",
+  "character": "ironclad",
+  "cost": 1,
+  "target": "enemy",
+  "effects": [
+    { "op": "damage", "amount": 9 },
+    { "op": "draw", "amount": 1 }
+  ],
+  "upgrade": { "effects": [
+    { "op": "damage", "amount": 10 },
+    { "op": "draw", "amount": 2 }
+  ]}
+}

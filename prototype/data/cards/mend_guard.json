@@ -1,0 +1,33 @@
+{
+  "id": "mend_guard",
+  "name": "Mend Guard",
+  "type": "skill",
+  "rarity": "uncommon",
+  "character": "ironclad",
+  "cost": 1,
+  "target": "self",
+  "exhaust": true,
+  "effects": [
+    {
+      "op": "from_state",
+      "emit": "heal",
+      "value": {
+        "state": "block",
+        "scale": 0.5
+      }
+    }
+  ],
+  "upgrade": {
+    "effects": [
+      {
+        "op": "from_state",
+        "emit": "heal",
+        "value": {
+          "state": "block"
+        }
+      }
+    ]
+  },
+  "flavor": "Let your shield melt into mended flesh.",
+  "source": "llm"
+}

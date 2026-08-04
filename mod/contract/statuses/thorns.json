@@ -1,0 +1,6 @@
+{
+  "id": "thorns",
+  "name": "Thorns",
+  "kind": "buff",
+  "decay": "none"
+}

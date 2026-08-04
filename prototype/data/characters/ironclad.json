@@ -1,0 +1,14 @@
+{
+  "id": "ironclad",
+  "name": "The Ironclad",
+  "description": "A Strength-and-Block bruiser. Trades HP for power and rewards aggressive, self-buffing play.",
+  "max_hp": 80,
+  "max_energy": 3,
+  "starting_relic": "burning_blood",
+  "starting_deck": [
+    "strike", "strike", "strike", "strike", "strike",
+    "defend", "defend", "defend", "defend",
+    "bash"
+  ],
+  "signature_cards": ["bash"]
+}

@@ -1,0 +1,11 @@
+{
+  "id": "blood_vial",
+  "name": "Blood Vial",
+  "tier": "common",
+  "pool": "combat",
+  "description": "At the start of combat, heal 2 HP.",
+  "source": "authored",
+  "hooks": [
+    { "trigger": "combat_start", "effects": [ { "op": "heal", "amount": 2 } ] }
+  ]
+}

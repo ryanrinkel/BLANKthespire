@@ -1,0 +1,6 @@
+{
+  "id": "ritual",
+  "name": "Ritual",
+  "kind": "buff",
+  "decay": "none"
+}

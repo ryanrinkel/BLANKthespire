@@ -1,0 +1,35 @@
+{
+  "id": "jab",
+  "name": "Jab",
+  "type": "attack",
+  "rarity": "common",
+  "character": "ironclad",
+  "cost": 1,
+  "target": "enemy",
+  "effects": [
+    {
+      "op": "damage",
+      "amount": 7
+    },
+    {
+      "op": "apply_status",
+      "status": "weak",
+      "amount": 1
+    }
+  ],
+  "upgrade": {
+    "effects": [
+      {
+        "op": "damage",
+        "amount": 9
+      },
+      {
+        "op": "apply_status",
+        "status": "weak",
+        "amount": 2
+      }
+    ]
+  },
+  "source": "llm",
+  "flavor": "A swift strike to rattle their guard."
+}

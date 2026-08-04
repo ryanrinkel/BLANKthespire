@@ -1,0 +1,18 @@
+{
+  "id": "bloodletting",
+  "name": "Bloodletting",
+  "type": "skill",
+  "rarity": "uncommon",
+  "character": "ironclad",
+  "cost": 0,
+  "target": "self",
+  "effects": [
+    { "op": "lose_hp", "amount": 3 },
+    { "op": "gain_energy", "amount": 2 }
+  ],
+  "upgrade": { "effects": [
+    { "op": "lose_hp", "amount": 3 },
+    { "op": "gain_energy", "amount": 3 }
+  ]},
+  "flavor": "Trade HP for energy. Exercises 'lose_hp' (ignores Block)."
+}

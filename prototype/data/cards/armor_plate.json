@@ -1,0 +1,19 @@
+{
+  "id": "armor_plate",
+  "name": "Armor Plate",
+  "type": "power",
+  "rarity": "uncommon",
+  "character": "armor_dillo",
+  "archetype": "bulwark",
+  "cost": 1,
+  "target": "self",
+  "effects": [
+    { "op": "apply_status", "status": "armor", "amount": 1 },
+    { "op": "block", "amount": 5 }
+  ],
+  "upgrade": { "effects": [
+    { "op": "apply_status", "status": "armor", "amount": 1 },
+    { "op": "block", "amount": 8 }
+  ]},
+  "flavor": "Bolt the plating on. Your Block stops wearing off and starts piling up."
+}

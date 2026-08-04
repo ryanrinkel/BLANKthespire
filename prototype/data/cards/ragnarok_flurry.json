@@ -1,0 +1,50 @@
+{
+  "id": "ragnarok_flurry",
+  "name": "Ragnarok Flurry",
+  "type": "attack",
+  "rarity": "rare",
+  "character": "ironclad",
+  "cost": 2,
+  "target": "enemy",
+  "exhaust": true,
+  "effects": [
+    {
+      "op": "damage",
+      "amount": 6
+    },
+    {
+      "op": "multi",
+      "times": {
+        "state": "strength"
+      },
+      "effects": [
+        {
+          "op": "damage",
+          "amount": 5
+        }
+      ]
+    }
+  ],
+  "upgrade": {
+    "effects": [
+      {
+        "op": "damage",
+        "amount": 8
+      },
+      {
+        "op": "multi",
+        "times": {
+          "state": "strength"
+        },
+        "effects": [
+          {
+            "op": "damage",
+            "amount": 7
+          }
+        ]
+      }
+    ]
+  },
+  "flavor": "One strike, then a flurry \u2014 one extra blow for every point of Strength you carry.",
+  "source": "llm"
+}

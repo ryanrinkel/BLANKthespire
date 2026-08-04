@@ -1,0 +1,11 @@
+{
+  "id": "anchor",
+  "name": "Anchor",
+  "tier": "common",
+  "pool": "combat",
+  "description": "At the start of combat, gain 10 Block (it carries into your first turn).",
+  "source": "authored",
+  "hooks": [
+    { "trigger": "combat_start", "effects": [ { "op": "block", "amount": 10 } ] }
+  ]
+}

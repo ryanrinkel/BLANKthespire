@@ -1,0 +1,12 @@
+{
+  "id": "bag_of_marbles",
+  "name": "Bag of Marbles",
+  "tier": "common",
+  "pool": "combat",
+  "description": "At the start of combat, apply 1 Vulnerable to ALL enemies.",
+  "source": "authored",
+  "hooks": [
+    { "trigger": "combat_start", "target": "all_enemies",
+      "effects": [ { "op": "apply_status", "status": "vulnerable", "amount": 1 } ] }
+  ]
+}

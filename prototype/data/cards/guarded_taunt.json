@@ -1,0 +1,35 @@
+{
+  "id": "guarded_taunt",
+  "name": "Guarded Taunt",
+  "type": "skill",
+  "rarity": "common",
+  "character": "ironclad",
+  "cost": 1,
+  "target": "enemy",
+  "effects": [
+    {
+      "op": "block",
+      "amount": 7
+    },
+    {
+      "op": "apply_status",
+      "status": "weak",
+      "amount": 1
+    }
+  ],
+  "upgrade": {
+    "effects": [
+      {
+        "op": "block",
+        "amount": 9
+      },
+      {
+        "op": "apply_status",
+        "status": "weak",
+        "amount": 2
+      }
+    ]
+  },
+  "flavor": "Brace yourself and goad them into a feeble swing.",
+  "source": "llm"
+}

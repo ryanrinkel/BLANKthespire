@@ -1,0 +1,11 @@
+{
+  "id": "akabeko",
+  "name": "Akabeko",
+  "tier": "common",
+  "pool": "combat",
+  "description": "Your first attack each combat deals 8 additional damage.",
+  "source": "authored",
+  "modifiers": [
+    { "stat": "attack_base", "amount": 8, "when": "first_attack" }
+  ]
+}

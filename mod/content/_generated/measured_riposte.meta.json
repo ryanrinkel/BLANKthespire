@@ -1,0 +1,10 @@
+{
+  "id": "measured_riposte",
+  "source": "llm",
+  "model": "claude-opus-4-8",
+  "generated_at": "2026-06-16T17:09:54.225194+00:00",
+  "brief": "type: attack, rarity: uncommon, theme: a tactical card that fits a Strength/Block hero",
+  "score": 21.2,
+  "warnings": [],
+  "repaired": false
+}

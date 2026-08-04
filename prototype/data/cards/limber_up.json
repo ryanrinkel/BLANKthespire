@@ -1,0 +1,35 @@
+{
+  "id": "limber_up",
+  "name": "Limber Up",
+  "type": "skill",
+  "rarity": "common",
+  "character": "ironclad",
+  "cost": 1,
+  "target": "self",
+  "effects": [
+    {
+      "op": "apply_status",
+      "status": "strength_temp",
+      "amount": 2
+    },
+    {
+      "op": "draw",
+      "amount": 1
+    }
+  ],
+  "upgrade": {
+    "effects": [
+      {
+        "op": "apply_status",
+        "status": "strength_temp",
+        "amount": 3
+      },
+      {
+        "op": "draw",
+        "amount": 1
+      }
+    ]
+  },
+  "flavor": "A quick stretch before the swing \u2014 the burst fades by turn's end.",
+  "source": "llm"
+}

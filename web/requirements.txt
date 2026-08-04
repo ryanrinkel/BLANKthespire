@@ -1,0 +1,11 @@
+# P3 website runtime deps. (btsgen itself is installed separately: `pip install ../generation`.)
+# These mirror generation/pyproject.toml's [project.optional-dependencies] web extra.
+flask>=3.0
+authlib>=1.3
+requests>=2.31  # authlib's OAuth client imports this at runtime (not a transitive dep of authlib)
+sqlalchemy>=2.0
+pymysql>=1.1
+python-dotenv>=1.0
+gunicorn>=21.0  # WSGI server for the DigitalOcean droplet (Linux; not used for local `python app.py`)
+stripe>=9.0     # token-pack purchases (Checkout + webhook); app boots fine without Stripe env config
+# btsgen pulls in: anthropic, jsonschema

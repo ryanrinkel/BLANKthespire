@@ -1,0 +1,17 @@
+{
+  "id": "shell_up",
+  "name": "Shell Up",
+  "type": "skill",
+  "rarity": "basic",
+  "character": "armor_dillo",
+  "archetype": "bulwark",
+  "cost": 1,
+  "target": "self",
+  "effects": [
+    { "op": "block", "amount": 7 }
+  ],
+  "upgrade": { "effects": [
+    { "op": "block", "amount": 10 }
+  ]},
+  "flavor": "Curl into your plating."
+}

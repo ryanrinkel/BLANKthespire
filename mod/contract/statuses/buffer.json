@@ -1,0 +1,6 @@
+{
+  "id": "buffer",
+  "name": "Buffer",
+  "kind": "buff",
+  "decay": "stack"
+}

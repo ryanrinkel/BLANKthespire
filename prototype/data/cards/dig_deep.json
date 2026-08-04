@@ -1,0 +1,17 @@
+{
+  "id": "dig_deep",
+  "name": "Dig Deep",
+  "type": "skill",
+  "rarity": "uncommon",
+  "character": "armor_dillo",
+  "archetype": "burrow",
+  "cost": 1,
+  "target": "self",
+  "effects": [
+    { "op": "from_state", "emit": "block", "value": { "state": "block" } }
+  ],
+  "upgrade": { "cost": 0, "effects": [
+    { "op": "from_state", "emit": "block", "value": { "state": "block" } }
+  ]},
+  "flavor": "Double down on your shell. Gain Block equal to your Block."
+}

@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "slapthespoor:card",
+  "title": "Card",
+  "description": "A playable card. A card is a cost + a target rule + an ordered list of effects drawn from the closed effect vocabulary. This schema is the generation contract: the LLM (and humans) compose effects from $defs/effect only — it never introduces new ops.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "type", "rarity", "cost", "target", "effects"],
+  "properties": {
+    "id":     { "type": "string", "pattern": "^[a-z0-9_]+$", "description": "Unique snake_case id." },
+    "name":   { "type": "string", "minLength": 1, "maxLength": 32 },
+    "type":   { "enum": ["attack", "skill", "power"] },
+    "rarity": { "enum": ["basic", "common", "uncommon", "rare"] },
+    "cost":   { "description": "Energy cost. -1 means X-cost (spend all energy).", "oneOf": [
+        { "type": "integer", "minimum": 0, "maximum": 6 },
+        { "const": -1 }
+    ]},
+    "target": { "enum": ["self", "enemy", "random_enemy", "all_enemies", "none"] },
+    "character": { "type": "string", "pattern": "^[a-z0-9_]+$", "default": "colorless", "description": "Owning class id (e.g. 'ironclad'), or 'colorless' for class-agnostic cards. Gates the reward pool: a class is only offered its own cards plus colorless ones." },
+    "archetype": { "type": "string", "pattern": "^[a-z0-9_]+$", "description": "Optional synergy-cluster tag within a class (e.g. 'berserk', 'shieldbearer'). Cards sharing an archetype are designed to combo. Metadata only -- no mechanical effect on its own." },
+    "exhaust":{ "type": "boolean", "default": false, "description": "Remove from combat after play." },
+    "effects": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/effect" } },
+    "upgrade": {
+      "description": "Overrides applied when the card is upgraded (Rest/reward). Partial: only listed fields change.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "cost":    { "type": "integer", "minimum": -1, "maximum": 6 },
+        "exhaust": { "type": "boolean" },
+        "effects": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/effect" } }
+      }
+    },
+    "flavor": { "type": "string", "maxLength": 140, "description": "Optional flavor text. No mechanical meaning." },
+    "source": { "enum": ["authored", "llm"], "default": "authored", "description": "Provenance tag. LLM-generated content is quarantined for review before promotion." }
+  },
+
+  "$defs": {
+    "scalar": {
+      "description": "A number, or a reference to live game state. Lets data express 'damage equal to your Block' without code.",
+      "oneOf": [
+        { "type": "integer" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state"],
+          "properties": {
+            "state": { "enum": ["block", "energy", "strength", "hand_size", "cards_played_this_turn", "hp_lost"] },
+            "scale": { "type": "number", "default": 1, "description": "Multiplier applied to the state value." }
+          }
+        }
+      ]
+    },
+    "predicate": {
+      "description": "A boolean test on combat state, for the 'conditional' op.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "op", "value"],
+      "properties": {
+        "state": { "enum": ["hp", "block", "energy", "hand_size", "enemy_count", "self_has_status", "target_has_status"] },
+        "op":    { "enum": ["lt", "lte", "eq", "gte", "gt"] },
+        "value": { "type": ["integer", "string"] }
+      }
+    },
+    "effect": {
+      "description": "One node of the effect vocabulary. The closed set of ops below is the entire authoring surface. To express a mechanic not covered here, a human adds ONE op (code) — the model never does.",
+      "type": "object",
+      "required": ["op"],
+      "oneOf": [
+        { "properties": { "op": { "const": "damage" },       "amount": { "$ref": "#/$defs/scalar" }, "raw": { "type": "boolean", "default": false, "description": "Deal a fixed amount straight through Block, bypassing the Strength/Weak/Vulnerable pipeline (and Akabeko/Thorns)." } }, "required": ["op", "amount"], "additionalProperties": false },
+        { "properties": { "op": { "const": "block" },        "amount": { "$ref": "#/$defs/scalar" } }, "required": ["op", "amount"], "additionalProperties": false },
+        { "properties": { "op": { "const": "apply_status" }, "status": { "type": "string" }, "amount": { "$ref": "#/$defs/scalar" }, "to": { "enum": ["self", "target"], "description": "Routing override. Default: buffs apply to the actor, debuffs to the receiver." } }, "required": ["op", "status", "amount"], "additionalProperties": false },
+        { "properties": { "op": { "const": "draw" },         "amount": { "$ref": "#/$defs/scalar" } }, "required": ["op", "amount"], "additionalProperties": false },
+        { "properties": { "op": { "const": "gain_energy" },  "amount": { "$ref": "#/$defs/scalar" } }, "required": ["op", "amount"], "additionalProperties": false },
+        { "properties": { "op": { "const": "lose_hp" },      "amount": { "$ref": "#/$defs/scalar" } }, "required": ["op", "amount"], "additionalProperties": false },
+        { "properties": { "op": { "const": "heal" },         "amount": { "$ref": "#/$defs/scalar" } }, "required": ["op", "amount"], "additionalProperties": false },
+        { "properties": { "op": { "const": "add_card" },     "card_id": { "type": "string" }, "pile": { "enum": ["hand", "discard", "draw"] }, "amount": { "type": "integer", "minimum": 1, "default": 1 } }, "required": ["op", "card_id", "pile"], "additionalProperties": false },
+        { "properties": { "op": { "const": "multi" },        "times": { "$ref": "#/$defs/scalar" }, "effects": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/effect" } } }, "required": ["op", "times", "effects"], "additionalProperties": false },
+        { "properties": { "op": { "const": "from_state" },   "emit": { "enum": ["damage", "block", "heal"] }, "value": { "$ref": "#/$defs/scalar" } }, "required": ["op", "emit", "value"], "additionalProperties": false },
+        { "properties": { "op": { "const": "conditional" },  "if": { "$ref": "#/$defs/predicate" }, "then": { "type": "array", "items": { "$ref": "#/$defs/effect" } }, "else": { "type": "array", "items": { "$ref": "#/$defs/effect" } } }, "required": ["op", "if", "then"], "additionalProperties": false },
+        { "properties": { "op": { "const": "set_flag" },     "flag": { "enum": ["no_draw_this_turn"] } }, "required": ["op", "flag"], "additionalProperties": false },
+        { "properties": { "op": { "const": "fuse" },         "turns": { "type": "integer", "minimum": 1 }, "scope": { "enum": ["all", "all_enemies", "self"], "default": "all_enemies" }, "label": { "type": "string", "maxLength": 32 }, "effects": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/effect" } } }, "required": ["op", "turns", "effects"], "additionalProperties": false, "description": "Plant a delayed charge: after `turns` of the planter's end-of-turns, run `effects` once per target in `scope`. Detonation is sourceless (no Strength scaling) but is amplified by the target's Vulnerable, nullified by Burrowed, and soaked by Block." }
+      ]
+    }
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "id": "war_flex",
+  "name": "War Flex",
+  "type": "skill",
+  "rarity": "uncommon",
+  "character": "ironclad",
+  "cost": 1,
+  "target": "self",
+  "effects": [
+    {
+      "op": "apply_status",
+      "status": "strength_temp",
+      "amount": 3
+    },
+    {
+      "op": "block",
+      "amount": 5
+    }
+  ],
+  "upgrade": {
+    "effects": [
+      {
+        "op": "apply_status",
+        "status": "strength_temp",
+        "amount": 4
+      },
+      {
+        "op": "block",
+        "amount": 7
+      }
+    ]
+  },
+  "flavor": "Tense every muscle: hit hard now, brace for the blow. The fire fades by turn's end.",
+  "source": "llm"
+}

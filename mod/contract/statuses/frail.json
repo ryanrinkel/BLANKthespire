@@ -1,0 +1,6 @@
+{
+  "id": "frail",
+  "name": "Frail",
+  "kind": "debuff",
+  "decay": "turn"
+}

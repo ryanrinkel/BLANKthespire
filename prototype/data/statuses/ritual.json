@@ -1,0 +1,8 @@
+{
+  "id": "ritual",
+  "name": "Ritual",
+  "kind": "buff",
+  "decay": "none",
+  "stacks": true,
+  "description": "(Enemy) gains its amount of Strength at end of turn. Behavior: core/powers/Ritual.gd (on_turn_end)."
+}

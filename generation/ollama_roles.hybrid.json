@@ -1,0 +1,27 @@
+{
+  "_comment": "HYBRID harness (Phase N sweep): mistral for the FIRST creative phase LOCALLY (fast, free), glm-5.2 (cloud) for the strict structure/card stages. Faithful to 'mistral first, then glm-5.2' and faster than an all-cloud front-end. Needs OLLAMA_API_KEY in env for the cloud roles.",
+  "defaults": {
+    "base_url": "https://ollama.com/v1",
+    "api_key": "${OLLAMA_API_KEY}"
+  },
+  "max_tokens_cap": 24000,
+  "roles": {
+    "brainstorm": {
+      "model": "dolphin-mistral:latest",
+      "base_url": "http://localhost:11434/v1",
+      "api_key": "ollama",
+      "temperature": 0.9,
+      "response_format": { "type": "json_object" }
+    },
+    "structure": {
+      "model": "glm-5.2",
+      "response_format": { "type": "json_object" },
+      "temperature": 0.4
+    },
+    "cards": {
+      "model": "glm-5.2",
+      "response_format": { "type": "json_object" },
+      "temperature": 0.3
+    }
+  }
+}

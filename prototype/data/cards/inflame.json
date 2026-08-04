@@ -1,0 +1,16 @@
+{
+  "id": "inflame",
+  "name": "Inflame",
+  "type": "power",
+  "rarity": "uncommon",
+  "character": "ironclad",
+  "cost": 1,
+  "target": "self",
+  "effects": [
+    { "op": "apply_status", "status": "strength", "amount": 2 }
+  ],
+  "upgrade": { "effects": [
+    { "op": "apply_status", "status": "strength", "amount": 3 }
+  ]},
+  "flavor": "Permanent +Strength. As a power it leaves the deck for the combat."
+}

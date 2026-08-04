@@ -1,0 +1,37 @@
+{
+  "id": "flurry_of_blows",
+  "name": "Flurry of Blows",
+  "type": "attack",
+  "rarity": "common",
+  "character": "ironclad",
+  "cost": 1,
+  "target": "enemy",
+  "effects": [
+    {
+      "op": "multi",
+      "times": 3,
+      "effects": [
+        {
+          "op": "damage",
+          "amount": 3
+        }
+      ]
+    }
+  ],
+  "upgrade": {
+    "effects": [
+      {
+        "op": "multi",
+        "times": 4,
+        "effects": [
+          {
+            "op": "damage",
+            "amount": 3
+          }
+        ]
+      }
+    ]
+  },
+  "flavor": "A rapid barrage \u2014 every fist carries your full Strength.",
+  "source": "llm"
+}

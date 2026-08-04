@@ -1,0 +1,70 @@
+"""The threaded state of the staged front-end: a Candidate (one composed class build) and the Dossier
+(everything the stages produced). The chosen Candidate + relic intent is what the reframed blueprint
+stage consumes to emit the `bp` dict."""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+
+
+@dataclass
+class Candidate:
+    """One composed class build = two archetypes in tension, hydrated against the catalog."""
+    name: str
+    fantasy: str
+    archetype_ids: list[str]
+    archetype_descs: list[str]
+    core_loop: str = ""
+    weakness: str = ""
+    tension: str = ""                    # how the two archetypes pull against each other
+    # 2-3 draftable game plans this ONE pool supports (the Ironclad test): [{strategy: aggro|control|combo,
+    # line: how these two archetypes play it, win_condition: how that deck closes a fight}]. The blueprint
+    # stage builds a card package (enablers/amplifiers/rare finisher) for each.
+    strategic_lines: list[dict] = field(default_factory=list)
+    class_kind: str = "normal"           # normal | orb | status | summon (drives which pool the blueprint declares)
+    suggested_max_hp: int = 72
+    buildable: bool = True               # all referenced archetypes expressible in the live vocabulary
+    gap_refs: list[str] = field(default_factory=list)
+    block_reasons: list[str] = field(default_factory=list)
+    spine_archetype: str | None = None   # set by the collision check when >=2 clusters map the same archetype
+    relic_intent: dict | None = None     # filled by the relic-intent stage
+
+    def preview(self) -> str:
+        tag = "buildable-now" if self.buildable else f"needs-vocab ({'; '.join(self.block_reasons) or 'gap'})"
+        spine = f"  [spine: {self.spine_archetype}]" if self.spine_archetype else ""
+        lines = "".join(f"\n    {l.get('strategy', '?')}: {l.get('win_condition') or l.get('line', '')}"
+                        + (f" [{l['idiom']}]" if l.get('idiom') else "")  # O-3 texture tag
+                        for l in self.strategic_lines if isinstance(l, dict))
+        return (f"{self.name} — {self.fantasy}\n"
+                f"    archetypes: {', '.join(self.archetype_ids)} [{tag}]{spine}\n"
+                f"    loop: {self.core_loop}\n"
+                f"    weakness: {self.weakness}" + lines)
+
+
+@dataclass
+class DossierBrief:
+    """What the reframed blueprint stage (mode='dossier') consumes: the chosen Candidate + relic intent.
+    Carries `concept` too so the contract can fall back / reference the original theme, and `skin` — the
+    flavor-facet material (imagery/names) the blueprint dresses the class in (mechanics come from the driver)."""
+    candidate: Candidate
+    relic_intent: dict | None = None
+    concept: str = ""
+    skin: dict | None = None
+    featured: list | None = None   # Phase N-2 roulette picks, threaded from the ClassBrief for the brief block
+
+
+@dataclass
+class Dossier:
+    theme: str = ""
+    facets: list[dict] = field(default_factory=list)         # [{name, role: driver|flavor, richness, why}]
+    concepts: list[str] = field(default_factory=list)
+    clusters: list[dict] = field(default_factory=list)      # [{name, feeling, facet, concepts:[...]}]
+    mappings: list[dict] = field(default_factory=list)       # [{cluster, archetype_id, metaphor, off_vocab?}]
+    # Interactive mode (the mid-forge archetype pick): what the player was shown, and what they chose.
+    # Empty picked = auto (skipped / timed out / non-interactive) — the picker falls back to theme fidelity.
+    offered_archetypes: list[str] = field(default_factory=list)
+    picked_archetypes: list[str] = field(default_factory=list)
+    candidates: list[Candidate] = field(default_factory=list)
+    chosen: Candidate | None = None
+    relic_intent: dict | None = None
+    skin_bank: dict = field(default_factory=dict)   # {subject:[driver names], flavor:[names], imagery:[...], feelings:[...]}
+    gaps_logged: int = 0

@@ -1,0 +1,12 @@
+{
+  "id": "meat_on_the_bone",
+  "name": "Meat on the Bone",
+  "tier": "uncommon",
+  "pool": "combat",
+  "description": "At the end of combat, if your HP is at or below 50%, heal 12 HP.",
+  "source": "authored",
+  "hooks": [
+    { "trigger": "combat_end", "condition": ["victory", "hp_below_half"],
+      "effects": [ { "op": "heal", "amount": 12 } ] }
+  ]
+}

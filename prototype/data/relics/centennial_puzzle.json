@@ -1,0 +1,11 @@
+{
+  "id": "centennial_puzzle",
+  "name": "Centennial Puzzle",
+  "tier": "uncommon",
+  "pool": "combat",
+  "description": "The first time you lose HP each combat, draw 3 cards.",
+  "source": "authored",
+  "hooks": [
+    { "trigger": "attacked", "once_per_combat": true, "effects": [ { "op": "draw", "amount": 3 } ] }
+  ]
+}

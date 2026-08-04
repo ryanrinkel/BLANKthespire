@@ -1,0 +1,11 @@
+{
+  "id": "lantern",
+  "name": "Lantern",
+  "tier": "common",
+  "pool": "combat",
+  "description": "On the first turn of each combat, gain 1 energy.",
+  "source": "authored",
+  "hooks": [
+    { "trigger": "turn_start", "once_per_combat": true, "effects": [ { "op": "gain_energy", "amount": 1 } ] }
+  ]
+}

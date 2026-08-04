@@ -1,0 +1,51 @@
+# ── Secrets / local env ──────────────────────────────────────────────
+.env
+*.env.local
+
+# ── Python (generation/, web/) ───────────────────────────────────────
+.venv/
+__pycache__/
+.pytest_cache/
+*.py[cod]
+uv.lock
+
+# ── btsgen scratch / throwaway forge output ──────────────────────────
+generation/scratch/
+prototype/data/generated/
+
+# ── Locally-fetched MegaCrit reference data (NEVER commit — regenerate ──
+#    via generation/reference/distill_sts2.py from the public spire-codex repo) ──
+generation/reference/sts2_cards.json
+generation/reference/sts2_rarity_examples.md
+
+# ── Website local dev / server-side data ─────────────────────────────
+web/dev.db
+*.sqlite
+web/captured_gaps.jsonl
+web/card_feedback.jsonl
+
+# ── .NET build output ────────────────────────────────────────────────
+[Bb]in/
+[Oo]bj/
+
+# ── Godot ────────────────────────────────────────────────────────────
+.godot/
+/android/
+export_presets.cfg
+
+# ── Local research material (never committed) ────────────────────────
+/_modref/
+
+# ── Machine-specific config ──────────────────────────────────────────
+settings.local.json
+.mcp.json
+generation/ollama_roles.local.json
+
+# ── Release artifacts + generated splash art (user content on server) ─
+/release/*.zip
+/web/static/releases/*.zip
+/web/static/forged/
+
+# ── OS cruft ─────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db

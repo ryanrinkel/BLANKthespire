@@ -1,0 +1,15 @@
+{
+  "id": "burrow",
+  "name": "Burrow",
+  "type": "skill",
+  "rarity": "basic",
+  "character": "armor_dillo",
+  "archetype": "burrow",
+  "cost": 1,
+  "target": "self",
+  "effects": [
+    { "op": "apply_status", "status": "burrowed", "amount": 1 }
+  ],
+  "upgrade": { "cost": 0 },
+  "flavor": "Dig in. Invulnerable until your next turn -- but you cannot Attack while underground."
+}

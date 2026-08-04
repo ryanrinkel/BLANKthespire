@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Forge a Class — BLANK the spire</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <div class="brand">⚒ <strong>Forge a Class</strong> <span class="sub">BLANK the spire</span></div>
+    <nav>
+      <button id="nav-forge" class="tab active">Forge</button>
+      <button id="nav-library" class="tab">My Classes</button>
+      <button id="nav-account" class="tab">Account</button>
+      <a class="tab" href="/download">Get the mod ⬇</a>
+      <span class="spacer"></span>
+      <span id="tokens" class="tokens hidden" title="Tokens are spent by the 'Use a token' forge option — every account gets a free token each day."></span>
+      <span id="who" class="who"></span>
+      <button id="signout" class="ghost hidden">Sign out</button>
+    </nav>
+  </header>
+
+  <!-- Signed-out gate -->
+  <section id="gate" class="card hidden">
+    <h1>Forge a whole class with a sentence.</h1>
+    <p>Describe a class, and the site forges a cohesive set — identity, two archetypes, and a deck of cards
+       across rarities — then hands you one import code to paste in-game.</p>
+    <a id="google-signin" class="btn primary" href="/login">Sign in with Google</a>
+    <a class="btn ghost" href="/download">Get the mod &amp; install guide</a>
+    <a id="dev-signin" class="btn ghost hidden" href="/dev-login?email=dev@example.com">Dev sign-in (local)</a>
+  </section>
+
+  <!-- Forge view -->
+  <main id="view-forge" class="hidden">
+    <section class="card">
+      <label class="lbl" for="concept">Describe your class</label>
+      <textarea id="concept" rows="3" placeholder="e.g. a venomous plague doctor who sacrifices health to stack poison, then turns blood into armor"></textarea>
+
+      <details class="settings">
+        <summary>Generation settings</summary>
+        <div class="modes">
+          <label><input type="radio" name="mode" value="token" checked /> Use a token</label>
+          <label><input type="radio" name="mode" value="byok" /> Bring your own key</label>
+          <label id="mode-fake-label" class="hidden"><input type="radio" name="mode" value="fake" /> Offline demo (no key)</label>
+        </div>
+        <div id="token-fields">
+          <p class="hint" id="token-status">Forges on our models — one token per class.</p>
+        </div>
+        <div id="byok-fields" style="display:none">
+          <label class="lbl small" for="provider">Provider</label>
+          <select id="provider" class="in">
+            <option value="anthropic" selected>Anthropic (Claude)</option>
+            <option value="openai">OpenAI</option>
+            <option value="ollama">Ollama Cloud</option>
+            <option value="openrouter">OpenRouter</option>
+            <option value="groq">Groq</option>
+            <option value="google">Google Gemini</option>
+            <option value="deepseek">DeepSeek</option>
+            <option value="together">Together</option>
+            <option value="custom">Other (OpenAI-compatible URL)</option>
+          </select>
+          <input id="base_url" class="in" placeholder="Base URL — e.g. https://api.openai.com/v1" style="display:none" />
+          <input id="api_key" class="in" type="password" placeholder="API key (used once, never stored on our server)" />
+          <div class="model-row">
+            <input id="model" class="in" placeholder="Model" list="model-list" autocomplete="off" />
+            <datalist id="model-list"></datalist>
+            <button id="load-models" class="btn" type="button">Load available models</button>
+          </div>
+          <p class="hint" id="byok-hint"></p>
+        </div>
+        <label class="small" style="display:block;margin-top:.6rem;">
+          <input id="staged" type="checkbox" checked />
+          Creative mode — diverge on the theme, map to archetypes, compose in tension (a few extra steps)
+        </label>
+        <label class="small" style="display:block;margin-top:.35rem;">
+          <input id="interactive" type="checkbox" />
+          Interactive forge — pause once your theme is mapped, and pick the build engines yourself
+        </label>
+      </details>
+
+      <button id="forge-btn" class="btn primary">Forge the class</button>
+    </section>
+
+    <section id="progress" class="card hidden">
+      <h3>Forging… <span id="spinner" class="spin">◓</span></h3>
+      <div id="choice" class="choice hidden">
+        <p class="lbl">Your call — pick up to 2 engines to build the class around <span id="choice-timer" class="muted"></span></p>
+        <div id="choice-options" class="choice-options"></div>
+        <div class="choice-actions">
+          <button id="choice-go" class="btn primary" disabled>Forge with my picks</button>
+          <button id="choice-skip" class="btn">Let the forge decide</button>
+        </div>
+      </div>
+      <pre id="log" class="log"></pre>
+    </section>
+
+    <section id="result" class="card hidden">
+      <h2 id="r-name"></h2>
+      <p id="r-desc" class="muted"></p>
+      <div id="r-archetypes" class="archetypes hidden"></div>
+      <div id="r-relic" class="relic hidden"></div>
+      <div id="r-mechanics" class="mechanics hidden"></div>
+      <div id="r-cards" class="cards"></div>
+      <div class="codebox">
+        <label class="lbl small">Class import code</label>
+        <textarea id="r-code" rows="3" readonly></textarea>
+        <button id="copy-code" class="btn">Copy code</button>
+        <p class="hint">Paste in-game → mod settings → <em>Import a class code</em> → Import → Restart.</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- Library view -->
+  <main id="view-library" class="hidden">
+    <section class="card">
+      <h2>My Classes</h2>
+      <p id="lib-empty" class="muted hidden">No classes yet — forge one!</p>
+      <ul id="lib-list" class="lib"></ul>
+    </section>
+  </main>
+
+  <!-- Account view: balance, donations (pay-what-you-want), donation history -->
+  <main id="view-account" class="hidden">
+    <section class="card">
+      <h2>Account</h2>
+      <p id="acct-email" class="muted"></p>
+      <p class="acct-balance-row"><span id="acct-balance" class="acct-balance"></span> <span class="muted">tokens</span></p>
+      <p class="hint">One token forges one class with the "Use a token" option. Every account gets a
+        <b>free token each day</b> its balance is empty — forging never costs money.</p>
+    </section>
+
+    <section class="card">
+      <h2>Support the forge</h2>
+      <p class="hint">BLANK the spire is donation-based: your daily token is free, and donations keep the
+        servers running. As a thank-you, every $1 donated adds a bonus token to your balance.</p>
+      <div id="donate" class="donate hidden">
+        <div id="donate-presets" class="donate-presets"></div>
+        <div class="donate-custom">
+          <input id="donate-amount" class="in" type="number" min="1" step="1" inputmode="numeric"
+                 placeholder="Custom amount (USD)" />
+          <button id="donate-btn" class="btn primary">Donate</button>
+        </div>
+      </div>
+      <p id="donate-note" class="hint hidden">Donations aren't available right now — your free daily token
+        and BYOK forging both keep working.</p>
+      <p class="hint">Payments are handled by Stripe — we never see your card details.</p>
+    </section>
+
+    <section class="card">
+      <h2>Donation history</h2>
+      <p id="purchases-empty" class="muted hidden">No donations yet.</p>
+      <ul id="purchase-list" class="lib"></ul>
+    </section>
+  </main>
+
+  <!-- Per-card feedback overlay (single reusable modal) -->
+  <div id="fb-overlay" class="fb-overlay hidden">
+    <div class="fb-panel" role="dialog" aria-modal="true" aria-labelledby="fb-title">
+      <button id="fb-close" class="fb-close" aria-label="Close">×</button>
+      <h3 id="fb-title">How's this card?</h3>
+      <p id="fb-card-name" class="muted"></p>
+      <div id="fb-detail" class="fb-detail hidden"></div>
+      <div id="fb-cats" class="fb-cats"></div>
+      <textarea id="fb-note" rows="3" maxlength="500"
+                placeholder="Optional — tell us why (your words help tune future generations)"></textarea>
+      <div class="fb-actions">
+        <button id="fb-submit" class="btn primary" disabled>Submit feedback</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <footer class="foot">
+    <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> ·
+    <a href="mailto:ryan.r.rinkel@gmail.com">Support</a>
+  </footer>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

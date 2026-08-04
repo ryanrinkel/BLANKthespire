@@ -1,0 +1,19 @@
+{
+  "id": "quick_charge",
+  "name": "Quick Charge",
+  "type": "skill",
+  "rarity": "common",
+  "character": "armor_dillo",
+  "archetype": "demolition",
+  "cost": 1,
+  "target": "self",
+  "effects": [
+    { "op": "fuse", "turns": 1, "scope": "all_enemies", "label": "Quick Charge",
+      "effects": [ { "op": "damage", "amount": 7 } ] }
+  ],
+  "upgrade": { "effects": [
+    { "op": "fuse", "turns": 1, "scope": "all_enemies", "label": "Quick Charge",
+      "effects": [ { "op": "damage", "amount": 10 } ] }
+  ]},
+  "flavor": "A small charge under their feet. Goes off at the end of this turn -- and only stings them."
+}

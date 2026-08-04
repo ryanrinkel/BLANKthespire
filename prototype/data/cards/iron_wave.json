@@ -1,0 +1,17 @@
+{
+  "id": "iron_wave",
+  "name": "Iron Wave",
+  "type": "attack",
+  "rarity": "common",
+  "character": "ironclad",
+  "cost": 1,
+  "target": "enemy",
+  "effects": [
+    { "op": "block", "amount": 5 },
+    { "op": "damage", "amount": 5 }
+  ],
+  "upgrade": { "effects": [
+    { "op": "block", "amount": 7 },
+    { "op": "damage", "amount": 7 }
+  ]}
+}

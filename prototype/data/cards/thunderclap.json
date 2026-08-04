@@ -1,0 +1,17 @@
+{
+  "id": "thunderclap",
+  "name": "Thunderclap",
+  "type": "attack",
+  "rarity": "common",
+  "character": "ironclad",
+  "cost": 1,
+  "target": "all_enemies",
+  "effects": [
+    { "op": "damage", "amount": 4 },
+    { "op": "apply_status", "status": "vulnerable", "amount": 1 }
+  ],
+  "upgrade": { "effects": [
+    { "op": "damage", "amount": 7 },
+    { "op": "apply_status", "status": "vulnerable", "amount": 1 }
+  ]}
+}

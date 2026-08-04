@@ -1,0 +1,17 @@
+{
+  "id": "shrug_it_off",
+  "name": "Shrug It Off",
+  "type": "skill",
+  "rarity": "common",
+  "character": "ironclad",
+  "cost": 1,
+  "target": "self",
+  "effects": [
+    { "op": "block", "amount": 8 },
+    { "op": "draw", "amount": 1 }
+  ],
+  "upgrade": { "effects": [
+    { "op": "block", "amount": 11 },
+    { "op": "draw", "amount": 1 }
+  ]}
+}

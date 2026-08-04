@@ -1,0 +1,11 @@
+{
+  "id": "bronze_scales",
+  "name": "Bronze Scales",
+  "tier": "common",
+  "pool": "combat",
+  "description": "Whenever you take unblocked attack damage, deal 3 damage back to the attacker (Thorns).",
+  "source": "authored",
+  "hooks": [
+    { "trigger": "attacked", "effects": [ { "op": "damage", "amount": 3, "raw": true } ] }
+  ]
+}

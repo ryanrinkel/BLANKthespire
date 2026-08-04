@@ -1,0 +1,6 @@
+{
+  "id": "blur",
+  "name": "Blur",
+  "kind": "buff",
+  "decay": "turn"
+}

@@ -1,0 +1,11 @@
+{
+  "id": "burning_blood",
+  "name": "Burning Blood",
+  "tier": "starter",
+  "pool": "starter",
+  "description": "At the end of combat, heal 6 HP.",
+  "source": "authored",
+  "hooks": [
+    { "trigger": "combat_end", "condition": "victory", "effects": [ { "op": "heal", "amount": 6 } ] }
+  ]
+}

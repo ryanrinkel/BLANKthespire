@@ -1,0 +1,11 @@
+{
+  "id": "cleave",
+  "name": "Cleave",
+  "type": "attack",
+  "rarity": "common",
+  "character": "ironclad",
+  "cost": 1,
+  "target": "all_enemies",
+  "effects": [{ "op": "damage", "amount": 8 }],
+  "upgrade": { "effects": [{ "op": "damage", "amount": 11 }] }
+}

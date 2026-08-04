@@ -1,0 +1,27 @@
+{
+  "id": "poise",
+  "name": "Poise",
+  "type": "power",
+  "rarity": "uncommon",
+  "character": "ironclad",
+  "cost": 1,
+  "target": "self",
+  "effects": [
+    {
+      "op": "apply_status",
+      "status": "dexterity",
+      "amount": 2
+    }
+  ],
+  "upgrade": {
+    "effects": [
+      {
+        "op": "apply_status",
+        "status": "dexterity",
+        "amount": 3
+      }
+    ]
+  },
+  "flavor": "Stand composed. Every shield you raise this fight rises a little higher.",
+  "source": "llm"
+}

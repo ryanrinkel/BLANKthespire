@@ -1,0 +1,11 @@
+{
+  "id": "energy_core",
+  "name": "Energy Core",
+  "tier": "boss",
+  "pool": "boss",
+  "description": "Gain 1 additional energy at the start of each turn.",
+  "source": "authored",
+  "modifiers": [
+    { "stat": "max_energy", "amount": 1 }
+  ]
+}

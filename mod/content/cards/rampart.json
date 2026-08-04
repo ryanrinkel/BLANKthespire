@@ -1,0 +1,22 @@
+{
+  "id": "rampart",
+  "name": "Rampart",
+  "type": "skill",
+  "rarity": "uncommon",
+  "cost": 1,
+  "target": "self",
+  "effects": [
+    {
+      "op": "block",
+      "amount": 10
+    }
+  ],
+  "upgrade": {
+    "effects": [
+      {
+        "op": "block",
+        "amount": 14
+      }
+    ]
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "id": "regen",
+  "name": "Regen",
+  "kind": "buff",
+  "decay": "turn"
+}

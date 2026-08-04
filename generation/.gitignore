@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+ollama_roles.json
+uv.lock
+
+# Locally-fetched MegaCrit reference data (never commit; regenerate via reference/distill_sts2.py)
+reference/sts2_cards.json
+reference/sts2_rarity_examples.md

@@ -1,0 +1,15 @@
+{
+  "id": "dillo_strike",
+  "name": "Strike",
+  "type": "attack",
+  "rarity": "basic",
+  "character": "armor_dillo",
+  "cost": 1,
+  "target": "enemy",
+  "effects": [
+    { "op": "damage", "amount": 6 }
+  ],
+  "upgrade": { "effects": [
+    { "op": "damage", "amount": 9 }
+  ]}
+}

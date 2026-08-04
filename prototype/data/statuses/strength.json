@@ -1,0 +1,8 @@
+{
+  "id": "strength",
+  "name": "Strength",
+  "kind": "buff",
+  "decay": "none",
+  "stacks": true,
+  "description": "Adds its amount to attack damage per hit. Behavior: core/powers/Strength.gd (on_deal_attack_damage hook)."
+}

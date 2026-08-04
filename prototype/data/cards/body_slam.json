@@ -1,0 +1,14 @@
+{
+  "id": "body_slam",
+  "name": "Body Slam",
+  "type": "attack",
+  "rarity": "common",
+  "character": "ironclad",
+  "cost": 1,
+  "target": "enemy",
+  "effects": [
+    { "op": "from_state", "emit": "damage", "value": { "state": "block" } }
+  ],
+  "upgrade": { "cost": 0 },
+  "flavor": "Deal damage equal to your current Block. Exercises the 'from_state' scalar."
+}

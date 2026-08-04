@@ -1,0 +1,30 @@
+{
+  "id": "last_stand",
+  "name": "Last Stand",
+  "type": "skill",
+  "rarity": "rare",
+  "cost": 2,
+  "target": "self",
+  "effects": [
+    {
+      "op": "block",
+      "amount": 20
+    },
+    {
+      "op": "draw",
+      "amount": 2
+    }
+  ],
+  "upgrade": {
+    "effects": [
+      {
+        "op": "block",
+        "amount": 25
+      },
+      {
+        "op": "draw",
+        "amount": 2
+      }
+    ]
+  }
+}

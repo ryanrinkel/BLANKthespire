@@ -1,0 +1,46 @@
+[project]
+name = "btsgen"
+version = "0.1.0"
+description = "BLANK the spire LLM class-forging harness. Engine-independent: emits schema-validated class bundles (BTSC codes) the STS2 mod imports; reads its contract from mod/contract/."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "anthropic>=0.40",
+    "jsonschema>=4.18",
+]
+
+[project.optional-dependencies]
+# The P3 website (web/) reuses btsgen directly — single source of truth. Install with `uv sync --extra web`.
+# PyMySQL is pure-Python (no compiler needed on Windows/cPanel); SQLite is used for local dev.
+web = [
+    "flask>=3.0",
+    "authlib>=1.3",
+    "sqlalchemy>=2.0",
+    "pymysql>=1.1",
+    "python-dotenv>=1.0",
+]
+
+[project.scripts]
+btsgen-forge = "btsgen.cli_forge:main"
+btsgen-forge-class = "btsgen.cli_forge_class:main"
+btsgen-generate = "btsgen.cli_generate:main"
+btsgen-review = "btsgen.cli_review:main"
+btsgen-relic-generate = "btsgen.cli_relic_generate:main"
+btsgen-relic-review = "btsgen.cli_relic_review:main"
+btsgen-character-generate = "btsgen.cli_character_generate:main"
+btsgen-character-review = "btsgen.cli_character_review:main"
+btsgen-autoslay-smoke = "btsgen.cli_autoslay_smoke:main"
+btsgen-forge-splash = "btsgen.cli_forge_splash:main"
+btsgen-census = "btsgen.cli_census:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["btsgen"]

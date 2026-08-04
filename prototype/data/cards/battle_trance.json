@@ -1,0 +1,18 @@
+{
+  "id": "battle_trance",
+  "name": "Battle Trance",
+  "type": "skill",
+  "rarity": "uncommon",
+  "character": "ironclad",
+  "cost": 0,
+  "target": "self",
+  "effects": [
+    { "op": "draw", "amount": 3 },
+    { "op": "set_flag", "flag": "no_draw_this_turn" }
+  ],
+  "upgrade": { "effects": [
+    { "op": "draw", "amount": 4 },
+    { "op": "set_flag", "flag": "no_draw_this_turn" }
+  ]},
+  "flavor": "Draw 3, then no more cards this turn. Exercises 'set_flag'."
+}

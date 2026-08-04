@@ -1,0 +1,8 @@
+{
+  "id": "dexterity",
+  "name": "Dexterity",
+  "kind": "buff",
+  "decay": "none",
+  "stacks": true,
+  "description": "Adds its amount to Block gained. Behavior: core/powers/Dexterity.gd (on_apply_block)."
+}

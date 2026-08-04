@@ -1,0 +1,6 @@
+{
+  "id": "temp_dexterity",
+  "name": "Dexterity",
+  "kind": "buff",
+  "decay": "turn"
+}

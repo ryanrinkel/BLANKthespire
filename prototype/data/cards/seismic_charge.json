@@ -1,0 +1,21 @@
+{
+  "id": "seismic_charge",
+  "name": "Seismic Charge",
+  "type": "skill",
+  "rarity": "rare",
+  "character": "armor_dillo",
+  "archetype": "demolition",
+  "cost": 2,
+  "target": "self",
+  "effects": [
+    { "op": "fuse", "turns": 2, "scope": "all", "label": "Seismic Charge",
+      "effects": [ { "op": "damage", "amount": 30 } ] },
+    { "op": "draw", "amount": 1 }
+  ],
+  "upgrade": { "effects": [
+    { "op": "fuse", "turns": 2, "scope": "all", "label": "Seismic Charge",
+      "effects": [ { "op": "damage", "amount": 38 } ] },
+    { "op": "draw", "amount": 1 }
+  ]},
+  "flavor": "Bring the whole cavern down in two turns. Pray you're not standing in it."
+}

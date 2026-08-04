@@ -1,0 +1,15 @@
+{
+  "id": "dillo_defend",
+  "name": "Defend",
+  "type": "skill",
+  "rarity": "basic",
+  "character": "armor_dillo",
+  "cost": 1,
+  "target": "self",
+  "effects": [
+    { "op": "block", "amount": 5 }
+  ],
+  "upgrade": { "effects": [
+    { "op": "block", "amount": 8 }
+  ]}
+}

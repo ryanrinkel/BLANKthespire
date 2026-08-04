@@ -1,0 +1,17 @@
+{
+  "id": "disarm",
+  "name": "Disarm",
+  "type": "skill",
+  "rarity": "uncommon",
+  "character": "ironclad",
+  "cost": 1,
+  "target": "enemy",
+  "exhaust": true,
+  "effects": [
+    { "op": "apply_status", "status": "strength", "amount": -2, "to": "target" }
+  ],
+  "upgrade": { "effects": [
+    { "op": "apply_status", "status": "strength", "amount": -3, "to": "target" }
+  ]},
+  "flavor": "Reduce the enemy's Strength. Exercises the 'to' routing override."
+}

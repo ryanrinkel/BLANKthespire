@@ -1,0 +1,249 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "BLANK the spire card (constrained to the C# EffectRunner's supported vocabulary)",
+  "type": "object",
+  "required": ["id", "name", "type", "rarity", "cost", "target", "effects"],
+  "additionalProperties": true,
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+    "name": { "type": "string", "minLength": 1 },
+    "type": { "enum": ["attack", "skill", "power"] },
+    "rarity": { "enum": ["basic", "common", "uncommon", "rare", "token"] },
+    "cost": { "oneOf": [ { "type": "integer", "minimum": 0, "maximum": 3 }, { "const": "X" } ], "description": "Energy cost 0–3, or \"X\" for an X-cost card (spends all energy; pair with an effect that has scale:\"x\")." },
+    "target": { "enum": ["enemy", "self", "all_enemies"] },
+    "source": { "type": "string" },
+    "flavor": { "type": "string" },
+    "tags": { "type": "array", "minItems": 1, "maxItems": 2, "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,15}$" }, "description": "Phase AE (gap #25): 1-2 lowercase synergy slugs declaring this card's kind (e.g. [\"strike\"]). Purely declarative metadata — no behavior on its own; a 'scale:tag_cards_owned' payoff counts cards carrying a given tag across your combat piles (the Perfected-Strike synergy). Tag 3-5 cards of a class with the same slug + add 1-2 payoffs referencing it." },
+    "token": { "type": "boolean", "description": "True marks this card a non-drafted TOKEN — the forge class's signature blade. Phase T: the blade is NOT in the deck; the FIRST Forge income of each combat SUMMONS it to your hand (ForgedForgePower.Stoke). It is registered showInCardLibrary:false (hidden from the compendium) + CanBeGeneratedInCombat:false, carries rarity \"token\", and CardFactory never rolls Token for a merchant/reward draft — so it is never offered. Assembly-injected on the class's signature blade (retain + damage scale:\"forged\", cost 2); NOT authored by the card LLM." },
+    "effects": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/effect" } },
+    "upgrade": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "effects": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/effect" } },
+        "cost": { "type": "integer", "minimum": 0, "maximum": 3, "description": "Phase AG (gap #39): OPTIONAL — the card's ABSOLUTE energy cost AFTER upgrade (0..3). Upgrades only CHEAPEN: this must be <= the card's base 'cost' (never raise it), and is not allowed on an X-cost card. Use it when a card should get cheaper as you invest (the base-game True Blade drops 2 -> 1). Omit if the upgrade doesn't change cost." }
+      },
+      "required": ["effects"]
+    }
+  },
+  "$defs": {
+    "effect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op"],
+      "properties": {
+        "op": { "enum": ["damage", "block", "draw", "apply_status", "gain_energy", "lose_hp", "heal", "exhaust", "innate", "retain", "ethereal", "purge", "purge_card", "channel_orb", "evoke", "gain_orb_slot", "forge", "add_trigger", "apply_status_custom", "summon", "summon_attack", "buff_summon", "add_card", "discard", "balance_step", "summon_blade", "upgrade_card", "scry", "corruption", "heal_summon", "shield_summon", "blade_empower", "transform_card", "graft_card"], "description": "The effect verb. Flag-ops carry no amount/target: 'exhaust' (leaves for the rest of COMBAT), 'innate' (starts in your opening hand), 'retain' (not discarded at end of turn), 'ethereal' (exhausts if still in hand), 'purge' (Phase W, gap #19 — when played, THIS card is removed from your RUN DECK for the rest of the run: deck-thinning, a permanent stronger exhaust). purge and exhaust are mutually exclusive on one card; never put purge on a BASIC card. 'purge_card' (Phase Z, gap #19 — when played, YOU choose a card in your hand and purge THAT card from your run deck for the rest of the run: targeted deck-thinning; carries no amount/target). Put purge/purge_card on a strong one-shot skill/attack you're happy to spend to thin your deck. 'scry' (Phase AA, gap #17 — needs an 'amount' N: look at the top N cards of your DRAW pile and discard any of them you want; a draw-filter that pairs with discard payoffs / on_discard. Card-only.). 'corruption' (Phase AB, gap #20 — a flag-op: while active this combat, your Skills cost 0 but Exhaust when played. Put it on a POWER or SKILL card; card-only (never in a trigger payload); at most one per class. Pairs with Skill density + on_exhaust payoffs.). 'heal_summon' (Phase AC, gap #2 — needs 'amount' 1..9: heal YOUR living summon that many HP) and 'shield_summon' (Phase AC — needs 'amount' 1..12: grant your living summon that much Block). Both are SUMMON-CLASS only and no-op (never error) when no summon is out; legal on cards AND in add_trigger self-payloads (a per-turn medic engine). 'blade_empower' (Phase AF, gap #41 — needs 'amount' 2..3: your signature blade deals that many TIMES its damage THIS turn, a burst spike distinct from the slow Forge ramp; refreshes, cleared at your next turn start). FORGE-CLASS only (a class with forge income + a signature blade); put it on a SKILL or POWER; card-only (never in a trigger payload). 'transform_card' (Phase AH, gaps #35/#38 — needs a 'card_id' (a DIFFERENT card in THIS class's own set, never itself): when the carrying card is PLAYED it PERMANENTLY becomes that card for the rest of the run — a self-rewrite (a weak card ranks up into a strong one) or a two-card MODE-SWAP (two cards each transform into the other; A↔B is allowed, but a CHAIN A→B→C where the target ALSO transforms into a third card is not). Carries no amount/pile. Card-only (never in a trigger payload); never on a BASIC card; mutually exclusive with 'purge'; at most one per card; keep it to 1-3 per class. 'graft_card' (Phase AI, gap #7 — needs a 'card_id' (a card in THIS class's own set): the CHOOSE form of transform_card — when played, YOU pick a card in your HAND and THAT picked card PERMANENTLY becomes card_id for the rest of the run (a targeted transform, as purge_card is the targeted purge). Carries no amount/pile. Card-only (never in a trigger payload); never on a BASIC card; mutually exclusive with 'purge'/'purge_card'; at most one per card; counts toward the 1-3-per-class transform-family cap." },
+        "amount": { "type": "integer", "minimum": 1 },
+        "card_id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "Required on 'add_card' AND on 'transform_card': the id of a card in THIS class's own set. For 'add_card' it's the card to generate copies of (resolved at play time; the validator checks it exists); may reference ITSELF (the Anger-style self-copy); depth-1 loop discipline: a DIFFERENT referenced card must NOT itself contain an add_card op (no add_card chains). For 'transform_card' (Phase AH, gaps #35/#38) it's the card THIS card permanently BECOMES — must be a DIFFERENT same-class card (never itself), and may itself carry transform_card ONLY if it transforms back to this card (a two-card mode-swap A↔B; a chain A→B→C is refused). For 'graft_card' (Phase AI, gap #7) it's the card the PLAYER-PICKED hand card permanently BECOMES (a same-class card); the pick is a runtime choice, so no self-target restriction applies here (picking the target itself is a runtime no-op)." },
+        "pile": { "enum": ["hand", "discard", "draw"], "description": "Required on 'add_card': which combat pile the generated copies drop into. Copies are combat-transient (never added to your deck)." },
+        "pole": { "enum": ["light", "dark"], "description": "Required on 'balance_step' (Phase S, gap #1): which pole to move the Balance gauge toward ('amount' 1..5 = the step size). The gauge is a SIGNED per-combat counter (Dark and Light are opposite ends, 0 = centered). BALANCE-CLASS mechanic: a class using balance_step needs income on BOTH poles + a pole/centered-gated payoff (a lone balance card is just Forge with extra steps). The gauge BITES at |8| each turn-start (Dark: lose 3 HP; Light: gain 1 Weak)." },
+        "cards": { "enum": ["random", "all", "choose"], "description": "Required on 'upgrade_card' (Phase V/X, gap #18): which cards in your HAND to upgrade — 'random' (one random UPGRADABLE card in hand), 'all' (every upgradable card in hand; the Armaments+ form), or 'choose' (Phase X — YOU pick one upgradable card in hand, the true Armaments feel). No 'amount'. The upgrade is COMBAT-SCOPED (base-StS convention): it lasts the rest of THIS combat — your run deck is untouched. Already-upgraded / non-upgradable cards are skipped; a no-match play does nothing (never an error). 'choose' is card-only (not legal in a repeating trigger payload). Pair with retain or big hands so upgraded cards stick around to matter." },
+        "status_name": { "type": "string", "minLength": 1, "description": "Required on 'apply_status_custom': the name of a custom status declared in this class's status_pool (matched case-insensitively). The validator checks membership against the class's pool. STATUS-CLASS ONLY (a class with a status_pool)." },
+        "summon_name": { "type": "string", "minLength": 1, "description": "Required on 'summon': the name of the minion declared in this class's summon_pool (matched case-insensitively). Optional 'amount' = the HP to grant when summoning; if the minion is ALREADY on board, the summon op instead RAISES its Max HP by 'amount' (the base-game Osty Summon keyword). Omit 'amount' to use its max_hp. ONE summon per class. SUMMON-CLASS ONLY (a class with a summon_pool)." },
+        "hits": { "type": "integer", "minimum": 2, "description": "Only on a 'damage' or 'summon_attack' op: deal 'amount' damage this many times (multi-hit). Omit for a single hit." },
+        "grow": { "type": "integer", "minimum": 1, "maximum": 9, "description": "Phase U (gap #23, Rampage): DAMAGE-ONLY. This attack's damage INCREASES by 'grow' each time THIS card instance is played this combat: damage dealt = 'amount' + grow × (times played earlier this combat). First play = printed 'amount'. Per-card-INSTANCE (a generated add_card copy grows independently) and per-combat (resets each combat). NOT a scale — grow and 'scale' are mutually exclusive on one effect; must satisfy grow <= amount. The card shows its CURRENT (grown) damage in hand. base-StS Rampage. Not legal inside an add_trigger payload." },
+        "tag": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,15}$", "description": "Required on a 'scale:tag_cards_owned' effect (Phase AE, gap #25): the lowercase tag whose cards this effect counts (must be one of your class's declared card 'tags', present on >= 2 of the class's cards so the payoff is never dead). Only valid with scale:tag_cards_owned." },
+        "scale": { "enum": ["x", "cards_in_hand", "cards_retained", "unspent_energy_last_turn", "forged", "damage_dealt_unblocked", "target_debuff_count", "tag_cards_owned"], "description": "This effect's amount becomes a LIVE scalar instead of a fixed number (still include a nominal 'amount', which is ignored). Phase AE (gap #25): 'tag_cards_owned' is ADDITIVE and damage/block-only (like 'forged') — the effect resolves as its printed 'amount' (must be >= 1) PLUS the count of cards carrying the sibling 'tag' across your combat piles (Perfected-Strike synergy). Damage/block/draw scalars: 'x' = energy spent (X-cost card ONLY; pair with cost:\"X\"). 'cards_in_hand' = the other cards in your hand. 'cards_retained' = how many cards you held into this turn (the Retain payoff). 'unspent_energy_last_turn' = energy left at the end of your last turn. EXCEPTION — 'forged' is ADDITIVE and damage/block-only: the effect resolves as its printed 'amount' (NOT ignored; must be >= 1) PLUS your per-combat Forge counter (built with the 'forge' op) — the base-game Forge keyword payoff. Op-restricted scalars (Phase P): 'damage_dealt_unblocked' is HEAL-ONLY (lifesteal — heal the UNBLOCKED damage this card's earlier 'damage' effect(s) dealt this play; the card must have a 'damage' op before the 'heal'); 'target_debuff_count' is DAMAGE-ONLY (deal damage equal to the count of debuffs on the struck target). At most one scaled damage/block per card." },
+        "orb": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "Required on 'channel_orb': which orb to channel. Base orbs 'lightning'/'frost'/'dark', 'random' (rolls the class's own pool), OR a custom orb's name declared in the class's orb_pool (lowercased). The validator checks membership against the class pool. ORB-CLASS ONLY (a class with orb_slots > 0)." },
+        "status": { "enum": ["vulnerable", "weak", "frail", "poison", "strength", "dexterity", "thorns", "regen", "metallicize", "artifact", "buffer", "intangible", "ritual", "blur", "temp_strength", "temp_dexterity", "barricade", "focus"] },
+        "when": { "$ref": "#/$defs/condition", "description": "Optional guard: this effect runs ONLY when the predicate holds at play time (the effect is still shown on the card). Composes the conditional payoffs, e.g. a 'slot machine' jackpot via {kind:'orbs_match'}. On an add_trigger op it is the FIRE-time gate re-checked each turn (and may not use target_has_status — no target at end/start of turn)." },
+        "trigger": { "enum": ["turn_end", "turn_start", "ripen", "on_hp_lost", "on_exhaust", "on_card_played", "on_card_drawn", "on_damage_dealt", "on_block_gained", "attacked", "on_discard", "on_blade_played"], "description": "Required on 'add_trigger': when the granted ongoing power fires. 'turn_end'/'turn_start' fire EVERY turn. 'ripen' is a ONE-SHOT delayed-maturation trigger: it does nothing for 'amount' turns, then fires its payload ONCE (set 'amount' = turns to wait, >= 1). The rest are REACTIVE (fire whenever the event happens, possibly MANY times a turn — keep payloads small / add 'once_per_turn'): 'on_hp_lost' = you lose HP on your own turn (self/card-caused; a la Rupture); 'on_exhaust' = a card of yours is Exhausted (Feel No Pain / Dark Embrace); 'on_card_played' = you play a card (Rage); 'on_card_drawn' = you draw a card; 'on_damage_dealt' = you deal card damage; 'on_block_gained' = you gain Block (Juggernaut); 'attacked' = an enemy deals you damage (reactive Thorns). SPECIAL — 'on_discard' (Phase R, gap #17) is CARD-LATENT (Reflex): the payload fires when THIS card is DISCARDED BY AN EFFECT (a 'discard' op), NOT when played and NOT at turn-end hand cleanup. Playing an on_discard card grants no power — you keep it in hand and discard it for value. Put it on a card the deck WANTS to discard (a discard-fuel deck). SPECIAL — 'on_blade_played' (Phase T) is the Parry pattern: a power whose payload fires WHENEVER you play your signature blade (the token). Use it for blade-interaction support (e.g. 'whenever you play your blade, gain 8 Block'); FORGE CLASSES ONLY." },
+        "once_per_turn": { "type": "boolean", "description": "Only on 'add_trigger' with a MULTI-FIRE reactive trigger (on_hp_lost / on_exhaust / on_card_played / on_card_drawn / on_damage_dealt / on_block_gained / attacked): gate the payload to fire AT MOST ONCE per turn. Rejected on turn_start/turn_end/ripen (they already fire at most once per turn)." },
+        "effects": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/triggerEffect" }, "description": "Required on 'add_trigger': the payload run when it fires. SELF/orb-only by default (no target at trigger time); an individual payload effect may instead carry a 'target' to hit enemies (damage / debuff apply_status)." }
+      },
+      "allOf": [
+        {
+          "comment": "Phase AE (gap #25): a 'scale:tag_cards_owned' effect requires a 'tag' (the card tag it counts).",
+          "if": { "properties": { "scale": { "const": "tag_cards_owned" } }, "required": ["scale"] },
+          "then": { "required": ["tag"] }
+        },
+        {
+          "if": { "properties": { "op": { "const": "apply_status" } } },
+          "then": { "required": ["status", "amount"] }
+        },
+        {
+          "if": { "properties": { "op": { "const": "channel_orb" } } },
+          "then": { "required": ["orb"] }
+        },
+        {
+          "if": { "properties": { "op": { "const": "add_trigger" } } },
+          "then": { "required": ["trigger", "effects"] }
+        },
+        {
+          "if": { "properties": { "op": { "const": "apply_status_custom" } } },
+          "then": { "required": ["status_name", "amount"] }
+        },
+        {
+          "if": { "properties": { "op": { "const": "summon" } } },
+          "then": { "required": ["summon_name"] }
+        },
+        {
+          "if": { "properties": { "op": { "const": "add_card" } } },
+          "then": { "required": ["card_id", "pile"], "properties": { "amount": { "type": "integer", "minimum": 1, "maximum": 3 } } }
+        },
+        {
+          "comment": "Phase U (gap #23): 'grow' is legal ONLY on a damage op (⊥scale, grow<=amount enforced by the validator).",
+          "if": { "required": ["grow"] },
+          "then": { "properties": { "op": { "const": "damage" } } }
+        },
+        {
+          "if": { "properties": { "op": { "const": "balance_step" } } },
+          "then": { "required": ["pole", "amount"], "properties": { "amount": { "type": "integer", "minimum": 1, "maximum": 5 } } }
+        },
+        {
+          "comment": "Phase V (gap #18): 'upgrade_card' requires a hand-scope 'cards' (random/all); it carries no 'amount'.",
+          "if": { "properties": { "op": { "const": "upgrade_card" } } },
+          "then": { "required": ["cards"] }
+        },
+        {
+          "comment": "Phase AA (gap #17 R-2): 'scry' requires an 'amount' N (top-of-draw cards to look at); cap at 7.",
+          "if": { "properties": { "op": { "const": "scry" } } },
+          "then": { "required": ["amount"], "properties": { "amount": { "type": "integer", "minimum": 1, "maximum": 7 } } }
+        },
+        {
+          "comment": "Phase AC (gap #2): 'heal_summon' requires 'amount' 1..9 (HP to heal your summon).",
+          "if": { "properties": { "op": { "const": "heal_summon" } } },
+          "then": { "required": ["amount"], "properties": { "amount": { "type": "integer", "minimum": 1, "maximum": 9 } } }
+        },
+        {
+          "comment": "Phase AC (gap #2): 'shield_summon' requires 'amount' 1..12 (Block to grant your summon).",
+          "if": { "properties": { "op": { "const": "shield_summon" } } },
+          "then": { "required": ["amount"], "properties": { "amount": { "type": "integer", "minimum": 1, "maximum": 12 } } }
+        },
+        {
+          "comment": "Phase AF (gap #41): 'blade_empower' requires 'amount' 2..3 (the blade damage multiplier this turn).",
+          "if": { "properties": { "op": { "const": "blade_empower" } } },
+          "then": { "required": ["amount"], "properties": { "amount": { "type": "integer", "minimum": 2, "maximum": 3 } } }
+        },
+        {
+          "comment": "Phase AH (gaps #35/#38): 'transform_card' requires a 'card_id' (the same-class card it becomes); it carries no 'pile' and no 'amount'.",
+          "if": { "properties": { "op": { "const": "transform_card" } } },
+          "then": { "required": ["card_id"], "not": { "required": ["pile"] } }
+        },
+        {
+          "comment": "Phase AI (gap #7): 'graft_card' requires a 'card_id' (the same-class card the picked card becomes); it carries no 'pile' and no 'amount'.",
+          "if": { "properties": { "op": { "const": "graft_card" } } },
+          "then": { "required": ["card_id"], "not": { "required": ["pile"] } }
+        },
+        {
+          "if": { "properties": { "op": { "enum": ["damage", "block", "draw", "gain_energy", "lose_hp", "heal", "gain_orb_slot", "forge", "summon_attack", "buff_summon", "discard", "balance_step"] } } },
+          "then": { "required": ["amount"] }
+        }
+      ]
+    },
+    "triggerEffect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op"],
+      "description": "An effect inside an add_trigger payload (Phase H3/H4). SELF/orb-only by default (the trigger runner has no card/target): no multi-hit, no nested when/trigger; apply_status must be a SELF-BUFF; the only allowed 'scale' is 'cards_retained' (F5), not on channel_orb/evoke. H4 (gap #14): a payload effect may instead carry a 'target' (enemy/all_enemies) to hit enemies — then op must be 'damage' or an enemy-debuff 'apply_status' (vulnerable/weak/frail/poison), and it can't be scaled. Phase Q (gap #16): 'add_card' is a legal payload op (the on_exhaust 'compost' loop) — CLASS-ONLY, with card_id + pile.",
+      "properties": {
+        "op": { "enum": ["damage", "block", "draw", "gain_energy", "heal", "lose_hp", "apply_status", "gain_orb_slot", "channel_orb", "evoke", "forge", "add_card", "discard", "balance_step", "summon_blade", "upgrade_card", "heal_summon", "shield_summon"] },
+        "amount": { "type": "integer", "minimum": 1 },
+        "cards": { "const": "random", "description": "Required on a payload 'upgrade_card' (Phase V, gap #18): trigger-side upgrade is 'random' ONLY — one random UPGRADABLE card in your hand (combat-scoped). The 'all' form is card-only ('all' every turn is degenerate). E.g. turn_start → upgrade_card cards:random." },
+        "card_id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "Required on a payload 'add_card': the id of a card in THIS class's own set to copy (see the top-level add_card). CLASS-ONLY." },
+        "pile": { "enum": ["hand", "discard", "draw"], "description": "Required on a payload 'add_card': which combat pile the generated copies drop into." },
+        "pole": { "enum": ["light", "dark"], "description": "Required on a payload 'balance_step' (Phase S, gap #1): the pole to move the Balance gauge toward ('amount' 1..5, fixed — no scale). Trigger-side balance_step is the 'engine' half (steady per-turn gauge income), e.g. turn_start → shift 2 toward the Dark." },
+        "scale": { "const": "cards_retained", "description": "F5: make this payload effect's amount = the cards you held into this turn (resolved each turn it fires). Only on the numeric SELF ops (not channel_orb/evoke, not a targeted effect). Still include a nominal 'amount' (ignored)." },
+        "orb": { "enum": ["lightning", "frost", "dark", "random"] },
+        "target": { "enum": ["enemy", "all_enemies"], "description": "H4 (gap #14): aim this payload effect at enemies — 'enemy' (first hittable) or 'all_enemies'. Only on 'damage' or an enemy-debuff 'apply_status'. Omit for the default self/orb effect." },
+        "status": { "enum": ["vulnerable", "weak", "frail", "poison", "strength", "dexterity", "thorns", "regen", "metallicize", "artifact", "buffer", "intangible", "ritual", "blur", "temp_strength", "temp_dexterity", "barricade", "focus"], "description": "For a SELF apply_status (no target) this must be a self-buff; for a TARGETED apply_status it must be a debuff (vulnerable/weak/frail/poison). The self-buff-vs-debuff coupling is enforced by the validators." }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "op": { "const": "apply_status" } } },
+          "then": { "required": ["status", "amount"] }
+        },
+        {
+          "if": { "properties": { "op": { "const": "channel_orb" } } },
+          "then": { "required": ["orb"] }
+        },
+        {
+          "if": { "properties": { "op": { "const": "damage" } } },
+          "then": { "required": ["amount", "target"] }
+        },
+        {
+          "if": { "properties": { "op": { "const": "add_card" } } },
+          "then": { "required": ["card_id", "pile"], "properties": { "amount": { "type": "integer", "minimum": 1, "maximum": 3 } } }
+        },
+        {
+          "if": { "properties": { "op": { "const": "balance_step" } } },
+          "then": { "required": ["pole", "amount"], "properties": { "amount": { "type": "integer", "minimum": 1, "maximum": 5 } } }
+        },
+        {
+          "comment": "Phase V (gap #18): a payload 'upgrade_card' requires 'cards' (const 'random'); it carries no 'amount'.",
+          "if": { "properties": { "op": { "const": "upgrade_card" } } },
+          "then": { "required": ["cards"] }
+        },
+        {
+          "comment": "Phase AC (gap #2): a payload 'heal_summon' requires 'amount' 1..9 (the medic engine).",
+          "if": { "properties": { "op": { "const": "heal_summon" } } },
+          "then": { "required": ["amount"], "properties": { "amount": { "type": "integer", "minimum": 1, "maximum": 9 } } }
+        },
+        {
+          "comment": "Phase AC (gap #2): a payload 'shield_summon' requires 'amount' 1..12.",
+          "if": { "properties": { "op": { "const": "shield_summon" } } },
+          "then": { "required": ["amount"], "properties": { "amount": { "type": "integer", "minimum": 1, "maximum": 12 } } }
+        },
+        {
+          "if": { "required": ["target"] },
+          "then": { "properties": { "op": { "enum": ["damage", "apply_status"] } } }
+        },
+        {
+          "if": { "properties": { "op": { "enum": ["block", "draw", "gain_energy", "lose_hp", "heal", "gain_orb_slot", "forge", "discard", "balance_step"] } } },
+          "then": { "required": ["amount"] }
+        },
+        {
+          "if": { "properties": { "op": { "enum": ["forge", "balance_step"] } } },
+          "then": { "not": { "required": ["scale"] } }
+        }
+      ]
+    },
+    "condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "description": "A pure combat-state predicate gating an effect's `when` (mirrors the C# Conditions.Validate). `negate` inverts it (the 'else' lever).",
+      "properties": {
+        "kind": { "enum": ["orbs_match", "orb_count_ge", "target_has_status", "no_block", "hp_below_half", "has_block", "enemy_count_ge", "turn_at_least", "hand_size_ge", "retained_last_turn", "forged_ge", "draw_pile_empty", "light_ge", "dark_ge", "centered", "hp_lost_ge"] },
+        "value": { "type": "integer", "minimum": 1, "description": "Required on 'orb_count_ge' (>= value orbs), 'enemy_count_ge' (>= value enemies), 'turn_at_least' (it is turn >= value), 'hand_size_ge' (you hold >= value cards), 'forged_ge' (your Forge counter is >= value), and the Balance gauge reads (Phase S, gap #1): 'dark_ge'/'light_ge' (that pole's magnitude is >= value) and 'centered' (|gauge| <= value — a knife's-edge window), and 'hp_lost_ge' (Phase AD, gap #12 — you have lost >= value HP THIS turn, 1..15; the Ice Shatter threshold: pair a self-damage 'lose_hp' fuel effect with a payoff gated on hp_lost_ge). Optional on 'has_block' (>= value Block; default 1)." },
+        "status": { "enum": ["poison", "vulnerable", "weak", "frail"], "description": "Required on 'target_has_status': true when the target has this debuff." },
+        "negate": { "type": "boolean", "description": "Invert the predicate (worded 'unless …' on the card)." }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "orb_count_ge" } } },
+          "then": { "required": ["value"] }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "hand_size_ge" } } },
+          "then": { "required": ["value"] }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "enemy_count_ge" } } },
+          "then": { "required": ["value"] }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "turn_at_least" } } },
+          "then": { "required": ["value"] }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "forged_ge" } } },
+          "then": { "required": ["value"] }
+        },
+        {
+          "if": { "properties": { "kind": { "enum": ["dark_ge", "light_ge", "centered"] } } },
+          "then": { "required": ["value"] }
+        },
+        {
+          "comment": "Phase AD (gap #12): 'hp_lost_ge' requires 'value' 1..15 (HP lost this turn threshold).",
+          "if": { "properties": { "kind": { "const": "hp_lost_ge" } } },
+          "then": { "required": ["value"], "properties": { "value": { "type": "integer", "minimum": 1, "maximum": 15 } } }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "target_has_status" } } },
+          "then": { "required": ["status"] }
+        }
+      ]
+    }
+  }
+}

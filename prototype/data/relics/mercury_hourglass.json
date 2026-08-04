@@ -1,0 +1,11 @@
+{
+  "id": "mercury_hourglass",
+  "name": "Mercury Hourglass",
+  "tier": "uncommon",
+  "pool": "shop",
+  "description": "At the start of each turn, deal 3 damage to ALL enemies.",
+  "source": "authored",
+  "hooks": [
+    { "trigger": "turn_start", "target": "all_enemies", "effects": [ { "op": "damage", "amount": 3, "raw": true } ] }
+  ]
+}

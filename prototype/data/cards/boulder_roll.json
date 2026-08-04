@@ -1,0 +1,18 @@
+{
+  "id": "boulder_roll",
+  "name": "Boulder Roll",
+  "type": "attack",
+  "rarity": "rare",
+  "character": "armor_dillo",
+  "archetype": "bulwark",
+  "cost": 0,
+  "target": "enemy",
+  "exhaust": true,
+  "effects": [
+    { "op": "from_state", "emit": "damage", "value": { "state": "block" } }
+  ],
+  "upgrade": { "effects": [
+    { "op": "from_state", "emit": "damage", "value": { "state": "block", "scale": 1.5 } }
+  ]},
+  "flavor": "Pour your whole shell into one downhill roll. Free, but you only get one."
+}

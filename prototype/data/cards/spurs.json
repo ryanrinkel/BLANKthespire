@@ -1,0 +1,17 @@
+{
+  "id": "spurs",
+  "name": "Spurs",
+  "type": "attack",
+  "rarity": "common",
+  "character": "armor_dillo",
+  "archetype": "bulwark",
+  "cost": 0,
+  "target": "enemy",
+  "effects": [
+    { "op": "damage", "amount": 5 }
+  ],
+  "upgrade": { "effects": [
+    { "op": "damage", "amount": 7 }
+  ]},
+  "flavor": "A free jab of the claws while you keep your guard up."
+}

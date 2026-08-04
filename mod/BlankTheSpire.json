@@ -1,0 +1,11 @@
+﻿{
+  "id": "BlankTheSpire",
+  "name": "BLANK the spire",
+  "author": "Ryan Rinkel",
+  "description": "A data-driven, LLM-extensible custom character for Slay the Spire 2.",
+  "version": "v0.1.5",
+  "has_pck": true,
+  "has_dll": true,
+  "dependencies": ["BaseLib"],
+  "affects_gameplay": true
+}

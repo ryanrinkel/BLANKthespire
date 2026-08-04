@@ -1,0 +1,32 @@
+{
+  "id": "reckoning",
+  "name": "Reckoning",
+  "type": "attack",
+  "rarity": "rare",
+  "cost": 2,
+  "target": "all_enemies",
+  "effects": [
+    {
+      "op": "damage",
+      "amount": 10
+    },
+    {
+      "op": "apply_status",
+      "status": "vulnerable",
+      "amount": 2
+    }
+  ],
+  "upgrade": {
+    "effects": [
+      {
+        "op": "damage",
+        "amount": 14
+      },
+      {
+        "op": "apply_status",
+        "status": "vulnerable",
+        "amount": 3
+      }
+    ]
+  }
+}

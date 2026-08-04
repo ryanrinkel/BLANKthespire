@@ -1,0 +1,19 @@
+{
+  "id": "dig_in",
+  "name": "Dig In",
+  "type": "skill",
+  "rarity": "common",
+  "character": "armor_dillo",
+  "archetype": "burrow",
+  "cost": 1,
+  "target": "self",
+  "effects": [
+    { "op": "block", "amount": 6 },
+    { "op": "draw", "amount": 1 }
+  ],
+  "upgrade": { "effects": [
+    { "op": "block", "amount": 8 },
+    { "op": "draw", "amount": 1 }
+  ]},
+  "flavor": "Burrowing leaves your hands free to keep working."
+}

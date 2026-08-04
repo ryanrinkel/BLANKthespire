@@ -1,0 +1,35 @@
+{
+  "id": "cleaving_blow",
+  "name": "Cleaving Blow",
+  "type": "attack",
+  "rarity": "uncommon",
+  "character": "ironclad",
+  "cost": 2,
+  "target": "enemy",
+  "effects": [
+    {
+      "op": "damage",
+      "amount": 14
+    },
+    {
+      "op": "apply_status",
+      "status": "vulnerable",
+      "amount": 2
+    }
+  ],
+  "upgrade": {
+    "effects": [
+      {
+        "op": "damage",
+        "amount": 18
+      },
+      {
+        "op": "apply_status",
+        "status": "vulnerable",
+        "amount": 3
+      }
+    ]
+  },
+  "flavor": "Wind up, swing hard, and watch them stagger \u2014 the next hit lands twice as deep.",
+  "source": "llm"
+}

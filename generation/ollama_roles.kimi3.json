@@ -1,0 +1,49 @@
+{
+  "_comment": "EXPERIMENT (2026-07-21): what if a very powerful model DESIGNS the class? Creative roles (brainstorm = cloud/cluster + relic-intent; structure = map/compose + blueprint, i.e. the actual class design) go to Kimi K3 (2.8T reasoning model) via OpenRouter — it is NOT on Ollama Cloud (catalog tops out at kimi-k2.7-code). Cards stay on glm-5.2 @ Ollama Cloud exactly as prod, so the only variable is the designer. Needs OPENROUTER_API_KEY + OLLAMA_API_KEY in generation/.env. Run via: uv run python tools/ab_compare.py --concept \"...\" --only ollama --ollama-config ollama_roles.kimi3.json --out scratch/ab_<slug>_kimi3.md  (and a second run with no --ollama-config as the cheap-designer baseline).",
+
+  "defaults": {
+    "base_url": "https://ollama.com/v1",
+    "api_key": "${OLLAMA_API_KEY}"
+  },
+
+  "max_tokens_cap": 24000,
+
+  "roles": {
+    "_kimi_comment": "K3 is a reasoning model: reasoning streams in delta.reasoning (ignored by our parser, but it keeps the stream alive) and the answer lands in delta.content — smoke-verified 2026-07-21 through OpenAICompatGenerator, temperature accepted too (kept at parity with the baseline mix). max_tokens_floor raises tiny stage budgets (relic-intent asks 2000) because hidden reasoning bills against max_tokens BEFORE any content — the smoke test burned 2000 tokens of pure reasoning and truncated. Generous timeout: reasoning can run long between visible chunks. $3/M in, $15/M out — reasoning tokens bill as output.",
+    "brainstorm": {
+      "model": "moonshotai/kimi-k3",
+      "base_url": "https://openrouter.ai/api/v1",
+      "api_key": "${OPENROUTER_API_KEY}",
+      "response_format": { "type": "json_object" },
+      "temperature": 0.9,
+      "max_tokens_floor": 24000,
+      "timeout": 600
+    },
+    "structure": {
+      "model": "moonshotai/kimi-k3",
+      "base_url": "https://openrouter.ai/api/v1",
+      "api_key": "${OPENROUTER_API_KEY}",
+      "response_format": { "type": "json_object" },
+      "temperature": 0.4,
+      "max_tokens_floor": 24000,
+      "timeout": 600
+    },
+    "cards": {
+      "model": "glm-5.2",
+      "response_format": { "type": "json_object" },
+      "temperature": 0.3
+    }
+  },
+
+  "_fallback_comment": "Explicit so a mid-forge Ollama quota trip (from the cards role) does NOT silently swap the designer: kimi roles 'fail over' to the same kimi-k3 slug (their primary already IS OpenRouter), cards fail over to glm on OpenRouter as usual.",
+  "fallback": {
+    "base_url": "https://openrouter.ai/api/v1",
+    "api_key": "${OPENROUTER_API_KEY}",
+    "models": {
+      "brainstorm": "moonshotai/kimi-k3",
+      "structure": "moonshotai/kimi-k3",
+      "cards": "z-ai/glm-5.2"
+    },
+    "cooldown_s": 3600
+  }
+}

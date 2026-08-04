@@ -1,0 +1,113 @@
+# BLANK the spire — install & play
+
+Forge a whole **Slay the Spire 2** character class from a sentence on
+[blankthespire.com](https://blankthespire.com), then play it in the game.
+
+The loop: **describe a class → get an import code → paste it in-game → restart → play.**
+
+---
+
+## 1. What you need
+
+- **Slay the Spire 2** installed on Steam (Windows).
+- The **latest release zip** (`BlankTheSpire-vX.Y.Z.zip`) — download it from
+  [blankthespire.com/download](https://blankthespire.com/download) or this repo's GitHub Releases page.
+  It already includes **BaseLib** (the mod loader BLANK the spire depends on) — you don't have to grab it
+  separately.
+
+---
+
+## 2. Install the mod (one drop)
+
+1. **Find your STS2 `mods` folder.** In Steam: right-click *Slay the Spire 2* →
+   *Manage* → *Browse local files*. You'll land in the game folder
+   (default `C:\Program Files (x86)\Steam\steamapps\common\Slay the Spire 2`).
+   Make a `mods` folder there if one doesn't already exist.
+2. **Unzip the latest `BlankTheSpire-vX.Y.Z.zip` into that `mods` folder.** When you're done it should look like:
+
+   ```
+   Slay the Spire 2\
+     mods\
+       BaseLib\          ← from the zip
+       BlankTheSpire\    ← from the zip
+   ```
+3. **Launch the game.** If it loaded, the title screen will say it's running modded. (To double-check,
+   the log at `%APPDATA%\SlayTheSpire2\logs\godot.log` prints `RUNNING MODDED` near the top.)
+
+> Updating later? Just re-unzip a newer `BlankTheSpire-vX.zip` over the same folder, overwriting.
+
+### On Linux (Ubuntu / Steam, incl. Steam Deck)
+
+Same idea — the mod is platform-neutral; only the paths differ. It works whether STS2 runs natively or
+through Proton.
+
+1. **Find the `mods` folder the easy way:** right-click *Slay the Spire 2* → *Manage* → *Browse local files*
+   (lands you in the game dir regardless of native vs Proton). Make a `mods` folder there if needed. Typical
+   locations:
+   - `~/.steam/steam/steamapps/common/Slay the Spire 2/`
+   - or `~/.local/share/Steam/steamapps/common/Slay the Spire 2/`
+2. **Unzip into `mods/`** so you get `mods/BaseLib/` and `mods/BlankTheSpire/` (same layout as above).
+   `unzip BlankTheSpire-vX.Y.Z.zip -d "<game dir>/mods"`.
+3. **Launch.** To check the log, it's under your user data, not `%APPDATA%`:
+   - **Native build:** `~/.local/share/Godot/app_userdata/SlayTheSpire2/logs/godot.log`
+   - **Proton:** inside the prefix —
+     `~/.steam/steam/steamapps/compatdata/2868840/pfx/drive_c/users/steamuser/AppData/Roaming/SlayTheSpire2/logs/godot.log`
+   - (Find it fast: `find ~ -name godot.log 2>/dev/null`.)
+
+> **Heads-up:** the mod loader **BaseLib** is what loads everything; if the game boots and the title says
+> modded, you're good. If it doesn't load on your distro, that's a BaseLib-on-Linux issue, not the cards —
+> please open a GitHub Issue and we'll sort it.
+
+---
+
+## 3. Forge a class and play it
+
+1. Go to **[blankthespire.com](https://blankthespire.com)** and sign in with Google.
+2. Type a class concept (e.g. *"a venomous plague doctor who sacrifices health to stack poison, then turns
+   blood into armor"*) and click **Forge the class**. You'll get an **import code** (starts with `BTSC.`).
+   - Hosted forging uses a token system (you get some free tokens). You can also pick
+     **"Anthropic (your key)"** or **"My API key (BYOK)"** to forge with your own key instead.
+3. **Copy the code.**
+4. In-game: main menu → **Mods / mod settings** → **BLANK the spire** → paste the code into
+   **Import a class code** → **Import** → **Restart** when prompted.
+5. After the restart, start a new run and pick your forged class. 
+
+> The mod has to restart to load a newly imported class — that's expected.
+
+---
+
+## 4. Starter classes (paste these to try it immediately)
+
+No need to forge your first one — paste any of these into **Import a class code** to play right away:
+
+**The Tempest** — a storm-caller who channels lightning and frost orbs and unleashes them in bursts.
+```
+BTSC.6.H4sIAKglMmoC_61YS2_jNhD-KwTP6gK289i6p-xu0h6KFmiC7qFYCJQ0kglTpEBSdowg_71DSrZox17Jsk-WhiJn-M3rG7_RJZcZndNUMGNoRNMF0yy1oOn8jUpWAq69LIC8QFmBsfhFBibVvLJcSVx7IMYqXf6SMiG4LAgIKEFaJrixZL1QBA-UEoQhghcLK_GbiORaGRsRJjOSMb0kSicmInYBksBKLcG455LkSnfnkaTWxhrCykrwnENGkg2B10oZpzZXYD6hcSV7jRcVnd9Pm2eQoIsNnc8iikpiI5Q1_s1Ypi3ujDNIl3T-3xt1a3Q-QQhULfHp9j3aCqc74U0nnO2Ek054Ewh_vOML05nxx3OHsrGaLwHtbJF93r7bTeXembUMzYmoZppbtJsmzPDU-QUR89ah3QXgI8WrlRtcMarWqdssRImvkOeQ2kanQiRoxkpWOB2sbCy7e_8R0boqNMvAebl_x694F3dHf4cMcsCQ2d3h2_a9vYNZciGGXcGAyAfcIBHKg7I157bvAocbPof2mwpDLja1LkJHOCF5boW9N-mSxMORurxgOl1Au9MF9CU3bpMmxnOoj1z36TZ_gotN-pAYflC0db5m630NGMa5YCvlbvu4Ar1pUp4kUHBpyJrbBWHEpaEA4tH9RHdoLxgXh1H_Ryjrj_wBYF83Qe53YLCqEpsYa4WtnT_bhzld1QILC0sEnOOMI3k1StF03ydYghGijKi8KawkRbyWvoZyTYrara15Br6eorB1n8XarEoIfOV3x2v8vvPVkz_xeyM7lRd4Tond4AqJMSiAvZ1Hg_cw8W_G5Mfw4--9Iw7ia-eXr0pkxIC1Ahsal02_c_in4cIGdxP08co1sJ0rELM4UcJ2jnjQKfnSSE6mzBX8sE2a_uC93cFytWr1QcfnMTp-4pKHpj652PcEoEuHAPuMG4df2B6-BaJTSVDLs-E_MHN4VniWNLB8_xzyw5OmAxvBn2AJtwRZH1E1_lqiZBoWk5XiWVwwG6D4L4rI743oiiiO7rIF4zLe0sKjaB6LOsdY6e4LoQw4xtntnvVBfoHaY346akHoqr8r5NUu0FkF2tYafDf4zYs8_c40l9gvMoDKNRGsSIEfYQOxymP8OPaJ0rnzcQPuc3fMc7vSOqZSa_Ra4FV8gEvzYjogL0610VylXvARvXHO6CpPn7OHWjS7okV75KCpcTielSTFQQp0hDOWJ3G-EjrqgPFhXElk2IcgE2EWy7pM3JRUMBEk8l-NFHNZwLm0gGssFIJl53WfUzCugR3PirOZwEANs5Ma7no6j-_6a-5m3loIT89IgkCA5wXGArRCU3EZ-sAPuRDnrA75wKOXkqdWen0f9FXPMynr2AZ1lprZwO71xLdUzFHl9q-Hpat_no5hzTNEubK5pcwSXm3gEl8JYwtlpcJh3tHql1Y4oMGNbv8HlzuoZu1_HscqB7wuWI1aeonYvoLZCAUh3P-46cOHthuwcXBEWMHRh0RjdoW8F8uRxRh1JccIgCDen3cr5LldOcmDT5CIIOx7OwwSG3fPkoMZxIb7R7lc49h7ERueTM9WcjAqfkGAcOogTJcY2O2cKHAQJ5pjUyA8BVLLDHSuVBjvKUOIxcYE3f9rIDrpiCN9_0PtmV2A-uRu7AQdjW0sg1Po0NbpdJyts3NtnfVko_s71ywdARDcmm4sXSuNHSoBodae2kuDLM7_q7qXLXjY_zcwlcA2FgAA.c0953037
+```
+
+**The Jackpot** — a slot-machine gambler: spin reels (channel orbs), match symbols, and cash out for huge swings.
+```
+BTSC.7.H4sIAJU1MmoC_71YbW_bNhD-KwQ_e0Eip03rb0HXYdhatGsDDMMWCDR1kjVRokZS9ozA_313lGSxjhW_wN2HAOZRfLl7nnvumCde5FXCZ1wqYS2fcLkQRkgHhs-eeCVKwLmHBbBfhCxq7fCLBKw0ee1yXeHcPbNQuRz_mFXa_VAKucgrYFJX1plGuhmrG6WYEVWiS6bN3DKnma3zijnc1wAoO2E4i5-gLdGrign2d3sc0ymr9QoMWy3AL1gzgbspOqKpWSkcHZdd4b1K8W-8qPnsLmp_QwUmW_PZdMLx1JhuZ_nsdsKtE8bhojgBWfDZn0-c5vjsBr3XTYW_Xm0mvTHaGm8H43RrvBmMt4HxcYMDYRLrt88pwBiNvAC8ZxfUr_3YrWsaC-fQZxwbYXKH9-ZzYXNJkGjb3g7vnQH-5OhaucYZqxsjabFSJQ4hTUG69kyNkeCJKEVGZ4iyvdnrzeOEN3VmRAIE8OEVb9EX8tH7kEAKyJatDz_2484HW-RKHeeCBZUe4cFcaR-U_jqvDjmwu-BNeH9iXYBAOzp49yEjfAAkJYEwcgHdSuL0c1dGXX52ZTygqkDFuA_3XEVbmy6BH9Ehx4_aZeqZmSqx1OTOZ8pMykIFS8wxSkIFbshLhhmSJ8DW6BpLhYMrvo2lamSxjltWx9EQ1Q9kZyewOwgv5elWiEZZf5i0d3TL_fyZcFISimAnfIRe7HWEb87IjrGD7g4ctHlGmC0qv3dS12HQad3Emxa5Ywpxsh4ssmQN6gzLNFj8KMDnnyaXRUzaO2DzG9nY59Y2xnupy1JXY8RvYbm-FK1vtgFMjFh9M3EJvkcvbP8CAl_76oQQgmpDLQoaCufzgOqXs0w3Loi4SJJYxATaEPH7JMFq9qW1dRH3Be1gxPH4OBPlXPlv9-jN2ZqaYZ2N-5J4SsjHFkbfqsp71JI16xsBbBfALJGdGgelNtgaIHISqAvoqB3EUONaSakUk_8-AYZgfuonPTZfuskxHjfVy0weDWl0MKRbV_8QVbFHQIWXVbx9SyDLsGMCUV6dnSbT75smo9tHYfV0TQVJXAJtmdtywOWBJtjHYGKM6YcwOZvToq4VVSPhGl-L2x8znmrpDUfH69iNdjj_Tqh8bkgZiA0Sad72tOBzwdbCFMxiz4m6jax3TiFldJOACbgvhV3EKClhNX2HNvapcafqNWWPaJzGeuPnLqkfsNQFnBLT3QW7sdNK4YK2y1jlVeXjNIeUxGJQYet0bf3DofId_8BLyrRYpyi-vtQOvPQpiE8IwX7Nwz71eTdytlhcpC1_s82_MfotG4XPGYHVIIzjZZuZm-vzrjE93Opssf7QPdyG9qbvYxa6scBqsfZllWEBnpsmt2ADpFPsXGL_4QDyT9TD_tzZTqwFYb95yQzZbQZfj-rrvtDF_hkZe2yWQjVAAn3qu-ftJY4MkbtnFH0219Ru9jAF2JSQie7VHgrYx8H8Uv7hDzhdwvY-uaYBXliI6f8AZQ72qESMbr9PCpyYidP_IRMDcaRvr9iDV1qNlcloXe6D2GdeDEkWpJ_PPPa-tY2V_RF0X2xv92IbHfHuGO9SJ6fX-HMb4lOPmu6C0wuiUCsCAsuiZX810fXNLbMam-uifZVTEAb5RKweN_8B3qyTPdMTAAA.3d93acde
+```
+
+**The Broodmind** — a hive-queen who summons swarms and spreads poison as the brood grows.
+```
+BTSC.13.H4sIAPLINGoC_81aW2_juBX-K4Re-uIGYzvJZrJPs5fpLrDFZieDLop2YNASZbGhRZWk4vEO8t_7HVK2acl3O7N9CBAdWSLPd27fOdSX5EmWWXKfpIpbm_SStOCGp06Y5P5LUvKpwL2PhWDfGa2zKf22l2TCpkZWTuoSd9-xUqRGT3mZCsNmhWa5wm8tc3gsl0JlbCZdwXLDJ1IJZis-K3GTOzaujXVMlk6zjE_5ROBxQffEnGVS9FguMjaes0pLq0vGS1zRu_9qOTaQy1RcYTtT_nlUVMn97V34X5TCTObJ_bCXaDMeWaWdTe7f9BLruHGynIwykT4l9__6ktC95L4PtXVd4r-bl95COFgKr1fC4VLYXwmvI-EnrFJPp7ocVVorv0YD4iOprbB6tOPrLpYLlFLDZwp4BpykE5YJnhbM1aYBgrCzATDpCC5LYMB2eJX1K2sskXDnOLTFnWnYJHQADhOBfxNANZ0ntGvsOBPcFTsevN7wIKHQKPhBu5Z6NxvUExa-hZ-xianHQTtbGcHhL42VvUZj3ajJJ1yWHS2x2wBztN2qUvMRTOxqG226781OsvskLJBEanClyF2meK1HYT96g0PR27yd4c7tLFEFrknKTRZ2IilArTPySeDXC39aXLt5JeKdGm6kg_snY25lSiGtbQCitQ62omuT0sNKTXEp8lykLtI-BGW0_VtStq4mhmeCEsT-J95CF3ISr0MmcuEzSKPDD4vrRgf7JJU6TAUrVH6ABkgXa-a72adA-4G7eP_w1rRYbf-n5vLVdt_4-DKnbEglSz-nTW7U4HqfyhdZ5Rvvs7nizxqlI_m1dhSvPovZHivqcmLmPqDn0Nmyf9eDN_3rEOFshjBkOmdpIZGe2Vi4mUC845f-B1RHMm6erpKlIXwVUML5bD5YWeS7SH6wYd4cbxilraAUFwX2EpkMOscJYx_8R7xruA7yO6akcygWHg5W6hmqwtwC0Vxal9ceVO2Tr43Bo1I-spV0EXAkY49Btg22VDeO8jUcenBBt23hRnymkM8osrqeFJbVFfxMw80MwwOuaJBzQrgiws1H_8gsy1ycBdiq-l0MvS1Eoltn73bVWU-3rtiviCtpQMMkFVwxswyKMP0MnSn6miLYo2ArEYj0A1-LuRP4zV8sSB43eOmKhRxWh7vVblMlPb4ObyQjnw53uRWKq9x2msN13zRYd7efkQf1FAQOvuX9Cu4nJhPgTrxnvkiOcUps7sBETpSRC4IT8IqnEQ34fiV5vbBtJ_vbZYI6qnYcWXrfnrhKjP1jIajCVAp-vCox34Jm6ylCoYd7DfxNKnUFBU2oWyzXZi0DTDSP2MvfwtVW_rUD9wUBO4Rx9fYE1nOt0PDwsRLHZM8NRO3UhV46DrSE_-8o297fQfHnTXJBrbIiCAFYhO6zKPV0hD40olj_IBn7JcgOQHrVvSbS6BJdbXamAW724tLJbMOjwf_m-EWudwKPCqBk-rRIN2PgIJgS_FkQPaCYaaoDMaXIBv-t8dRo2V6vDPEb3WCP0Y396WaXMTaQrqOYEbWFi05_Ez9tMaf-8SxscMZa6ywtM7oiSwSahqQCE0xREUqHujo21DhetbPw0iIGHdIoVyKOig-QsfeN7OSoaPnOOUHy9miP7w_aKKVwz7IHPGrHwb8qAnxRFImdkbvmvEyRR_5Tg4iMdSmakRBWjXzYzriZRo1yc7nNX-tyI1AIm5FnylPPDGnrBrxo8ZZ6LbcPXpUKD1-TChshFrWv0MZoNGeACLzDhCK5YCvICcs-jlzYT_fgTI6ySQw_ErgbGZpYrWyABO7Yh0Z2WUM01j2Z23QD__oU3nFWm3e6_f4J7Zq8Iv3EVRoiL-iB48YFvc6ImuyoaaH25_cgapCs9Myju88eO-vqgaBvq3JTgdhH4ZJ_iGOGNse9rjWq-EU4Am7qSfoVo-bQDyQmRqMJWjSGis_9dFuqwF2837FMo55KGsPqtfmEEbJEkKSCkryNE3dLfkgsXIq1320vWF-Dzvf7l14_tuJPWoVJkbdd1EuldB11-GONxsppBI0Q2TKTtXJYJp4BbjyobK63Ftv9wXLBcruyZCG42pi6OlPAXkJDdLJUc-JTVKOxUHo2Kjjc6YXMuSoLaPaZJx0g7fwJ7u7AQybgKSE-BGQmDOiM8LwehMYIL0H6efbnMsfxgf42nW636nS7X6eX1tTL0WQhte3B18el-M9Ihhn2ZeRk4ldc_IfCV5ty5M-sNjrFthjaxlY_7c2iX2cf26w5bM49lk74I02aMkR-L8q4M3ieDTxEhuOxMgQwGEYUwGj4J7VoDTkfvLA15TwllLukLx5gXaatv0BXeXf5rjKej45RC3vMAiIk0glZWtdWzSMriM-Wl5NaltxFreSP69I_JaV22diqz-_mpuFZM_zO625bZyVVOOwwTM9K9gyKYHuLgw8JOj4DN0ChUshrEbbLCe9ohtdGY6n3y9Hv782Nsz39QmeHWxL8sJPGw2JI4na7z76c5NwnR1Brzzdfa8-33aMLGtx74unpDojnt77u6lLNWYHaS-yG2udwcKa1aR-cjXIU8z_mnYMz9t7Lz6qCe0PylGHPNrQWrOS8PmxwyjqtPuyBvlJAB-YnE3kt1KpHliZmlk5_lukoVbrOYvw_kph9T-LjO-QjKtOpjVnHL0_uyTpvuuucllhB4wgbPgzyxR3l3vqUiNfMveMT7RScppeMz_icKU3_5U4E1D3AiAbrx0ooUDG55-ZpVAG8iN_TnPohiM4F_7TJ5u2OM99jHfp69_nxtur-ABjp-J1SwbIAMf8Ziu-NfSEC4OslvsxgKhsmNFGND-Lw2dgOUPGP-H8evG0jq_3LHk9vXaYVHO8XEzny4V7ouZZjC_zP6U_NKEboXuz0Wk_bRvoBslew0NpEbng4ST4JsaMOq4avYrSjtrCbYD_CtFS60eHQqEIoNe-tfQPTnCT780nKfXSkHIaycfODJ4ByGheYh0a2iw5uMHUnuw3PaHr61yfxn2MnCSe0PXc7rfLz6hvFnFu3aDtzFJYr9qh1YFqzQisiZ3SwbMOnJWQhn047DIxXFDraStvmYO_iO9t42G5LbeRggwPK0s4JQPhS7-A6v5mbnTWDOH8Hm2cM4QjOfx7ATUmfIedCNB8wh3OnZtKFiET8hRPTTy__A5A6DBk8LQAA.190c3a90
+```
+
+---
+
+## 5. Known issues (it's an early build)
+
+- **Placeholder art.** Orbs are plain colored circles; some card/character art is generic. Cosmetic only.
+- **Relic-collection screen may glitch.** Opening the in-game *Relics* compendium can throw a (harmless) error
+  from the mod loader. It doesn't affect runs — just back out.
+- **You must restart to load a freshly imported class.** The mod tells you; it's normal.
+- Forged classes are balanced *loosely* — expect some swingy, undercooked, or overpowered cards. That's
+  half the fun. Tell us what breaks.
+
+## 6. Feedback
+
+**Found a bug, a hang, or a hilariously broken card?** Please
+[open a GitHub Issue](https://github.com/ryanrinkel/BLANKthespire/issues).
+If anything crashed, the log at `%APPDATA%\SlayTheSpire2\logs\godot.log` is gold — include the relevant lines.

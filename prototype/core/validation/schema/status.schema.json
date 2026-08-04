@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "slapthespoor:status",
+  "title": "StatusDef",
+  "description": "Declares a status/power's identity and decay, and binds it to a hand-written behavior class by id. Behavior (hook logic) is CODE, not data — this file only declares the status exists and how it decays, so cards/enemies/the validator can reference it. Adding a status with NEW hook logic requires a behavior class; the LLM may apply existing statuses but should not invent behaviors.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "kind", "decay"],
+  "properties": {
+    "id":   { "type": "string", "pattern": "^[a-z0-9_]+$", "description": "Must match a behavior class in core/powers/." },
+    "name": { "type": "string", "minLength": 1, "maxLength": 24 },
+    "kind": { "enum": ["buff", "debuff"], "description": "Display/UX category only." },
+    "decay": {
+      "enum": ["none", "end_of_turn_decrement", "end_of_turn_remove", "start_of_turn_remove"],
+      "description": "none=permanent (Strength); end_of_turn_decrement=loses 1/turn (Vulnerable/Weak); end_of_turn_remove=cleared at the owner's turn end (temp Strength from Flex); start_of_turn_remove=cleared at the owner's NEXT turn start, so it survives the intervening enemy turn (Burrowed)."
+    },
+    "stacks": { "type": "boolean", "default": true, "description": "Whether re-applying adds to the amount." },
+    "description": { "type": "string", "maxLength": 140 }
+  }
+}

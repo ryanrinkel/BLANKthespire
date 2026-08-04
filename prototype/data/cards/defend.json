@@ -1,0 +1,11 @@
+{
+  "id": "defend",
+  "name": "Defend",
+  "type": "skill",
+  "rarity": "basic",
+  "character": "ironclad",
+  "cost": 1,
+  "target": "self",
+  "effects": [{ "op": "block", "amount": 5 }],
+  "upgrade": { "effects": [{ "op": "block", "amount": 8 }] }
+}

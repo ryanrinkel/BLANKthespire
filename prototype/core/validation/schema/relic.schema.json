@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "slapthespoor:relic",
+  "title": "Relic",
+  "description": "A relic is fully data-driven, like a card: metadata + `hooks` (a trigger -> a list of effects drawn from the SAME closed effect vocabulary cards use) + `modifiers` (passive stat bonuses the compute pipelines read). The generic interpreter in core/relics/Relic.gd executes them; there is no per-relic code. This schema is the generation contract — the LLM composes hooks/effects/modifiers from the closed sets below and never introduces new triggers, ops, or stats.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name"],
+  "properties": {
+    "id":   { "type": "string", "pattern": "^[a-z0-9_]+$", "description": "Unique snake_case id." },
+    "name": { "type": "string", "minLength": 1, "maxLength": 32 },
+    "tier": { "enum": ["starter", "common", "uncommon", "rare", "boss"] },
+    "pool": {
+      "enum": ["starter", "combat", "elite", "boss", "shop"],
+      "description": "Which reward source grants this relic. 'starter' relics are never rolled into a reward."
+    },
+    "description": { "type": "string", "maxLength": 200 },
+    "hooks":     { "type": "array", "items": { "$ref": "#/$defs/hook" } },
+    "modifiers": { "type": "array", "items": { "$ref": "#/$defs/modifier" } },
+    "source": { "enum": ["authored", "llm"], "default": "authored", "description": "Provenance tag. LLM-generated content is quarantined for review before promotion." }
+  },
+
+  "$defs": {
+    "hook": {
+      "description": "One triggered behavior: when `trigger` fires and `condition`(s) hold, run `effects`. The effect context's source is the player; the default target depends on the trigger (the attacker for 'attacked', else the first alive enemy). `target` overrides it; 'all_enemies' runs the effects once per alive enemy. `once_per_combat` gates one-shot hooks.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["trigger", "effects"],
+      "properties": {
+        "trigger":   { "enum": ["combat_start", "combat_end", "turn_start", "turn_end", "attacked"] },
+        "condition": {
+          "description": "All listed conditions must hold for the hook to fire. Default: always.",
+          "oneOf": [
+            { "$ref": "#/$defs/condition" },
+            { "type": "array", "items": { "$ref": "#/$defs/condition" } }
+          ]
+        },
+        "target":          { "enum": ["self", "enemy", "all_enemies"] },
+        "once_per_combat": { "type": "boolean", "default": false },
+        "effects":         { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/effect" } }
+      }
+    },
+    "condition": { "enum": ["always", "victory", "defeat", "hp_below_half"] },
+    "modifier": {
+      "description": "A passive stat bonus read by the compute pipelines (not the effect queue). attack_base feeds the player's attack damage (Akabeko); max_energy feeds energy per turn (Energy Core).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stat", "amount"],
+      "properties": {
+        "stat":   { "enum": ["attack_base", "max_energy"] },
+        "amount": { "type": "integer" },
+        "when":   { "enum": ["always", "first_attack"], "default": "always", "description": "first_attack: applies once per combat to the player's first attack (Akabeko)." }
+      }
+    },
+
+    "scalar": {
+      "description": "A number, or a reference to live game state.",
+      "oneOf": [
+        { "type": "integer" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["state"],
+          "properties": {
+            "state": { "enum": ["block", "energy", "strength", "hand_size", "cards_played_this_turn", "hp_lost"] },
+            "scale": { "type": "number", "default": 1 }
+          }
+        }
+      ]
+    },
+    "predicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "op", "value"],
+      "properties": {
+        "state": { "enum": ["hp", "block", "energy", "hand_size", "enemy_count", "self_has_status", "target_has_status"] },
+        "op":    { "enum": ["lt", "lte", "eq", "gte", "gt"] },
+        "value": { "type": ["integer", "string"] }
+      }
+    },
+    "effect": {
+      "description": "One node of the effect vocabulary — the SAME closed set cards use.",
+      "type": "object",
+      "required": ["op"],
+      "oneOf": [
+        { "properties": { "op": { "const": "damage" },       "amount": { "$ref": "#/$defs/scalar" }, "raw": { "type": "boolean", "default": false, "description": "Deal a fixed amount straight through Block, bypassing the Strength/Weak/Vulnerable pipeline (and Akabeko/Thorns)." } }, "required": ["op", "amount"], "additionalProperties": false },
+        { "properties": { "op": { "const": "block" },        "amount": { "$ref": "#/$defs/scalar" } }, "required": ["op", "amount"], "additionalProperties": false },
+        { "properties": { "op": { "const": "apply_status" }, "status": { "type": "string" }, "amount": { "$ref": "#/$defs/scalar" }, "to": { "enum": ["self", "target"] } }, "required": ["op", "status", "amount"], "additionalProperties": false },
+        { "properties": { "op": { "const": "draw" },         "amount": { "$ref": "#/$defs/scalar" } }, "required": ["op", "amount"], "additionalProperties": false },
+        { "properties": { "op": { "const": "gain_energy" },  "amount": { "$ref": "#/$defs/scalar" } }, "required": ["op", "amount"], "additionalProperties": false },
+        { "properties": { "op": { "const": "lose_hp" },      "amount": { "$ref": "#/$defs/scalar" } }, "required": ["op", "amount"], "additionalProperties": false },
+        { "properties": { "op": { "const": "heal" },         "amount": { "$ref": "#/$defs/scalar" } }, "required": ["op", "amount"], "additionalProperties": false },
+        { "properties": { "op": { "const": "add_card" },     "card_id": { "type": "string" }, "pile": { "enum": ["hand", "discard", "draw"] }, "amount": { "type": "integer", "minimum": 1, "default": 1 } }, "required": ["op", "card_id", "pile"], "additionalProperties": false },
+        { "properties": { "op": { "const": "multi" },        "times": { "$ref": "#/$defs/scalar" }, "effects": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/effect" } } }, "required": ["op", "times", "effects"], "additionalProperties": false },
+        { "properties": { "op": { "const": "from_state" },   "emit": { "enum": ["damage", "block", "heal"] }, "value": { "$ref": "#/$defs/scalar" } }, "required": ["op", "emit", "value"], "additionalProperties": false },
+        { "properties": { "op": { "const": "conditional" },  "if": { "$ref": "#/$defs/predicate" }, "then": { "type": "array", "items": { "$ref": "#/$defs/effect" } }, "else": { "type": "array", "items": { "$ref": "#/$defs/effect" } } }, "required": ["op", "if", "then"], "additionalProperties": false },
+        { "properties": { "op": { "const": "set_flag" },     "flag": { "enum": ["no_draw_this_turn"] } }, "required": ["op", "flag"], "additionalProperties": false }
+      ]
+    }
+  }
+}

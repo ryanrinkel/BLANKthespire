@@ -1,0 +1,6 @@
+{
+  "id": "barricade",
+  "name": "Barricade",
+  "kind": "buff",
+  "decay": "none"
+}

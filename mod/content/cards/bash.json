@@ -1,0 +1,17 @@
+{
+  "id": "bash",
+  "name": "Bash",
+  "type": "attack",
+  "rarity": "basic",
+  "character": "ironclad",
+  "cost": 2,
+  "target": "enemy",
+  "effects": [
+    { "op": "damage", "amount": 8 },
+    { "op": "apply_status", "status": "vulnerable", "amount": 2 }
+  ],
+  "upgrade": { "effects": [
+    { "op": "damage", "amount": 10 },
+    { "op": "apply_status", "status": "vulnerable", "amount": 3 }
+  ]}
+}

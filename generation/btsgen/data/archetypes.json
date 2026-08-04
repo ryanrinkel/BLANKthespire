@@ -1,0 +1,1094 @@
+{
+  "_comment": "Metaphor-tagged archetype catalog for the staged creative front-end (the MAP stage). Each entry pairs a mechanical engine (vocabulary.ops + class_kind) with seeded-but-open metaphors. The `buildable` field here is a documentation guess only - catalog.py RECOMPUTES it at load against the live mod/contract/VOCABULARY.md and VOCABULARY_GAPS.md, so it auto-flips as the vocab roadmap ships. Ops use the exact tokens from VOCABULARY.md.",
+  "archetypes": [
+    {
+      "id": "retain_hold",
+      "name": "Retain / hold & build",
+      "description": "keep cheap cards in hand, coil, then release a scaled payoff",
+      "metaphors": [
+        "the held breath",
+        "coiling",
+        "the perfect strike",
+        "foresight",
+        "patience",
+        "the drawn bow",
+        "the loaded spring",
+        "the pause before the pounce",
+        "stored lightning",
+        "the withheld word",
+        "the gathering wave"
+      ],
+      "leans": [
+        "control",
+        "combo"
+      ],
+      "vocabulary": {
+        "ops": [
+          "retain",
+          "draw",
+          "scale",
+          "add_trigger"
+        ],
+        "class_kind": "normal"
+      },
+      "buildable": true,
+      "gap_refs": [
+        "VOCABULARY_GAPS#5"
+      ]
+    },
+    {
+      "id": "forge_ramp",
+      "name": "Forge / signature-blade ramp",
+      "description": "stoke a per-combat Forge counter with forge income (cards + a per-turn power), then cash it with one or two scale:\"forged\" payoff attacks whose printed damage grows hit-by-hit; a blade_empower card can spike the blade to double/triple damage for a turn",
+      "metaphors": [
+        "the smith at the anvil",
+        "stoking the furnace",
+        "the blade reforged",
+        "tempering",
+        "heat and hammer",
+        "the masterwork",
+        "sharpening the signature weapon",
+        "the ringing anvil",
+        "the whetstone",
+        "the growing edge",
+        "the quenching"
+      ],
+      "leans": [
+        "combo",
+        "aggro"
+      ],
+      "vocabulary": {
+        "ops": [
+          "forge",
+          "scale",
+          "forged_ge",
+          "add_trigger",
+          "blade_empower"
+        ],
+        "class_kind": "normal"
+      },
+      "buildable": true,
+      "gap_refs": [
+        "VOCABULARY_GAPS#36"
+      ]
+    },
+    {
+      "id": "rampage_grow",
+      "name": "Rampage / grow-on-play",
+      "description": "a signature attack that grows every time you swing it - commit to the same card again and again as it climbs to a finisher. Distinct from Forge ramp: grow is ONE card feeding itself (via the `grow` field on a damage effect), not a class-level counter that many cards pump. Give the grow attack cheap draw/retain support so it recurs; 1-2 grow attacks per class max.",
+      "metaphors": [
+        "building momentum",
+        "the snowball down the hill",
+        "the rising storm",
+        "each blow harder than the last",
+        "the runaway engine",
+        "gathering fury",
+        "the avalanche",
+        "the escalating duel",
+        "the crescendo",
+        "one weapon, mastered"
+      ],
+      "leans": [
+        "aggro",
+        "combo"
+      ],
+      "vocabulary": {
+        "ops": [
+          "damage",
+          "grow",
+          "draw",
+          "retain"
+        ],
+        "class_kind": "normal"
+      },
+      "buildable": true,
+      "gap_refs": [
+        "VOCABULARY_GAPS#23"
+      ]
+    },
+    {
+      "id": "battle_smith",
+      "name": "Battle-smith / in-run upgrade",
+      "description": "sharpen your tools mid-fight - upgrades as a combat resource (the Armaments fantasy). A skill carries `{\"op\":\"upgrade_card\",\"cards\":\"choose\"}` (YOU pick one card in hand - the true Armaments feel), `\"cards\":\"random\"` (upgrade one random card in hand), or `\"cards\":\"all\"` (upgrade the whole hand, a strong uncommon+). COMBAT-SCOPED: upgrades last this combat only, so lean on retain or big/refilling hands so an upgraded card sticks around to matter; a rare power can run a `turn_start`-> `upgrade_card` (random) engine. 1-2 upgrade cards per class.",
+      "metaphors": [
+        "the forge between blows",
+        "honing the edge mid-duel",
+        "the armorer at war",
+        "tempering under fire",
+        "the whetstone in your pack",
+        "sharpening as you strike",
+        "the field smithy",
+        "growing keener each turn",
+        "the craftsman-warrior",
+        "tools that improve as you fight"
+      ],
+      "leans": [
+        "control",
+        "combo"
+      ],
+      "vocabulary": {
+        "ops": [
+          "upgrade_card",
+          "retain",
+          "draw"
+        ],
+        "class_kind": "normal"
+      },
+      "buildable": true,
+      "gap_refs": [
+        "VOCABULARY_GAPS#18"
+      ]
+    },
+    {
+      "id": "ascetic_purge",
+      "name": "Ascetic / deck-thinning",
+      "description": "burn the chaff - cards that thin your deck toward a lean engine (permanent deck-thinning). Two shapes: a strong, over-statted skill or attack carries the flag-op `{\"op\":\"purge\"}` so that playing it removes THAT card from your RUN DECK for the rest of the run (a stronger `exhaust` that never returns; you spend the card once, so over-stat it for its cost); OR the op `{\"op\":\"purge_card\"}` lets the PLAYER choose a card in hand and purge THAT one (targeted thinning - cut a Basic, Curse, or dead draw), and since the purge_card card itself stays it can be a normal repeatable skill. Pair with a deck the player WANTS thin (a few key payoff cards you dig to). Neither goes on a basic; keep deck-thinning to 1-3 cards per class - it sharpens the identity, it isn't the whole identity. (`purge` is also mutually exclusive with `exhaust`.)",
+      "metaphors": [
+        "burning the chaff",
+        "the ascetic's discipline",
+        "shedding dead weight",
+        "the lean blade",
+        "one perfect cut",
+        "renunciation",
+        "trimming to the essence",
+        "the pilgrim's light pack",
+        "sacrifice for sharpness",
+        "less, but keener"
+      ],
+      "leans": [
+        "combo"
+      ],
+      "vocabulary": {
+        "ops": [
+          "purge",
+          "purge_card",
+          "draw",
+          "damage"
+        ],
+        "class_kind": "normal"
+      },
+      "buildable": true,
+      "gap_refs": [
+        "VOCABULARY_GAPS#19"
+      ]
+    },
+    {
+      "id": "poison_attrition",
+      "name": "Venom / attrition",
+      "description": "stack Poison and let the slow tide do the killing",
+      "metaphors": [
+        "rot",
+        "the slow tide",
+        "decay",
+        "inevitability",
+        "the creeping dark",
+        "corrosion",
+        "the wasting sickness",
+        "venom in the blood",
+        "the long fever",
+        "the spreading stain"
+      ],
+      "leans": [
+        "control"
+      ],
+      "vocabulary": {
+        "ops": [
+          "poison",
+          "apply_status",
+          "damage"
+        ],
+        "class_kind": "normal"
+      },
+      "buildable": true,
+      "gap_refs": []
+    },
+    {
+      "id": "block_bulwark",
+      "name": "Bulwark / turtle",
+      "description": "out-defend the fight; turn Block into an engine",
+      "metaphors": [
+        "the wall",
+        "the shell",
+        "the immovable",
+        "the fortress",
+        "endurance",
+        "the tide breaks",
+        "the bulwark",
+        "the aegis",
+        "the phalanx",
+        "the anchor",
+        "the breakwater"
+      ],
+      "leans": [
+        "control"
+      ],
+      "vocabulary": {
+        "ops": [
+          "block",
+          "apply_status",
+          "add_trigger"
+        ],
+        "class_kind": "normal"
+      },
+      "buildable": true,
+      "gap_refs": []
+    },
+    {
+      "id": "strength_berserk",
+      "name": "Berserker / rage",
+      "description": "trade your own blood for raw, escalating power",
+      "metaphors": [
+        "fury",
+        "the red haze",
+        "sacrifice",
+        "momentum",
+        "the breaking point",
+        "abandon",
+        "the blood rage",
+        "the war cry",
+        "nothing held back",
+        "the rising storm"
+      ],
+      "leans": [
+        "aggro"
+      ],
+      "vocabulary": {
+        "ops": [
+          "apply_status",
+          "lose_hp",
+          "damage"
+        ],
+        "class_kind": "normal"
+      },
+      "buildable": true,
+      "gap_refs": []
+    },
+    {
+      "id": "strike_tempo",
+      "name": "Striker / relentless offense",
+      "description": "win by attacking: multi-hit flurries (repeated hits on one target), scaling strikes, and one decisive finisher",
+      "metaphors": [
+        "the striker",
+        "the finisher",
+        "the flurry",
+        "the killing blow",
+        "the breakaway",
+        "momentum",
+        "precision",
+        "the counterattack",
+        "the volley",
+        "the one-two",
+        "the fast break",
+        "relentless pressure"
+      ],
+      "leans": [
+        "aggro"
+      ],
+      "vocabulary": {
+        "ops": [
+          "damage",
+          "scale",
+          "apply_status"
+        ],
+        "class_kind": "normal"
+      },
+      "buildable": true,
+      "gap_refs": []
+    },
+    {
+      "id": "orb_channel",
+      "name": "Channeler / elements",
+      "description": "channel orbs that tick each turn, then evoke the burst",
+      "metaphors": [
+        "the storm",
+        "conduction",
+        "the cycle",
+        "the elements",
+        "kindling",
+        "the reservoir",
+        "the charged coil",
+        "the gathering current",
+        "the primed battery",
+        "the elemental wheel"
+      ],
+      "leans": [
+        "control",
+        "combo"
+      ],
+      "vocabulary": {
+        "ops": [
+          "channel_orb",
+          "evoke",
+          "gain_orb_slot",
+          "focus"
+        ],
+        "class_kind": "orb"
+      },
+      "buildable": true,
+      "gap_refs": []
+    },
+    {
+      "id": "slot_machine",
+      "name": "Gambler / RNG jackpot",
+      "description": "pull random orbs and pay off the jackpot when they match",
+      "metaphors": [
+        "the wheel",
+        "luck",
+        "the jackpot",
+        "chaos",
+        "the gamble",
+        "fortune's favor",
+        "the dice",
+        "the spin",
+        "the long shot",
+        "the roll of bones"
+      ],
+      "leans": [
+        "combo"
+      ],
+      "vocabulary": {
+        "ops": [
+          "channel_orb",
+          "orbs_match",
+          "orb_count_ge",
+          "evoke"
+        ],
+        "class_kind": "orb"
+      },
+      "buildable": true,
+      "gap_refs": []
+    },
+    {
+      "id": "summon_swarm",
+      "name": "Commander / minions",
+      "description": "win through a loyal minion you raise, strike through, buff, and keep alive (heal/shield it)",
+      "metaphors": [
+        "the pack",
+        "loyalty",
+        "command",
+        "the conjured ally",
+        "the standard",
+        "the leash",
+        "the war-hound",
+        "the sworn blade",
+        "the shield-bearer",
+        "the raised banner"
+      ],
+      "leans": [
+        "aggro",
+        "control"
+      ],
+      "vocabulary": {
+        "ops": [
+          "summon",
+          "summon_attack",
+          "buff_summon",
+          "heal_summon",
+          "shield_summon"
+        ],
+        "class_kind": "summon"
+      },
+      "buildable": true,
+      "gap_refs": [
+        "VOCABULARY_GAPS#2"
+      ]
+    },
+    {
+      "id": "status_signature",
+      "name": "Signature condition",
+      "description": "invent your own buff/debuff and build the whole class around it",
+      "metaphors": [
+        "the mark",
+        "the brand",
+        "the tell",
+        "mastery",
+        "the signature",
+        "the curse",
+        "the sigil",
+        "the fingerprint",
+        "the calling card",
+        "the personal hex"
+      ],
+      "leans": [
+        "combo",
+        "control"
+      ],
+      "vocabulary": {
+        "ops": [
+          "apply_status_custom"
+        ],
+        "class_kind": "status"
+      },
+      "buildable": true,
+      "gap_refs": []
+    },
+    {
+      "id": "tempo_draw",
+      "name": "Tempo / flow",
+      "description": "draw and energy acceleration that snowballs a single turn",
+      "metaphors": [
+        "the current",
+        "the dance",
+        "acceleration",
+        "the cascade",
+        "rhythm",
+        "the open road",
+        "the downhill run",
+        "the chain reaction",
+        "the flow state",
+        "the slipstream"
+      ],
+      "leans": [
+        "combo",
+        "aggro"
+      ],
+      "vocabulary": {
+        "ops": [
+          "draw",
+          "gain_energy",
+          "scale"
+        ],
+        "class_kind": "normal"
+      },
+      "buildable": true,
+      "gap_refs": []
+    },
+    {
+      "id": "self_sacrifice",
+      "name": "Blood / sacrifice",
+      "description": "spend HP as a resource, then claw it back",
+      "metaphors": [
+        "the offering",
+        "blood price",
+        "the bargain",
+        "martyrdom",
+        "the wound",
+        "communion",
+        "the self-cut",
+        "the crimson tithe",
+        "the pact",
+        "flesh for power"
+      ],
+      "leans": [
+        "aggro",
+        "combo"
+      ],
+      "vocabulary": {
+        "ops": [
+          "lose_hp",
+          "heal",
+          "apply_status"
+        ],
+        "class_kind": "normal"
+      },
+      "buildable": true,
+      "gap_refs": []
+    },
+    {
+      "id": "debuff_expose",
+      "name": "Expose / hex",
+      "description": "crack the enemy open with Vulnerable/Weak, then exploit it - the more debuffs pile on, the harder your flechettes bite",
+      "metaphors": [
+        "the opening",
+        "the chink",
+        "the curse",
+        "the weakness found",
+        "the unraveling",
+        "the hex",
+        "the exposed throat",
+        "the crack in the armor",
+        "the marked prey",
+        "the pried-open guard",
+        "the flechette storm",
+        "a thousand small cuts",
+        "the piled-on afflictions"
+      ],
+      "leans": [
+        "aggro",
+        "control"
+      ],
+      "vocabulary": {
+        "ops": [
+          "apply_status",
+          "target_has_status",
+          "damage",
+          "target_debuff_count"
+        ],
+        "class_kind": "normal"
+      },
+      "buildable": true,
+      "gap_refs": []
+    },
+    {
+      "id": "reaper_lifesteal",
+      "name": "Reaper / lifesteal",
+      "description": "hit everything and heal for the unblocked damage you deal - attrition as the win condition",
+      "metaphors": [
+        "the reaper",
+        "the red harvest",
+        "the scythe",
+        "blood for blood",
+        "the vampire's feast",
+        "life drawn from death",
+        "the crimson tithe",
+        "the leeching blade",
+        "sustain through slaughter",
+        "the drinking wound"
+      ],
+      "leans": [
+        "aggro",
+        "control"
+      ],
+      "vocabulary": {
+        "ops": [
+          "damage",
+          "heal",
+          "damage_dealt_unblocked"
+        ],
+        "class_kind": "normal"
+      },
+      "buildable": false,
+      "gap_refs": [
+        "VOCABULARY_GAPS#21"
+      ]
+    },
+    {
+      "id": "power_ramp",
+      "name": "Power engine / snowball",
+      "description": "per-turn triggers that escalate; win the long game",
+      "metaphors": [
+        "the engine",
+        "the snowball",
+        "escalation",
+        "the long game",
+        "compounding",
+        "the wound-up spring",
+        "the flywheel",
+        "the rising tide",
+        "interest on interest",
+        "the building storm"
+      ],
+      "leans": [
+        "control",
+        "combo"
+      ],
+      "vocabulary": {
+        "ops": [
+          "add_trigger",
+          "apply_status",
+          "scale"
+        ],
+        "class_kind": "normal"
+      },
+      "buildable": true,
+      "gap_refs": []
+    },
+    {
+      "id": "countdown_ripen",
+      "name": "Delayed maturation (ripen)",
+      "description": "plant something that does nothing now and fires once after N turns",
+      "metaphors": [
+        "the seed",
+        "dormancy",
+        "the long fuse",
+        "ripening",
+        "the harvest",
+        "the slow burn",
+        "the buried charge",
+        "the sleeper",
+        "the ticking clock",
+        "the patient trap"
+      ],
+      "leans": [
+        "combo",
+        "control"
+      ],
+      "vocabulary": {
+        "ops": [
+          "ripen",
+          "add_trigger"
+        ],
+        "class_kind": "normal"
+      },
+      "buildable": false,
+      "gap_refs": [
+        "VOCABULARY_GAPS#6"
+      ]
+    },
+    {
+      "id": "balance_gauge",
+      "name": "Two-pole balance gauge",
+      "description": "a meter pushed toward light or dark; both extremes bite",
+      "metaphors": [
+        "the knife's edge",
+        "equilibrium",
+        "the two-faced",
+        "the tightrope",
+        "duality",
+        "the center held",
+        "the scales",
+        "the fulcrum",
+        "the swinging pendulum",
+        "light and shadow"
+      ],
+      "leans": [
+        "combo"
+      ],
+      "vocabulary": {
+        "ops": [
+          "balance_step"
+        ],
+        "class_kind": "normal"
+      },
+      "buildable": false,
+      "gap_refs": [
+        "VOCABULARY_GAPS#1"
+      ]
+    },
+    {
+      "id": "madness_discard",
+      "name": "Madness / discard-matters",
+      "description": "churn your hand - discard as fuel, cards that reward being thrown away (Reflex). Three tools: `{\"op\":\"discard\",\"amount\":1}` throws random cards from hand (a cost/enabler; pair with draw); `{\"op\":\"add_trigger\",\"trigger\":\"on_discard\",...}` is the Reflex payoff that fires when THAT card is effect-discarded (keep discard-fuel cards in hand and pitch them for value); and `{\"op\":\"scry\",\"amount\":3}` looks at the top N of your draw pile and discards any (a draw-filter that also lets you CHOOSE which fuel card to pitch - scry-discards trigger on_discard too). Ship discard income + a couple of on_discard fuel cards + a scry/churn engine.",
+      "metaphors": [
+        "the gambler",
+        "sifting the ashes",
+        "reckless abandon",
+        "throw it away",
+        "the fever dream",
+        "cards through your fingers",
+        "the churn",
+        "what you cast aside",
+        "the overflowing hand",
+        "fuel for the fire"
+      ],
+      "leans": [
+        "combo"
+      ],
+      "vocabulary": {
+        "ops": [
+          "discard",
+          "scry",
+          "add_trigger",
+          "draw"
+        ],
+        "class_kind": "normal"
+      },
+      "buildable": true,
+      "gap_refs": [
+        "VOCABULARY_GAPS#17"
+      ]
+    },
+    {
+      "id": "token_conjurer",
+      "name": "Token conjurer",
+      "description": "conjure copies of your own cards into your piles - a deck that manufactures its own fuel",
+      "metaphors": [
+        "the conjurer",
+        "sleight of hand",
+        "the echo",
+        "manufactured ammunition",
+        "more where that came from",
+        "the summoning trick",
+        "copies upon copies",
+        "the endless quiver",
+        "the printing press",
+        "what burns returns"
+      ],
+      "leans": [
+        "combo"
+      ],
+      "vocabulary": {
+        "ops": [
+          "add_card",
+          "add_trigger",
+          "exhaust"
+        ],
+        "class_kind": "normal"
+      },
+      "buildable": false,
+      "gap_refs": [
+        "VOCABULARY_GAPS#16"
+      ]
+    },
+    {
+      "id": "exhaust_pyre",
+      "name": "Pyre / exhaust-matters",
+      "description": "burn cards away for power - every Exhaust feeds the engine; pair with token_conjurer for the compost loop (on_exhaust + add_card = what burns returns), or with corruption (your Skills cost 0 but Exhaust when played - reckless-tempo fuel for the on_exhaust engine)",
+      "metaphors": [
+        "the pyre",
+        "ashes",
+        "burning bridges",
+        "no way back",
+        "feeding the flame",
+        "what's spent is fuel",
+        "the bonfire",
+        "scorched earth",
+        "the last match",
+        "the funeral pyre"
+      ],
+      "leans": [
+        "combo"
+      ],
+      "vocabulary": {
+        "ops": [
+          "exhaust",
+          "add_trigger",
+          "draw",
+          "corruption"
+        ],
+        "class_kind": "normal"
+      },
+      "buildable": true,
+      "gap_refs": [
+        "VOCABULARY_GAPS#20"
+      ]
+    },
+    {
+      "id": "strike_synergy",
+      "name": "Strikes-matter / tag synergy",
+      "description": "a family of same-named cards that reward owning many of them - the more you draft, the harder your payoffs hit (Perfected Strike)",
+      "metaphors": [
+        "the drilled form",
+        "one strike, mastered",
+        "repetition",
+        "the signature blow",
+        "muscle memory",
+        "the practiced kata",
+        "the honed technique",
+        "many hands, one strike",
+        "the perfected form",
+        "the drilled squad"
+      ],
+      "leans": [
+        "aggro"
+      ],
+      "vocabulary": {
+        "ops": [
+          "damage",
+          "tag_cards_owned"
+        ],
+        "class_kind": "normal"
+      },
+      "buildable": true,
+      "gap_refs": [
+        "VOCABULARY_GAPS#25"
+      ]
+    },
+    {
+      "id": "metamorph",
+      "name": "Metamorph / self-rewriting cards",
+      "description": "cards that PERMANENTLY transform into other cards mid-run - a weak card ranks up into a strong one once you've built up (rank-up), two cards swap into each other as a stance/weapon-mode toggle (mode-swap), or a graft card lets you PICK a weak card in hand and reforge it into a strong one (prune & graft). The deck rewrites itself as the run goes on",
+      "metaphors": [
+        "the circuit that rewrites itself",
+        "filing the sear, reboring the barrel",
+        "the caterpillar and the butterfly",
+        "reconfiguring the weapon mid-duel",
+        "the shape that learns",
+        "molting into a new form",
+        "the blade reforged",
+        "flipping between two stances",
+        "the machine that upgrades itself",
+        "one card, two lives",
+        "grafting a cutting onto the rootstock",
+        "reforging scrap into a blade"
+      ],
+      "leans": [
+        "combo"
+      ],
+      "vocabulary": {
+        "ops": [
+          "damage",
+          "transform_card",
+          "graft_card"
+        ],
+        "class_kind": "normal"
+      },
+      "buildable": true,
+      "gap_refs": [
+        "VOCABULARY_GAPS#35",
+        "VOCABULARY_GAPS#38",
+        "VOCABULARY_GAPS#7"
+      ]
+    },
+    {
+      "id": "big_energy",
+      "name": "Overload / big energy",
+      "description": "generate outsized energy, then dump it into huge expensive turns",
+      "metaphors": [
+        "the surge",
+        "overload",
+        "the dynamo",
+        "the floodgates",
+        "all at once",
+        "the spending spree",
+        "the power surge",
+        "the reactor",
+        "the open throttle",
+        "the full tank"
+      ],
+      "leans": [
+        "aggro",
+        "combo"
+      ],
+      "vocabulary": {
+        "ops": [
+          "gain_energy",
+          "damage",
+          "scale"
+        ],
+        "class_kind": "normal"
+      },
+      "buildable": true,
+      "gap_refs": []
+    },
+    {
+      "id": "counter_riposte",
+      "name": "Counterpuncher",
+      "description": "get hit, hit back: retaliation triggers and thorns turn the enemy's own attack into your damage",
+      "metaphors": [
+        "the riposte",
+        "the parry-and-thrust",
+        "the counterpunch",
+        "the coiled snake",
+        "the caltrops",
+        "the thornbush",
+        "turning the blow",
+        "the hedgehog",
+        "the return strike",
+        "the rebound"
+      ],
+      "leans": [
+        "control",
+        "aggro"
+      ],
+      "vocabulary": {
+        "ops": [
+          "add_trigger",
+          "attacked",
+          "on_hp_lost",
+          "thorns"
+        ],
+        "class_kind": "normal"
+      },
+      "buildable": true,
+      "gap_refs": []
+    },
+    {
+      "id": "threshold_duelist",
+      "name": "Duelist of moments",
+      "description": "when-gated payoffs ARE the identity: execute windows, late-game spikes, no-block daring - the right moment is everything",
+      "metaphors": [
+        "the perfect moment",
+        "the execute",
+        "the last stand",
+        "the drawn-out duel",
+        "the opening window",
+        "the ripe instant",
+        "the do-or-die",
+        "the killing window",
+        "the late bloom",
+        "the razor's timing"
+      ],
+      "leans": [
+        "combo",
+        "aggro"
+      ],
+      "vocabulary": {
+        "ops": [
+          "hp_below_half",
+          "turn_at_least",
+          "no_block",
+          "has_block"
+        ],
+        "class_kind": "normal"
+      },
+      "buildable": true,
+      "gap_refs": []
+    },
+    {
+      "id": "horde_breaker",
+      "name": "Crowd-breaker",
+      "description": "AoE payoffs that want MANY enemies: the more they bring, the harder you hit all of them at once",
+      "metaphors": [
+        "the whirlwind",
+        "the cleave",
+        "the sweep",
+        "the mob-breaker",
+        "the scythe through wheat",
+        "the crowd-clearer",
+        "the storm of blades",
+        "the sweeping arc",
+        "the many-against-one",
+        "the field of foes"
+      ],
+      "leans": [
+        "aggro",
+        "control"
+      ],
+      "vocabulary": {
+        "ops": [
+          "damage",
+          "all_enemies",
+          "enemy_count_ge"
+        ],
+        "class_kind": "normal"
+      },
+      "buildable": true,
+      "gap_refs": []
+    },
+    {
+      "id": "ambush_alpha",
+      "name": "Ambusher",
+      "description": "innate opening-hand burst: win the first three turns before the enemy ever sets up",
+      "metaphors": [
+        "the ambush",
+        "the first strike",
+        "the dawn raid",
+        "the opening gambit",
+        "the surprise",
+        "the pounce",
+        "the head start",
+        "the sucker punch",
+        "the alpha strike",
+        "the pre-emptive blow"
+      ],
+      "leans": [
+        "aggro"
+      ],
+      "vocabulary": {
+        "ops": [
+          "innate",
+          "damage",
+          "gain_energy"
+        ],
+        "class_kind": "normal"
+      },
+      "buildable": true,
+      "gap_refs": []
+    },
+    {
+      "id": "fleeting_flux",
+      "name": "Use-it-or-lose-it",
+      "description": "ethereal cards over-statted for their cost: big now, gone at end of turn - churn your hand or waste them",
+      "metaphors": [
+        "the fading spark",
+        "the melting snow",
+        "the mayfly",
+        "here-and-gone",
+        "the flash flood",
+        "the shooting star",
+        "use it or lose it",
+        "the borrowed power",
+        "the vanishing edge",
+        "the ephemeral blade"
+      ],
+      "leans": [
+        "combo",
+        "aggro"
+      ],
+      "vocabulary": {
+        "ops": [
+          "ethereal",
+          "draw",
+          "damage"
+        ],
+        "class_kind": "normal"
+      },
+      "buildable": true,
+      "gap_refs": []
+    },
+    {
+      "id": "untouchable_ward",
+      "name": "Untouchable",
+      "description": "mitigation exotica: negate, absorb, and phase (buffer/artifact/intangible/blur) instead of flat Block",
+      "metaphors": [
+        "the ghost",
+        "the ward",
+        "the phase-step",
+        "the deflection",
+        "the untouchable",
+        "the null field",
+        "the warded skin",
+        "the intangible one",
+        "the absorbing veil",
+        "the charmed life"
+      ],
+      "leans": [
+        "control"
+      ],
+      "vocabulary": {
+        "ops": [
+          "apply_status",
+          "buffer",
+          "artifact",
+          "intangible",
+          "blur"
+        ],
+        "class_kind": "normal"
+      },
+      "buildable": true,
+      "gap_refs": []
+    },
+    {
+      "id": "burst_window",
+      "name": "Glass tempest",
+      "description": "temp-stat spike turns: all your strength at once, then gone - one explosive window per fight",
+      "metaphors": [
+        "the adrenaline spike",
+        "the sugar rush",
+        "the burst window",
+        "the flash of fury",
+        "the one big turn",
+        "the sudden squall",
+        "the glass cannon",
+        "the peak moment",
+        "the fleeting frenzy",
+        "the overclock"
+      ],
+      "leans": [
+        "aggro",
+        "combo"
+      ],
+      "vocabulary": {
+        "ops": [
+          "temp_strength",
+          "temp_dexterity",
+          "damage"
+        ],
+        "class_kind": "normal"
+      },
+      "buildable": true,
+      "gap_refs": []
+    },
+    {
+      "id": "iron_regrowth",
+      "name": "Regrower",
+      "description": "heal/regen attrition: outlast the fight by healing more than they can ever land",
+      "metaphors": [
+        "the regrowth",
+        "the mending",
+        "the second wind",
+        "the deep roots",
+        "the tide of health",
+        "the renewing spring",
+        "the knitting wound",
+        "the evergreen",
+        "the slow recovery",
+        "the unkillable"
+      ],
+      "leans": [
+        "control"
+      ],
+      "vocabulary": {
+        "ops": [
+          "heal",
+          "regen",
+          "apply_status"
+        ],
+        "class_kind": "normal"
+      },
+      "buildable": true,
+      "gap_refs": []
+    }
+  ]
+}

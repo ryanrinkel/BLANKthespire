@@ -1,0 +1,15 @@
+{
+  "id": "philosophers_stone",
+  "name": "Philosopher's Stone",
+  "tier": "boss",
+  "pool": "boss",
+  "description": "Gain 1 energy at the start of each turn. ALL enemies start combat with 1 Strength.",
+  "source": "authored",
+  "modifiers": [
+    { "stat": "max_energy", "amount": 1 }
+  ],
+  "hooks": [
+    { "trigger": "combat_start", "target": "all_enemies",
+      "effects": [ { "op": "apply_status", "status": "strength", "amount": 1, "to": "target" } ] }
+  ]
+}

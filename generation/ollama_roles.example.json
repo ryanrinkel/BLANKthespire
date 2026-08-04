@@ -1,0 +1,46 @@
+{
+  "_comment": "Per-role model mixture for the parallel `--ollama` forge path. Copy to ollama_roles.json (gitignored) and edit, or just use `--ollama` for the built-in defaults in btsgen/ollama_mix.py. Models must be live in the catalog: curl -H 'Authorization: Bearer $OLLAMA_API_KEY' https://ollama.com/v1/models",
+
+  "defaults": {
+    "base_url": "https://ollama.com/v1",
+    "api_key": "${OLLAMA_API_KEY}"
+  },
+
+  "_max_tokens_cap_comment": "Clamp every per-stage max_tokens request (the blueprint asks for 48000, sized for Claude; too high for most open models). Effective = min(requested, cap).",
+  "max_tokens_cap": 24000,
+
+  "roles": {
+    "_brainstorm_comment": "Divergent ideation (cloud/cluster + relic-intent). Small + permissive + warm. response_format=json_object pins output to valid JSON grammar. NOTE: map/compose moved to the 'structure' role — a small hot model emits unparseable JSON for that complex schema ~half the time even in JSON mode. To use a LOCAL uncensored model here instead, add e.g. \"base_url\": \"http://localhost:11434/v1\", \"api_key\": \"ollama\" to this role.",
+    "brainstorm": {
+      "model": "gemma4:31b",
+      "temperature": 0.9,
+      "response_format": { "type": "json_object" }
+    },
+
+    "_structure_comment": "Convergent + schema-strict: map/compose (_MapComposeContract) AND the dossier->card-briefs blueprint (_BlueprintContract). Strong, schema-faithful model, pinned to JSON.",
+    "structure": {
+      "model": "glm-5.2",
+      "response_format": { "type": "json_object" },
+      "temperature": 0.4
+    },
+
+    "_cards_comment": "Codes the ~23 cards + the relic in strict closed-vocab JSON. Strong coder, low temperature, pinned to JSON.",
+    "cards": {
+      "model": "glm-5.2",
+      "response_format": { "type": "json_object" },
+      "temperature": 0.3
+    }
+  },
+
+  "_fallback_comment": "Metered escape hatch for when the flat Ollama plan hits its GPU-time quota: the SAME harness re-issues the failed call per-token via OpenRouter (same model families). Inert until OPENROUTER_API_KEY is set; quota errors (429/402) divert all calls here for cooldown_s. Omit the key to inherit this default; set \"fallback\": null to disable.",
+  "fallback": {
+    "base_url": "https://openrouter.ai/api/v1",
+    "api_key": "${OPENROUTER_API_KEY}",
+    "models": {
+      "brainstorm": "google/gemma-3-27b-it",
+      "structure": "z-ai/glm-5.2",
+      "cards": "z-ai/glm-5.2"
+    },
+    "cooldown_s": 3600
+  }
+}

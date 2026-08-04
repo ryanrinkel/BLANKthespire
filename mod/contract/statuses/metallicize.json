@@ -1,0 +1,6 @@
+{
+  "id": "metallicize",
+  "name": "Metallicize",
+  "kind": "buff",
+  "decay": "none"
+}

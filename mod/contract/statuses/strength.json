@@ -1,0 +1,6 @@
+{
+  "id": "strength",
+  "name": "Strength",
+  "kind": "buff",
+  "decay": "none"
+}

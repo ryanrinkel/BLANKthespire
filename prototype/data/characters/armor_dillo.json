@@ -1,0 +1,14 @@
+{
+  "id": "armor_dillo",
+  "name": "The Armor Dillo",
+  "description": "A defensive bruiser that hoards Block behind permanent plating and burrows underground to weather any blow. Turtles up, then crushes with the wall it built.",
+  "max_hp": 85,
+  "max_energy": 3,
+  "starting_relic": "worn_carapace",
+  "starting_deck": [
+    "dillo_strike", "dillo_strike", "dillo_strike", "dillo_strike",
+    "dillo_defend", "dillo_defend", "dillo_defend", "dillo_defend",
+    "burrow", "shell_up"
+  ],
+  "signature_cards": ["burrow", "shell_up"]
+}

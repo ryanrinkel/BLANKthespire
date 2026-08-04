@@ -1,0 +1,6 @@
+{
+  "id": "vulnerable",
+  "name": "Vulnerable",
+  "kind": "debuff",
+  "decay": "turn"
+}

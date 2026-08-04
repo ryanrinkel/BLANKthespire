@@ -1,0 +1,17 @@
+{
+  "id": "bandage_up",
+  "name": "Bandage Up",
+  "type": "skill",
+  "rarity": "uncommon",
+  "character": "ironclad",
+  "cost": 0,
+  "target": "self",
+  "exhaust": true,
+  "effects": [
+    { "op": "heal", "amount": 4 }
+  ],
+  "upgrade": { "effects": [
+    { "op": "heal", "amount": 6 }
+  ]},
+  "flavor": "Restore HP, then exhaust. Exercises 'heal'."
+}

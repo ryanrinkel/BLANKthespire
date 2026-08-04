@@ -1,0 +1,6 @@
+{
+  "id": "focus",
+  "name": "Focus",
+  "kind": "buff",
+  "decay": "none"
+}

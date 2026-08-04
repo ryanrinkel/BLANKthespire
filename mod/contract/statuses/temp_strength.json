@@ -1,0 +1,6 @@
+{
+  "id": "temp_strength",
+  "name": "Strength",
+  "kind": "buff",
+  "decay": "turn"
+}

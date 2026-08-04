@@ -1,0 +1,30 @@
+{
+  "id": "hold_the_line",
+  "name": "Hold the Line",
+  "type": "skill",
+  "rarity": "common",
+  "cost": 1,
+  "target": "self",
+  "effects": [
+    {
+      "op": "block",
+      "amount": 6
+    },
+    {
+      "op": "draw",
+      "amount": 1
+    }
+  ],
+  "upgrade": {
+    "effects": [
+      {
+        "op": "block",
+        "amount": 9
+      },
+      {
+        "op": "draw",
+        "amount": 1
+      }
+    ]
+  }
+}

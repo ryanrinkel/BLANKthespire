@@ -1,0 +1,8 @@
+{
+  "id": "armor",
+  "name": "Armor",
+  "kind": "buff",
+  "decay": "none",
+  "stacks": true,
+  "description": "Barricade: while you have Armor, your Block no longer resets between turns -- it accumulates. Behavior: core/powers/Armor.gd (retains_block); the block-reset skip lives in CombatManager._start_player_turn."
+}

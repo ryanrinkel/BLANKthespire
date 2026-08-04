@@ -1,0 +1,19 @@
+{
+  "id": "miners_tnt",
+  "name": "Miner's TNT",
+  "type": "skill",
+  "rarity": "uncommon",
+  "character": "armor_dillo",
+  "archetype": "demolition",
+  "cost": 1,
+  "target": "self",
+  "effects": [
+    { "op": "fuse", "turns": 3, "scope": "all", "label": "Miner's TNT",
+      "effects": [ { "op": "damage", "amount": 24 } ] }
+  ],
+  "upgrade": { "effects": [
+    { "op": "fuse", "turns": 2, "scope": "all", "label": "Miner's TNT",
+      "effects": [ { "op": "damage", "amount": 24 } ] }
+  ]},
+  "flavor": "Abandoned mining dynamite. After 3 turns it levels EVERYTHING -- so be underground or behind your shell when it blows."
+}

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "slapthespoor:enemy",
+  "title": "Enemy",
+  "description": "An enemy is HP + a list of moves + an AI that picks the next move. Moves reuse the exact same effect vocabulary as cards (card.schema.json#/$defs/effect) — there is no separate 'enemy effect' system.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "hp", "moves", "ai"],
+  "properties": {
+    "id":   { "type": "string", "pattern": "^[a-z0-9_]+$" },
+    "name": { "type": "string", "minLength": 1, "maxLength": 32 },
+    "tier": { "enum": ["normal", "elite", "boss"], "default": "normal" },
+    "hp":   { "description": "Fixed value, or [min,max] rolled (seeded) at spawn.", "oneOf": [
+        { "type": "integer", "minimum": 1 },
+        { "type": "array", "items": { "type": "integer", "minimum": 1 }, "minItems": 2, "maxItems": 2 }
+    ]},
+    "innate_statuses": {
+      "description": "Statuses the enemy starts combat with (e.g. Ritual on a Cultist).",
+      "type": "array",
+      "items": { "type": "object", "required": ["status", "amount"], "additionalProperties": false,
+        "properties": { "status": { "type": "string" }, "amount": { "type": "integer" } } }
+    },
+    "moves": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "intent", "effects"],
+        "properties": {
+          "id":      { "type": "string", "pattern": "^[a-z0-9_]+$" },
+          "intent":  { "enum": ["attack", "block", "buff", "debuff", "attack_block", "attack_buff", "unknown"] },
+          "effects": { "type": "array", "minItems": 1, "items": { "$ref": "card.schema.json#/$defs/effect" } }
+        }
+      }
+    },
+    "ai": {
+      "description": "Move-selection policy. 'weighted' = probabilistic with constraints; 'scripted' = fixed/phased sequence (bosses).",
+      "type": "object", "additionalProperties": false, "required": ["type"],
+      "properties": {
+        "type":     { "enum": ["weighted", "scripted"] },
+        "weights":  { "type": "object", "additionalProperties": { "type": "number" }, "description": "move_id -> weight (weighted only)." },
+        "no_repeat":{ "type": "object", "additionalProperties": { "type": "integer" }, "description": "move_id -> max consecutive uses." },
+        "sequence": { "type": "array", "items": { "type": "string" }, "description": "ordered move_ids, looped (scripted only)." },
+        "phases":   { "description": "Optional phase shifts (e.g. Guardian mode-shift). Authored as data; one phase-trigger op may need adding to the vocabulary.",
+          "type": "array", "items": { "type": "object" } }
+      }
+    },
+    "source": { "enum": ["authored", "llm"], "default": "authored" }
+  }
+}

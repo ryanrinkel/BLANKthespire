@@ -1,0 +1,18 @@
+{
+  "id": "anger",
+  "name": "Anger",
+  "type": "attack",
+  "rarity": "common",
+  "character": "ironclad",
+  "cost": 0,
+  "target": "enemy",
+  "effects": [
+    { "op": "damage", "amount": 6 },
+    { "op": "add_card", "card_id": "anger", "pile": "discard" }
+  ],
+  "upgrade": { "effects": [
+    { "op": "damage", "amount": 8 },
+    { "op": "add_card", "card_id": "anger", "pile": "discard" }
+  ]},
+  "flavor": "Free damage that copies itself into the discard. Exercises 'add_card'."
+}

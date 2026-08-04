@@ -1,0 +1,6 @@
+{
+  "id": "poison",
+  "name": "Poison",
+  "kind": "debuff",
+  "decay": "stack"
+}

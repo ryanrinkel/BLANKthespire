@@ -1,0 +1,19 @@
+# systemd unit for the Forge-a-Class app. Install to /etc/systemd/system/btsweb.service, then:
+#   sudo systemctl daemon-reload && sudo systemctl enable --now btsweb
+# Adjust the paths/User to match where you cloned the repo and the venv you created.
+[Unit]
+Description=Forge a Class (BLANK the spire) web app
+After=network.target
+
+[Service]
+Type=simple
+User=btsweb
+Group=btsweb
+WorkingDirectory=/opt/btsweb/web
+EnvironmentFile=/opt/btsweb/web/.env
+ExecStart=/opt/btsweb/.venv/bin/gunicorn --config deploy/gunicorn.conf.py app:app
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
