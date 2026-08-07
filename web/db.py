@@ -9,7 +9,7 @@ import os
 from contextlib import contextmanager
 from pathlib import Path
 
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.orm import sessionmaker
 
 from models import INITIAL_TOKENS, Base
@@ -39,6 +39,20 @@ elif _url.startswith("mysql"):
         _engine_kwargs["connect_args"] = {"ssl": {}}
 
 engine = create_engine(_url, **_engine_kwargs)
+
+if _url.startswith("sqlite"):
+    @event.listens_for(engine, "connect")
+    def _sqlite_pragmas(dbapi_conn, _record):
+        # WAL lets the 8 gthread workers read while a write is in flight (no "database is locked"
+        # under concurrency), and is what Litestream replicates from. synchronous=NORMAL is the
+        # recommended (and still durable-on-app-crash) pairing with WAL; busy_timeout makes any
+        # residual writer contention wait instead of erroring.
+        cur = dbapi_conn.cursor()
+        cur.execute("PRAGMA journal_mode=WAL")
+        cur.execute("PRAGMA synchronous=NORMAL")
+        cur.execute("PRAGMA busy_timeout=5000")
+        cur.close()
+
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False, future=True)
 
 
