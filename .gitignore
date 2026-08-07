@@ -1,5 +1,9 @@
 # ── Secrets / local env ──────────────────────────────────────────────
+# .env.* catches server-side backup copies (.env.bak, .env.predeploy-*, …)
+# that would otherwise be stageable by a stray `git add -A` on the droplet.
 .env
+.env.*
+!.env.example
 *.env.local
 
 # ── Python (generation/, web/) ───────────────────────────────────────
@@ -19,10 +23,17 @@ generation/reference/sts2_cards.json
 generation/reference/sts2_rarity_examples.md
 
 # ── Website local dev / server-side data ─────────────────────────────
-web/dev.db
+web/dev.db*
 *.sqlite
 web/captured_gaps.jsonl
 web/card_feedback.jsonl
+
+# ── Droplet-local files living inside the /opt/btsweb checkout ───────
+#    (btsweb's home dir IS the repo dir, so shell/service cruft lands here)
+/.ssh/
+/.cache/
+/_backups/
+/deploy.sh
 
 # ── .NET build output ────────────────────────────────────────────────
 [Bb]in/
