@@ -39,11 +39,6 @@ BTSWEB_UNLIMITED_EMAILS=you@example.com
 # Allow BYOK endpoints on private/loopback hosts (local Ollama) — NEVER in prod.
 # BTSWEB_ALLOW_PRIVATE_URLS=
 
-# ── Forge queue (process-local — keep gunicorn at 1 worker) ──────────
-# BTSWEB_FORGE_MAX_CONCURRENT=3                          # forges running at once
-# BTSWEB_FORGE_MAX_QUEUE=12                              # forges waiting in line (beyond ⇒ 503 turn-away)
-# BTSWEB_FORGE_QUEUE_TIMEOUT_S=1800                      # max queue wait before giving up (token refunded)
-
 # ── Misc knobs (all optional) ────────────────────────────────────────
 # BTSWEB_CHOICE_TIMEOUT_S=120                            # interactive-forge choice timeout
 # BTSWEB_GAP_LOG=/path/to/captured_gaps.jsonl            # vocabulary-gap capture log

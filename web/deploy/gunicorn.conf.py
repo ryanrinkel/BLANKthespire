@@ -6,11 +6,16 @@
 # is generous so gunicorn never kills a worker mid-forge.
 
 bind = "127.0.0.1:8000"
-workers = 1            # 1GB droplet: one worker fits comfortably; the forge is I/O-bound so threads, not
-                       # workers, give the concurrency. Bump to 2 only on a larger box (>=2GB RAM).
+workers = 1            # MUST stay 1 while forge admission + the hosted daily cap are process-local
+                       # (app.py) — a second worker would silently double both limits and split the
+                       # forge queue. The forge is I/O-bound; threads give the concurrency on this box.
 worker_class = "gthread"
-threads = 8            # each in-flight forge uses ~2 threads (the request + its background worker)
-timeout = 600          # a full class forge can take several minutes
+threads = 32           # each running OR QUEUED forge holds one thread for its SSE stream (the forge
+                       # work itself runs on separate daemon threads). 32 covers the admission worst
+                       # case (3 running + 12 in line — app.py FORGE_* knobs) with ~2x headroom for
+                       # page loads. gthreads are cheap here: they idle on I/O, not CPU.
+timeout = 600          # a full class forge can take several minutes; queue wait rides the SSE
+                       # keepalives, not this timeout
 graceful_timeout = 30
 keepalive = 5
 accesslog = "-"        # -> journald via systemd

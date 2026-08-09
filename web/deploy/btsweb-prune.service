@@ -1,0 +1,12 @@
+# Rotate forged art when the droplet disk runs low (no-op above the free-space target).
+# Installed together with btsweb-prune.timer — see DEPLOY-DIGITALOCEAN.md.
+[Unit]
+Description=BLANK the spire — prune oldest forged art when disk is low
+
+[Service]
+Type=oneshot
+User=btsweb
+Group=btsweb
+WorkingDirectory=/opt/btsweb/web
+EnvironmentFile=/opt/btsweb/web/.env
+ExecStart=/opt/btsweb/.venv/bin/python tools/prune_forged_art.py --target-free-gb 5 --keep-days 30

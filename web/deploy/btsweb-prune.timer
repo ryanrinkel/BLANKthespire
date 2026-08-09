@@ -1,0 +1,11 @@
+# Daily trigger for btsweb-prune.service (which no-ops unless disk is actually low).
+[Unit]
+Description=BLANK the spire — daily disk check for forged-art rotation
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target

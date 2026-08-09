@@ -91,6 +91,19 @@ sudo systemctl daemon-reload && sudo systemctl enable --now btsweb
 sudo systemctl status btsweb        # should be active; logs: journalctl -u btsweb -f
 ```
 
+### Forged-art rotation (disk safety valve)
+
+Generated art (`web/static/forged/`, ~3MB/class) grows forever. Install the daily prune timer —
+it no-ops until free disk drops under 5GB, then deletes the oldest idle classes' splash/sprite
+(clearing their DB hashes; the game shows its "?" placeholder for late imports of those codes):
+
+```bash
+sudo cp /opt/btsweb/web/deploy/btsweb-prune.{service,timer} /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now btsweb-prune.timer
+# preview what a low-disk day would do:  cd /opt/btsweb/web &&
+#   sudo -u btsweb ../.venv/bin/python tools/prune_forged_art.py --dry-run --target-free-gb 999
+```
+
 ## 6. nginx + TLS
 
 ```bash
@@ -122,6 +135,10 @@ In Google Cloud Console → Credentials → your OAuth client → **Authorized r
 - Updating: `git pull`, `pip install -r web/requirements.txt` (if changed), `sudo systemctl restart btsweb`.
   If generation/ was installed non-editable (plain `pip install ./generation`), also re-run the install so
   the new btsgen lands in site-packages; an **editable** (`-e`) install skips that — `git pull` is enough.
+- Forge admission: at most `BTSWEB_FORGE_MAX_CONCURRENT` (3) forges run at once; the next
+  `BTSWEB_FORGE_MAX_QUEUE` (12) wait in a FIFO line with live queue-position progress in the stream;
+  beyond that `/api/forge-class` answers 503 up front (no token spent). Process-local — keep
+  gunicorn at 1 worker or the limits silently double and the line splits.
 - "Try it free" is unlimited per user; the only hosted-key guard is a global daily kill-switch
   (`BTSWEB_HOSTED_DAILY_CAP`, default 1000; `0` disables it) plus the optional invite-only allowlist
   (`BTSWEB_HOSTED_ALLOWLIST`). With a single gunicorn process group the counter is process-local, which is

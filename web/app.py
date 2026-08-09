@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import os
 import queue
+import shutil
 import threading
 import time
 import uuid
@@ -105,6 +106,66 @@ class HostedLimiter:
 hosted_limiter = HostedLimiter(
     daily_cap=int(os.environ.get("BTSWEB_HOSTED_DAILY_CAP", "1000")),
 )
+
+
+# --- forge admission control: bounded concurrency + a FIFO wait line -----------------------------
+# Each in-flight forge holds one gunicorn thread (its SSE stream) plus a daemon worker thread, and
+# burns provider capacity — unbounded simultaneous forges would starve page loads and trip provider
+# rate limits in a traffic spike. Admission is process-local (like HostedLimiter — revisit both
+# before going multi-worker): at most FORGE_MAX_CONCURRENT forges run at once, the next
+# FORGE_MAX_QUEUE wait in line (their SSE stream shows live queue position), and beyond that
+# /api/forge-class turns the forge away up front, BEFORE any token is reserved.
+FORGE_MAX_CONCURRENT = int(os.environ.get("BTSWEB_FORGE_MAX_CONCURRENT", "3"))
+FORGE_MAX_QUEUE = int(os.environ.get("BTSWEB_FORGE_MAX_QUEUE", "12"))
+FORGE_QUEUE_TIMEOUT_S = int(os.environ.get("BTSWEB_FORGE_QUEUE_TIMEOUT_S", "1800"))
+
+_forge_admit_lock = threading.Lock()
+_forge_running = 0
+_forge_waiting: list[threading.Event] = []  # FIFO; each entry is one queued forge's turn signal
+
+
+def _forge_enqueue() -> threading.Event:
+    """Join the forge line. The returned Event is set once this forge may run (immediately when a
+    slot is free). Once it IS set, the holder owes exactly one _forge_release()."""
+    global _forge_running
+    ticket = threading.Event()
+    with _forge_admit_lock:
+        if _forge_running < FORGE_MAX_CONCURRENT and not _forge_waiting:
+            _forge_running += 1
+            ticket.set()
+        else:
+            _forge_waiting.append(ticket)
+    return ticket
+
+
+def _forge_abandon(ticket: threading.Event) -> bool:
+    """Leave the line (queue-wait timeout). True = removed while still queued (no release owed);
+    False = a slot was granted concurrently, so the caller now owes a _forge_release()."""
+    with _forge_admit_lock:
+        if ticket in _forge_waiting:
+            _forge_waiting.remove(ticket)
+            return True
+    return False
+
+
+def _forge_release() -> None:
+    """Free a slot: hand it straight to the head of the line (running count unchanged), or if
+    nobody waits, decrement the running count."""
+    global _forge_running
+    with _forge_admit_lock:
+        if _forge_waiting:
+            _forge_waiting.pop(0).set()
+        else:
+            _forge_running -= 1
+
+
+def _forge_position(ticket: threading.Event) -> int:
+    """1-based place in the wait line; 0 = not queued (running, or already granted)."""
+    with _forge_admit_lock:
+        try:
+            return _forge_waiting.index(ticket) + 1
+        except ValueError:
+            return 0
 
 # Invite-only gate for the hosted path (spends OUR Anthropic key; retired from the UI — the public paths
 # are the daily free token and BYOK). Comma-separated Google emails in BTSWEB_HOSTED_ALLOWLIST. Fail
@@ -381,6 +442,14 @@ def forge_class_route():
     if hosted:
         model = body.get("model") if body.get("model") in HOSTED_MODELS else HOSTED_DEFAULT_MODEL
 
+    # Full line ⇒ turn the forge away NOW, before a token is reserved (soft cap: a race past it just
+    # means one extra spot in line, never a lost token).
+    with _forge_admit_lock:
+        line_len = len(_forge_waiting)
+    if line_len >= FORGE_MAX_QUEUE:
+        return jsonify({"error": "the forge is at full capacity right now — please try again in a few "
+                                 "minutes."}), 503
+
     # The "Use a token" path forges on our server-side Ollama mixture and spends one of the user's tokens
     # (unless they're on the unlimited master list). Reserve it up front so we can 402 BEFORE streaming; a
     # forge that then fails refunds the token in the stream below.
@@ -421,6 +490,28 @@ def forge_class_route():
             q.put(("progress", msg))
 
         def worker() -> None:
+            # Admission: wait for a forge slot, narrating queue position over SSE. On queue timeout the
+            # "error" event below refunds any reserved token via the stream's normal error path. (If the
+            # player closes the tab while queued, this thread still waits its turn and the forge runs to
+            # completion unseen — same as a mid-forge disconnect today — bounded by the queue timeout.)
+            ticket = _forge_enqueue()
+            if not ticket.is_set():
+                last_pos = _forge_position(ticket)
+                q.put(("progress", f"the forge is busy — you're in line at position {last_pos} "
+                                   f"(your spot is held, hang tight)…"))
+                deadline = time.time() + FORGE_QUEUE_TIMEOUT_S
+                while not ticket.wait(timeout=5):
+                    if time.time() >= deadline:
+                        if _forge_abandon(ticket):
+                            q.put(("error", "the forge stayed at capacity too long — nothing was "
+                                            "forged (and no token was spent); please try again later."))
+                            return
+                        break  # a slot arrived in the same instant — we own it now, proceed
+                    pos = _forge_position(ticket)
+                    if pos and pos != last_pos:
+                        last_pos = pos
+                        q.put(("progress", f"in line: position {pos}…"))
+                q.put(("progress", "it's your turn — forging now…"))
             try:
                 result["out"] = forge_to_bundle(
                     concept, key=key, hosted=hosted, fake=fake, model=model,
@@ -432,6 +523,8 @@ def forge_class_route():
                 q.put(("error", str(e)))
             except Exception as e:  # never leak a stack trace to the browser
                 q.put(("error", f"unexpected error: {e}"))
+            finally:
+                _forge_release()
 
         threading.Thread(target=worker, daemon=True).start()
         # Carry the post-reserve balance on the FIRST event so the header chip ticks down the moment the
@@ -562,7 +655,11 @@ def delete_class(class_id: int):
         if cls is None:
             return jsonify({"error": "not found"}), 404
         s.delete(cls)
-        return jsonify({"ok": True})
+    # Row is committed gone — remove the class's generated art (splash/sprite/relic) too, or deleted
+    # classes leak ~3MB each forever. After the DB delete so a failed delete never strands a live
+    # class without its art; ignore_errors because the dir may never have existed (no image backend).
+    shutil.rmtree(STATIC_FORGED_DIR / str(class_id), ignore_errors=True)
+    return jsonify({"ok": True})
 
 
 # --- id-as-key resolver (public) ----------------------------------------------------------------
