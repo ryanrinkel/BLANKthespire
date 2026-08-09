@@ -311,6 +311,9 @@ def _persist_class(user_id: int, concept: str, out: dict, forge_meta: dict | Non
         bundle["forge_meta"] = forge_meta
     if out.get("archetypes"):  # report-only: the archetype cards the class was built around
         bundle["archetypes"] = out["archetypes"]
+    # Three short transactions with the art OUTSIDE them: the ~20s art calls used to run inside the
+    # insert's open transaction, holding SQLite's ONE write lock the whole time — concurrent forges
+    # then died "database is locked" the moment saves overlapped (caught by the 4-forge queue test).
     with session_scope() as s:
         cls = ForgedClass(
             user_id=user_id,
@@ -324,15 +327,21 @@ def _persist_class(user_id: int, concept: str, out: dict, forge_meta: dict | Non
             cls.cards.append(ForgedCard(card_json=json.dumps(card, separators=(",", ":")), ordinal=i))
         s.add(cls)
         s.flush()  # assigns cls.id, which keys the art paths/URLs
+        class_id = cls.id
 
-        from concurrent.futures import ThreadPoolExecutor
-        with ThreadPoolExecutor(max_workers=3) as pool:
-            f_splash = pool.submit(_generate_art, "splash", cls.id, out, bundle)
-            f_sprite = pool.submit(_generate_art, "sprite", cls.id, out, bundle)
-            f_relic = pool.submit(_generate_relic_icon, cls.id, out, bundle)
-            splash_digest, sprite_digest = f_splash.result(), f_sprite.result()
-            relic_digest = f_relic.result()
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        f_splash = pool.submit(_generate_art, "splash", class_id, out, bundle)
+        f_sprite = pool.submit(_generate_art, "sprite", class_id, out, bundle)
+        f_relic = pool.submit(_generate_relic_icon, class_id, out, bundle)
+        splash_digest, sprite_digest = f_splash.result(), f_sprite.result()
+        relic_digest = f_relic.result()
 
+    with session_scope() as s:
+        cls = s.query(ForgedClass).filter_by(id=class_id).one_or_none()
+        if cls is None:  # deleted mid-art-generation (rare): don't strand the fresh art on disk
+            shutil.rmtree(STATIC_FORGED_DIR / str(class_id), ignore_errors=True)
+            raise RuntimeError("this class was deleted while its art was still generating")
         cls.splash_hash = splash_digest or cls.splash_hash
         cls.sprite_hash = sprite_digest or cls.sprite_hash
         if splash_digest or sprite_digest or relic_digest:  # art made: re-encode the code so it delivers the URLs
