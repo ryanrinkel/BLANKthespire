@@ -43,15 +43,26 @@ engine = create_engine(_url, **_engine_kwargs)
 if _url.startswith("sqlite"):
     @event.listens_for(engine, "connect")
     def _sqlite_pragmas(dbapi_conn, _record):
-        # WAL lets the 8 gthread workers read while a write is in flight (no "database is locked"
-        # under concurrency), and is what Litestream replicates from. synchronous=NORMAL is the
-        # recommended (and still durable-on-app-crash) pairing with WAL; busy_timeout makes any
-        # residual writer contention wait instead of erroring.
+        # WAL lets the gthread workers read while a write is in flight (and is what Litestream
+        # replicates from). synchronous=NORMAL is the recommended (still durable-on-app-crash)
+        # pairing with WAL; busy_timeout makes writer contention wait instead of erroring.
+        dbapi_conn.isolation_level = None  # take over BEGIN ourselves (see _sqlite_begin)
         cur = dbapi_conn.cursor()
         cur.execute("PRAGMA journal_mode=WAL")
         cur.execute("PRAGMA synchronous=NORMAL")
         cur.execute("PRAGMA busy_timeout=5000")
         cur.close()
+
+    @event.listens_for(engine, "begin")
+    def _sqlite_begin(conn):
+        # BEGIN IMMEDIATE: take the write lock at transaction start. A session that reads first
+        # and INSERTs later (e.g. _persist_class) would otherwise upgrade its deferred read
+        # transaction mid-flight — and if another connection wrote in between, SQLite returns
+        # SQLITE_BUSY *immediately* (the busy handler is bypassed by design: the read snapshot is
+        # stale and retrying could never succeed). Verified live: 3 forges persisting at once all
+        # failed "database is locked" under deferred BEGIN; with IMMEDIATE they queue on
+        # busy_timeout. Cost: transactions serialize — fine at this scale (all writes are ~ms).
+        conn.exec_driver_sql("BEGIN IMMEDIATE")
 
 SessionLocal = sessionmaker(bind=engine, expire_on_commit=False, future=True)
 
