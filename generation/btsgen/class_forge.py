@@ -56,7 +56,7 @@ RELIC_VOCAB = CONTRACT / "RELIC_VOCABULARY.md"  # Phase L: the constrained forge
 # the forge FLOW changes (blueprint prompt, staged front-end, strategic lines, card pipeline, safety nets…) so
 # a log line lets you tell which harness produced a given forge — on the CLI and in the streamed browser log.
 # It's the FIRST line emitted by forge_class(). Bump on any harness tweak; a short "-what" suffix helps track.
-HARNESS_VERSION = "1.2-weave"
+HARNESS_VERSION = "1.3-resonant"
 
 # Forged-class pool target. A base StS2 class pool is 20 common / 35 uncommon / 25 rare (~80 non-basic
 # cards); we ship a lean, reward-functional subset — each non-basic brief is one card-generation (LLM)
@@ -1590,8 +1590,9 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
     note(f"forge harness v{HARNESS_VERSION} (vocab v{VOCAB_VERSION})")
 
     # --- Phase N-2: roll the featured-mechanic roulette (seeded per concept) BEFORE stage 1 so both brief
-    # modes REQUIRE them. The staged front-end reads brief.featured to stamp the DossierBrief; the one-shot
-    # concept brief reads it directly. Missing picks are checked + repaired by the N-1 coverage round.
+    # modes REQUIRE them. The one-shot concept brief uses this BLIND roll as-is; the staged front-end may
+    # RE-ROLL theme-aware after its cloud stage (Phase N-5) — brief.featured is re-resolved after build().
+    # Missing picks are checked + repaired by the N-1 coverage round.
     from . import featured as _featured_mod
     _feat = _featured_mod.roll_featured(brief.concept)
     brief.featured = [f.id for f in _feat]
@@ -1613,6 +1614,9 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
         if errs:
             note("front-end blueprint invalid: " + "; ".join(errs[:5]))
             return res
+        # Phase N-5: the front-end may have re-rolled brief.featured theme-aware — re-resolve so the
+        # coverage round enforces the FINAL picks, not the blind pre-roll.
+        _feat = _featured_mod.resolve(getattr(brief, "featured", None) or [])
     else:
         note("designing the class blueprint...")
         text, messages = blueprint_gen.first_attempt(brief)
@@ -1629,6 +1633,9 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
                 note("blueprint invalid after repair: " + "; ".join(errs[:5]) + hint)
                 return res
     res.blueprint = bp
+    # Phase N-5: the FINAL featured ids ride the blueprint so the ledger records them (recency damping for
+    # later themed rolls). Bundle assembly reads explicit keys, so this never leaks into the shipped class.
+    bp["featured"] = [f.id for f in _feat]
     _arche = ", ".join(str(a.get("name") or a.get("id") or "") for a in (bp.get("archetypes") or [])
                        if isinstance(a, dict))
     note(f"blueprint ready: '{bp['name']}' ({bp.get('max_hp', '?')} HP)"

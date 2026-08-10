@@ -48,6 +48,40 @@ def test_roll_reproducible() -> None:
     check(len(set(rolls)) >= 3, f"different concepts spread across picks: {rolls}")
 
 
+def test_themed_roll() -> None:
+    print("themed_roll(): slot 1 resonant + wild rest, deterministic, order-proof, recency-damped:")
+    concept = "a beekeeper who commands the swarm"
+    short = ["token_conjure", "x_dump", "scry_filter"]
+    menu_ids = {f.id for f in featured.FEATURED_MENU}
+    a = featured.themed_roll(concept, short)
+    b = featured.themed_roll(concept, short)
+    check([f.id for f in a] == [f.id for f in b], "same concept + shortlist -> same picks")
+    check(len(a) == featured.N_FEATURED and len({f.id for f in a}) == len(a),
+          f"N distinct picks, got {[f.id for f in a]}")
+    check(a[0].id in short, f"slot 1 comes from the resonant shortlist: {a[0].id}")
+    check(all(f.id in menu_ids for f in a), "every pick is a menu entry")
+    # the model re-ordering its nominations cannot change the draw (canonical menu order)
+    c = featured.themed_roll(concept, list(reversed(short)))
+    check([f.id for f in a] == [f.id for f in c], "shortlist ordering does not change the picks")
+    # empty / unknown shortlist -> all-wild fallback, still N picks off the menu
+    d = featured.themed_roll(concept, ["not_a_mechanic"])
+    check(len(d) == featured.N_FEATURED and all(f.id in menu_ids for f in d),
+          "unknown shortlist -> wild fallback still rolls N menu picks")
+    check(len(featured.themed_roll(concept, [])) == featured.N_FEATURED, "empty shortlist -> wild fallback")
+    # recency damping: a heavily-used shortlist favorite gets displaced (weight 1000 -> ~9), never banned
+    heavy = {a[0].id: 100.0}
+    e = featured.themed_roll(concept, short, recent=heavy)
+    check(e[0].id != a[0].id and e[0].id in short,
+          f"recency-damped favorite displaced within the shortlist: {a[0].id} -> {e[0].id}")
+    # different concepts spread the resonant pick across the same shortlist
+    rolls = {featured.themed_roll(s, short)[0].id for s in
+             ("a beekeeper", "a hive tyrant", "a honey merchant", "a wasp queen", "a pollen shaman")}
+    check(len(rolls) >= 2, f"the lottery spreads slot 1 across the shortlist: {rolls}")
+    # menu_block lists every id (the cloud stage's rating surface)
+    mb = featured.menu_block()
+    check(all(f"- {i}:" in mb for i in menu_ids), "menu_block carries every menu id")
+
+
 def test_brief_blocks() -> None:
     print("both brief modes carry the REQUIRED featured block:")
     feats = featured.roll_featured("a tidal warden")
@@ -180,6 +214,7 @@ def test_coverage_targets_featured() -> None:
 
 def main() -> int:
     test_roll_reproducible()
+    test_themed_roll()
     test_brief_blocks()
     test_detectors_round_trip()
     test_exclusion_and_presence()

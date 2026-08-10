@@ -152,6 +152,25 @@ def test_corrupt_and_missing() -> None:
         os.environ["BTS_FORGE_LEDGER"] = saved
 
 
+def test_featured_recency() -> None:
+    print("featured field round-trips + featured_recency() weights by recency (Phase N-5):")
+    _fresh()
+    bp = _bp(["poison_attrition", "self_sacrifice"])
+    bp["featured"] = ["x_dump", "scry_filter"]
+    ledger.record_forge(_bundle("Feat", [{"op": "damage", "amount": 6}]), bp)
+    e = ledger.read_window()[-1]
+    check(e.get("featured") == ["x_dump", "scry_filter"], f"featured ids recorded: {e.get('featured')}")
+
+    # weights: oldest 0.5, newest 1.0 in a 2-entry window
+    win = [{"featured": ["x_dump", "scry_filter"]}, {"featured": ["x_dump"]}]
+    rec = ledger.featured_recency(win)
+    check(abs(rec.get("x_dump", 0.0) - 1.5) < 1e-9, f"repeat sums recency weights: {rec}")
+    check(abs(rec.get("scry_filter", 0.0) - 0.5) < 1e-9, f"old single use weighs 0.5: {rec}")
+    check(ledger.featured_recency([]) == {}, "empty window -> empty dict")
+    # pre-N-5 lines (no 'featured' field) contribute nothing, never raise
+    check(ledger.featured_recency([{"archetype_ids": ["a"]}]) == {}, "legacy lines tolerated")
+
+
 def test_injection_lines() -> None:
     print("map/blueprint injection lines summarize the overused window:")
     check(ledger.payload_line([]) == "", "empty window -> empty payload line")
@@ -204,6 +223,7 @@ def main() -> int:
     test_window_trim()
     test_penalty_math()
     test_corrupt_and_missing()
+    test_featured_recency()
     test_injection_lines()
     test_picker_novelty_term()
     print(f"\n{_PASS} passed, {_FAIL} failed")

@@ -240,6 +240,10 @@ class BlueprintBuilder:
         self._narrate_facets(dossier)
         self._narrate_cloud(dossier)
         self._narrate_skin(dossier)
+        # Phase N-5: theme-aware featured re-roll. The cloud stage NOMINATED resonant mechanics; a seeded,
+        # recency-damped lottery makes the final picks (slot 1 resonant, the rest wild). brief.featured is
+        # mutated in place — the DossierBrief stamp below AND forge_class's post-build re-resolve read it.
+        self._reroll_featured(brief, cloud, dossier)
 
         # stage 3+4: map onto the catalog + compose candidates. Interactive mode splits the two halves and
         # puts the player between them (their archetype pick constrains compose); auto keeps the fused call.
@@ -304,6 +308,36 @@ class BlueprintBuilder:
             bp["skin"] = dossier.skin_bank
         self._enrich_archetypes(bp, dossier)
         return bp
+
+    def _reroll_featured(self, brief, cloud: dict, dossier: Dossier) -> None:
+        """Phase N-5: replace the blind concept-hash roll with the theme-aware lottery. Wholly guarded —
+        the re-roll is an enhancement, so ANY failure keeps the blind roll and never breaks the forge."""
+        try:
+            from .. import featured as featured_mod
+            raw = [e for e in (cloud.get("featured_resonance") or [])
+                   if isinstance(e, dict) and str(e.get("id", "")).strip()]
+            known = {f.id for f in featured_mod.resolve([str(e["id"]) for e in raw])}
+            entries = [e for e in raw if str(e["id"]) in known]
+            dossier.featured_resonance = entries
+            try:
+                from .. import ledger
+                recent = ledger.featured_recency(self._recency_window)
+            except Exception:
+                recent = {}
+            res_ids = [str(e["id"]) for e in entries]
+            picks = featured_mod.themed_roll(dossier.theme, res_ids, recent)
+            if not picks:
+                return
+            brief.featured = [f.id for f in picks]
+            why = {str(e["id"]): str(e.get("why") or "").strip() for e in entries}
+            parts = [f"{f.id} (resonant: {why[f.id]})" if why.get(f.id)
+                     else (f"{f.id} (resonant)" if f.id in known else f"{f.id} (wild roll)")
+                     for f in picks]
+            self._note("      featured mechanics (theme-aware lottery): " + "; ".join(parts))
+            if not res_ids:
+                self._note("      (no resonance shortlist from the cloud stage — all slots rolled wild)")
+        except Exception as e:  # noqa: BLE001 — never break the forge over the featured re-roll
+            self._note(f"      featured re-roll skipped ({e}); keeping the concept-hash roll")
 
     def _enrich_archetypes(self, bp: dict, dossier: Dossier) -> None:
         """Stamp the map stage's player-facing skin (themed title + strategy pitch) onto bp["archetypes"] so

@@ -67,4 +67,5 @@ class Dossier:
     chosen: Candidate | None = None
     relic_intent: dict | None = None
     skin_bank: dict = field(default_factory=dict)   # {subject:[driver names], flavor:[names], imagery:[...], feelings:[...]}
+    featured_resonance: list[dict] = field(default_factory=list)  # [{id, why}] the cloud stage's menu shortlist (N-5)
     gaps_logged: int = 0

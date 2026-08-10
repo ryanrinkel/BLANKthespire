@@ -9,19 +9,26 @@ a "driver" facet is verb/action-rich (the natural engine of a class); a "flavor"
 from crowding out the mechanically-natural driver idea (e.g. "soccer") — every facet gets a per-facet concept
 QUOTA, and every driver facet must survive into the clusters, so the driver's actions can't be dropped.
 
-Output: one JSON object {facets:[...], concepts:[...], clusters:[{name, feeling, facet, concepts:[...]}]}.
+Phase N-5 adds one MECHANIC touch at the very end: a RESONANCE shortlist over the featured-mechanic menu
+(which menu entries FEEL made for this theme). It runs strictly AFTER the pure thematic work so the menu
+cannot steer the cloud; the shortlist only NOMINATES — featured.themed_roll makes the final picks code-side.
+
+Output: one JSON object {facets:[...], concepts:[...], clusters:[...], featured_resonance:[{id, why}]}.
 """
 from __future__ import annotations
 
 import json
 import re
 
+from ..featured import FEATURED_MENU, menu_block
+
 _SYSTEM = """You are the divergent front-end of a class designer for "BLANK the spire", a Slay-the-Spire-like \
 deckbuilder. Given a player's THEME, you brainstorm — first break the theme into its distinct ideas, then \
-free-associate on each. You do NOT talk about game mechanics, cards, damage, or numbers yet; this stage is \
-pure thematic association, the raw material a designer free-associates before deciding how anything works.
+free-associate on each. For the first three tasks you do NOT talk about game mechanics, cards, damage, or \
+numbers; they are pure thematic association, the raw material a designer free-associates before deciding how \
+anything works. Only the LAST task (resonance) touches mechanics, and only as a shortlist.
 
-Do THREE things:
+Do FOUR things:
 
 1. DECOMPOSE the theme into its 1-4 distinct IDEAS (facets). "haunted lighthouse keeper" -> [ghosts/haunting, \
 the lighthouse, solitude]; a single-idea theme like "vampires" has just one facet. For EACH facet assign a \
@@ -42,6 +49,14 @@ AND the oblique.
 from. EVERY driver facet MUST yield at least one cluster — a driver's actions are the class's future mechanics \
 and cannot be dropped. Threads should pull in different directions, not restate each other.
 
+4. RESONATE — ONLY now, with the thematic work done: from the MECHANIC MENU below, shortlist the 4-8 mechanics \
+whose FANTASY most resonates with this theme (which would feel made-for-it in play), each with a one-line "why" \
+tying it to a facet or cluster you produced. Judge by feel and fantasy, not power. This is a NOMINATION, not a \
+choice — a lottery makes the final picks. Do NOT let the menu steer tasks 1-3.
+
+MECHANIC MENU (id: fantasy):
+{menu}
+
 Output EXACTLY ONE JSON object, nothing else, in this shape:
 {
   "facets": [
@@ -51,10 +66,13 @@ Output EXACTLY ONE JSON object, nothing else, in this shape:
   "clusters": [
     { "name": "Short Thread Name", "feeling": "one line", "facet": "which facet name it springs from",
       "concepts": ["pulled", "from", "the", "cloud"] }
+  ],
+  "featured_resonance": [
+    { "id": "a mechanic id from the MENU", "why": "one line tying it to a facet/cluster" }
   ]
 }
 "concepts" is a FLAT array of plain strings — never nest arrays or objects inside it, never put a key: inside it. \
-Emit strictly valid JSON. Return only the JSON object."""
+Emit strictly valid JSON. Return only the JSON object.""".replace("{menu}", menu_block())
 
 
 class _CloudClusterContract:
@@ -66,7 +84,8 @@ class _CloudClusterContract:
         return ('Theme to diverge on:\n"' + concept.strip() + '"\n\n'
                 "Decompose it into 1-4 facets (each tagged driver/flavor by how action-rich it is), brainstorm a "
                 "BALANCED cloud (6-10 concepts per facet), then cluster into 3-6 threads. Every driver facet must "
-                "yield a cluster. Return only the JSON object.")
+                "yield a cluster. Finish with the featured_resonance shortlist (4-8 menu ids + why). "
+                "Return only the JSON object.")
 
     def repair_message(self, text: str, errors: list[str]) -> str:
         bullet = "\n".join(f"- {e}" for e in errors)
@@ -96,7 +115,9 @@ class _CloudClusterContract:
             {"name": "The Turning Point", "feeling": "the moment it pays off", "facet": driver,
              "concepts": concepts[12:18]},
         ]
-        return {"facets": facets, "concepts": concepts, "clusters": clusters}
+        # A deterministic slice of the menu so the offline path exercises the N-5 resonance -> themed_roll flow.
+        resonance = [{"id": f.id, "why": f"echoes {words[0]} (offline)"} for f in FEATURED_MENU[:4]]
+        return {"facets": facets, "concepts": concepts, "clusters": clusters, "featured_resonance": resonance}
 
 
 def validate_cloud(obj: dict) -> list[str]:
@@ -131,4 +152,9 @@ def validate_cloud(obj: dict) -> list[str]:
         for d in drivers:
             if not any(d and (d in c or c in d) for c in covered if c):
                 errs.append(f"driver facet '{d}' has no cluster — its actions can't be dropped; add one")
+    # featured_resonance is an ENHANCEMENT, never a blocker: a missing/empty shortlist degrades to the wild
+    # roll in the builder, so only a wrong TYPE is worth a repair round (unknown ids are filtered downstream).
+    fr = obj.get("featured_resonance")
+    if fr is not None and not isinstance(fr, list):
+        errs.append("'featured_resonance' must be a list of {id, why} objects (or omitted)")
     return errs

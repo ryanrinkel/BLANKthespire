@@ -8,6 +8,11 @@ directive (the same phrasebook coverage.py uses) so a missing featured mechanic 
 The roll is seeded ONLY by the concept (sha256 of its lowercased text) — reproducible per concept, never
 the `random` module. Orb/status/summon-only mechanics stay OFF this menu (class-kind pools remain the
 compose stage's call); every entry here is a base mechanic valid on any class kind.
+
+Phase N-5 adds the THEME-AWARE roll (themed_roll): the staged front-end's cloud stage nominates a
+resonance shortlist off menu_block(), and a seeded, recency-damped lottery fills slot 1 from that
+shortlist (theme fit) and the remaining slot(s) wild off the whole menu (deliberate forced-collision
+spice). The model only ever NOMINATES — code makes the final picks, so its favorites can't converge.
 """
 from __future__ import annotations
 
@@ -136,11 +141,16 @@ FEATURED_MENU: list[Featured] = [
 _BY_ID = {f.id: f for f in FEATURED_MENU}
 
 
+def _seed_val(text: str) -> int:
+    return int.from_bytes(hashlib.sha256((text or "").strip().lower().encode("utf-8")).digest(), "big")
+
+
 def roll_featured(concept: str, n: int = N_FEATURED) -> list[Featured]:
     """Deterministically pick `n` distinct featured mechanics for this concept. Seeded ONLY by the concept
-    (sha256 of its stripped, lowercased text) — same concept always rolls the same picks."""
-    seed = hashlib.sha256((concept or "").strip().lower().encode("utf-8")).digest()
-    val = int.from_bytes(seed, "big")
+    (sha256 of its stripped, lowercased text) — same concept always rolls the same picks. This is the BLIND
+    roll: the one-shot path uses it as-is; the staged front-end re-rolls via themed_roll after its cloud
+    stage (Phase N-5)."""
+    val = _seed_val(concept)
     pool = list(FEATURED_MENU)
     picks: list[Featured] = []
     while pool and len(picks) < n:
@@ -152,9 +162,60 @@ def roll_featured(concept: str, n: int = N_FEATURED) -> list[Featured]:
     return picks
 
 
+def themed_roll(concept: str, resonant_ids, recent=None, n: int = N_FEATURED) -> list[Featured]:
+    """Phase N-5: the theme-aware roll — slot 1 RESONANT, the rest WILD, all picked by a code-side lottery.
+
+    The model only ever NOMINATES (resonant_ids = the cloud stage's shortlist); the final picks are a
+    seeded WEIGHTED lottery so the model's favorites can't converge across forges. Every entry's weight
+    starts equal and is damped by `recent` (id -> recency-weighted use count from the ledger window):
+    weight = 1/(1+uses) — a recently-rolled mechanic grows unlikely, never impossible. Slot 1 draws from
+    the resonant shortlist (theme fit); remaining slots draw from the WHOLE remaining menu (the deliberate
+    forced-collision spice). Empty/unknown shortlist -> every slot wild (the blind roll, now recency-aware).
+
+    Seeded ONLY by the concept text, like roll_featured — same concept + same shortlist + same ledger
+    window -> the same picks. The shortlist is canonicalized to menu order, so the model re-ordering its
+    nominations cannot change the draw."""
+    recent = dict(recent or {})
+    val = _seed_val(concept)
+    resonant_set = {str(i) for i in (resonant_ids or [])}
+    shortlist = [f for f in FEATURED_MENU if f.id in resonant_set]
+    picks: list[Featured] = []
+
+    def _draw(pool: list[Featured]) -> None:
+        nonlocal val
+        pool = [f for f in pool if f not in picks]
+        if not pool:
+            return
+        weights = [max(1, int(1000.0 / (1.0 + float(recent.get(f.id, 0.0) or 0.0)))) for f in pool]
+        total = sum(weights)
+        r = val % total
+        val //= total
+        if val == 0:  # extremely unlikely; reseed off the concept + first id so the stream never dies
+            val = _seed_val(concept + pool[0].id)
+        acc = 0
+        for f, w in zip(pool, weights):
+            acc += w
+            if r < acc:
+                picks.append(f)
+                return
+        picks.append(pool[-1])
+
+    if shortlist:
+        _draw(shortlist)
+    while len(picks) < max(0, int(n)) and len(picks) < len(FEATURED_MENU):
+        _draw(list(FEATURED_MENU))
+    return picks
+
+
 def resolve(ids) -> list[Featured]:
     """Featured entries for a list of ids (silently drops unknown ids)."""
     return [_BY_ID[i] for i in (ids or []) if i in _BY_ID]
+
+
+def menu_block() -> str:
+    """The full menu (id: fantasy phrase, one per line) for prompts that RATE the menu — the cloud stage's
+    resonance shortlist (Phase N-5). Ids + injections only; detectors and directives stay code-side."""
+    return "\n".join(f"- {f.id}: {f.injection}" for f in FEATURED_MENU)
 
 
 def injection_block(ids) -> str:

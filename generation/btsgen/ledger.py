@@ -111,6 +111,9 @@ def record_forge(bundle: dict, blueprint: dict, *, ts: float | None = None) -> b
             "name": str((bundle.get("character") or {}).get("name") or (blueprint or {}).get("name") or ""),
             "archetype_ids": _archetype_ids(blueprint),
             "class_kind": _class_kind(blueprint),
+            # Phase N-5: the featured-roulette picks (forge_class stamps bp["featured"] with the FINAL ids,
+            # theme-aware re-rolls included) — feeds featured_recency() to damp repeats in later rolls.
+            "featured": [str(i) for i in ((blueprint or {}).get("featured") or [])],
             "top_ops": [op for op, _ in cen.ops.most_common(6)],
             "statuses_used": sorted(cen.statuses),
             "trigger_kinds": sorted(cen.triggers),
@@ -172,6 +175,18 @@ def pair_penalty(archetype_ids, window) -> float:
             pair_hits += w
         arch_hits += w * len(ids & eids)
     return min(_NOVELTY_MAX, _PAIR_W * pair_hits + _ARCH_W * arch_hits)
+
+
+def featured_recency(window) -> dict:
+    """id -> recency-weighted use count of the featured-roulette picks across the window (Phase N-5).
+    Feeds featured.themed_roll's lottery damping (weight = 1/(1+count)); entries without a 'featured'
+    field (pre-N-5 ledger lines) simply contribute nothing."""
+    out: dict = {}
+    for w, e in zip(_recency_weights(window or []), window or []):
+        for fid in (e.get("featured") or []):
+            fid = str(fid)
+            out[fid] = out.get(fid, 0.0) + w
+    return out
 
 
 def payload_line(window, *, k: int = 3) -> str:
