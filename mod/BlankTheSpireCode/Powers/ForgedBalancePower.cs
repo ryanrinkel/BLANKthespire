@@ -43,9 +43,14 @@ public sealed class ForgedBalancePower : BlankTheSpirePower
     private int _value;
 
     public override PowerType Type => PowerType.Buff;
-    // We own the arithmetic (signed steps can't ride native Counter stacking — a Light step must SUBTRACT), so
-    // Single: re-applying never auto-adds. BalanceStep sets the value + syncs Amount/display explicitly.
-    public override PowerStackType StackType => PowerStackType.Single;
+    // We own the arithmetic (signed steps can't ride native Counter stacking — a Light step must SUBTRACT):
+    // BalanceStep sets the value + syncs Amount/display explicitly. StackType is COUNTER anyway, purely for
+    // DISPLAY: in play the gauge's magnitude never rendered on the icon under Single (El Traficante
+    // 2026-08-12: the log stepped the gauge 1→2→3 while the badge stayed blank), while the Counter-stacked
+    // ForgedForgePower shows its count fine — Single reads as a binary toggle to the power UI. Counter's
+    // auto-add path never runs here: BalanceStep is the ONLY applier (EffectRunner + TriggerRunner both
+    // funnel through it) and it Applies only when the power is ABSENT, then mutates the live stack.
+    public override PowerStackType StackType => PowerStackType.Counter;
 
     /// <summary>The current signed gauge (positive = Dark, negative = Light, 0 = centered). Read by <see cref="Conditions"/>.</summary>
     public int Value => _value;

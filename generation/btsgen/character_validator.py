@@ -272,6 +272,191 @@ def balance_pairing_warnings(cards: list[dict]) -> list[str]:
     return out
 
 
+# --- Balance REACHABILITY + payoff density (El Traficante post-mortem, 2026-08-12) -------------------
+# balance_pairing_warnings checks EXISTENCE (both poles + >=1 gate); a class can pass it and still play
+# dead: El Traficante shipped 14 gauge-steppers against 3 readers, ALL rare, gates at dark_ge/light_ge 5
+# while a mixed-pole deck's gauge hovers at 0-3 (opposing steps cancel — the run log's observed peak was
+# 3), and its `centered 2` rare was trivially always-true. These lints price the gates AGAINST the set's
+# own income, the same posture as class_forge's deck-aware keystone gate. All advisory (a human decides).
+
+# A pole power (balance_step inside a turn_start/turn_end add_trigger payload) played ~turn 2 of a ~6-turn
+# fight ticks ~4 times; a reactive-trigger payload fires less predictably — price it at 2.
+_BAL_TURN_TRIGGER_FIRES = 4
+_BAL_REACTIVE_TRIGGER_FIRES = 2
+# Card steppers a COMMITTED drafter (leaning one pole, cycling the deck) actually plays in one combat.
+_BAL_COMMITTED_PLAYS = 5
+# `centered N` with N >= this is ~always true: the gauge STARTS centered and mixed-pole income keeps it
+# there, so the "restriction" plays as an unconditional payout (the Equilibrio failure).
+_BAL_CENTERED_TRIVIAL = 2
+
+
+def _balance_step_profile(card: dict) -> dict:
+    """Per-pole income profile of one card: {'direct': {pole: [amounts]}, 'per_turn': {pole: total},
+    'reactive': {pole: total}}. `direct` = steps that fire when the card is played (per play);
+    `per_turn` = steps inside a turn_start/turn_end add_trigger payload (an engine, fires every turn);
+    `reactive` = steps inside any other trigger payload. Base effects only for direct (the floor a
+    drafter buys); a committed player upgrades, so the per-card direct amount is max(base, upgrade)."""
+    prof = {"direct": {"light": [], "dark": []},
+            "per_turn": {"light": 0, "dark": 0},
+            "reactive": {"light": 0, "dark": 0}}
+
+    def steps(effects) -> dict:
+        got = {"light": 0, "dark": 0}
+        for e in effects or []:
+            if isinstance(e, dict) and e.get("op") == "balance_step":
+                p = str(e.get("pole", "")).strip().lower()
+                if p in got:
+                    try:
+                        got[p] += max(1, int(e.get("amount", 1) or 1))
+                    except (TypeError, ValueError):
+                        got[p] += 1
+        return got
+
+    def walk(effects, bucket: dict) -> None:
+        direct = steps([e for e in effects or [] if isinstance(e, dict) and e.get("op") == "balance_step"])
+        for p in ("light", "dark"):
+            bucket[p] = max(bucket[p], direct[p])
+        for e in effects or []:
+            if not isinstance(e, dict):
+                continue
+            if e.get("op") == "add_trigger":
+                trig = str(e.get("trigger", "")).strip().lower()
+                payload = steps(e.get("effects"))
+                key = "per_turn" if trig in ("turn_start", "turn_end") else "reactive"
+                for p in ("light", "dark"):
+                    prof[key][p] = max(prof[key][p], payload[p])
+            for k in ("then", "else"):
+                if e.get(k):
+                    sub = {"light": 0, "dark": 0}
+                    walk(e.get(k), sub)
+                    for p in ("light", "dark"):
+                        bucket[p] = max(bucket[p], sub[p])
+
+    base = {"light": 0, "dark": 0}
+    walk(card.get("effects"), base)
+    up = {"light": 0, "dark": 0}
+    _upgrade = card.get("upgrade")
+    walk(_upgrade.get("effects") if isinstance(_upgrade, dict) else None, up)
+    for p in ("light", "dark"):
+        amt = max(base[p], up[p])
+        if amt:
+            prof["direct"][p].append(amt)
+    return prof
+
+
+def _balance_peaks(cards: list[dict]) -> dict:
+    """The per-combat gauge peak a COMMITTED drafter can realistically reach per pole: the pole's best
+    _BAL_COMMITTED_PLAYS direct card steps (one play each) + its per-turn trigger engines ticking
+    _BAL_TURN_TRIGGER_FIRES times + reactive engines at _BAL_REACTIVE_TRIGGER_FIRES. Opposing income is
+    NOT subtracted — committed players skip the other pole's cards — so this is the generous ceiling:
+    a gate above it is dead even for the player who builds around it."""
+    direct = {"light": [], "dark": []}
+    per_turn = {"light": 0, "dark": 0}
+    reactive = {"light": 0, "dark": 0}
+    for c in cards:
+        if not isinstance(c, dict):
+            continue
+        prof = _balance_step_profile(c)
+        for p in ("light", "dark"):
+            direct[p] += prof["direct"][p]
+            per_turn[p] += prof["per_turn"][p]
+            reactive[p] += prof["reactive"][p]
+    return {p: (sum(sorted(direct[p], reverse=True)[:_BAL_COMMITTED_PLAYS])
+                + per_turn[p] * _BAL_TURN_TRIGGER_FIRES
+                + reactive[p] * _BAL_REACTIVE_TRIGGER_FIRES)
+            for p in ("light", "dark")}
+
+
+def _balance_gates(card: dict) -> list[tuple[str, int]]:
+    """Every (kind, value) Balance gate in the card (base/upgrade, incl. trigger payloads)."""
+    found: list[tuple[str, int]] = []
+
+    def walk(effects) -> None:
+        for e in effects or []:
+            if not isinstance(e, dict):
+                continue
+            w = e.get("when")
+            if isinstance(w, dict) and str(w.get("kind", "")).strip().lower() in _BALANCE_GATE_KINDS:
+                try:
+                    found.append((str(w.get("kind")).strip().lower(), int(w.get("value", 0) or 0)))
+                except (TypeError, ValueError):
+                    found.append((str(w.get("kind")).strip().lower(), 0))
+            for key in ("effects", "then", "else"):
+                walk(e.get(key))
+
+    walk(card.get("effects"))
+    _up = card.get("upgrade")
+    walk(_up.get("effects") if isinstance(_up, dict) else None)
+    return found
+
+
+def balance_reachability_warnings(cards: list[dict], starting_ids: set | None = None) -> list[str]:
+    """Price the set's Balance gates AGAINST its own gauge income (the reachability half the pairing
+    check can't see). Warns on: a pole gate above the committed drafter's realistic per-combat peak; a
+    `centered N` (N >= 2) gate that is trivially always-true (the gauge starts centered and mixed income
+    keeps it there); and STARTING-DECK cards (basics + signatures — pass their ids as `starting_ids`)
+    stepping OPPOSITE poles: the forced deck then cancels itself every combat, pinning the gauge at 0
+    before the player has drafted anything. Advisory."""
+    peaks = _balance_peaks(cards)
+    if not any(peaks.values()) and not any(_balance_gates(c) for c in cards if isinstance(c, dict)):
+        return []
+    out: list[str] = []
+    gate_pole = {"dark_ge": "dark", "light_ge": "light"}
+    for c in cards:
+        if not isinstance(c, dict):
+            continue
+        cid = str(c.get("id", "?"))
+        for kind, value in _balance_gates(c):
+            pole = gate_pole.get(kind)
+            if pole is not None and value > peaks[pole]:
+                out.append(f"unreachable Balance gate: {cid} gates on {kind} {value} but even a committed "
+                           f"{pole}-drafter peaks at ~{peaks[pole]} per combat with this set's income — "
+                           f"the payoff never fires. Lower the gate or add {pole} income.")
+            elif kind == "centered" and value >= _BAL_CENTERED_TRIVIAL:
+                out.append(f"trivial `centered` gate: {cid} gates on centered {value}, but the gauge STARTS "
+                           "centered and mixed-pole income keeps it near 0 — the gate is ~always true and "
+                           "reads as a restriction while paying out unconditionally. Use centered 0-1, or "
+                           "gate on a pole instead.")
+    if starting_ids:
+        start_poles: dict[str, set[str]] = {}
+        for c in cards:
+            if isinstance(c, dict) and str(c.get("id", "")) in starting_ids:
+                prof = _balance_step_profile(c)
+                poles = {p for p in ("light", "dark")
+                         if prof["direct"][p] or prof["per_turn"][p] or prof["reactive"][p]}
+                if poles:
+                    start_poles[str(c.get("id"))] = poles
+        stepped = set().union(*start_poles.values()) if start_poles else set()
+        if stepped == {"light", "dark"}:
+            names = ", ".join(f"{cid} ({'/'.join(sorted(ps))})" for cid, ps in sorted(start_poles.items()))
+            out.append(f"opposing steppers in the STARTING deck: {names} — the forced starting cards "
+                       "cancel each other every combat, pinning the gauge at 0 before any drafting. "
+                       "Starting-deck cards may step toward at most ONE pole; let drafted cards carry "
+                       "the other.")
+    return out
+
+
+def balance_payoff_density_warnings(cards: list[dict]) -> list[str]:
+    """The reader:income ratio + rarity spread of the Balance payoffs. El Traficante shipped 14 steppers
+    against 3 readers, ALL rare — the engine ran all game and paid out only if a rare was drafted. Warn
+    when readers < 1 per 4 income cards, and when no reader sits below rare. Advisory."""
+    income = [c for c in cards if isinstance(c, dict) and _balance_income_poles(c)]
+    readers = [c for c in cards if isinstance(c, dict) and _has_balance_gate(c)]
+    if not income:
+        return []
+    out: list[str] = []
+    if readers and len(readers) * 4 < len(income):
+        out.append(f"Balance payoff density: {len(income)} cards feed the gauge but only {len(readers)} "
+                   f"read it ({', '.join(sorted(str(c.get('id', '?')) for c in readers))}) — most of the "
+                   "engine's work goes unread. Aim for >=1 reader per ~4 income cards (convert an income "
+                   "card's bonus into a pole-gated payoff).")
+    if readers and all(str(c.get("rarity", "")).strip().lower() == "rare" for c in readers):
+        out.append("all Balance readers are RARE: the gauge only pays off if a rare is drafted, so most "
+                   "runs never cash it. Put at least one pole- or centered-gated payoff at uncommon "
+                   "(or common).")
+    return out
+
+
 def _has_grow(card: dict) -> bool:
     """True if any of the card's effects (base or upgrade) carries a `grow` (Rampage) damage step."""
     for lst in (card.get("effects") or [], (card.get("upgrade") or {}).get("effects") or []):

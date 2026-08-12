@@ -17,7 +17,8 @@ point_btsgen_at_mod_contract()
 
 from btsgen import bts1, cardgen                          # noqa: E402
 from btsgen.validator import CardValidator                # noqa: E402
-from btsgen.character_validator import balance_pairing_warnings  # noqa: E402
+from btsgen.character_validator import (balance_pairing_warnings, balance_payoff_density_warnings,  # noqa: E402
+                                        balance_reachability_warnings)
 from btsgen.frontend import catalog as C                  # noqa: E402
 
 _PASS = 0
@@ -187,6 +188,74 @@ def test_pairing() -> None:
     check(none == [], f"a non-balance set should not warn: {none}")
 
 
+# ---------------------------------------------------------------- 5b. reachability + payoff density
+# The El Traficante post-mortem (2026-08-12): a set can pass the pairing check and still play dead —
+# gates above the income's realistic peak, a trivially-true `centered`, a self-cancelling starting
+# deck, and readers too sparse / all-rare.
+def test_reachability() -> None:
+    print("balance_reachability_warnings prices gates against the set's own income:")
+    small_dark = _pool_card("small_dark", [{"op": "balance_step", "pole": "dark", "amount": 1}])
+    small_light = _pool_card("small_light", [{"op": "balance_step", "pole": "light", "amount": 1}])
+    high_gate = _pool_card("high_bomb", [{"op": "damage", "amount": 10, "when": {"kind": "dark_ge", "value": 5}}],
+                           type="attack", target="enemy", rarity="rare")
+    # a lone 1-step dark income peaks at 1 -> a dark_ge 5 gate can never open
+    w = balance_reachability_warnings([small_dark, small_light, high_gate])
+    check(any("unreachable" in x for x in w), f"a gate above the committed peak must warn: {w}")
+
+    # chunky income (a 3-step card + a turn_start engine) peaks well above the same gate -> silent
+    big_dark = _pool_card("big_dark", [{"op": "balance_step", "pole": "dark", "amount": 3}])
+    dark_engine = _pool_card("dark_engine", [{"op": "add_trigger", "trigger": "turn_start",
+                                              "effects": [{"op": "balance_step", "pole": "dark", "amount": 1}]}],
+                             type="power")
+    w = balance_reachability_warnings([big_dark, dark_engine, small_light, high_gate])
+    check(not any("unreachable" in x for x in w), f"a reachable gate must stay silent: {w}")
+
+    # centered 2 is ~always true (the gauge starts centered); centered 1 is the knife's edge
+    triv = _pool_card("triv", [{"op": "block", "amount": 12, "when": {"kind": "centered", "value": 2}}],
+                      rarity="rare")
+    edge = _pool_card("edge", [{"op": "block", "amount": 12, "when": {"kind": "centered", "value": 1}}],
+                      rarity="rare")
+    w = balance_reachability_warnings([small_dark, small_light, triv])
+    check(any("trivial" in x for x in w), f"centered 2 must warn as ~always true: {w}")
+    w = balance_reachability_warnings([small_dark, small_light, edge])
+    check(not any("trivial" in x for x in w), f"centered 1 is a real gate: {w}")
+
+    # opposing steppers in the STARTING deck cancel every combat before any drafting
+    w = balance_reachability_warnings([small_dark, small_light, edge],
+                                      starting_ids={"small_dark", "small_light"})
+    check(any("STARTING deck" in x for x in w), f"opposing starting steppers must warn: {w}")
+    w = balance_reachability_warnings([small_dark, small_light, edge], starting_ids={"small_dark"})
+    check(not any("STARTING deck" in x for x in w), f"a one-pole starting deck is fine: {w}")
+
+    # a non-balance set stays silent
+    check(balance_reachability_warnings(
+        [_pool_card("plain", [{"op": "damage", "amount": 6}], type="attack", target="enemy")]) == [],
+        "a non-balance set must not warn")
+
+
+def test_payoff_density() -> None:
+    print("balance_payoff_density_warnings flags sparse and all-rare readers:")
+    income = [_pool_card(f"inc_{i}", [{"op": "balance_step", "pole": "dark" if i % 2 else "light",
+                                       "amount": 1}]) for i in range(9)]
+    rare_reader = _pool_card("reader_r", [{"op": "damage", "amount": 10, "when": {"kind": "dark_ge", "value": 3}}],
+                             type="attack", target="enemy", rarity="rare")
+    unc_reader = _pool_card("reader_u", [{"op": "block", "amount": 8, "when": {"kind": "light_ge", "value": 3}}],
+                            rarity="uncommon")
+    # 9 income : 1 reader -> too sparse; and that one reader is rare -> both warnings
+    w = balance_payoff_density_warnings(income + [rare_reader])
+    check(any("density" in x for x in w), f"9:1 income:reader must warn: {w}")
+    check(any("RARE" in x for x in w), f"all-rare readers must warn: {w}")
+    # 3 readers incl. an uncommon on 9 income -> silent
+    reader3 = _pool_card("reader_3", [{"op": "damage", "amount": 8, "when": {"kind": "dark_ge", "value": 3}}],
+                         type="attack", target="enemy", rarity="uncommon")
+    w = balance_payoff_density_warnings(income + [rare_reader, unc_reader, reader3])
+    check(w == [], f"3 readers (incl. uncommon) on 9 income is healthy: {w}")
+    # a non-balance set stays silent
+    check(balance_payoff_density_warnings(
+        [_pool_card("plain", [{"op": "damage", "amount": 6}], type="attack", target="enemy")]) == [],
+        "a non-balance set must not warn")
+
+
 # ---------------------------------------------------------------- 6. version + gap + catalog lockstep
 def test_version_gap_catalog() -> None:
     print("version bump, gap flip, and catalog buildability:")
@@ -208,6 +277,8 @@ def main() -> int:
     for t in (test_accepts, test_rejects, test_text, test_emit):
         t(v)
     test_pairing()
+    test_reachability()
+    test_payoff_density()
     test_version_gap_catalog()
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return 1 if _FAIL else 0

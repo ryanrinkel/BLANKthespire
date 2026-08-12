@@ -89,7 +89,10 @@ enemy), `attacker` (the enemy that just hit you — **`attacked` hooks only**). 
 - `no_block` — you have 0 Block · `has_block` — you have Block (or `value`+ Block)
 - `enemy_count_ge` (needs `value` ≥ 1) — there are `value`+ enemies (so `value: 2` = a crowd; `negate` it for a lone elite)
 - `turn_at_least` (needs `value` ≥ 1) — it is turn `value`+ (a relic that powers up late)
-- `hand_size_ge` (needs `value` ≥ 1) — you hold `value`+ cards
+- `hand_size_ge` (needs `value` ≥ 1) — you hold `value`+ cards. **Timing:** the condition is read AT FIRE
+  TIME — on an `on_card_played` hook that is AFTER the played card has left your hand, so the player must have
+  held `value`+1 cards *before* playing. With a 5-card draw, `hand_size_ge 5`+ on `on_card_played` ~never fires;
+  keep it ≤ 4 there, or read the full hand from `turn_start` / `turn_end` instead.
 
 `negate: true` inverts any of them.
 

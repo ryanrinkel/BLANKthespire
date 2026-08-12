@@ -153,12 +153,59 @@ def test_uptime_and_stats_helpers() -> None:
           "garbage relic/made must not raise")
 
 
+# --- the DEAD end of the gate (the Hidden Ledger fix, El Traficante 2026-08-12) ----------------------
+# The power gate above prices generously HIGH; these cover the opposite failure: a keystone whose `when`
+# ~never holds (it shipped, equipped, and never fired once all run).
+
+def test_post_play_hand_gate_rejected() -> None:
+    print("on_card_played + hand_size_ge 6 (checked AFTER the card leaves hand) -> rejected as near-dead:")
+    relic = {"id": "hl", "name": "Hidden Ledger", "hooks": [
+        {"trigger": "on_card_played", "once_per_combat": True,
+         "when": {"kind": "hand_size_ge", "value": 6},
+         "effects": [{"op": "gain_energy", "amount": 1}]}]}
+    errs = _relic_balance_errors(relic, _made(retain_pool=3), _V)
+    check(bool(errs) and "NEAR-DEAD" in errs[0] and "leaves your hand" in errs[0],
+          f"the post-play timing trap must be named: {errs}")
+
+
+def test_post_play_hand_gate_ok_low_value() -> None:
+    print("the same shape with hand_size_ge 4 (reachable post-play) -> allowed:")
+    relic = {"id": "hl2", "name": "hl2", "hooks": [
+        {"trigger": "on_card_played", "once_per_combat": True,
+         "when": {"kind": "hand_size_ge", "value": 4},
+         "effects": [{"op": "gain_energy", "amount": 1}]}]}
+    errs = _relic_balance_errors(relic, _made(retain_pool=3), _V)
+    check(not errs, f"hand_size_ge 4 on on_card_played is a real but reachable gate: {errs}")
+
+
+def test_never_true_condition_rejected() -> None:
+    print("turn_start + hand_size_ge 9 on a retainless deck (~never true) -> rejected as near-dead:")
+    relic = {"id": "r", "name": "r", "hooks": [
+        {"trigger": "turn_start", "when": {"kind": "hand_size_ge", "value": 9},
+         "effects": [{"op": "block", "amount": 3}]}]}
+    errs = _relic_balance_errors(relic, _made(retain_pool=0), _V)
+    check(bool(errs) and "never" in errs[0], f"a condition the deck never reaches must be flagged: {errs}")
+
+
+def test_uptime_post_play_timing() -> None:
+    print("_cond_uptime: on_card_played reads a one-smaller hand; realistic mode holds fewer cards:")
+    lean = _keystone_deck_stats(_made(retain_pool=0))
+    w = {"kind": "hand_size_ge", "value": 6}
+    check(_cond_uptime(w, lean, "on_card_played") < _cond_uptime(w, lean),
+          "the post-play hand is one smaller, so uptime must drop")
+    mid = _keystone_deck_stats(_made(retain_pool=3))
+    check(_cond_uptime(w, mid, "on_card_played", realistic=True) <= _cond_uptime(w, mid, "on_card_played"),
+          "the realistic model must never exceed the generous power-gate model")
+
+
 def main() -> int:
     for t in (test_diamond_hands_rejected_on_retain_deck, test_same_relic_ok_on_retainless_deck,
               test_retain_basic_counts_as_starting_deck, test_unconditional_energy_rejected,
               test_max_energy_modifier_rejected, test_modest_keystones_pass,
               test_per_turn_draw_engine_rejected, test_reactive_trigger_priced_per_event,
-              test_uptime_and_stats_helpers):
+              test_uptime_and_stats_helpers, test_post_play_hand_gate_rejected,
+              test_post_play_hand_gate_ok_low_value, test_never_true_condition_rejected,
+              test_uptime_post_play_timing):
         t()
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return 1 if _FAIL else 0

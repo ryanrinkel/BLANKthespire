@@ -56,7 +56,7 @@ RELIC_VOCAB = CONTRACT / "RELIC_VOCABULARY.md"  # Phase L: the constrained forge
 # the forge FLOW changes (blueprint prompt, staged front-end, strategic lines, card pipeline, safety nets…) so
 # a log line lets you tell which harness produced a given forge — on the CLI and in the streamed browser log.
 # It's the FIRST line emitted by forge_class(). Bump on any harness tweak; a short "-what" suffix helps track.
-HARNESS_VERSION = "1.3-resonant"
+HARNESS_VERSION = "1.4-reachable"  # El Traficante post-mortem: gate-reachability lints + the dead-keystone gate
 
 # Forged-class pool target. A base StS2 class pool is 20 common / 35 uncommon / 25 rare (~80 non-basic
 # cards); we ship a lean, reward-functional subset — each non-basic brief is one card-generation (LLM)
@@ -378,15 +378,23 @@ fury, life vs death. The identity anchor is the BALANCE GAUGE: a SIGNED per-comb
 ends (Light and Dark; 0 = centered), moved with the `balance_step` op ({{"op":"balance_step","pole": \
 "light"|"dark","amount":1-5}} = "Shift N toward the Light/Dark"). Ship the ENGINE: INCOME on BOTH poles at \
 common (small steps, 1-3 — the gauge is a slow tug-of-war), including inside a power's `add_trigger` payload \
-("power: at the start of your turn, shift 2 toward the Dark" — that trigger income IS the engine). PAYOFFS gate \
-on the gauge at uncommon/rare via `when`: {{"kind":"dark_ge","value":N}} / {{"kind":"light_ge","value":N}} \
-("if your Dark is 5+, deal +damage / gain +block" — a leaning-pole payoff) and the knife's-edge \
-{{"kind":"centered","value":N}} ("if you are centered (within 2), …" — a rare that rewards NOT committing to a \
-pole). The gauge BITES at the extremes: while |gauge| >= 8, each turn-start the leaning pole penalizes you (the \
-Dark drains 3 HP, the Light inflicts 1 Weak) — so leaning hard is a real commitment, never free. A BALANCE \
-class MUST have income on BOTH poles AND at least one pole- or centered-gated payoff (a one-pole gauge is just \
-Forge with extra steps); NEVER sprinkle a lone `balance_step` onto a class whose identity is elsewhere. The \
-gauge resets each combat.
+("power: at the start of your turn, shift 2 toward the Dark" — that trigger income IS the engine). BUT make the \
+income ASYMMETRIC: opposing steps CANCEL (the gauge is one signed number), so a 50/50 pole mix plays every \
+combat pinned at 0 and no gate ever opens. Let the class's fantasy pick a DOMINANT pole (bigger/more frequent \
+steps) with the other pole as the deliberate counterweight — and NEVER put opposing steppers in the STARTING \
+deck (a basic or signature): forced cards that fight each other neuter the gauge before the first draft. \
+PAYOFFS gate on the gauge via `when`: {{"kind":"dark_ge","value":N}} / {{"kind":"light_ge","value":N}} \
+("if your Dark is 3+, deal +damage / gain +block" — a leaning-pole payoff). Keep gates REACHABLE: N of 3-5 at \
+most — a committed drafter realistically banks ~5-8 gauge in a combat, so a gate above that never fires — and \
+spread the readers: MANY cards should read the gauge (aim for one reader per 3-4 income cards), with at least \
+one payoff at UNCOMMON so the gauge cashes out before a rare is drafted. The knife's-edge \
+{{"kind":"centered","value":N}} ("if you are centered (within N), …") is ONLY a real gate at N of 0-1: the \
+gauge STARTS centered and mixed income keeps it there, so "centered within 2" is ~always true — a fake \
+restriction. The gauge BITES at the extremes: while |gauge| >= 8, each turn-start the leaning pole penalizes \
+you (the Dark drains 3 HP, the Light inflicts 1 Weak) — so leaning hard is a real commitment, never free. A \
+BALANCE class MUST have income on BOTH poles AND at least one pole- or centered-gated payoff (a one-pole gauge \
+is just Forge with extra steps); NEVER sprinkle a lone `balance_step` onto a class whose identity is elsewhere. \
+The gauge resets each combat.
 
 THE STATUS POOL (optional — this is how a class invents its OWN signature buff/debuff): a class may declare \
 "status_pool", up to 4 CUSTOM statuses that ARE the class identity (like Strength/Vulnerable, but yours). Each is \
@@ -807,11 +815,15 @@ def _keystone_deck_stats(made: list[dict]) -> dict:
             "pool": f"{pool_retain}/{pool or '?'} pool cards"}
 
 
-def _cond_uptime(when, deck_stats: dict) -> float:
+def _cond_uptime(when, deck_stats: dict, trigger: str = "", realistic: bool = False) -> float:
     """How often a hook's `when` actually holds, 0.05..1.0. hand_size_ge is the deck-aware one: the
     expected turn-start hand is the drawn 5 plus what retain lets the player hold (players hold retain
-    cards on purpose — retaining is free). Estimated at turn start (the roomiest hand), so mid-turn
-    triggers price conservatively high — the strict direction for a power gate."""
+    cards on purpose — retaining is free). Two hand models for the two directions the gate is read in:
+    the default (realistic=False) prices GENEROUSLY HIGH — the strict direction for the POWER gate; the
+    realistic model (realistic=True, used by the dead-hook check) assumes players hold only a card or
+    two, the strict direction for a DEADNESS read. `trigger` matters for timing: `on_card_played` fires
+    AFTER the played card leaves the hand (the El Traficante "Hidden Ledger" trap — a hand_size_ge that
+    read as mildly conditional never fired), so the at-fire hand is one smaller in both models."""
     if not isinstance(when, dict):
         return 1.0
     kind = str(when.get("kind", "")).strip().lower()
@@ -829,7 +841,8 @@ def _cond_uptime(when, deck_stats: dict) -> float:
     elif kind == "turn_at_least":
         up = min(1.0, max(0.15, (7.0 - value) / 6.0))  # ~6-turn fight
     elif kind == "hand_size_ge":
-        expected = 5 + min(5, round(10 * deck_stats["share"]))
+        held = min(3, round(4 * deck_stats["share"])) if realistic else min(5, round(10 * deck_stats["share"]))
+        expected = 5 + held - (1 if str(trigger).strip().lower() == "on_card_played" else 0)
         deficit = value - expected
         up = 1.0 if deficit <= 0 else (0.35 if deficit == 1 else (0.12 if deficit == 2 else 0.05))
     if when.get("negate"):
@@ -844,6 +857,7 @@ def _relic_balance_errors(relic: dict, made: list[dict], card_validator) -> list
         stats = _keystone_deck_stats(made)
         total = 0.0
         parts: list[tuple[float, str]] = []  # (value, human reason) — the top one names the fix
+        dead: list[str] = []
         for i, h in enumerate(relic.get("hooks") or []):
             if not isinstance(h, dict):
                 continue
@@ -853,7 +867,7 @@ def _relic_balance_errors(relic: dict, made: list[dict], card_validator) -> list
             once = bool(h.get("once_per_combat"))
             freq = 1.0 if once else _HOOK_FREQ.get(trigger, 3.0)
             when = h.get("when") if isinstance(h.get("when"), dict) else None
-            uptime = _cond_uptime(when, stats)
+            uptime = _cond_uptime(when, stats, trigger)
             total += value * freq * uptime
             ops = "+".join(str(e.get("op")) for e in h.get("effects") or [] if isinstance(e, dict))
             reason = f"hook[{i}] ({trigger}{', once_per_combat' if once else ''}: {ops}) ~{value * freq * uptime:.0f}"
@@ -861,6 +875,24 @@ def _relic_balance_errors(relic: dict, made: list[dict], card_validator) -> list
                 reason += (f" — its 'hand_size_ge {when.get('value')}' condition is ~always true for this"
                            f" deck (retain on {stats['start']}, {stats['pool']}), so it is no discount")
             parts.append((value * freq * uptime, reason))
+            # The DEAD end of the same gate (the Hidden Ledger fix): a keystone that ~never fires is as
+            # broken as an overtuned one. Two rules — the targeted post-play timing trap, then a coarse
+            # realistic-uptime net for any other ~never-true condition.
+            if when:
+                kind = str(when.get("kind", "")).strip().lower()
+                wval = when.get("value")
+                if kind == "hand_size_ge" and trigger == "on_card_played" and int(wval or 0) >= 5:
+                    dead.append(f"hook[{i}] is NEAR-DEAD: 'hand_size_ge {wval}' on 'on_card_played' is "
+                                "evaluated AFTER the played card leaves your hand, so the player must have "
+                                f"HELD {int(wval or 0) + 1}+ cards before playing — with a 5-card draw that "
+                                "~never happens. Lower the value (<= 4), or move the read to 'turn_start' / "
+                                "'turn_end' (the full-hand moments), keeping the same theme.")
+                elif _cond_uptime(when, stats, trigger, realistic=True) <= 0.12:
+                    dead.append(f"hook[{i}] is NEAR-DEAD: its '{kind}{f' {wval}' if wval else ''}' condition "
+                                "~never holds for this deck, so the keystone never fires. Pick a condition "
+                                "the class actually reaches (or drop the condition and weaken the payout).")
+        if dead:
+            return dead
         for m in relic.get("modifiers") or []:
             if not isinstance(m, dict):
                 continue
@@ -1777,6 +1809,20 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
         if _class_has_op("buff_summon") and not _class_has_op("summon_attack"):
             note("WARNING: summon class has buff_summon cards but NO summon_attack — the passive minion never "
                  "attacks on its own, so its Strength buffs are dead weight. Add summon_attack cards (re-forge).")
+
+    # Balance reachability + payoff density (El Traficante post-mortem): the pairing check only proves the
+    # gauge EXISTS; these price its gates against the set's own income (unreachable pole gates, trivially-true
+    # `centered`, a starting deck that cancels itself, readers too sparse / all-rare). Advisory notes — the
+    # class still ships; the BALANCE ARCHETYPE prompt guidance is the generative-side fix.
+    try:
+        from .character_validator import balance_payoff_density_warnings, balance_reachability_warnings
+        _start_ids = {str(m["card"].get("id", "")) for m in made
+                      if m["plan"].get("role") in (_BASIC_ROLES | _SIGNATURE_ROLES)}
+        for w in (balance_reachability_warnings([m["card"] for m in made], _start_ids)
+                  + balance_payoff_density_warnings([m["card"] for m in made])):
+            note("WARNING: balance: " + w)
+    except Exception as e:  # noqa: BLE001 — advisory lint: a scoring bug must never break a forge
+        note(f"balance lint: skipped (internal error: {e})")
 
     # --- stage 2.5: the keystone starter relic (Phase L) --------------------
     # Optional + non-fatal: if relic generation fails, the class still ships (the slot defaults to Burning Blood).

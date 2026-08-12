@@ -94,8 +94,9 @@ FEATURED_MENU: list[Featured] = [
              lambda cc: "scry" in cc.ops),
     Featured("balance_shift", 'a card that moves the two-pole BALANCE gauge (op "balance_step", light/dark)',
              'REQUIRED: add a card with op "balance_step" (pole light or dark, amount 1-5) moving the Balance '
-             'gauge, and gate a payoff on it (`when` dark_ge/light_ge/centered). A balance class needs income on '
-             'BOTH poles + a pole/centered-gated payoff.',
+             'gauge, and gate a payoff on it (`when` dark_ge/light_ge value 3-5 — a gate the deck can actually '
+             'reach; opposing steps cancel, so lean one DOMINANT pole; `centered` only at value 0-1). A balance '
+             'class needs income on BOTH poles + a pole/centered-gated payoff at uncommon or below.',
              lambda cc: "balance_step" in cc.ops),
     Featured("rampage_grow", 'a signature attack that GROWS each time you play it this combat (field "grow")',
              'REQUIRED: add ONE damage card carrying a "grow" field (1-9, <= its amount) so its damage climbs '

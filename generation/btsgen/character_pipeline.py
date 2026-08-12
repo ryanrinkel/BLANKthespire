@@ -26,7 +26,8 @@ from pathlib import Path
 from . import character_contract, contract, paths, relic_contract
 from .character_contract import Brief
 from .character_validator import (BlueprintValidator, CharacterValidator,
-                                  balance_pairing_warnings, blade_empower_warnings, combo_loop_warnings,
+                                  balance_pairing_warnings, balance_payoff_density_warnings,
+                                  balance_reachability_warnings, blade_empower_warnings, combo_loop_warnings,
                                   debuff_monotony_warnings,
                                   corruption_warnings, forge_manipulation_warnings, forge_pairing_warnings,
                                   identity_overlap_warnings, purge_warnings, rampage_grow_warnings,
@@ -177,6 +178,14 @@ def generate_character(brief: Brief, model: str | None = None, fake: bool = Fals
     if bw:
         res.warnings["balance"] = bw
         for w in bw:
+            note("  BALANCE WARN " + w)
+    # Balance reachability + payoff density (El Traficante post-mortem): existence isn't enough — price the
+    # gates against the set's own gauge income. Same advisory treatment.
+    brw = (balance_reachability_warnings([m["card"] for m in made])
+           + balance_payoff_density_warnings([m["card"] for m in made]))
+    if brw:
+        res.warnings["balance_reachability"] = brw
+        for w in brw:
             note("  BALANCE WARN " + w)
     # Phase U (gap #23): Rampage identity — a growing signature attack is a build-around, not wallpaper;
     # warn if a class stacks more than two `grow` cards. Same advisory treatment.

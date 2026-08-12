@@ -18,9 +18,13 @@ public static class ForgedRelicIcon
 {
     public static string IconPath(int k) => $"user://forged/characters/{k:00}/relic.png";
 
-    /// <summary>Per-slot resolved synthetic paths (icon, outline), or null when no cached icon. Emptied
-    /// by <see cref="Invalidate"/> when an import rewrites the slot.</summary>
-    private static readonly Dictionary<int, (string Icon, string Outline)?> _resolved = new();
+    /// <summary>Per-slot resolved synthetic paths (icon, outline) PLUS strong refs to the taken-over
+    /// textures, or null when no cached icon. Godot's resource cache holds taken-over resources only
+    /// WEAKLY — dropping the C# reference (as this originally did) let GC free the textures, evicting
+    /// the synthetic paths so a later relic-bar Reload failed with "No loader found for resource"
+    /// (the invisible-relic bug, El Traficante 2026-08-12: icons "live" at boot, dead by run start).
+    /// The textures live here for the process lifetime; Invalidate replaces them on re-import.</summary>
+    private static readonly Dictionary<int, (string Icon, string Outline, ImageTexture IconTex, ImageTexture OutlineTex)?> _resolved = new();
 
     /// <summary>Synthetic res:// path for class <paramref name="k"/>'s emoji icon, or null.</summary>
     public static string? TryGetPath(int k) => Resolve(k)?.Icon;
@@ -31,10 +35,10 @@ public static class ForgedRelicIcon
     /// <summary>Forget a slot's cached takeover so a re-import (new relic.png) is picked up.</summary>
     public static void Invalidate(int k) => _resolved.Remove(k);
 
-    private static (string Icon, string Outline)? Resolve(int k)
+    private static (string Icon, string Outline, ImageTexture IconTex, ImageTexture OutlineTex)? Resolve(int k)
     {
         if (_resolved.TryGetValue(k, out var cached)) return cached;
-        (string, string)? result = null;
+        (string, string, ImageTexture, ImageTexture)? result = null;
         try
         {
             string path = IconPath(k);
@@ -47,9 +51,13 @@ public static class ForgedRelicIcon
                     if (img.GetFormat() != Image.Format.Rgba8) img.Convert(Image.Format.Rgba8);
                     string iconPath = $"res://BlankTheSpire/images/relics/forged_relic_{k:00}_live.png";
                     string outlinePath = $"res://BlankTheSpire/images/relics/forged_relic_{k:00}_outline_live.png";
-                    ImageTexture.CreateFromImage(img).TakeOverPath(iconPath);
-                    ImageTexture.CreateFromImage(Silhouette(img)).TakeOverPath(outlinePath);
-                    result = (iconPath, outlinePath);
+                    // Keep BOTH textures strongly referenced (stored below): TakeOverPath only registers
+                    // them in Godot's WEAK resource cache, and an evicted synthetic path is unloadable.
+                    var iconTex = ImageTexture.CreateFromImage(img);
+                    var outlineTex = ImageTexture.CreateFromImage(Silhouette(img));
+                    iconTex.TakeOverPath(iconPath);
+                    outlineTex.TakeOverPath(outlinePath);
+                    result = (iconPath, outlinePath, iconTex, outlineTex);
                     MainFile.Logger.Info($"[ForgedRelicIcon] emoji icon live for class {k:00}.");
                 }
             }
