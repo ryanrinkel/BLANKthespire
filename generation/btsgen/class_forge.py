@@ -1883,6 +1883,17 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
         note(f"blade-safety: forge class had Forge income but no signature blade; added '{blade['name']}' "
              "(cost 2, retain, damage + your Forge) as a token summoned on your first Forge (not in the deck)")
 
+    # Self-healing discipline (Suck-U-Lator post-mortem, 2026-08-12): lifesteal rarity floor, sustain
+    # density, and relic-stacking — runs AFTER stage 2.5 so the stacking check can see the keystone relic.
+    # Advisory notes — the class still ships; the reaper_lifesteal / iron_regrowth archetype notes are the
+    # generative-side fix.
+    try:
+        from .character_validator import lifesteal_warnings
+        for w in lifesteal_warnings([m["card"] for m in made], relic):
+            note("WARNING: lifesteal: " + w)
+    except Exception as e:  # noqa: BLE001 — advisory lint: a scoring bug must never break a forge
+        note(f"lifesteal lint: skipped (internal error: {e})")
+
     # --- stage 3: assemble the BTSC bundle ----------------------------------
     # Hard backstop: the mod holds CARDS_PER_CLASS card slots and the import rejects a larger bundle. The
     # blueprint cap + "safety nets only restore drops" reasoning means this never triggers, but if it somehow

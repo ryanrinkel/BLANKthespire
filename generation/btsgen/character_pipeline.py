@@ -30,8 +30,9 @@ from .character_validator import (BlueprintValidator, CharacterValidator,
                                   balance_reachability_warnings, blade_empower_warnings, combo_loop_warnings,
                                   debuff_monotony_warnings,
                                   corruption_warnings, forge_manipulation_warnings, forge_pairing_warnings,
-                                  identity_overlap_warnings, purge_warnings, rampage_grow_warnings,
-                                  summon_support_warnings, tag_synergy_warnings, transform_warnings)
+                                  identity_overlap_warnings, lifesteal_warnings, purge_warnings,
+                                  rampage_grow_warnings, summon_support_warnings, tag_synergy_warnings,
+                                  transform_warnings)
 from .generator import AnthropicGenerator, extract_card_json
 from .pipeline import _unique_id, generate_card
 from .relic_pipeline import generate_relic
@@ -242,6 +243,15 @@ def generate_character(brief: Brief, model: str | None = None, fake: bool = Fals
         if relic is None:
             return abort("starter relic failed twice")
     res.relic_id = relic["id"]
+
+    # Self-healing discipline (Suck-U-Lator post-mortem, 2026-08-12): lifesteal rarity floor, sustain
+    # density, and relic-stacking — runs AFTER the relic exists so the stacking check can see it.
+    # Same advisory treatment as the other set-level lints.
+    lsw = lifesteal_warnings([m["card"] for m in made], relic)
+    if lsw:
+        res.warnings["lifesteal"] = lsw
+        for w in lsw:
+            note("  LIFESTEAL WARN " + w)
 
     # ---- stage 4: assemble + validate + quarantine the character ------------
     deck: list[str] = []

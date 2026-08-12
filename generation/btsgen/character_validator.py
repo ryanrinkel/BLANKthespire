@@ -539,6 +539,99 @@ def summon_support_warnings(cards: list[dict]) -> list[str]:
     return []
 
 
+def _heals_anywhere(effects) -> bool:
+    """True if any effect in the list (incl. nested then/else/trigger payloads) is a `heal` op."""
+    for e in effects or []:
+        if not isinstance(e, dict):
+            continue
+        if e.get("op") == "heal":
+            return True
+        if any(_heals_anywhere(e.get(k)) for k in ("effects", "then", "else")):
+            return True
+    return False
+
+
+def _has_lifesteal_heal(card: dict) -> bool:
+    """True if any effect (base/upgrade, incl. nested payloads) is a `heal` scaled by
+    `damage_dealt_unblocked` — full lifesteal (the Reaper pattern, VOCABULARY)."""
+    def walk(effects) -> bool:
+        for e in effects or []:
+            if not isinstance(e, dict):
+                continue
+            if e.get("op") == "heal" and str(e.get("scale", "")).strip().lower() == "damage_dealt_unblocked":
+                return True
+            if any(walk(e.get(k)) for k in ("effects", "then", "else")):
+                return True
+        return False
+
+    _up = card.get("upgrade")
+    return walk(card.get("effects")) or walk(_up.get("effects") if isinstance(_up, dict) else None)
+
+
+def _has_per_turn_heal_engine(card: dict) -> bool:
+    """True if the card installs a turn_start/turn_end trigger whose payload heals — a passive
+    sustain engine that ticks every turn for free once played (base or upgrade)."""
+    def walk(effects) -> bool:
+        for e in effects or []:
+            if not isinstance(e, dict):
+                continue
+            if (e.get("op") == "add_trigger"
+                    and str(e.get("trigger", "")).strip().lower() in ("turn_start", "turn_end")
+                    and _heals_anywhere(e.get("effects"))):
+                return True
+            if any(walk(e.get(k)) for k in ("then", "else")):
+                return True
+        return False
+
+    _up = card.get("upgrade")
+    return walk(card.get("effects")) or walk(_up.get("effects") if isinstance(_up, dict) else None)
+
+
+# Sustain cards (lifesteal + per-turn heal engines) a class may carry before healing stops being able
+# to lose to a bad turn. The Reaper is ONE rare in the base game; two slots is already generous.
+_SUSTAIN_CARD_CAP = 2
+
+
+def lifesteal_warnings(cards: list[dict], relic: dict | None = None) -> list[str]:
+    """Set-level self-healing discipline (Suck-U-Lator post-mortem, 2026-08-12): the vacuum-salesman
+    class shipped full lifesteal on 7 cards (one a BASIC), a per-turn heal power, AND an
+    on_damage_dealt heal relic — three stacked sustain engines that made incoming damage irrelevant.
+    Three checks, all advisory (a human decides), mirroring rampage/purge:
+      1. RARITY FLOOR — a damage_dealt_unblocked heal on a basic/common. Full lifesteal is rare-tier
+         power; at low rarity it becomes the texture of every draft instead of a build-around.
+      2. SUSTAIN DENSITY — more than _SUSTAIN_CARD_CAP cards carrying lifesteal or a per-turn heal
+         engine. Healing should be able to LOSE to a bad turn; attrition is a win condition, not immunity.
+      3. RELIC STACKING — the starter relic ALSO heals in combat while the cards already sustain
+         (a `combat_end` victory heal is the sanctioned Burning Blood form and is exempt).
+    The generative-side fix is the reaper_lifesteal / iron_regrowth archetype notes in DESIGN_HEURISTICS.md."""
+    out: list[str] = []
+    steal = sorted({str(c.get("id", "?")) for c in cards if isinstance(c, dict) and _has_lifesteal_heal(c)})
+    engines = sorted({str(c.get("id", "?")) for c in cards if isinstance(c, dict) and _has_per_turn_heal_engine(c)})
+    low = sorted({str(c.get("id", "?")) for c in cards
+                  if isinstance(c, dict) and _has_lifesteal_heal(c)
+                  and str(c.get("rarity", "")).strip().lower() in ("basic", "common")})
+    if low:
+        out.append(f"lifesteal below uncommon: {', '.join(low)} carry a damage_dealt_unblocked heal at "
+                   "basic/common rarity — full lifesteal is rare-tier power (the base game's Reaper is ONE "
+                   "rare that exhausts); move it to uncommon+ or drop the heal.")
+    sustain = sorted({*steal, *engines})
+    if len(sustain) > _SUSTAIN_CARD_CAP:
+        out.append(f"too many sustain cards: {', '.join(sustain)} each heal (a lifesteal-scaled heal or a "
+                   f"per-turn heal trigger) — keep it to {_SUSTAIN_CARD_CAP} per class so healing can still "
+                   "LOSE to a bad turn; attrition is a win condition, not immunity.")
+    if sustain and isinstance(relic, dict):
+        for h in relic.get("hooks") or []:
+            if not isinstance(h, dict):
+                continue
+            trig = str(h.get("trigger", "")).strip().lower()
+            if trig != "combat_end" and _heals_anywhere(h.get("effects")):
+                out.append(f"relic stacks a second sustain engine: relic '{relic.get('id', '?')}' heals on "
+                           f"{trig} while {', '.join(sustain)} already sustain through cards — give the relic "
+                           "a different form (a combat_end victory heal is fine) or cut the card sustain.")
+                break
+    return out
+
+
 def corruption_warnings(cards: list[dict]) -> list[str]:
     """Set-level Corruption guidance (Phase AB, gap #20): `corruption` grants a BINARY per-combat power (your
     Skills cost 0 + Exhaust). A class needs at most ONE card that grants it — a second is dead redundancy (the

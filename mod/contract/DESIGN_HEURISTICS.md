@@ -122,3 +122,9 @@ Strength is the priciest buff: it is permanent and compounds every attack. When 
 
 <!-- archetype-note: self_sacrifice -->
 The 'claw it back' is a DECK-WIDE economy, not a same-card refund: put the HP cost on one card and the healing on DIFFERENT cards, never both on the same card/relic (a card that spends HP and heals it cancels its own cost). Even across the deck the clawback must stay net-negative over a loop. If HP is traded for Strength, price it at >=3 HP per 1 Strength at baseline (see strength_berserk).
+
+<!-- archetype-note: reaper_lifesteal -->
+Full lifesteal (a `heal` scaled by `damage_dealt_unblocked`) is rare-tier power: 1-2 cards per class MAX, uncommon or rare only -- never on a basic or common -- and the biggest one wants `exhaust` or a condition. Sustain must be able to LOSE to incoming damage on a bad turn: the identity is winning attrition SLOWLY, not making damage irrelevant. Never stack a second sustain engine on top -- if the cards carry lifesteal, the starter relic must NOT also heal in combat (pick another relic form; a `combat_end` victory heal is the sanctioned exception), and a passive per-turn heal power counts as one of the 1-2 lifesteal slots.
+
+<!-- archetype-note: iron_regrowth -->
+Healing is the win condition, so ration it like one: small numbers on repeatable heals (1-3 HP), and anything bigger gated (once per combat, conditional, or exhaust). The class's total per-turn sustain -- cards plus powers plus relic -- must stay BELOW what a hard-hitting enemy turn deals, so the regrower survives by outlasting, not by being unhittable. Don't stack sustain engines: if the cards heal, the starter relic must NOT also heal in combat (a `combat_end` victory heal is fine), and keep passive per-turn heal powers to ONE per class.
