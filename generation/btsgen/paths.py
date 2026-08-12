@@ -65,9 +65,18 @@ GENERATED_CHARACTERS_DIR = GODOT_ROOT / "data" / "generated" / "characters"  # q
 # This package's own dir (for .env discovery).
 PACKAGE_DIR = Path(__file__).resolve().parents[1]
 
-# In-game card feedback (the inspect view's rating buttons append JSONL entries here).
-# The card/character prompts read it back as few-shot examples / anti-examples.
-FEEDBACK_FILE = PACKAGE_DIR / "feedback" / "card_feedback.jsonl"
+# Player card feedback (the in-game inspect view and the website's rating buttons append JSONL
+# entries in this shape). The card/character prompts read it back as few-shot examples /
+# anti-examples, and feedback_store retrieves similar entries into class/card briefs.
+# Env-overridable: on the droplet the package is installed non-editably (site-packages has no
+# feedback/ dir), so web/forge.py points this at the repo checkout's curated file.
+FEEDBACK_FILE = _env_path("BTSGEN_FEEDBACK_FILE", PACKAGE_DIR / "feedback" / "card_feedback.jsonl")
+
+# Extra LIVE feedback sources (os.pathsep-separated), unioned with FEEDBACK_FILE by
+# feedback_store.load_entries(). The website sets this to its append-only card_feedback.jsonl so
+# droplet forges apply fresh player ratings without waiting for the manual pull-into-git cycle.
+FEEDBACK_EXTRA = [Path(p.strip()) for p in os.environ.get("BTSGEN_FEEDBACK_EXTRA", "").split(os.pathsep)
+                  if p.strip()]
 
 # Distilled StS2 rarity-calibration digest (see reference/distill_sts2.py for provenance).
 # Optional: prompts embed it when present to teach the power/complexity ladder per rarity.

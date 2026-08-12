@@ -78,7 +78,8 @@ supported via CLI flags / the website.
 | `btsgen/fakes.py` | deterministic offline FakeGenerator (`--fake`, tests) |
 | `tests/` | offline gate tests (no API key, no game install needed) |
 | `reference/` | optional StS2 rarity-calibration data — regenerated locally, never committed (see `reference/README.md`) |
-| `feedback/card_feedback.jsonl` | player card ratings, read back into prompts as examples/anti-examples |
+| `btsgen/feedback_store.py` | feedback store + similarity retrieval: ratings most similar to the current concept/brief ride the blueprint and per-card prompts |
+| `feedback/card_feedback.jsonl` | curated player card ratings (pull from the droplet via `web/tools/pull_card_feedback.ps1`), read back into prompts as examples/anti-examples. The website also reads its own live rating log directly (`BTSGEN_FEEDBACK_EXTRA`, set in `web/forge.py`), so droplet forges apply fresh feedback without a pull |
 
 ### Legacy single-artifact CLIs
 

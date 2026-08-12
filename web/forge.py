@@ -19,7 +19,21 @@ from pathlib import Path
 # guess (`parents[2]`) lands inside the venv, not the repo — and the mod contract (mod/contract/) can't
 # be found. We DO know the real repo root from this file's location (web/ -> repo), so hand it to btsgen
 # via BTS_REPO_ROOT before importing it. setdefault: an explicit env (or editable install) still wins.
-os.environ.setdefault("BTS_REPO_ROOT", str(Path(__file__).resolve().parents[1]))
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+os.environ.setdefault("BTS_REPO_ROOT", str(_REPO_ROOT))
+
+# Wire the player-feedback loop CLOSED on the server (paths.py reads these at import, so set them
+# before any btsgen import):
+#   BTSGEN_FEEDBACK_FILE   the curated git-tracked log, read from the repo checkout (the non-editable
+#                          site-packages install has no feedback/ dir, so btsgen's default is empty);
+#   BTSGEN_FEEDBACK_EXTRA  the website's own live append-only rating log (see CARD_FEEDBACK_LOG below)
+#                          — feedback_store unions + de-dupes both, so a rating filed on the site
+#                          steers the NEXT forge with no manual pull-into-git step.
+os.environ.setdefault("BTSGEN_FEEDBACK_FILE",
+                      str(_REPO_ROOT / "generation" / "feedback" / "card_feedback.jsonl"))
+os.environ.setdefault("BTSGEN_FEEDBACK_EXTRA",
+                      os.environ.get("BTSWEB_CARD_FEEDBACK_LOG",
+                                     str(Path(__file__).resolve().parent / "card_feedback.jsonl")))
 
 # MUST run before any btsgen module reads paths at import time — repoints the card schema/vocab/statuses
 # at the constrained vocab-v2 mod contract. (Same call cli_forge_class makes at the top of main().)

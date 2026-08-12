@@ -56,7 +56,7 @@ RELIC_VOCAB = CONTRACT / "RELIC_VOCABULARY.md"  # Phase L: the constrained forge
 # the forge FLOW changes (blueprint prompt, staged front-end, strategic lines, card pipeline, safety nets…) so
 # a log line lets you tell which harness produced a given forge — on the CLI and in the streamed browser log.
 # It's the FIRST line emitted by forge_class(). Bump on any harness tweak; a short "-what" suffix helps track.
-HARNESS_VERSION = "1.4-reachable"  # El Traficante post-mortem: gate-reachability lints + the dead-keystone gate
+HARNESS_VERSION = "1.5-feedback-rag"  # player-feedback retrieval: similar past ratings ride the blueprint + card briefs
 
 # Forged-class pool target. A base StS2 class pool is 20 common / 35 uncommon / 25 rare (~80 non-basic
 # cards); we ship a lean, reward-functional subset — each non-basic brief is one card-generation (LLM)
@@ -566,9 +566,20 @@ summon_pool may use those ops; summon / buff_summon ride self-target skills, sum
         except Exception:
             return ""
 
+    @staticmethod
+    def _feedback_ask(query: str) -> str:
+        """Player ratings on past forged designs SIMILAR to this concept, retrieved from the feedback
+        store (the website's rating buttons feed it live). Guarded — empty string on any failure."""
+        try:
+            from . import feedback_store
+            return feedback_store.similar_feedback_section(query, k=10)
+        except Exception:
+            return ""
+
     def _concept_brief(self, brief: ClassBrief) -> str:
         return (f'Design a new playable class from this player concept:\n"{brief.concept.strip()}"\n\n'
-                f"{self._POOL_ASK}{self._featured_ask(brief)}{self._recency_status()}\n"
+                f"{self._POOL_ASK}{self._featured_ask(brief)}{self._recency_status()}"
+                f"{self._feedback_ask(brief.concept)}\n"
                 "Return only the JSON blueprint object.")
 
     def _dossier_brief(self, brief) -> str:
@@ -621,7 +632,8 @@ summon_pool may use those ops; summon / buff_summon ride self-target skills, sum
             f'The TWO archetypes (in tension — {c.tension or "they pull against each other"}):\n{archs}\n'
             f'{lines}{kind_guidance}{relic}{skin}\n\n'
             f"Use these two archetypes as the blueprint's two archetypes (keep their ids). {self._POOL_ASK}"
-            f"{self._featured_ask(brief)}{self._recency_status()}\n"
+            f"{self._featured_ask(brief)}{self._recency_status()}"
+            f"{self._feedback_ask(f'{c.name} {c.fantasy} {c.core_loop} {archs}')}\n"
             "Return only the JSON blueprint object.")
 
     def repair_message(self, blueprint_text: str, errors: list[str]) -> str:

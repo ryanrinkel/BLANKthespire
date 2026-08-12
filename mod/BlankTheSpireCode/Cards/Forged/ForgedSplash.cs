@@ -139,16 +139,36 @@ internal static class ForgedSplashBgPatch
             var tex = ForgedSplash.LoadTexture(fs.ClassSlot);
             if (tex == null) return;
 
-            var rect = new TextureRect
+            // The gpt-image sizes are 3:2 but the select screen is ~16:9, so a plain
+            // KeepAspectCovered fill cropped ~9% off the top AND bottom — characters with tight
+            // headroom lost their heads. Show the WHOLE splash instead: a contained (letterboxed)
+            // foreground over a dimmed cover-stretched copy of itself, so the spill areas read as
+            // matching ambience rather than black bars (and nothing of the art is ever cropped).
+            var wrap = new Control { Name = OverlayName, MouseFilter = Control.MouseFilterEnum.Ignore };
+            wrap.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+
+            var ambience = new TextureRect
             {
-                Name = OverlayName,
                 Texture = tex,
                 ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
                 StretchMode = TextureRect.StretchModeEnum.KeepAspectCovered,
                 MouseFilter = Control.MouseFilterEnum.Ignore,
+                Modulate = new Color(0.30f, 0.30f, 0.34f),
             };
-            rect.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-            bg.AddChild(rect);
+            ambience.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+            wrap.AddChild(ambience);
+
+            var art = new TextureRect
+            {
+                Texture = tex,
+                ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+                StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+                MouseFilter = Control.MouseFilterEnum.Ignore,
+            };
+            art.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+            wrap.AddChild(art);
+
+            bg.AddChild(wrap);
         }
         catch (Exception e)
         {

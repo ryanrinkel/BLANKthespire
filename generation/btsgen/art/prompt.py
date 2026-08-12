@@ -26,7 +26,10 @@ def splash_prompt(art: ClassArt, style: StyleProfile, enriched_body: str | None 
         "Composition: an off-center rule-of-thirds layout with the character standing in the RIGHT "
         "third of the frame, facing inward toward the left. The left two-thirds are quiet atmospheric "
         "background (mist, scenery, mood) with no focal elements, no second character, and nothing "
-        "important, as that area will be covered by menu UI."
+        "important, as that area will be covered by menu UI. Keep the ENTIRE character inside the "
+        "frame with clear margin — the top of the head and the feet must sit well inside the edges, "
+        "and nothing important may touch the top or bottom 12% of the frame, which can be cropped "
+        "on different screen shapes."
     )
     if style.prompt_suffix:
         parts.append(style.prompt_suffix)

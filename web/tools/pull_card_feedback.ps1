@@ -3,6 +3,10 @@
 # back as emulate-examples / anti-examples. Safe to run repeatedly: identical lines are de-duped,
 # so re-pulling the (append-only) server log never creates duplicates.
 #
+# NOTE: the droplet's OWN forges no longer need this — web/forge.py points the generator at the
+# live server log (BTSGEN_FEEDBACK_EXTRA), so website ratings steer the next forge immediately.
+# This pull remains the way feedback reaches git (and thus LOCAL generation runs / history).
+#
 $ErrorActionPreference = 'Stop'
 
 # --- config (edit for your own server SSH alias / remote path) -------------------------------

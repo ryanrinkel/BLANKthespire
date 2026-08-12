@@ -171,53 +171,25 @@ def hp_economy() -> str:
     return _heuristic("hp_economy")
 
 
-_FEEDBACK_LABELS = {
-    "doesnt_work": "did not work as written",
-    "overpowered": "overpowered",
-    "underpowered": "underpowered",
-    "off_theme": "did not match its class fantasy",
-    "confusing": "confusing card text",
-}
+# Canonical categories live in feedback_store (with the loader/retriever); re-exported here because
+# web/forge.py and older callers import them from the contract.
+from .feedback_store import _FEEDBACK_LABELS  # noqa: F401 (re-export)
 
 
 def feedback_section(max_entries: int = 20) -> str:
-    """In-game card ratings (see the CardInspect feedback buttons) folded back into the
-    prompt: 'great' cards as examples to emulate, everything else as anti-examples with the
-    player's complaint attached. When the player typed an explanation into the optional
-    "why" box, their own words ride the line (a `note` field on the JSONL entry) — far more
-    instructive than the category alone. Empty string when no feedback has been filed yet."""
-    f = paths.FEEDBACK_FILE
-    if not f.exists():
-        return ""
-    entries = []
-    for line in f.read_text().splitlines():
-        try:
-            d = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(d, dict) and d.get("category"):
-            entries.append(d)
+    """Player card ratings (the in-game CardInspect buttons and the website's feedback buttons)
+    folded back into the prompt: 'great' cards as examples to emulate, everything else as
+    anti-examples with the player's complaint attached. When the player typed an explanation into
+    the optional "why" box, their own words ride the line (a `note` field on the JSONL entry) —
+    far more instructive than the category alone. Reads the curated log plus any live sources
+    (feedback_store), most recent `max_entries`. Empty string when no feedback has been filed yet."""
+    from . import feedback_store
+    entries = feedback_store.load_entries()
     if not entries:
         return ""
-    good, bad = [], []
-    for d in entries[-max_entries:]:
-        effects = json.dumps((d.get("card") or {}).get("effects", []), separators=(",", ":"))
-        line = f"- {d.get('name', '?')} ({d.get('card_id', '?')}, class {d.get('character', '?')}): {effects}"
-        note = str(d.get("note") or "").strip()
-        if d.get("category") == "great":
-            good.append(line + (f'  [player: "{note}"]' if note else ""))
-        else:
-            complaint = _FEEDBACK_LABELS.get(str(d.get("category")), str(d.get("category")))
-            if note:
-                complaint += f' -- "{note}"'
-            bad.append(f"{line}  [player flag: {complaint}]")
-    out = ["\n# PLAYER FEEDBACK ON PAST CARDS (in-game ratings; let it steer your design)"]
-    if good:
-        out.append("Players rated these GREAT — emulate their feel:\n" + "\n".join(good))
-    if bad:
-        out.append("Players FLAGGED these — anti-examples; do not repeat the flagged problem:\n"
-                   + "\n".join(bad))
-    return "\n".join(out) + "\n"
+    return feedback_store.render_section(
+        entries[-max_entries:],
+        header="PLAYER FEEDBACK ON PAST CARDS (in-game ratings; let it steer your design)")
 
 
 def system_prompt() -> str:
@@ -278,6 +250,14 @@ def user_brief(brief: Brief) -> str:
     msg = f"Design a card with — {brief.describe()}.\n"
     if brief.context:
         msg += f"\n{brief.context}\n"
+    # Targeted feedback fold-in: past player ratings on designs SIMILAR to this brief (the system
+    # prompt's feedback section is recency-global; this one is per-card). Empty string when nothing
+    # relevant has been rated, so most briefs are untouched.
+    from . import feedback_store
+    fb = feedback_store.similar_feedback_section(
+        f"{brief.card_type} {brief.rarity} {brief.theme} {brief.context}")
+    if fb:
+        msg += fb
     msg += "Return only the JSON object."
     return msg
 
