@@ -24,10 +24,14 @@ public class ForgeConfig : SimpleModConfig
     [ConfigSlider(0, ForgedCharacters.ClassCount, 1)]
     public static int ImportClassSlot { get; set; } = 0;
 
-    [ConfigButton("Import class into a slot")]
+    // Button text must stay short: BaseLib's NConfigButton is a fixed 324px texture and long text
+    // spills past its edges. The descriptive text lives in the row label + hover tip instead
+    // (settings_ui.json keys derived from the method name, e.g. BLANKTHESPIRE-IMPORT_CLASS.title).
+    [ConfigButton("Import")]
+    [ConfigHoverTip]
     public static void ImportClass(ModConfig config)
     {
-        if (string.IsNullOrWhiteSpace(ImportClassCode)) { Dialog("Import class", "Paste a class code into the field above first."); return; }
+        if (string.IsNullOrWhiteSpace(ImportClassCode)) { Dialog("Import class", "Paste a class code into the \"Class code\" field above first."); return; }
 
         if (!BTS1Codec.TryDecode(ImportClassCode, out var json, out var kind, out var decodeError))
         {
@@ -56,12 +60,13 @@ public class ForgeConfig : SimpleModConfig
             $"Imported into class slot {classSlot:00}.\n\nPress \"Restart game\" below, then pick the class on the character-select screen.");
     }
 
-    [ConfigButton("Clear class (set ImportClassSlot first)")]
+    [ConfigButton("Clear slot")]
+    [ConfigHoverTip]
     public static void ClearClass(ModConfig config)
     {
         if (ImportClassSlot < 1)
         {
-            Dialog("Clear class", $"Set \"ImportClassSlot\" above to the class slot to clear (1..{ForgedCharacters.ClassCount}), then click again.");
+            Dialog("Clear class", $"Set \"Class slot\" above to the class slot to clear (1..{ForgedCharacters.ClassCount}), then click again.");
             return;
         }
         bool ok = ForgedCharacters.DeleteClass(ImportClassSlot);
@@ -70,7 +75,8 @@ public class ForgeConfig : SimpleModConfig
             : $"Class slot {ImportClassSlot:00} was already empty.");
     }
 
-    [ConfigButton("Clear ALL forged classes", Color = "#b03f3f")]
+    [ConfigButton("Clear ALL", Color = "#b03f3f")]
+    [ConfigHoverTip]
     public static void ClearAllClasses(ModConfig config)
     {
         int n = ForgedCharacters.ClearAllClasses();
@@ -82,7 +88,8 @@ public class ForgeConfig : SimpleModConfig
     // Imported classes are JSON loaded at startup, so applying them just needs a relaunch. A detached
     // helper waits for THIS process to exit, then re-launches the game via Steam.
     [ConfigSection("Apply changes")]
-    [ConfigButton("Restart game (closes & reopens automatically)")]
+    [ConfigButton("Restart game")]
+    [ConfigHoverTip]
     public static void RestartGame(ModConfig config)
     {
         if (!_importedThisSession)

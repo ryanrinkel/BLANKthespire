@@ -1,0 +1,16 @@
+{
+  "BLANKTHESPIRE-IMPORT_CLASS_CODE.title": "Class code",
+  "BLANKTHESPIRE-IMPORT_CLASS_SLOT.title": "Class slot (0 = auto)",
+
+  "BLANKTHESPIRE-IMPORT_CLASS.title": "Import class into a slot",
+  "BLANKTHESPIRE-IMPORT_CLASS.hover.desc": "Paste a class (BTSC) code from blankthespire.com into the \"Class code\" field, then press Import. Slot 0 picks automatically: it updates a same-named class, or takes the lowest empty slot.",
+
+  "BLANKTHESPIRE-CLEAR_CLASS.title": "Clear one class slot",
+  "BLANKTHESPIRE-CLEAR_CLASS.hover.desc": "Removes the forged class in the selected slot. Set \"Class slot\" above to 1 or higher first.",
+
+  "BLANKTHESPIRE-CLEAR_ALL_CLASSES.title": "Delete ALL forged classes",
+  "BLANKTHESPIRE-CLEAR_ALL_CLASSES.hover.desc": "Removes every imported class at once. This cannot be undone.",
+
+  "BLANKTHESPIRE-RESTART_GAME.title": "Restart game (applies changes)",
+  "BLANKTHESPIRE-RESTART_GAME.hover.desc": "Closes the game and reopens it automatically via Steam. Imported or cleared classes only take effect after a restart."
+}
