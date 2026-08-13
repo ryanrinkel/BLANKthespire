@@ -571,16 +571,48 @@ function summonLines(sm) {
   return out;
 }
 
+// A card's `upgrade` (when present) is a positional overlay: upgrade.effects[i] replaces effects[i]
+// (same op, better numbers — mirrors the mod's per-var delta in EffectRunner.UpgradeDelta), and
+// upgrade.cost is the ABSOLUTE post-upgrade cost. Merge each entry over its base effect so a sparse
+// upgrade spec still renders as a whole card.
+function upgradedView(c) {
+  const up = c.upgrade || {};
+  const effects = (c.effects || []).map((e, i) => ({ ...e, ...((up.effects || [])[i] || {}) }));
+  return { ...c, name: (c.name || "") + "+", cost: up.cost ?? c.cost, effects };
+}
+
+function hasUpgrade(c) {
+  return c.upgrade != null && typeof c.upgrade === "object" && !Array.isArray(c.upgrade)
+    && ((Array.isArray(c.upgrade.effects) && c.upgrade.effects.length > 0) || c.upgrade.cost != null);
+}
+
 function cardEl(c, classId) {
   const d = document.createElement("div");
   d.className = "cardchip r-" + (c.rarity || "common");
   d.dataset.cardId = c.id ?? "";
-  const effects = (c.effects || []).map((e) => fmtEffect(e, c.target)).join(". ");
   d.innerHTML = `<button class="cc-fb" title="Give feedback" aria-label="Give feedback">💬</button>`
-    + `<div class="cc-top"><span class="cc-name">${esc(c.name)}</span>`
-    + `<span class="cc-cost">${c.cost ?? ""}</span></div>`
+    + `<div class="cc-top"><span class="cc-name"></span><span class="cc-cost"></span></div>`
     + `<div class="cc-meta">${esc(c.type)} · ${esc(c.rarity)}</div>`
-    + `<div class="cc-eff">${esc(effects)}</div>`;
+    + `<div class="cc-eff"></div>`;
+  // Name/cost/effects are painted (not baked into the innerHTML) so the upgrade toggle can repaint
+  // them without rebuilding the chip — the feedback button keeps its listener and rated state.
+  const paint = (view) => {
+    d.querySelector(".cc-name").textContent = view.name ?? "";
+    d.querySelector(".cc-cost").textContent = view.cost ?? "";
+    d.querySelector(".cc-eff").textContent =
+      (view.effects || []).map((e) => fmtEffect(e, view.target)).join(". ");
+  };
+  paint(c);
+  if (hasUpgrade(c)) {
+    const lab = document.createElement("label");
+    lab.className = "cc-up";
+    lab.innerHTML = `<input type="checkbox"> Show upgraded`;
+    lab.querySelector("input").onchange = (ev) => {
+      d.classList.toggle("upgraded", ev.target.checked);
+      paint(ev.target.checked ? upgradedView(c) : c);
+    };
+    d.appendChild(lab);
+  }
   // classId is needed to tie feedback to a persisted card; only forged/re-opened classes have one.
   const fb = d.querySelector(".cc-fb");
   if (classId != null) {
