@@ -128,8 +128,15 @@ STARTING_DECK_SIZE = 10
 
 
 def point_btsgen_at_mod_contract() -> None:
-    """Repoint the card schema/vocabulary/statuses at the constrained v2 mod contract. MUST run before the
-    btsgen modules that read paths at import time."""
+    """Repoint the card schema/vocabulary/statuses at the constrained v2 mod contract. Ideally run before the
+    btsgen modules that read paths at import time — but `btsgen.paths` snapshots its BTSGEN_* env vars ONCE, at
+    first import, so if a caller has ALREADY imported a paths-bearing module (contract / validator / generator /
+    frontend / bts1) this env-set alone is a no-op and the harness silently keeps running on the *prototype*
+    contract. That footgun shipped a whole triad forge (Blood Orchard) on the prototype vocabulary — the model
+    emitted prototype-only `conditional`/`from_state` ops instead of the mod's `when` guards, and every mod-shape
+    coverage floor (`when`/scale/balance_step) read zero. So we reload paths in place whenever it's already
+    imported (the fix conftest.py and the CLIs' lazy-import order otherwise depend on), which is idempotent and
+    a no-op when paths hasn't been imported yet."""
     # GODOT_ROOT is only asserted-to-exist (its content paths are all overridden below). The prototype
     # build root it defaults to isn't deployed to the website host, so anchor it at the repo root, which is.
     os.environ["BTSGEN_GODOT_ROOT"] = str(REPO)
@@ -139,6 +146,13 @@ def point_btsgen_at_mod_contract() -> None:
     os.environ["BTSGEN_STATUSES_DIR"] = str(CONTRACT / "statuses")
     os.environ["BTSGEN_CARDS_DIR"] = str(REPO / "mod" / "content" / "cards")
     os.environ["BTSGEN_GENERATED_DIR"] = str(REPO / "generation" / "scratch" / "_class_gen")
+    # If paths was already imported (its module globals are bound to the OLD env), re-read the env into the
+    # single paths module object so already-imported and later-imported modules alike see the mod contract.
+    import importlib
+    import sys
+    _paths = sys.modules.get("btsgen.paths")
+    if _paths is not None:
+        importlib.reload(_paths)
 
 
 @dataclass
