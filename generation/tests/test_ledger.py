@@ -142,9 +142,12 @@ def test_triad_penalty_and_pairs() -> None:
     pl = ledger.payload_line([{"archetype_ids": triple, "top_ops": ["damage"]}])
     check("a+b" in pl and "a+c" in pl and "b+c" in pl, f"all three pairs named in the payload line: {pl}")
 
-    # a 2-archetype candidate's single pair IS its full set -> behavior unchanged (still penalized, still capped)
-    check(ledger.pair_penalty(["a", "b"], [{"archetype_ids": ["a", "b"]}]) > 0,
-          "a 2-archetype repeat is still penalized")
+    # a 2-archetype candidate's single pair IS its full set -> the pair term already covers the repeat; the
+    # triple bonus must NOT fire on top (it would double-penalize every legacy repeat vs the pre-triad ledger)
+    p2 = ledger.pair_penalty(["a", "b"], [{"archetype_ids": ["a", "b"]}])
+    check(p2 > 0, "a 2-archetype repeat is still penalized")
+    check(abs(p2 - (ledger._PAIR_W + 2 * ledger._ARCH_W)) < 1e-9,
+          f"2-archetype repeat keeps the pre-triad formula (no triple bonus), got {p2}")
     check(ledger.pair_penalty(["a", "b"], [{"archetype_ids": ["a", "b"]}] * 12) <= ledger._NOVELTY_MAX,
           "a triad/pair penalty never exceeds the cap")
 

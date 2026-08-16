@@ -191,9 +191,10 @@ def pair_penalty(archetype_ids, window) -> float:
     """A novelty penalty in [0, _NOVELTY_MAX]: recency-weighted overlap of this candidate's archetypes/pairs
     with the recent window. 0 when nothing overlaps; grows with recent PAIR repeats (each of the candidate's
     C(n,2) pairs that also appears in a recent entry), shared archetypes, and — stronger — a full set-repeat
-    (the WHOLE 2- or 3-archetype set recurring, penalized extra via _TRIPLE_W). Capped so it can only break
+    (the WHOLE 3-archetype set recurring, penalized extra via _TRIPLE_W). Capped so it can only break
     ties under the fidelity weight. A triad thus penalizes each shared pair AND the full triple; a 2-archetype
-    candidate's single pair IS its full set, so its behavior is unchanged from before."""
+    candidate's single pair IS its full set, so the pair term already covers it — no triple bonus there,
+    keeping 2-archetype behavior unchanged from before."""
     if not window:
         return 0.0
     ids = {str(i) for i in (archetype_ids or [])}
@@ -208,7 +209,7 @@ def pair_penalty(archetype_ids, window) -> float:
         eids = {str(i) for i in (e.get("archetype_ids") or [])}
         epairs = {frozenset(p) for p in combinations(sorted(eids), 2)}
         pair_hits += w * len(my_pairs & epairs)        # every shared pair repeats (all three for a triad)
-        if len(full) >= 2 and frozenset(eids) == full:  # the WHOLE set recurred — the worst kind of repeat
+        if len(full) >= 3 and frozenset(eids) == full:  # the WHOLE triple recurred — the worst kind of repeat
             triple_hits += w
         arch_hits += w * len(ids & eids)
     return min(_NOVELTY_MAX, _PAIR_W * pair_hits + _TRIPLE_W * triple_hits + _ARCH_W * arch_hits)

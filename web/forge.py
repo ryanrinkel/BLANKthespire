@@ -331,6 +331,10 @@ def forge_to_bundle(concept: str, *, key: dict | None = None, hosted: bool = Fal
     if not concept:
         raise ForgeError("concept is empty.")
 
+    # Triad lives in the staged front-end (the one-shot path has no triad prompt): without `staged` the forge
+    # runs the legacy 2-archetype flow, so drop the flag rather than stamp a non-triad forge as 1.7-triad-exp.
+    triad = bool(triad) and bool(staged)
+
     # Per-user recency ledger: scope every read_window()/record_forge() in this forge to the user's OWN ledger
     # file. ledger_scope uses a thread-local ContextVar (NOT os.environ), so concurrent forges on other users
     # never see this override. user_id None (CLI/anon) => nullcontext => the shared global ledger. Import here
