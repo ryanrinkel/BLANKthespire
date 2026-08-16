@@ -1,10 +1,17 @@
-"""bridges.py — required BRIDGE cards, the fusion enforcer (Phase O-1).
+"""bridges.py — required BRIDGE cards, the fusion enforcer (Phase O-1; triad-aware Phase 1).
 
-A two-archetype class earns its "two engines" claim only if some cards actually FUSE them. O-1 requires
-MIN_BRIDGES pool cards tagged `"bridge": true`, each combining BOTH archetypes' engines in ONE card, with at
+A multi-archetype class earns its "several engines" claim only if some cards actually FUSE them. O-1 requires
+MIN_BRIDGES pool cards tagged as bridges, each combining a PAIR of archetypes' engines in ONE card, with at
 least one at rare (the fusion's poster card). `class_forge._validate_blueprint` enforces the tag-count + the
 rare at the blueprint stage; this module supplies the pure post-generation WITNESS check (does a bridge card
 actually TOUCH each engine?) that the N-1 coverage repair round runs after the whole set is designed.
+
+Under TRIAD (three archetypes A/B/C) a bridge declares its PAIR — `"bridge": [id1, id2]` — and each of the
+three pairs (AB/AC/BC) wants its own package (TARGET_BRIDGES_PER_PAIR each, floor MIN_BRIDGES_PER_PAIR + the
+MIN_BRIDGES total floor). The witness check runs pairwise on the DECLARED pair's ops, so the core function is
+unchanged; the new `third_wheel_tokens` names the excluded engine's unique tokens for the SOFT anti-blend
+warning (an AB bridge should not quietly touch C). Two-archetype classes keep the boolean `"bridge": true`,
+normalized to the only pair at parse time.
 
 Witness math: each archetype's WITNESS tokens = its catalog `ops` MINUS the partner's (the mechanics unique
 to it in THIS pair). A bridge card is witnessed if it touches >=1 witness token of EACH archetype. When a
@@ -22,9 +29,12 @@ from . import census
 
 # The validation FLOOR (hard: _validate_blueprint rejects below it) vs the prompt ASK (the TARGET_RARES /
 # MIN_RARES pattern): models land near the ask, the floor keeps a shortfall from aborting a forge. ~a quarter
-# of the pool fusing both engines is what makes a two-archetype class play as ONE deck.
+# of the pool fusing both engines is what makes a two-archetype class play as ONE deck. MIN_BRIDGES stays the
+# TOTAL floor under triad; the per-pair pattern (TARGET/MIN) mirrors it for each of the three pairs.
 MIN_BRIDGES = 4
 TARGET_BRIDGES = 6
+TARGET_BRIDGES_PER_PAIR = 2  # triad ask: 2 bridges per pair (6 total — same total as the 2-arch TARGET)
+MIN_BRIDGES_PER_PAIR = 1    # triad floor: >=1 bridge for EACH of the three pairs (AND >=MIN_BRIDGES total)
 
 
 def card_tokens(card: dict) -> set[str]:
@@ -56,6 +66,20 @@ def is_witnessed(card: dict, ops_a, ops_b) -> bool:
         return bool(toks & wit_a) and bool(toks & wit_b)
     union = a | b
     return len(toks & union) >= 2
+
+
+def third_wheel_tokens(ops_x, ops_y, ops_z) -> set[str]:
+    """The THIRD archetype's UNIQUE tokens for a pair (X, Y): ops(Z) - ops(X) - ops(Y). A pair bridge that
+    touches any of these is quietly an ABC card (the anti-blend guard). SOFT check only — token overlap
+    between engines is common, so this feeds a warn + repair-directive line, never a hard reject."""
+    return set(ops_z or []) - set(ops_x or []) - set(ops_y or [])
+
+
+def pair_key(id1: str, id2: str) -> tuple[str, str]:
+    """A pair's normalized key: the two archetype ids as a sorted tuple, so AB and BA hash the same (used by
+    validation and the ledger to bucket bridges/pairs regardless of declaration order)."""
+    a, b = str(id1), str(id2)
+    return (a, b) if a <= b else (b, a)
 
 
 def repair_directive(name_a: str, name_b: str, ops_a, ops_b) -> str:

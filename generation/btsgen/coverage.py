@@ -102,15 +102,37 @@ def bridge_indices(made: list[dict]) -> list[int]:
     return [i for i in measurable_indices(made) if _is_bridge(made[i])]
 
 
+def _pair_ctx(entry: dict, bridge_ctx):
+    """The witness context ({name_a, ops_a, name_b, ops_b[, ops_third, name_third]}) for ONE bridge card's
+    DECLARED pair (Phase 1). A triad bridge declares `[id1, id2]` -> look that pair up in bridge_ctx["pairs"];
+    a 2-archetype boolean bridge uses the single top-level pair. None when it can't be resolved (the semantic
+    check is then skipped for that card)."""
+    if not bridge_ctx:
+        return None
+    b = ((entry.get("plan") or {}).get("bridge")) or ((entry.get("card") or {}).get("bridge"))
+    if isinstance(b, (list, tuple)) and len(b) == 2:
+        key = bridges.pair_key(str(b[0]), str(b[1]))
+        return (bridge_ctx.get("pairs") or {}).get(key)
+    # boolean bridge (2-archetype) -> the single pair, exposed top-level
+    if "ops_a" in bridge_ctx and "ops_b" in bridge_ctx:
+        return bridge_ctx
+    pairs = bridge_ctx.get("pairs") or {}
+    return next(iter(pairs.values())) if len(pairs) == 1 else None
+
+
 def bridge_failures(made: list[dict], bridge_ctx) -> list[int]:
-    """Indices of bridge cards that do NOT witness both archetypes' engines (bridges.is_witnessed). Empty
-    when there is no resolvable archetype context (invented concept-path ids) — the semantic check is then
-    skipped and only the blueprint-stage tag-count applies."""
+    """Indices of bridge cards that do NOT witness their DECLARED pair's engines (bridges.is_witnessed).
+    Empty when there is no resolvable archetype context (invented concept-path ids) — the semantic check is
+    then skipped and only the blueprint-stage tag-count applies. Under triad each bridge is checked against
+    ITS OWN pair's ops (routed via _pair_ctx), not one global pair."""
     if not bridge_ctx:
         return []
-    ops_a, ops_b = bridge_ctx["ops_a"], bridge_ctx["ops_b"]
-    return [i for i in bridge_indices(made)
-            if not bridges.is_witnessed((made[i].get("card") or {}), ops_a, ops_b)]
+    fails = []
+    for i in bridge_indices(made):
+        pctx = _pair_ctx(made[i], bridge_ctx)
+        if pctx and not bridges.is_witnessed((made[i].get("card") or {}), pctx["ops_a"], pctx["ops_b"]):
+            fails.append(i)
+    return fails
 
 
 def measurable_indices(made: list[dict]) -> list[int]:
@@ -281,12 +303,17 @@ def enforce_coverage(made: list[dict], regen_card, note, *, featured=None, bridg
         note("coverage featured: " + "; ".join(
             f"{f.id}={'MISSING' if f.id in missing_ids else 'present'}" for f in featured))
 
-    # O-1 bridges: witness the fusion cards (skip the semantic check if the archetype ops can't be resolved).
+    # O-1 bridges: witness the fusion cards against each card's DECLARED pair (skip the semantic check if the
+    # archetype ops can't be resolved). Under triad there are three pairs, so name the engine count, not a
+    # single A x B.
     bridge_all = bridge_indices(made)
     bridge_fail = bridge_failures(made, bridge_ctx)
     if bridge_ctx:
-        note(f"coverage bridges: {len(bridge_all)} tagged, {len(bridge_all) - len(bridge_fail)} fuse both "
-             f"engines ({bridge_ctx['name_a']} x {bridge_ctx['name_b']})")
+        n_pairs = len(bridge_ctx.get("pairs") or {}) or 1
+        engines = (f"{bridge_ctx['name_a']} x {bridge_ctx['name_b']}" if "name_a" in bridge_ctx
+                   else f"{n_pairs} pair-lanes")
+        note(f"coverage bridges: {len(bridge_all)} tagged, {len(bridge_all) - len(bridge_fail)} fuse their "
+             f"declared pair ({engines})")
         if len(bridge_all) < bridges.MIN_BRIDGES:
             note(f"WARNING: only {len(bridge_all)} bridge card(s) survived generation "
                  f"(want {bridges.MIN_BRIDGES})")
@@ -306,11 +333,11 @@ def enforce_coverage(made: list[dict], regen_card, note, *, featured=None, bridg
     # non-bridge victims. Everything shares the one budget.
     pairs: list[tuple[int, str]] = []
     if bridge_ctx:
-        bdir = bridges.repair_directive(bridge_ctx["name_a"], bridge_ctx["name_b"],
-                                        bridge_ctx["ops_a"], bridge_ctx["ops_b"])
         for i in bridge_fail:
             if len(pairs) >= budget:
                 break
+            pctx = _pair_ctx(made[i], bridge_ctx) or bridge_ctx  # per declared pair (triad-aware)
+            bdir = bridges.repair_directive(pctx["name_a"], pctx["name_b"], pctx["ops_a"], pctx["ops_b"])
             pairs.append((i, bdir))
 
     remaining = max(0, budget - len(pairs))

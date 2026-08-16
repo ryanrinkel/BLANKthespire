@@ -27,7 +27,21 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import bridges as _bridges_mod  # Phase O-2: proactive fusion directives on first generation
-from .bridges import MIN_BRIDGES, TARGET_BRIDGES  # Phase O-1: the required-bridge-card count (fusion enforcer)
+from .bridges import (MIN_BRIDGES, MIN_BRIDGES_PER_PAIR, TARGET_BRIDGES,  # Phase O-1 / Phase 1 triad
+                      TARGET_BRIDGES_PER_PAIR)
+
+
+def triad_enabled(override: bool | None = None) -> bool:
+    """Phase 1 mode switch: is the TRIAD (three-archetype) creative path ON?
+
+    Triad is an EXPERIMENT behind a flag — OFF is exactly today's v1.6 two-archetype flow. The default reads
+    the `BTS_TRIAD` env var (any of 1/true/yes/on, case-insensitive); an explicit `override` argument wins so
+    the web layer can pass a per-request flag in Phase 2 without touching the process env. The flag drives the
+    PROMPT/target MODE only — validation itself keys off the blueprint's actual archetype count, so a 2- or
+    3-archetype blueprint validates the same regardless of this flag."""
+    if override is not None:
+        return bool(override)
+    return str(os.environ.get("BTS_TRIAD", "")).strip().lower() in ("1", "true", "yes", "on")
 
 def _find_repo_root() -> Path:
     """Repo root = the directory that contains ``mod/contract/``. Resolve it robustly so the forge works
@@ -58,6 +72,9 @@ RELIC_VOCAB = CONTRACT / "RELIC_VOCABULARY.md"  # Phase L: the constrained forge
 # a log line lets you tell which harness produced a given forge — on the CLI and in the streamed browser log.
 # It's the FIRST line emitted by forge_class(). Bump on any harness tweak; a short "-what" suffix helps track.
 HARNESS_VERSION = "1.6-synergy-weave"  # O-2: class/archetype context on every card call, proactive bridge fusion directives, fusion-shape variety, per-archetype design recency, deck-aware relic prompt hint
+# Phase 1 (triad experiment): the triad path stamps its OWN version so every forge is attributable to the
+# mode that produced it (see the Rollout / compat note). forge_class picks this when triad_enabled() is on.
+HARNESS_VERSION_TRIAD = "1.7-triad-exp"
 
 # Forged-class pool target. A base StS2 class pool is 20 common / 35 uncommon / 25 rare (~80 non-basic
 # cards); we ship a lean, reward-functional subset — each non-basic brief is one card-generation (LLM)
@@ -70,6 +87,23 @@ TARGET_UNCOMMONS = 12
 TARGET_RARES = 4
 MIN_RARES = 3
 TARGET_POOL = TARGET_COMMONS + TARGET_UNCOMMONS + TARGET_RARES  # ~23 non-basic pool cards
+# Phase 1 (triad): three archetypes each want a genuinely full lane, so the pool grows to the practical cap
+# (9C/16U/7R = 32 pool cards ≈ 8-9 own cards per archetype + 6 bridges). MIN_RARES stays 3 (the boss-reward
+# floor is about existence, not depth; 7 rares comfortably covers one finisher per pair-line). Targets are
+# mode-dependent: `_pool_targets(count)` keys off the blueprint's ACTUAL archetype count, not the env flag.
+TARGET_COMMONS_TRIAD = 9
+TARGET_UNCOMMONS_TRIAD = 16
+TARGET_RARES_TRIAD = 7
+TARGET_POOL_TRIAD = TARGET_COMMONS_TRIAD + TARGET_UNCOMMONS_TRIAD + TARGET_RARES_TRIAD  # 32 pool cards
+
+
+def _pool_targets(archetype_count: int) -> tuple[int, int, int, int]:
+    """The (commons, uncommons, rares, pool) rarity targets for a blueprint, keyed off its ACTUAL archetype
+    count — 3 archetypes -> the triad 9/16/7 pool, else today's 7/12/4. Mode-dependent knobs (validation,
+    the pool ask) resolve their numbers through here so both paths share one codebase."""
+    if archetype_count >= 3:
+        return TARGET_COMMONS_TRIAD, TARGET_UNCOMMONS_TRIAD, TARGET_RARES_TRIAD, TARGET_POOL_TRIAD
+    return TARGET_COMMONS, TARGET_UNCOMMONS, TARGET_RARES, TARGET_POOL
 
 # The strategy taxonomy for STRATEGIC LINES (see the blueprint prompt): every class's pool must support at
 # least two of these as genuinely draftable game plans, each with its own rare finisher — the Ironclad test
@@ -152,12 +186,22 @@ class _BlueprintContract:
     Runs in TWO modes with the SAME system_prompt (so the 190-line f-string is never re-touched — only the
     user message changes): mode="concept" (today's one-shot: concept -> everything) and mode="dossier" (the
     staged front-end: a decided identity -> card briefs + pools). Both emit the IDENTICAL bp shape, so
-    _validate_blueprint and everything downstream is untouched."""
+    _validate_blueprint and everything downstream is untouched.
 
-    def __init__(self, mode: str = "concept") -> None:
+    Phase 1 adds a THIRD axis, `triad` (default: triad_enabled() reads BTS_TRIAD). OFF -> exactly today's
+    v1.6 two-archetype prompt/targets (byte-for-byte). ON -> the legacy system prompt PLUS a TRIAD OVERRIDE
+    block appended at the end (three archetypes, pairwise bridges, pair->strategy, neutral signatures, the
+    9/16/7 pool ask) — the legacy f-string is untouched, so the flag-off path never changes."""
+
+    def __init__(self, mode: str = "concept", triad: bool | None = None) -> None:
         self.mode = mode
+        self.triad = triad_enabled(triad)
 
     def system_prompt(self) -> str:
+        base = self._system_prompt_legacy()
+        return base + self._triad_addendum() if self.triad else base
+
+    def _system_prompt_legacy(self) -> str:
         from . import paths
         vocab = paths.VOCABULARY.read_text(encoding="utf-8")
         return f"""You are a CLASS designer for "BLANK the spire", a Slay-the-Spire-like deckbuilder. From a \
@@ -556,6 +600,80 @@ summon_pool may use those ops; summon / buff_summon ride self-target skills, sum
                  "DIFFERENT fusion shape, at least one of them a rare, the rest spread across "
                  "common/uncommon.")
 
+    # Triad (D4): the bigger 9/16/7 pool + per-lane rarity discipline + pairwise bridges (2 per pair, floor 1
+    # per pair AND 4 total, >=1 rare overall) + the pair->strategy declaration. Used only when self.triad.
+    _POOL_ASK_TRIAD = (f"Give it the full triad reward pool: about {TARGET_COMMONS_TRIAD} commons, "
+                       f"{TARGET_UNCOMMONS_TRIAD} uncommons, and {TARGET_RARES_TRIAD} rares "
+                       f"(~{TARGET_POOL_TRIAD} pool cards), split across the THREE archetypes — each lane wants "
+                       f">=2-3 of its OWN commons so it is draftable from the first reward. At least {MIN_RARES} "
+                       "rares is REQUIRED (7 covers a finisher per pair-line plus spares). Declare \"pair_lines\": "
+                       "map each of the three pairs to a DISTINCT strategy — [{\"pair\": [id1, id2], "
+                       "\"strategy\": \"aggro|control|combo\"}, ...] — and tag every pool card with the matching "
+                       f"\"strategy\" so ALL THREE lines each get >={_LINE_MIN_CARDS} tagged cards including >=1 "
+                       "rare finisher. Include the required reprint homage: one COMMON pool card faithfully "
+                       "recreating a real base-game card ('Reprint of <Name> (base game): <original effect>'). "
+                       f"Include ~{TARGET_BRIDGES_PER_PAIR} BRIDGE cards PER PAIR (~{TARGET_BRIDGES} total; hard "
+                       f"floor {MIN_BRIDGES_PER_PAIR} per pair AND {MIN_BRIDGES} total), each declaring its pair "
+                       "as \"bridge\": [id1, id2] (NEVER a boolean, NEVER three ids — trinity cards are BANNED), "
+                       "carrying its pair's strategy tag, at least one rare overall, and a DIFFERENT fusion shape "
+                       "per pair.")
+
+    def _pool_ask(self) -> str:
+        return self._POOL_ASK_TRIAD if self.triad else self._POOL_ASK
+
+    @staticmethod
+    def _triad_addendum() -> str:
+        """The TRIAD OVERRIDE block appended to the legacy system prompt when self.triad (Phase 1). It RESTATES
+        the rules that change under three archetypes so the legacy f-string is never re-touched — the flag-off
+        path is byte-for-byte today's prompt. Covers: three archetypes forming a triangle of pairs; pairwise
+        BRIDGE cards (declare the pair, 2 per pair, >=1 rare overall, vary the fusion shape, the no-third-wheel
+        rule, the trinity ban); the pair->strategy mapping (D3); signature neutrality (D5); class-kind pools
+        bind to ONE archetype the other two bridge into (D6); the 9/16/7 pool ask (D4)."""
+        return f"""
+
+========================= TRIAD OVERRIDE (three-archetype experiment) =========================
+This class has THREE archetypes (A, B, C), not two — a TRIANGLE OF PAIRS (AB, AC, BC). The rules \
+above still hold EXCEPT where this block overrides them. The goal: each archetype is a standalone \
+draftable lane, and the player commits to a PAIR mid-run through what they draft. Everything must \
+NOT blend into one deck — three engines that fuse pairwise, never all at once.
+
+ARCHETYPES: output EXACTLY three archetype objects. Each is its own engine, enterable from common \
+up, with its own enablers and payoffs. Example third entry: \
+{{ "id": "snake_case", "name": "Short Name", "description": "a THIRD distinct engine in vocabulary terms" }}.
+
+BRIDGE CARDS (this REPLACES the two-archetype BRIDGE CARDS rule): a bridge fuses exactly ONE PAIR. \
+Declare its pair explicitly: "bridge": ["<arch_id_1>", "<arch_id_2>"] (two DISTINCT archetype ids of \
+this class) — NEVER a boolean, and NEVER three ids. TRINITY CARDS ARE BANNED: a card that fuses all \
+three engines is a validation ERROR — every bridge is exactly one pair, so the draft signals stay \
+clean. Ship ~{TARGET_BRIDGES_PER_PAIR} bridges PER PAIR (~{TARGET_BRIDGES} total; hard floor \
+{MIN_BRIDGES_PER_PAIR} per pair AND {MIN_BRIDGES} total), at least ONE bridge a RARE overall (the \
+poster card), and VARY THE FUSION SHAPE per pair (FUEL / GATE / RIDER / CONVERTER / COUPLER — see the \
+shapes above). NO-THIRD-WHEEL: an AB bridge should touch A's and B's engines and NOT reach into C's \
+unique mechanics — keep each bridge a clean two-engine card, not a quiet ABC blend.
+
+PAIR -> STRATEGY (this REPLACES the two-line STRATEGIC LINES minimum): map the three pairs to the \
+three DISTINCT strategies (aggro / control / combo) — one per pair — and declare it top-level: \
+"pair_lines": [ {{ "pair": [id1, id2], "strategy": "aggro|control|combo" }}, ... ] (one entry per \
+pair, three total, three distinct strategies). "Pick a pair" and "pick a game plan" become the same \
+decision. Tag every pool card with the "strategy" of the line it serves; a bridge carries ITS PAIR's \
+strategy. ALL THREE lines must be a full package: >={_LINE_MIN_CARDS} tagged cards each including >=1 \
+rare finisher (the 7-rare budget covers three finishers plus spares).
+
+SIGNATURES (D5 — starting-deck neutrality): with three archetypes a signature is either NEUTRAL glue \
+("archetype": null) or tied to the concept's CORE archetype — NEVER a bridge, and NEVER two signatures \
+serving the same pair. The starting deck must not decide the pair for the player.
+
+CLASS-KIND POOLS (D6): an orb / status / summon / forge subsystem still binds to ONE archetype (make \
+ONE archetype the orb/status/summon/forge engine). The texture is that the OTHER TWO archetypes each \
+BRIDGE into it differently (e.g. AB: orbs+aggro, AC: orbs+control) — different pair-lanes into the \
+same engine, never a three-way blend.
+
+POOL SIZE (D4): a base-class-sized-for-three pool — about {TARGET_COMMONS_TRIAD} commons, \
+{TARGET_UNCOMMONS_TRIAD} uncommons, {TARGET_RARES_TRIAD} rares (~{TARGET_POOL_TRIAD} pool cards), so \
+every lane drafts from a genuinely full pool. Per-lane rarity discipline: each archetype wants >=2-3 of \
+its OWN commons. A FORGE class takes ONE signature at this pool size (the blade token row leaves no room \
+for a second signature under the card cap)."""
+
     def user_brief(self, brief) -> str:
         return self._dossier_brief(brief) if self.mode == "dossier" else self._concept_brief(brief)
 
@@ -599,7 +717,7 @@ summon_pool may use those ops; summon / buff_summon ride self-target skills, sum
 
     def _concept_brief(self, brief: ClassBrief) -> str:
         return (f'Design a new playable class from this player concept:\n"{brief.concept.strip()}"\n\n'
-                f"{self._POOL_ASK}{self._featured_ask(brief)}{self._recency_status()}"
+                f"{self._pool_ask()}{self._featured_ask(brief)}{self._recency_status()}"
                 f"{self._feedback_ask(brief.concept)}\n"
                 "Return only the JSON blueprint object.")
 
@@ -652,7 +770,7 @@ summon_pool may use those ops; summon / buff_summon ride self-target skills, sum
             f'Weakness: {c.weakness}\n'
             f'The TWO archetypes (in tension — {c.tension or "they pull against each other"}):\n{archs}\n'
             f'{lines}{kind_guidance}{relic}{skin}\n\n'
-            f"Use these two archetypes as the blueprint's two archetypes (keep their ids). {self._POOL_ASK}"
+            f"Use these two archetypes as the blueprint's two archetypes (keep their ids). {self._pool_ask()}"
             f"{self._featured_ask(brief)}{self._recency_status()}{self._archetype_recency(c.archetype_ids)}"
             f"{self._feedback_ask(f'{c.name} {c.fantasy} {c.core_loop} {archs}')}\n"
             "Return only the JSON blueprint object.")
@@ -677,10 +795,13 @@ summon_pool may use those ops; summon / buff_summon ride self-target skills, sum
         bp["max_hp"] = int(c.suggested_max_hp)
         ids = list(c.archetype_ids) or ["a", "b"]
         descs = list(c.archetype_descs) or ["", ""]
+        # Phase 1: seed however many archetypes the candidate carries (2 or, under triad, 3), padding to the
+        # 2-archetype floor. All ids flow through so a triad candidate seeds a triad bp.
         while len(ids) < 2:
             ids.append(f"arch_{len(ids)}"); descs.append("")
-        bp["archetypes"] = [{"id": ids[0], "name": ids[0], "description": descs[0]},
-                            {"id": ids[1], "name": ids[1], "description": descs[1]}]
+        while len(descs) < len(ids):
+            descs.append("")
+        bp["archetypes"] = [{"id": ids[k], "name": ids[k], "description": descs[k]} for k in range(len(ids))]
         if getattr(brief, "relic_intent", None):
             bp["relic_intent"] = brief.relic_intent
         # The staged path validates the blueprint strictly (real path must pass _validate_blueprint), but the
@@ -1051,6 +1172,36 @@ _SIGNATURE_ROLES = {"signature"}
 _MERCHANT_TYPES = ("attack", "skill", "power")
 
 
+def _archetype_ids(bp: dict) -> list[str]:
+    """The blueprint's archetype ids in declared order (skipping malformed entries)."""
+    return [str(a.get("id")) for a in (bp.get("archetypes") or [])
+            if isinstance(a, dict) and a.get("id") is not None]
+
+
+def _bridge_pair(card, arch_ids: list[str]):
+    """Resolve ONE card's declared bridge pair to a normalized (id1, id2) tuple, or None if it is not a
+    bridge. Phase 1 schema: `"bridge": [id1, id2]` (exactly two DISTINCT valid archetype ids of this class).
+    Back-compat: a boolean `true` is legal ONLY on a 2-archetype class and normalizes to the (only) pair.
+    Malformed declarations (a 3-id list, unknown/duplicate ids, a boolean on a 3-archetype class) return the
+    sentinel string "invalid" so the caller can raise a precise error — they are NOT silently dropped."""
+    if not isinstance(card, dict):
+        return None
+    b = card.get("bridge")
+    if not b:
+        return None
+    if b is True:
+        # Boolean back-compat: only meaningful when there is exactly ONE pair to normalize to (2 archetypes).
+        if len(arch_ids) == 2:
+            return _bridges_mod.pair_key(arch_ids[0], arch_ids[1])
+        return "invalid"
+    if isinstance(b, (list, tuple)):
+        ids = [str(x) for x in b]
+        if len(ids) != 2 or ids[0] == ids[1] or any(i not in arch_ids for i in ids):
+            return "invalid"
+        return _bridges_mod.pair_key(ids[0], ids[1])
+    return "invalid"
+
+
 def _validate_blueprint(bp: dict) -> list[str]:
     errs: list[str] = []
     if not isinstance(bp, dict):
@@ -1060,12 +1211,18 @@ def _validate_blueprint(bp: dict) -> list[str]:
             errs.append(f"missing '{key}'")
     if errs:
         return errs
-    if not isinstance(bp["archetypes"], list) or len(bp["archetypes"]) != 2:
-        errs.append("need exactly 2 archetypes")
+    # Phase 1: accept 2 OR 3 archetypes (the triad experiment shares this codebase). All mode-dependent knobs
+    # below key off the ACTUAL archetype count, never the BTS_TRIAD flag, so a 2- or 3-archetype blueprint
+    # validates identically whether or not the flag is set.
+    if not isinstance(bp["archetypes"], list) or len(bp["archetypes"]) not in (2, 3):
+        errs.append("need exactly 2 or 3 archetypes")
     cards = bp.get("cards") or []
     if not isinstance(cards, list) or not cards:
         errs.append("need a non-empty cards list")
         return errs
+    arch_ids = _archetype_ids(bp)
+    arch_count = len(arch_ids)
+    is_triad = arch_count >= 3
     roles = [c.get("role") for c in cards]
     if roles.count("basic_attack") != 1 or roles.count("basic_skill") != 1:
         errs.append("need exactly one basic_attack and one basic_skill")
@@ -1076,6 +1233,12 @@ def _validate_blueprint(bp: dict) -> list[str]:
     if len(cards) > _BLUEPRINT_CARD_CAP:
         errs.append(f"at most {_BLUEPRINT_CARD_CAP} cards per class (the mod holds {CARDS_PER_CLASS} card "
                     f"slots; the remainder is reserved for merchant/rare safety fillers)")
+        # D4 cap math (triad's 32-pool target rides right up to the 36-row cap): a FORGE class adds the blade
+        # token row, so at 32 pool cards it fits with ONE signature (2 basics + 1 sig + 1 blade + 32 = 36) but
+        # a SECOND signature breaches it (37). Name the concrete fix so the model doesn't just shave a card.
+        if roles.count(_BLADE_ROLE) >= 1 and roles.count("signature") >= 2:
+            errs.append("forge class at 32-pool target: drop to one signature or drop one uncommon (the blade "
+                        f"token row plus two signatures overflows the {_BLUEPRINT_CARD_CAP}-row cap)")
     # Merchant safety: the shop builds one entry per card type from the NON-basic pool; an empty type bucket
     # makes CardFactory.CreateForMerchant throw and hangs the game. Require ≥1 non-basic of each merchant type.
     # The signature blade is a TOKEN (never in the shop), so it does NOT count toward a merchant bucket.
@@ -1094,21 +1257,19 @@ def _validate_blueprint(bp: dict) -> list[str]:
     if rares < MIN_RARES:
         errs.append(f"need at least {MIN_RARES} rare pool cards (a boss card reward rolls a Rare and the run "
                     f"hangs if none is available); got {rares}")
-    # Strategic-line coverage: the pool must support >=2 distinct strategies (aggro/control/combo), each as a
-    # real package — >=_LINE_MIN_CARDS tagged non-basic cards including >=1 rare finisher. This is the
-    # Ironclad test: one pool, several draftable game plans, each with a wincon to build toward.
-    errs += _strategy_coverage(cards)[0]
-    # O-1 fusion enforcer: a two-archetype class must ship real BRIDGE cards that combine BOTH engines in one
-    # card (>=MIN_BRIDGES pool cards tagged "bridge", >=1 of them a rare — the fusion's poster card). The
-    # post-generation witness detector (bridges.py, run in the coverage round) checks they actually fuse; this
-    # is the blueprint-stage tag-count + rare floor.
-    bridge_cards = [c for c in cards if isinstance(c, dict) and c.get("bridge")
-                    and c.get("role") not in _BASIC_ROLES]
-    if len(bridge_cards) < MIN_BRIDGES:
-        errs.append(f"need at least {MIN_BRIDGES} bridge cards ('bridge': true, role 'pool') that fuse BOTH "
-                    f"archetypes' engines into one card; got {len(bridge_cards)}")
-    elif not any(str(c.get("rarity", "")).lower() == "rare" for c in bridge_cards):
-        errs.append("at least one bridge card must be a rare (the fusion's poster card)")
+    # Strategic-line coverage: the pool must support several distinct strategies (aggro/control/combo), each as
+    # a real package — >=_LINE_MIN_CARDS tagged non-basic cards including >=1 rare finisher. This is the
+    # Ironclad test: one pool, several draftable game plans, each with a wincon to build toward. D3: a TRIAD
+    # class HARD-requires ALL THREE lines (each pair IS a game plan — the replay guarantee), up from >=2.
+    errs += _strategy_coverage(cards, min_lines=3 if is_triad else 2)[0]
+    if is_triad:
+        errs += _validate_pair_lines(bp, arch_ids)
+    # O-1 fusion enforcer, generalized pairwise (Phase 1): every bridge declares a PAIR of this class's
+    # archetypes (2-arch: boolean `true` -> the only pair; 3-arch: `[id1, id2]`, a trinity 3-id bridge is an
+    # ERROR). Floors: >=MIN_BRIDGES total AND >=MIN_BRIDGES_PER_PAIR per pair (triad), >=1 bridge a rare
+    # overall. The post-generation witness detector (bridges.py, coverage round) checks they actually fuse;
+    # this is the blueprint-stage tag-count + rare floor + per-pair floor.
+    errs += _validate_bridges(bp, cards, arch_ids)
     if not (60 <= int(bp.get("max_hp", 0)) <= 95):
         errs.append("max_hp must be 60..95")
     orb_slots = 0
@@ -1131,10 +1292,11 @@ def _validate_blueprint(bp: dict) -> list[str]:
 _GLUE_TAGS = {"", "any", "all", "glue", "none", "null"}  # ways the model says "generic glue" — all fine
 
 
-def _strategy_coverage(cards) -> tuple[list[str], dict[str, dict]]:
+def _strategy_coverage(cards, min_lines: int = 2) -> tuple[list[str], dict[str, dict]]:
     """Count the pool's strategy packages. Returns (errors, {strategy: {cards, rares}}). A card with no
-    strategy tag (or a glue tag) is legal — it's the generic filler any deck drafts — but at least TWO
-    distinct strategies must each have a full package (>=_LINE_MIN_CARDS cards, >=1 rare finisher)."""
+    strategy tag (or a glue tag) is legal — it's the generic filler any deck drafts — but at least `min_lines`
+    distinct strategies must each have a full package (>=_LINE_MIN_CARDS cards, >=1 rare finisher). Legacy
+    (2-archetype) classes pass min_lines=2; a triad class passes 3 (D3 — each of the three pairs is a line)."""
     errs: list[str] = []
     by: dict[str, dict] = {}
     for c in cards or []:
@@ -1153,13 +1315,116 @@ def _strategy_coverage(cards) -> tuple[list[str], dict[str, dict]]:
         if str(c.get("rarity", "")).lower() == "rare":
             b["rares"] += 1
     covered = sorted(s for s, b in by.items() if b["cards"] >= _LINE_MIN_CARDS and b["rares"] >= 1)
-    if len(covered) < 2:
+    if len(covered) < min_lines:
         tally = ", ".join(f"{s}: {b['cards']} card(s)/{b['rares']} rare(s)" for s, b in sorted(by.items())) \
                 or "no cards tagged"
-        errs.append(f"the pool must support at least 2 strategic lines: tag pool cards with \"strategy\" "
-                    f"(aggro/control/combo) so >=2 strategies each have >={_LINE_MIN_CARDS} tagged cards "
-                    f"including >=1 rare finisher; covered so far: {covered or 'none'} ({tally})")
+        errs.append(f"the pool must support at least {min_lines} strategic lines: tag pool cards with "
+                    f"\"strategy\" (aggro/control/combo) so >={min_lines} strategies each have "
+                    f">={_LINE_MIN_CARDS} tagged cards including >=1 rare finisher; covered so far: "
+                    f"{covered or 'none'} ({tally})")
     return errs, by
+
+
+def _pair_lines(bp: dict) -> list[dict]:
+    """The blueprint's declared pair->strategy mapping (D3), the triad analogue of the compose stage's
+    strategic_lines. Phase 1 shape (a natural extension of `archetypes` + per-card `strategy`, and forward-
+    compatible with Phase 2's richer `pair_lines`): a top-level
+
+        "pair_lines": [ {"pair": [id1, id2], "strategy": "aggro|control|combo"}, ... ]
+
+    with one entry per pair (three for a triad). Phase 2 adds "line"/"win_condition" text from the compose
+    stage; the minimum Phase 1 needs is the pair->strategy declaration, so extra keys are simply ignored."""
+    return [l for l in (bp.get("pair_lines") or []) if isinstance(l, dict)]
+
+
+def _validate_pair_lines(bp: dict, arch_ids: list[str]) -> list[str]:
+    """D3 (triad only): the three pairs must map to the three DISTINCT strategies. Validate that pair_lines
+    declares every pair exactly once and assigns each a distinct valid strategy — three runs of the class then
+    feel like three classes. Returns the mapping errors (the per-line pool coverage is _strategy_coverage's)."""
+    errs: list[str] = []
+    lines = _pair_lines(bp)
+    all_pairs = {_bridges_mod.pair_key(arch_ids[i], arch_ids[j])
+                 for i in range(len(arch_ids)) for j in range(i + 1, len(arch_ids))}
+    seen: dict[tuple, str] = {}
+    strategies_used: list[str] = []
+    for l in lines:
+        pr = l.get("pair")
+        if not isinstance(pr, (list, tuple)) or len(pr) != 2 or str(pr[0]) == str(pr[1]) \
+                or any(str(x) not in arch_ids for x in pr):
+            errs.append(f"pair_lines entry {l.get('pair')!r} must name two distinct archetype ids of this class")
+            continue
+        key = _bridges_mod.pair_key(str(pr[0]), str(pr[1]))
+        if key in seen:
+            errs.append(f"pair_lines declares the pair {list(key)} more than once")
+            continue
+        strat = str(l.get("strategy") or "").strip().lower()
+        if strat not in STRATEGIES:
+            errs.append(f"pair_lines pair {list(key)} needs a \"strategy\" of {'/'.join(STRATEGIES)}")
+            continue
+        seen[key] = strat
+        strategies_used.append(strat)
+    missing = all_pairs - set(seen)
+    if missing:
+        errs.append(f"a triad must map ALL THREE pairs to a strategy in \"pair_lines\"; missing "
+                    f"{sorted(list(p) for p in missing)}")
+    if len(set(strategies_used)) < len(strategies_used):
+        errs.append("the three pairs must serve THREE DISTINCT strategies (aggro/control/combo), not repeats — "
+                    f"got {strategies_used}")
+    return errs
+
+
+def _validate_bridges(bp: dict, cards, arch_ids: list[str]) -> list[str]:
+    """Blueprint-stage bridge enforcement, pairwise (Phase 1). Each bridge card declares a PAIR (2-arch:
+    boolean `true`; 3-arch: `[id1, id2]`); a 3-id bridge, an unknown/duplicate id, or a boolean on a triad
+    blueprint is an ERROR (trinity cards banned; a triad bridge must declare its pair). Floors: >=MIN_BRIDGES
+    bridges total, >=1 a rare (the poster card), and — on a triad — >=MIN_BRIDGES_PER_PAIR for EACH pair.
+    D3: a bridge's strategy tag must be its pair's declared line."""
+    errs: list[str] = []
+    is_triad = len(arch_ids) >= 3
+    pair_strat = {k: s for k, s in ((_bridges_mod.pair_key(str(l["pair"][0]), str(l["pair"][1])),
+                                     str(l.get("strategy") or "").strip().lower())
+                                    for l in _pair_lines(bp)
+                                    if isinstance(l.get("pair"), (list, tuple)) and len(l["pair"]) == 2)}
+    bridge_cards = [c for c in cards if isinstance(c, dict) and c.get("bridge")
+                    and c.get("role") not in _BASIC_ROLES]
+    per_pair: dict[tuple, int] = {}
+    for c in bridge_cards:
+        pair = _bridge_pair(c, arch_ids)
+        if pair == "invalid":
+            b = c.get("bridge")
+            if isinstance(b, (list, tuple)) and len(b) == 3:
+                errs.append(f"bridge card '{c.get('name_hint', '?')}' declares THREE archetypes — trinity "
+                            "cards are banned; every bridge fuses exactly ONE pair")
+            elif b is True and is_triad:
+                errs.append(f"bridge card '{c.get('name_hint', '?')}' must declare its pair as "
+                            "\"bridge\": [id1, id2] on a three-archetype class (a boolean is 2-archetype only)")
+            else:
+                errs.append(f"bridge card '{c.get('name_hint', '?')}' has an invalid \"bridge\" — it must be "
+                            "two distinct archetype ids of this class")
+            continue
+        if pair is None:
+            continue
+        per_pair[pair] = per_pair.get(pair, 0) + 1
+        # D3: a bridge carries its pair's declared strategy line (its cards count toward that line).
+        if is_triad and pair in pair_strat:
+            tag = str(c.get("strategy") or "").strip().lower()
+            if tag in STRATEGIES and tag != pair_strat[pair]:
+                errs.append(f"bridge card '{c.get('name_hint', '?')}' is tagged '{tag}' but its pair "
+                            f"{list(pair)} serves the '{pair_strat[pair]}' line — a bridge carries its pair's "
+                            "declared strategy")
+    if len(bridge_cards) < MIN_BRIDGES:
+        errs.append(f"need at least {MIN_BRIDGES} bridge cards (role 'pool') that fuse a PAIR of archetypes' "
+                    f"engines into one card; got {len(bridge_cards)}")
+    elif not any(str(c.get("rarity", "")).lower() == "rare" for c in bridge_cards):
+        errs.append("at least one bridge card must be a rare (the fusion's poster card)")
+    if is_triad:
+        all_pairs = {_bridges_mod.pair_key(arch_ids[i], arch_ids[j])
+                     for i in range(len(arch_ids)) for j in range(i + 1, len(arch_ids))}
+        short = sorted(list(p) for p in all_pairs if per_pair.get(p, 0) < MIN_BRIDGES_PER_PAIR)
+        if short:
+            errs.append(f"each of the three pairs needs at least {MIN_BRIDGES_PER_PAIR} bridge card(s); "
+                        f"short: {short}")
+    return errs
 
 
 def validate_blueprint_for(strategies) -> "callable":
@@ -1626,28 +1891,70 @@ def _ensure_min_rares(made: list[dict], note) -> list[dict]:
 
 
 def _resolve_bridge_ctx(bp: dict):
-    """Resolve the two archetypes' catalog `ops` for the O-1 witness detector. Returns
-    {ops_a, ops_b, name_a, name_b} or None when the ops can't be resolved — an invented concept-path
-    archetype id not in the catalog, or an archetype with no ops — in which case the semantic bridge check
-    is skipped (the blueprint-stage tag-count + rare floor still applies). Fully guarded: any failure yields
-    None and the forge proceeds (coverage is advisory)."""
+    """Resolve the archetypes' catalog `ops` for the witness detector, for a 2- OR 3-archetype class (Phase
+    1). Returns None when the ops can't be resolved — an invented concept-path archetype id not in the
+    catalog, or an archetype with no ops — in which case the semantic bridge check is skipped (the
+    blueprint-stage tag-count + rare floor still applies). Fully guarded: any failure yields None and the
+    forge proceeds (coverage is advisory).
+
+    Shape (back-compat kept for the two-archetype callers):
+      {"by_id":  {id: (name, ops)},                          # every archetype's resolved ops
+       "pairs":  {pair_key: {name_a, ops_a, name_b, ops_b,   # per-pair witness context (the DECLARED order is
+                             name_third, ops_third}},          #   normalized by pair_key; third = the excluded
+       "ops_a", "ops_b", "name_a", "name_b"}                 #   engine, present only for a triad)
+    The top-level ops_a/ops_b/name_a/name_b mirror the SINGLE pair on a 2-archetype class (unchanged for
+    coverage's legacy path); a triad has no single top-level pair, so those keys are absent."""
     try:
         from .frontend.catalog import load_catalog
         archs = [a for a in (bp.get("archetypes") or []) if isinstance(a, dict)]
-        if len(archs) != 2:
+        if len(archs) not in (2, 3):
             return None
         cat = load_catalog()
-        resolved = []
+        by_id: dict[str, tuple] = {}
+        order: list[str] = []
         for a in archs:
-            e = cat.by_id.get(str(a.get("id")))
+            aid = str(a.get("id"))
+            e = cat.by_id.get(aid)
             ops = set(e.ops) if e else set()
             if not ops:
                 return None
-            resolved.append((str(a.get("name") or a.get("id") or "engine"), ops))
-        (name_a, ops_a), (name_b, ops_b) = resolved
-        return {"ops_a": ops_a, "ops_b": ops_b, "name_a": name_a, "name_b": name_b}
+            by_id[aid] = (str(a.get("name") or aid or "engine"), ops)
+            order.append(aid)
+        ctx: dict = {"by_id": by_id, "pairs": {}}
+        for i in range(len(order)):
+            for j in range(i + 1, len(order)):
+                ai, aj = order[i], order[j]
+                key = _bridges_mod.pair_key(ai, aj)
+                name_a, ops_a = by_id[ai]
+                name_b, ops_b = by_id[aj]
+                pair = {"name_a": name_a, "ops_a": ops_a, "name_b": name_b, "ops_b": ops_b}
+                third = next((t for t in order if t not in (ai, aj)), None)  # the excluded engine (triad only)
+                if third is not None:
+                    pair["name_third"], pair["ops_third"] = by_id[third]
+                ctx["pairs"][key] = pair
+        if len(order) == 2:  # a single pair — expose it top-level for the legacy 2-archetype callers
+            only = ctx["pairs"][_bridges_mod.pair_key(order[0], order[1])]
+            ctx.update({k: only[k] for k in ("name_a", "ops_a", "name_b", "ops_b")})
+        return ctx
     except Exception:
         return None
+
+
+def _pair_ctx_for(bp: dict, plan: dict, bridge_ctx) -> dict | None:
+    """The per-pair witness context for ONE bridge card's DECLARED pair (Phase 1). Reads the card's declared
+    pair (2-arch boolean -> the only pair; 3-arch [id1, id2]) and looks it up in bridge_ctx["pairs"]. None
+    when there is no resolvable context or the pair can't be resolved (fall back to generic wording).
+
+    Back-compat: a bridge_ctx WITHOUT a "pairs" key is the legacy single-pair shape ({ops_a, ops_b, name_a,
+    name_b}) — a 2-archetype boolean bridge uses it directly."""
+    if not bridge_ctx:
+        return None
+    if "pairs" not in bridge_ctx:
+        return bridge_ctx if ("ops_a" in bridge_ctx and "ops_b" in bridge_ctx) else None
+    pair = _bridge_pair(plan, _archetype_ids(bp))
+    if not isinstance(pair, tuple):  # None or the "invalid" sentinel
+        return None
+    return bridge_ctx["pairs"].get(pair)
 
 
 def _class_context(bp: dict) -> str:
@@ -1659,10 +1966,17 @@ def _class_context(bp: dict) -> str:
     lines = "\n".join(f"- {a.get('name') or a.get('id') or 'engine'}: "
                       f"{str(a.get('description') or '').strip()}" for a in archs)
     desc = str(bp.get("description") or "").strip()
+    # Phase 1: the wording flexes with the archetype count. A triad card serves ONE engine and may nod to ONE
+    # partner (never all three) — that is what keeps the three pair-lanes distinct.
+    if len(archs) >= 3:
+        engines_line = ("Its THREE archetypes — three engines, three pair-lanes; serve the brief's engine, nod "
+                        "to ONE partner where natural, never all three:")
+    else:
+        engines_line = ("Its TWO archetypes (one deck, two engines — serve the brief's engine, and where "
+                        "natural let the card nod to the partner engine too):")
     return (f"CLASS CONTEXT — this card belongs to '{bp.get('name', '')}'"
             + (f" ({desc})" if desc else "") + ".\n"
-            "Its TWO archetypes (one deck, two engines — serve the brief's engine, and where natural let "
-            f"the card nod to the partner engine too):\n{lines}")
+            f"{engines_line}\n{lines}")
 
 
 def _card_context(bp: dict, plan: dict, bridge_ctx=None, class_ctx: str | None = None) -> str:
@@ -1680,9 +1994,18 @@ def _card_context(bp: dict, plan: dict, bridge_ctx=None, class_ctx: str | None =
     if strat in STRATEGIES:
         ctx += f" Strategic line: {strat}."
     if plan.get("bridge"):
-        if bridge_ctx:
-            ctx += "\n" + _bridges_mod.repair_directive(bridge_ctx["name_a"], bridge_ctx["name_b"],
-                                                        bridge_ctx["ops_a"], bridge_ctx["ops_b"])
+        pctx = _pair_ctx_for(bp, plan, bridge_ctx)
+        if pctx:
+            ctx += "\n" + _bridges_mod.repair_directive(pctx["name_a"], pctx["name_b"],
+                                                        pctx["ops_a"], pctx["ops_b"])
+            # No-third-wheel (D2, soft): on a triad, name the EXCLUDED engine's unique tokens so the model
+            # keeps this a clean PAIR bridge, not a quiet ABC card.
+            if pctx.get("ops_third"):
+                tw = _bridges_mod.third_wheel_tokens(pctx["ops_a"], pctx["ops_b"], pctx["ops_third"])
+                if tw:
+                    toks = ", ".join(sorted(tw)[:3])
+                    ctx += (f"\nKeep it a PAIR bridge: do NOT touch the {pctx['name_third']} engine "
+                            f"([{toks}]) — this card fuses only these two.")
         else:
             names = [str(a.get("name") or a.get("id") or "engine")
                      for a in (bp.get("archetypes") or []) if isinstance(a, dict)]
@@ -1693,7 +2016,7 @@ def _card_context(bp: dict, plan: dict, bridge_ctx=None, class_ctx: str | None =
 
 
 def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen=None, fake: bool = False,
-                on_event=None, front_end=None) -> ClassResult:
+                on_event=None, front_end=None, triad: bool | None = None) -> ClassResult:
     """Orchestrate one class. `blueprint_gen` does the blueprint call; `card_gen_factory()` returns a fresh
     card generator for the card pipeline (Anthropic / OpenAI-compatible / fake). `on_event(str)`, if given,
     is called with each progress line as it happens (the website streams these to the browser).
@@ -1701,7 +2024,12 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
     `front_end` (a BlueprintBuilder) opts into the STAGED creative front-end: instead of the single opaque
     blueprint call, it runs cloud->cluster->map->compose->relic-intent and produces the SAME `bp` dict. The
     bp shape is identical, so stage 2 onward (card set, safety nets, assembly) is untouched. None -> today's
-    one-shot path."""
+    one-shot path.
+
+    `triad` (Phase 1): the mode STAMP only — which HARNESS_VERSION this forge is attributed to. None reads
+    BTS_TRIAD (triad_enabled). The prompt/target MODE is decided by the blueprint contract (which reads the
+    same flag); validation + all downstream knobs key off the blueprint's ACTUAL archetype count, so this
+    argument is purely for attribution."""
     from .contract import Brief as CardBrief
     from .pipeline import generate_card
     from .validator import CardValidator
@@ -1718,8 +2046,10 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
                 pass  # a broken progress sink must never break generation
 
     # Stamp every forge with the harness version up front — the first log line on both the CLI and the
-    # browser stream, so you can tell which creative-harness produced a given class. See HARNESS_VERSION.
-    note(f"forge harness v{HARNESS_VERSION} (vocab v{VOCAB_VERSION})")
+    # browser stream, so you can tell which creative-harness produced a given class. See HARNESS_VERSION. The
+    # triad experiment stamps its OWN version so every forge is attributable to the mode that produced it.
+    _harness = HARNESS_VERSION_TRIAD if triad_enabled(triad) else HARNESS_VERSION
+    note(f"forge harness v{_harness} (vocab v{VOCAB_VERSION})")
 
     # --- Phase N-2: roll the featured-mechanic roulette (seeded per concept) BEFORE stage 1 so both brief
     # modes REQUIRE them. The one-shot concept brief uses this BLIND roll as-is; the staged front-end may
@@ -2083,13 +2413,34 @@ def _extract(text: str) -> dict | None:
         return None
 
 
-def _ensure_bridge_tags(bp: dict) -> dict:
-    """Phase O-1: tag >=MIN_BRIDGES non-basic pool cards as bridges, at least one a rare — so a fake or
-    topped-up blueprint satisfies the fusion-enforcer tag-count + rare floor in _validate_blueprint. Fake
-    bridges will NOT semantically WITNESS both engines (that is the real forge's job, checked by the coverage
-    round); here we only guarantee the tags so the offline paths validate. Mutates + returns bp."""
+def _ensure_bridge_tags(bp: dict, pair_strat: dict | None = None) -> dict:
+    """Phase O-1 (triad-aware Phase 1): tag >=MIN_BRIDGES non-basic pool cards as bridges, at least one a rare
+    — so a fake or topped-up blueprint satisfies the fusion-enforcer tag-count + rare floor (+ the per-pair
+    floor on a triad) in _validate_blueprint. Fake bridges will NOT semantically WITNESS their pair (that is
+    the real forge's job, checked by the coverage round); here we only guarantee valid tags so the offline
+    paths validate. A 2-archetype bp keeps boolean `"bridge": true`; a triad declares each bridge's PAIR as
+    `[id1, id2]`, cycling the three pairs so every pair clears MIN_BRIDGES_PER_PAIR. `pair_strat` (triad only)
+    maps each pair to its declared strategy so a tagged bridge also carries its pair's line (D3). Mutates +
+    returns bp."""
     cards = bp.setdefault("cards", [])
     pool = [c for c in cards if isinstance(c, dict) and c.get("role") == "pool"]
+    arch_ids = _archetype_ids(bp)
+    all_pairs = [_bridges_mod.pair_key(arch_ids[i], arch_ids[j])
+                 for i in range(len(arch_ids)) for j in range(i + 1, len(arch_ids))]
+    is_triad = len(arch_ids) >= 3
+    # cycle the pairs so per-pair floors fill evenly; a 2-archetype class just uses the boolean tag.
+    _cycle = {"n": 0}
+
+    def _tag(card):
+        """Tag one card as a bridge — boolean for 2-arch, a declared pair (+ its line) for a triad."""
+        if not is_triad:
+            card["bridge"] = True
+            return
+        pr = all_pairs[_cycle["n"] % len(all_pairs)]
+        _cycle["n"] += 1
+        card["bridge"] = [pr[0], pr[1]]
+        if pair_strat and pr in pair_strat:  # D3: a bridge carries its pair's declared strategy line
+            card["strategy"] = pair_strat[pr]
 
     def _bridges():
         return [c for c in pool if c.get("bridge")]
@@ -2097,22 +2448,34 @@ def _ensure_bridge_tags(bp: dict) -> dict:
     def _has_rare_bridge():
         return any(str(c.get("rarity", "")).lower() == "rare" for c in _bridges())
 
+    def _per_pair_ok():
+        if not is_triad:
+            return True
+        counts = {p: 0 for p in all_pairs}
+        for c in _bridges():
+            pr = _bridge_pair(c, arch_ids)
+            if isinstance(pr, tuple):
+                counts[pr] = counts.get(pr, 0) + 1
+        return all(counts[p] >= MIN_BRIDGES_PER_PAIR for p in all_pairs)
+
     # the rare poster bridge first, then fill to the count with any remaining pool cards
     if not _has_rare_bridge():
         rare = next((c for c in pool if str(c.get("rarity", "")).lower() == "rare" and not c.get("bridge")), None)
         if rare is not None:
-            rare["bridge"] = True
+            _tag(rare)
     for c in pool:
-        if len(_bridges()) >= MIN_BRIDGES:
+        if len(_bridges()) >= MIN_BRIDGES and _per_pair_ok():
             break
-        c["bridge"] = True
+        if not c.get("bridge"):
+            _tag(c)
     # pool too small to tag enough (shouldn't happen after the topup above) — append bridge fillers
     n = 0
-    while len(_bridges()) < MIN_BRIDGES:
+    while len(_bridges()) < MIN_BRIDGES or not _per_pair_ok():
         n += 1
         filler = {"role": "pool", "name_hint": f"Fusion {n}", "type": "skill",
                   "rarity": "rare" if not _has_rare_bridge() else "common", "cost": 1, "deck_count": 0,
-                  "archetype": None, "strategy": None, "bridge": True, "theme": "fuse both archetypes"}
+                  "archetype": None, "strategy": None, "theme": "fuse a pair of archetypes"}
+        _tag(filler)
         cards.append(filler)
         pool.append(filler)
     return bp
@@ -2143,10 +2506,14 @@ def _topup_blueprint_briefs(bp: dict, strategies=None) -> dict:
             n += 1; cards.append(_brief(t, n))
     while _rares() < MIN_RARES:
         n += 1; cards.append(_brief(_MERCHANT_TYPES[n % len(_MERCHANT_TYPES)], n))
-    # Strategy coverage: honor the declared lines when given, else default to two so the floor passes.
+    # Strategy coverage: honor the declared lines when given, else default so the floor passes. A triad needs
+    # ALL THREE lines (D3), a 2-archetype class two.
+    arch_ids = _archetype_ids(bp)
+    is_triad = len(arch_ids) >= 3
+    floor = 3 if is_triad else 2
     want = [s for s in dict.fromkeys(str(x).strip().lower() for x in (strategies or [])) if s in STRATEGIES]
-    if len(want) < 2:
-        want += [s for s in STRATEGIES if s not in want][:2 - len(want)]
+    if len(want) < floor:
+        want += [s for s in STRATEGIES if s not in want][:floor - len(want)]
 
     def _line(s: str) -> tuple[int, int]:
         tagged = [c for c in cards if c.get("role") not in _BASIC_ROLES
@@ -2162,7 +2529,16 @@ def _topup_blueprint_briefs(bp: dict, strategies=None) -> dict:
                           "rarity": rarity, "cost": 1, "deck_count": 0, "archetype": None,
                           "strategy": s, "theme": f"a {rarity} {s}-line card"})
             cnt, rare_cnt = _line(s)
-    return _ensure_bridge_tags(bp)  # O-1: satisfy the >=MIN_BRIDGES + rare fusion floor
+    # Triad (D3): declare the three pairs -> three DISTINCT strategies so _validate_pair_lines passes, and hand
+    # the map to _ensure_bridge_tags so each fake bridge's strategy tag matches its pair's declared line.
+    pair_strat = None
+    if is_triad:
+        pairs = [_bridges_mod.pair_key(arch_ids[i], arch_ids[j])
+                 for i in range(len(arch_ids)) for j in range(i + 1, len(arch_ids))]
+        strat3 = (want + [s for s in STRATEGIES if s not in want])[:3]
+        pair_strat = {p: strat3[k] for k, p in enumerate(pairs)}
+        bp["pair_lines"] = [{"pair": [p[0], p[1]], "strategy": pair_strat[p]} for p in pairs]
+    return _ensure_bridge_tags(bp, pair_strat)  # O-1: satisfy the >=MIN_BRIDGES (+ per-pair) + rare fusion floor
 
 
 def _fake_blueprint(brief: ClassBrief) -> dict:
