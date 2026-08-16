@@ -18,14 +18,16 @@ import os
 import time
 from collections import Counter
 from contextlib import contextmanager
+from itertools import combinations
 from pathlib import Path
 
 from . import census
 
 LEDGER_WINDOW = 12
 _NOVELTY_MAX = 2.0            # picker penalty ceiling; STRICTLY below _FIDELITY_WEIGHT (10.0)
-_PAIR_W = 0.8                 # weight of an exact recent pair-repeat
+_PAIR_W = 0.8                 # weight of a recent pair-repeat (any C(n,2) pair the candidate shares)
 _ARCH_W = 0.3                 # weight of each shared archetype
+_TRIPLE_W = 1.2              # extra weight when the WHOLE triple recurs (a triad repeat is worse than a pair)
 
 # Per-forge ledger override. The web layer runs each forge in its OWN thread and wants a PER-USER ledger, but
 # os.environ is process-global — mutating it per request would let concurrent forges clobber each other's path
@@ -186,23 +188,30 @@ def _recency_weights(window) -> list[float]:
 
 
 def pair_penalty(archetype_ids, window) -> float:
-    """A novelty penalty in [0, _NOVELTY_MAX]: recency-weighted overlap of this candidate's archetypes/pair
-    with the recent window. 0 when nothing overlaps; grows with recent exact-pair repeats and shared
-    archetypes; capped so it can only break ties under the fidelity weight."""
+    """A novelty penalty in [0, _NOVELTY_MAX]: recency-weighted overlap of this candidate's archetypes/pairs
+    with the recent window. 0 when nothing overlaps; grows with recent PAIR repeats (each of the candidate's
+    C(n,2) pairs that also appears in a recent entry), shared archetypes, and — stronger — a full set-repeat
+    (the WHOLE 2- or 3-archetype set recurring, penalized extra via _TRIPLE_W). Capped so it can only break
+    ties under the fidelity weight. A triad thus penalizes each shared pair AND the full triple; a 2-archetype
+    candidate's single pair IS its full set, so its behavior is unchanged from before."""
     if not window:
         return 0.0
     ids = {str(i) for i in (archetype_ids or [])}
     if not ids:
         return 0.0
-    pair = frozenset(ids)
+    my_pairs = {frozenset(p) for p in combinations(sorted(ids), 2)}  # every C(n,2) pair this candidate forms
+    full = frozenset(ids)
     pair_hits = 0.0
+    triple_hits = 0.0
     arch_hits = 0.0
     for w, e in zip(_recency_weights(window), window):
         eids = {str(i) for i in (e.get("archetype_ids") or [])}
-        if len(pair) >= 2 and frozenset(eids) == pair:
-            pair_hits += w
+        epairs = {frozenset(p) for p in combinations(sorted(eids), 2)}
+        pair_hits += w * len(my_pairs & epairs)        # every shared pair repeats (all three for a triad)
+        if len(full) >= 2 and frozenset(eids) == full:  # the WHOLE set recurred — the worst kind of repeat
+            triple_hits += w
         arch_hits += w * len(ids & eids)
-    return min(_NOVELTY_MAX, _PAIR_W * pair_hits + _ARCH_W * arch_hits)
+    return min(_NOVELTY_MAX, _PAIR_W * pair_hits + _TRIPLE_W * triple_hits + _ARCH_W * arch_hits)
 
 
 def featured_recency(window) -> dict:
@@ -225,8 +234,10 @@ def payload_line(window, *, k: int = 3) -> str:
     opw: Counter = Counter()
     for w, e in zip(_recency_weights(window), window):
         ids = sorted(str(i) for i in (e.get("archetype_ids") or []))
-        if len(ids) >= 2:
-            pairw[f"{ids[0]}+{ids[1]}"] += w
+        # Emit EVERY pair the entry formed (all C(n,2) — three for a triad, one for a 2-archetype forge), so the
+        # "recently overused pairs" nudge names each overused pair, not just the first two ids.
+        for a, b in combinations(ids, 2):
+            pairw[f"{a}+{b}"] += w
         for op in (e.get("top_ops") or []):
             opw[op] += w
     top_pairs = [p for p, _ in pairw.most_common(k)]

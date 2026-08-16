@@ -194,12 +194,16 @@ async function forge() {
   // based on the chosen provider, so the backend routing is unchanged.
   const stagedEl = el("staged");
   const interactiveEl = el("interactive");
+  const triadEl = el("triad");
+  const stagedOn = stagedEl ? stagedEl.checked : true;
   const body = {
     concept,
     mode: choice,
-    staged: stagedEl ? stagedEl.checked : true,
+    staged: stagedOn,
     // interactive forge mode: mid-forge archetype pick (only meaningful with the staged front-end)
-    interactive: !!(interactiveEl && interactiveEl.checked && (stagedEl ? stagedEl.checked : true)),
+    interactive: !!(interactiveEl && interactiveEl.checked && stagedOn),
+    // triad EXPERIMENT: three-archetype tension triangle (needs the staged front-end, like interactive)
+    triad: !!(triadEl && triadEl.checked && stagedOn),
   };
   if (choice === "token") {
     if (!ME.unlimited) {
@@ -235,7 +239,8 @@ async function forge() {
   resetChoice();  // clear any choice panel left over from a previous forge
   // Echo what we asked for, so a mode mishap (e.g. a stale page) is visible in the log immediately.
   appendLog(`• requested: ${body.mode} · ${body.staged ? "creative" : "one-shot"}`
-            + (body.interactive ? " · interactive" : ""));
+            + (body.interactive ? " · interactive" : "")
+            + (body.triad ? " · triad (experimental)" : ""));
 
   try {
     const resp = await fetch("/api/forge-class", {
@@ -1009,9 +1014,13 @@ el("tokens").onclick = () => selectTab("account");  // the header chip doubles a
 el("forge-btn").onclick = forge;
 el("choice-go").onclick = () => sendChoice([...(choiceState?.picked || [])]);
 el("choice-skip").onclick = () => sendChoice([]);
-// interactive needs the staged front-end: keep the two checkboxes honest instead of silently ignoring one
+// interactive AND triad each need the staged front-end: keep the checkboxes honest instead of silently
+// ignoring one (checking either turns on staged; unchecking staged clears both dependents).
 el("interactive").onchange = () => { if (el("interactive").checked) el("staged").checked = true; };
-el("staged").onchange = () => { if (!el("staged").checked) el("interactive").checked = false; };
+el("triad").onchange = () => { if (el("triad").checked) el("staged").checked = true; };
+el("staged").onchange = () => {
+  if (!el("staged").checked) { el("interactive").checked = false; el("triad").checked = false; }
+};
 el("copy-code").onclick = () => copy(el("r-code").value);
 el("signout").onclick = async () => { await fetch("/logout"); location.href = "/"; };
 el("load-models").onclick = loadModels;

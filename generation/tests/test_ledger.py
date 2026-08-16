@@ -120,6 +120,35 @@ def test_penalty_math() -> None:
     check(abs(ledger.pair_penalty(pair, many) - ledger._NOVELTY_MAX) < 1e-9, "heavy repetition hits the cap")
 
 
+def test_triad_penalty_and_pairs() -> None:
+    print("triad (3-id) ledger entries: all three pairs penalized, the full triple penalized stronger:")
+    triple = ["a", "b", "c"]
+    # ONE recent entry of the SAME triple (weight 1.0, well under the cap) -> the three pairs recur AND the
+    # whole triple recurs; a full-triple repeat must outscore a candidate that shares only ONE of its pairs.
+    win_triple = [{"archetype_ids": triple}]
+    p_triple = ledger.pair_penalty(triple, win_triple)
+    check(p_triple > 0, f"a repeated triple is penalized, got {p_triple}")
+
+    p_pair_only = ledger.pair_penalty(["a", "b", "z"], win_triple)  # shares only the (a,b) pair + one archetype
+    check(0 < p_pair_only < p_triple,
+          f"sharing one pair < repeating the whole triple: {p_pair_only} vs {p_triple}")
+
+    # the full-triple repeat also beats the SAME candidate against a window where only its (a,b) pair recurs
+    win_pair = [{"archetype_ids": ["a", "b", "q"]}]  # only the (a,b) pair recurs, never the whole triple
+    check(ledger.pair_penalty(triple, win_triple) > ledger.pair_penalty(triple, win_pair),
+          "the whole triple recurring outweighs just one of its pairs recurring")
+
+    # payload_line emits ALL THREE pairs of a triad entry (not just the first two ids)
+    pl = ledger.payload_line([{"archetype_ids": triple, "top_ops": ["damage"]}])
+    check("a+b" in pl and "a+c" in pl and "b+c" in pl, f"all three pairs named in the payload line: {pl}")
+
+    # a 2-archetype candidate's single pair IS its full set -> behavior unchanged (still penalized, still capped)
+    check(ledger.pair_penalty(["a", "b"], [{"archetype_ids": ["a", "b"]}]) > 0,
+          "a 2-archetype repeat is still penalized")
+    check(ledger.pair_penalty(["a", "b"], [{"archetype_ids": ["a", "b"]}] * 12) <= ledger._NOVELTY_MAX,
+          "a triad/pair penalty never exceeds the cap")
+
+
 def test_corrupt_and_missing() -> None:
     print("corrupt / missing / unwritable ledger never raises:")
     # missing file
@@ -261,6 +290,7 @@ def main() -> int:
     test_round_trip()
     test_window_trim()
     test_penalty_math()
+    test_triad_penalty_and_pairs()
     test_corrupt_and_missing()
     test_featured_recency()
     test_archetype_designs()

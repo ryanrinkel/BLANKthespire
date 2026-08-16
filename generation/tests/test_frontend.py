@@ -453,6 +453,84 @@ def test_strategy_idioms() -> None:
     check(all(l.get("idiom") for l in _FAKE_LINES), "fake strategic lines carry idioms")
 
 
+def test_triad_frontend() -> None:
+    print("Phase 2 triad: 3-archetype compose candidates, pair_lines validation, and a triad build:")
+    from btsgen.frontend.stage_map import (_ComposeOnlyContract, _MapComposeContract, validate_compose_for,
+                                            validate_map, validate_map_for)
+    cat = load_catalog()
+
+    # --- legacy (flag-off) compose is UNCHANGED: a 3-archetype candidate on the 2-arch validator still passes
+    #     its strategic_lines path (the flag decides the mode, not the id count)
+    two = {"mappings": [], "candidates": [{"name": "X", "archetype_ids": ["a", "b"], "strategic_lines": [
+        {"strategy": "aggro", "line": "l", "win_condition": "w"},
+        {"strategy": "control", "line": "l2", "win_condition": "w2"}]}]}
+    check(validate_map(two) == [], f"legacy 2-arch compose still validates: {validate_map(two)}")
+
+    # --- triad validator: a well-formed 3-id candidate with three DISTINCT-strategy pair_lines passes
+    ids = ["a", "b", "c"]
+    good = {"mappings": [], "candidates": [{"name": "Tri", "archetype_ids": ids, "pair_lines": [
+        {"pair": ["a", "b"], "strategy": "aggro", "line": "ab", "win_condition": "kill"},
+        {"pair": ["a", "c"], "strategy": "control", "line": "ac", "win_condition": "outlast"},
+        {"pair": ["b", "c"], "strategy": "combo", "line": "bc", "win_condition": "engine"}]}]}
+    check(validate_map_for(True)(good) == [], f"a valid triad candidate passes: {validate_map_for(True)(good)}")
+
+    # missing a pair is rejected
+    two_pairs = {"mappings": [], "candidates": [{"name": "Tri", "archetype_ids": ids, "pair_lines": [
+        {"pair": ["a", "b"], "strategy": "aggro", "win_condition": "w"},
+        {"pair": ["a", "c"], "strategy": "control", "win_condition": "w"}]}]}
+    check(any("pair_lines" in e for e in validate_map_for(True)(two_pairs)),
+          "a triad missing a pair-line is rejected")
+
+    # repeated strategy across pairs is rejected (D3 — three DISTINCT)
+    dup = {"mappings": [], "candidates": [{"name": "Tri", "archetype_ids": ids, "pair_lines": [
+        {"pair": ["a", "b"], "strategy": "aggro", "win_condition": "w"},
+        {"pair": ["a", "c"], "strategy": "aggro", "win_condition": "w"},
+        {"pair": ["b", "c"], "strategy": "combo", "win_condition": "w"}]}]}
+    check(any("DISTINCT" in e for e in validate_map_for(True)(dup)),
+          "three pairs must serve three DISTINCT strategies")
+
+    # a 2-archetype candidate under the TRIAD validator is rejected (triad needs exactly three)
+    triad_needs_three = {"mappings": [], "candidates": [{"name": "X", "archetype_ids": ["a", "b"], "pair_lines": [
+        {"pair": ["a", "b"], "strategy": "aggro", "win_condition": "w"}]}]}
+    check(any("THREE" in e for e in validate_map_for(True)(triad_needs_three)),
+          "the triad validator requires exactly three archetypes")
+
+    # --- the compose-only validator honors picks AND the triad line rules together
+    v = validate_compose_for(["a"], triad=True)
+    check(v(good) == [], f"triad compose-only validator passes a valid triad w/ its pick: {v(good)}")
+    v2 = validate_compose_for(["z"], triad=True)
+    check(any("picked archetype 'z'" in e for e in v2(good)), "the pick constraint still fires under triad")
+
+    # --- the triad FAKES compose 3-id candidates with pair_lines (fused + compose-only)
+    fused = _MapComposeContract(True).fake_output({"_catalog": cat, "clusters": []})
+    fc = fused["candidates"][0]
+    check(len(fc["archetype_ids"]) == 3 and len(fc.get("pair_lines", [])) == 3,
+          f"the fused triad fake composes a 3-id candidate w/ 3 pair_lines: {fc}")
+    conly = _ComposeOnlyContract(True).fake_output({"_catalog": cat, "picked": [sorted(cat.buildable_ids())[0]]})
+    check(all(len(c["archetype_ids"]) == 3 for c in conly["candidates"]),
+          "the compose-only triad fake composes 3-id candidates")
+
+    # --- hydrate carries pair_lines (scoped to the candidate's ids) and caps the id list at 3
+    cand = cat.hydrate_candidate({"name": "Tri", "archetype_ids": ids + ["d"], "pair_lines": good["candidates"][0]["pair_lines"]})
+    check(len(cand.archetype_ids) == 3, f"hydrate caps archetype_ids at 3: {cand.archetype_ids}")
+    check(len(cand.pair_lines) == 3 and cand.pair_lines[0]["strategy"] == "aggro",
+          f"hydrate carries pair_lines: {cand.pair_lines}")
+
+    # --- a full triad build produces a valid 3-archetype blueprint with top-level pair_lines
+    b = BlueprintBuilder(_fake_make_gen, catalog=cat, auto=True, gap_log_append=None, triad=True)
+    bp = b.build(ClassBrief(concept="a storm-calling gambler who bleeds for power"))
+    check(len(bp.get("archetypes") or []) == 3, f"triad build yields 3 archetypes: {bp.get('archetypes')}")
+    check(isinstance(bp.get("pair_lines"), list) and len(bp["pair_lines"]) == 3,
+          f"triad build declares three top-level pair_lines: {bp.get('pair_lines')}")
+    check(_validate_blueprint(bp) == [], f"the triad build's bp is valid: {_validate_blueprint(bp)}")
+
+    # --- flag OFF still builds a 2-archetype class (the default path is untouched)
+    b2 = BlueprintBuilder(_fake_make_gen, catalog=cat, auto=True, gap_log_append=None, triad=False)
+    bp2 = b2.build(ClassBrief(concept="a storm-calling gambler"))
+    check(len(bp2.get("archetypes") or []) == 2, f"flag-off build stays 2 archetypes: {bp2.get('archetypes')}")
+    check(not bp2.get("pair_lines"), "flag-off build declares no pair_lines")
+
+
 def main() -> int:
     test_catalog_loads()
     test_buildability_flips_with_gap_status()
@@ -467,6 +545,7 @@ def main() -> int:
     test_catalog_expansion()
     test_blueprint_contract_modes()
     test_strategy_idioms()
+    test_triad_frontend()
     test_forge_class_staged_end_to_end()
     test_forge_class_keystone_balance_gate()
     print(f"\n{_PASS} passed, {_FAIL} failed")

@@ -228,7 +228,10 @@ class ArchetypeCatalog:
 
     # -- turn a raw compose-stage candidate dict into a hydrated Candidate -------------------------
     def hydrate_candidate(self, raw: dict) -> Candidate:
-        ids = list(raw.get("archetype_ids") or raw.get("archetypes") or [])[:2]
+        # Phase 2 (triad): accept up to THREE archetype ids (a triad candidate) — the 2-vs-3 mode is decided
+        # by the compose stage, and everything downstream keys off the actual count. 2-arch candidates are
+        # unchanged (they carry two ids, so the [:3] cap is a no-op for them).
+        ids = list(raw.get("archetype_ids") or raw.get("archetypes") or [])[:3]
         known = [self.by_id[i] for i in ids if i in self.by_id]
         unknown = [i for i in ids if i not in self.by_id]
         descs = [self.by_id[i].description if i in self.by_id else "" for i in ids]
@@ -263,6 +266,23 @@ class ArchetypeCatalog:
                 lines.append({"strategy": s, "line": str(l.get("line", "")).strip(),
                               "win_condition": str(l.get("win_condition", "")).strip(),
                               "idiom": str(l.get("idiom", "")).strip()[:IDIOM_MAXLEN]})
+        # Phase 2 (triad): the per-PAIR strategy mapping (D3). Each entry is a pair of THIS candidate's ids +
+        # a strategy (+ optional line/win_condition text). Empty on a 2-archetype candidate — the compose
+        # stage only emits it under triad. Normalized here the same way strategic_lines is.
+        id_set = {str(i) for i in ids}
+        pair_lines: list[dict] = []
+        for l in (raw.get("pair_lines") or []):
+            if not isinstance(l, dict):
+                continue
+            pr = l.get("pair")
+            if not isinstance(pr, (list, tuple)) or len(pr) != 2:
+                continue
+            pr = [str(pr[0]), str(pr[1])]
+            if pr[0] == pr[1] or any(p not in id_set for p in pr):
+                continue
+            s = str(l.get("strategy", "")).strip().lower()
+            pair_lines.append({"pair": pr, "strategy": s, "line": str(l.get("line", "")).strip(),
+                               "win_condition": str(l.get("win_condition", "")).strip()})
         return Candidate(
             name=str(raw.get("name", "")).strip(),
             fantasy=str(raw.get("fantasy", raw.get("description", ""))).strip(),
@@ -272,6 +292,7 @@ class ArchetypeCatalog:
             weakness=str(raw.get("weakness", "")).strip(),
             tension=str(raw.get("tension", "")).strip(),
             strategic_lines=lines,
+            pair_lines=pair_lines,
             class_kind=class_kind,
             suggested_max_hp=max(60, min(95, max_hp)),
             buildable=all_buildable,

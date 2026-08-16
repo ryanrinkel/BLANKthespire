@@ -814,6 +814,10 @@ class BlueprintValidator:
             warnings.append(f"max_energy {en} != 3 (every existing class starts at 3)")
 
         # -- archetypes ------------------------------------------------------
+        # NOTE: the prototype/character path is DELIBERATELY FROZEN at exactly 2 archetypes (decided 2026-08-15).
+        # The three-archetype "triad" experiment lives only in the web forge's staged front-end + class_forge
+        # blueprint path (which accepts 2 OR 3); this validator is not on that path, so keeping it at 2 is
+        # intentional, not drift. See docs/plans/TRIAD_ARCHETYPE_PLAN.md (Phase 3 / Rollout).
         arch_ids: list[str] = []
         arch_kinds: list[str] = []
         archetypes = bp.get("archetypes")

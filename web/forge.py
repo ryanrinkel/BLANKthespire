@@ -302,9 +302,14 @@ def list_models(base_url: str, api_key: str) -> list[str]:
 def forge_to_bundle(concept: str, *, key: dict | None = None, hosted: bool = False,
                     fake: bool = False, model: str | None = None, pool_per_archetype: int = 4,
                     staged: bool = True, ollama_mix: bool = False, on_event=None,
-                    archetype_checkpoint=None, user_id=None) -> dict:
+                    archetype_checkpoint=None, user_id=None, triad: bool = False) -> dict:
     """Forge a whole class from `concept`. Returns
     {character, cards, blueprint, code, skipped, log}. Raises ForgeError on failure.
+
+    `triad` (EXPERIMENT, opt-in — the plan's Rollout/compat flag) runs the three-archetype creative path:
+    the staged front-end composes a TENSION TRIANGLE (three archetypes, three pair-lines) and the forge stamps
+    HARNESS_VERSION 1.7-triad-exp. Off (default) = today's untouched 2-archetype flow. NEEDS `staged` — the
+    one-shot blueprint path has no triad prompt — so triad without staged is ignored (falls back to 2-arch).
 
     `user_id` (optional) scopes the cross-forge recency ledger to THIS user: each signed-in user reads/writes
     their own recency window (via btsgen.ledger's per-forge scope), so one player's recent archetypes/ops never
@@ -349,9 +354,10 @@ def forge_to_bundle(concept: str, *, key: dict | None = None, hosted: bool = Fal
                 from btsgen.frontend import BlueprintBuilder, load_catalog
                 front_end = BlueprintBuilder(make_gen, catalog=load_catalog(), on_event=on_event,
                                              auto=True, gap_log_append=_append_captured_gaps,
-                                             archetype_checkpoint=archetype_checkpoint)
+                                             archetype_checkpoint=archetype_checkpoint, triad=triad)
             res = forge_class(brief, blueprint_gen=blueprint_gen, card_gen_factory=card_factory,
-                              relic_gen=relic_gen, fake=False, front_end=front_end, on_event=on_event)
+                              relic_gen=relic_gen, fake=False, front_end=front_end, on_event=on_event,
+                              triad=triad)
             return _bundle_result(res)
 
         blueprint_gen, card_factory, relic_gen = _build_generators(key, hosted, fake, model)
@@ -366,10 +372,11 @@ def forge_to_bundle(concept: str, *, key: dict | None = None, hosted: bool = Fal
             # to the SEPARATE untracked side log (_append_captured_gaps) for later human triage into git.
             front_end = BlueprintBuilder(make_gen, catalog=load_catalog(), on_event=on_event,
                                          auto=True, gap_log_append=_append_captured_gaps,
-                                         archetype_checkpoint=archetype_checkpoint)
+                                         archetype_checkpoint=archetype_checkpoint, triad=triad)
 
         res = forge_class(brief, blueprint_gen=blueprint_gen, card_gen_factory=card_factory, relic_gen=relic_gen,
-                          fake=(fake and front_end is None), front_end=front_end, on_event=on_event)
+                          fake=(fake and front_end is None), front_end=front_end, on_event=on_event,
+                          triad=triad)
         return _bundle_result(res)
 
 

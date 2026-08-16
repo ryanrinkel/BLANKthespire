@@ -5,13 +5,17 @@ catalog archetypes by metaphor resonance (explainable choices); concepts that fi
 as vocabulary gaps (never coded off-vocabulary — that's the closed-vocab safety guarantee). Then N candidate
 class builds are composed, each fusing TWO archetypes in tension.
 
+Phase 2 (triad experiment, opt-in behind `triad_enabled()`): a triad candidate fuses EXACTLY THREE archetypes
+in a TENSION TRIANGLE — three pairs (AB/AC/BC), each a distinct game plan via `pair_lines`. The flag-off path
+is byte-for-byte today's 2-archetype compose (same prompts, same `strategic_lines` schema).
+
 Output: {mappings:[...], candidates:[...], gaps:[...]} — one JSON object.
 """
 from __future__ import annotations
 
 import json
 
-from ..class_forge import STRATEGIES
+from ..class_forge import STRATEGIES, triad_enabled
 
 # The strategic-lines requirement, shared verbatim by the fused compose and the interactive compose-only
 # prompt. Strategies are NOT a class label: archetypes LEAN toward strategies, but a real class supports
@@ -32,10 +36,73 @@ _LINES_SCHEMA = """      "strategic_lines": [
         { "strategy": "aggro|control|combo", "line": "how these two archetypes play this plan", "win_condition": "how the deck closes a fight", "idiom": "optional short texture tag, e.g. turtle-scale" }
       ],"""
 
+# --- TRIAD (Phase 2): three archetypes in a tension TRIANGLE. The three PAIRS (AB/AC/BC) ARE the strategic
+# lines — each pair gets its own game plan (D3), all three DISTINCT, so three runs of the class feel like
+# three classes. This replaces `strategic_lines` with a per-pair `pair_lines` when triad_enabled().
+_PAIR_LINES_ASK = """This is a TRIAD candidate: EXACTLY THREE archetypes in a TENSION TRIANGLE. Its three \
+PAIRS — AB, AC, BC — are its strategic lines: each PAIR is its own game plan, and the player commits to a \
+pair mid-run through what they draft. Declare "pair_lines": one entry per pair (THREE total, covering all \
+three pairs of your three ids), each giving the "pair" (two of the candidate's archetype ids), a "strategy" \
+("aggro" = maximize offense, win fast; "control" = survive and outlast, ALWAYS needs a named finisher; \
+"combo" = assemble pieces into an engine that pops off), a "line" (how THAT pair plays its plan), and a \
+"win_condition" (how that pair's deck closes a fight). The three pairs must map to the THREE DISTINCT \
+strategies (one aggro, one control, one combo) — that is the replay guarantee. The catalog's `leans` are \
+hints, not limits."""
 
-def _candidate_line_errors(c: dict, i: int) -> list[str]:
-    """Validate one candidate's strategic_lines: 2-3 entries, strategies from the taxonomy, >=2 distinct,
-    each with a win_condition. Shared by the fused and the compose-only validators."""
+_PAIR_LINES_SCHEMA = """      "pair_lines": [
+        { "pair": ["id_a", "id_b"], "strategy": "aggro|control|combo", "line": "how this PAIR plays its plan", "win_condition": "how this pair's deck closes a fight" }
+      ],"""
+
+
+def _pair_line_errors(c: dict, i: int) -> list[str]:
+    """Validate one TRIAD candidate's pair_lines (D3): exactly the three pairs of its three archetype ids, each
+    a distinct valid strategy, each with a win_condition. The triad analogue of _candidate_line_errors."""
+    errs: list[str] = []
+    ids = [str(x) for x in (c.get("archetype_ids") or [])]
+    lines = c.get("pair_lines")
+    if not isinstance(lines, list) or len(lines) < 3:
+        return [f"candidate[{i}] is a triad and needs 'pair_lines' — one entry per pair (THREE total), each "
+                f"with a 'pair' of two of its archetype ids, a distinct 'strategy' ({'/'.join(STRATEGIES)}), "
+                "and a 'win_condition'"]
+    all_pairs = {frozenset((ids[a], ids[b])) for a in range(len(ids)) for b in range(a + 1, len(ids))}
+    seen_pairs: set[frozenset] = set()
+    seen_strats: list[str] = []
+    for j, l in enumerate(lines):
+        if not isinstance(l, dict):
+            errs.append(f"candidate[{i}].pair_lines[{j}] must be an object"); continue
+        pr = l.get("pair")
+        if not isinstance(pr, (list, tuple)) or len(pr) != 2 or str(pr[0]) == str(pr[1]) \
+                or any(str(x) not in ids for x in pr):
+            errs.append(f"candidate[{i}].pair_lines[{j}] 'pair' must name two DISTINCT archetype ids of this "
+                        f"candidate {ids}")
+        else:
+            seen_pairs.add(frozenset((str(pr[0]), str(pr[1]))))
+        s = str(l.get("strategy", "")).strip().lower()
+        if s not in STRATEGIES:
+            errs.append(f"candidate[{i}].pair_lines[{j}] strategy '{l.get('strategy')}' must be one of "
+                        f"{'/'.join(STRATEGIES)}")
+        else:
+            seen_strats.append(s)
+        if not str(l.get("win_condition", "")).strip():
+            errs.append(f"candidate[{i}].pair_lines[{j}] needs a 'win_condition' (how that pair's deck closes a fight)")
+    missing = all_pairs - seen_pairs
+    if len(ids) == 3 and missing:
+        errs.append(f"candidate[{i}].pair_lines must cover ALL THREE pairs of {ids}")
+    if len(set(seen_strats)) < len(seen_strats):
+        errs.append(f"candidate[{i}] pairs must serve THREE DISTINCT strategies (got {seen_strats})")
+    return errs
+
+
+def _candidate_line_errors(c: dict, i: int, triad: bool = False) -> list[str]:
+    """Validate one candidate's strategy declaration. Legacy (2-arch): strategic_lines — 2-3 entries,
+    strategies from the taxonomy, >=2 distinct, each with a win_condition. Triad: the per-pair pair_lines
+    (see _pair_line_errors). Shared by the fused and the compose-only validators."""
+    if triad:
+        errs = _pair_line_errors(c, i)
+        ids = c.get("archetype_ids")
+        if isinstance(ids, list) and len(ids) != 3:
+            errs.append(f"candidate[{i}] is a triad and must fuse EXACTLY THREE archetypes (got {ids})")
+        return errs
     errs: list[str] = []
     lines = c.get("strategic_lines")
     if not isinstance(lines, list) or len(lines) < 2:
@@ -66,8 +133,47 @@ _FAKE_LINES = [
      "idiom": "turtle-scale"},
 ]
 
+# The three DISTINCT strategies, in order, for a triad fake's three pairs (D3).
+_FAKE_TRIAD_STRATS = list(STRATEGIES)
 
-_SYSTEM = """You are the convergent front-end of a class designer for "BLANK the spire", a Slay-the-Spire-like \
+
+def _fake_pair_lines(ids: list[str]) -> list[dict]:
+    """Deterministic per-pair strategy mapping for a triad fake: the three pairs of `ids`, each a distinct
+    strategy (aggro/control/combo), each with a win_condition — enough for _pair_line_errors to pass."""
+    pairs = [(ids[a], ids[b]) for a in range(len(ids)) for b in range(a + 1, len(ids))]
+    out: list[dict] = []
+    for k, (a, b) in enumerate(pairs[:3]):
+        s = _FAKE_TRIAD_STRATS[k % len(_FAKE_TRIAD_STRATS)]
+        out.append({"pair": [a, b], "strategy": s, "line": f"the {a}+{b} {s} lane",
+                    "win_condition": f"the {s} finisher closes"})
+    return out
+
+
+# The fused map+compose system prompt. Legacy (2-archetype) is byte-for-byte today's prompt; the triad variant
+# (Phase 2, opt-in) swaps the "EXACTLY TWO archetypes in tension" ask for the tension-triangle ask and the
+# strategic_lines schema for pair_lines. Built by a function so the flag picks the variant without a re-touch.
+def _map_compose_system(triad: bool = False) -> str:
+    if triad:
+        compose_ask = ("3. COMPOSE the requested number of candidate class builds. Each candidate fuses "
+                       "EXACTLY THREE archetypes in a TENSION TRIANGLE — the three pull against each other and "
+                       "each PAIR (AB/AC/BC) is a distinct game plan, which is what makes the class a real "
+                       "triangle of choices instead of a pile of synergies. STRONGLY prefer archetypes tagged "
+                       "BUILDABLE; you MAY use a NEEDS-VOCAB archetype when it's the theme's most distinctive "
+                       "idea, but know it will be flagged. Make the candidates genuinely DIFFERENT from each "
+                       "other — different triangles, different fantasies.")
+        lines_ask, lines_schema = _PAIR_LINES_ASK, _PAIR_LINES_SCHEMA
+        ids_schema = '"archetype_ids": ["id_a", "id_b", "id_c"],\n      "tension": "how the three pull against each other (the triangle)",'
+    else:
+        compose_ask = ("3. COMPOSE the requested number of candidate class builds. Each candidate fuses EXACTLY "
+                       "TWO archetypes that are in productive TENSION (they pull against each other — e.g. "
+                       "patience vs. aggression, defense vs. sacrifice), which is what makes a class feel like a "
+                       "real identity instead of a pile of synergies. STRONGLY prefer archetypes tagged BUILDABLE; "
+                       "you MAY use a NEEDS-VOCAB archetype when it's the theme's most distinctive idea, but know "
+                       "it will be flagged (its signature mechanic isn't in the engine yet). Make the candidates "
+                       "genuinely DIFFERENT from each other — different spines, different fantasies.")
+        lines_ask, lines_schema = _LINES_ASK, _LINES_SCHEMA
+        ids_schema = '"archetype_ids": ["id_a", "id_b"],\n      "tension": "how the two pull against each other",'
+    return """You are the convergent front-end of a class designer for "BLANK the spire", a Slay-the-Spire-like \
 deckbuilder. You receive (a) a theme's concept CLUSTERS and (b) an ARCHETYPE CATALOG — reusable mechanical \
 engines, each tagged with metaphors and a buildability flag. Do THREE things:
 
@@ -80,14 +186,9 @@ invent a new archetype id — only use ids from the catalog.
 2. Notice COLLISIONS: when two clusters map to the same archetype, that archetype is the theme's mechanical \
 spine — lean into it rather than discarding a mapping.
 
-3. COMPOSE the requested number of candidate class builds. Each candidate fuses EXACTLY TWO archetypes that are \
-in productive TENSION (they pull against each other — e.g. patience vs. aggression, defense vs. sacrifice), \
-which is what makes a class feel like a real identity instead of a pile of synergies. STRONGLY prefer archetypes \
-tagged BUILDABLE; you MAY use a NEEDS-VOCAB archetype when it's the theme's most distinctive idea, but know it \
-will be flagged (its signature mechanic isn't in the engine yet). Make the candidates genuinely DIFFERENT from \
-each other — different spines, different fantasies.
+""" + compose_ask + """
 
-""" + _LINES_ASK + """
+""" + lines_ask + """
 
 Output EXACTLY ONE JSON object, nothing else:
 {
@@ -95,9 +196,8 @@ Output EXACTLY ONE JSON object, nothing else:
     { "cluster": "cluster name", "archetype_id": "an id from the catalog", "metaphor": "the resonance, one line", "off_vocab": false }
   ],
   "candidates": [
-    { "name": "<= 24 chars", "fantasy": "the class fantasy in one line", "archetype_ids": ["id_a", "id_b"],
-      "tension": "how the two pull against each other",
-""" + _LINES_SCHEMA + """
+    { "name": "<= 24 chars", "fantasy": "the class fantasy in one line", """ + ids_schema + """
+""" + lines_schema + """
       "core_loop": "the turn-to-turn play loop",
       "weakness": "where the class is vulnerable", "suggested_max_hp": 72 }
   ],
@@ -109,8 +209,11 @@ Return only the JSON object. "gaps" may be an empty list."""
 
 
 class _MapComposeContract:
+    def __init__(self, triad: bool | None = None) -> None:
+        self.triad = triad_enabled(triad)
+
     def system_prompt(self) -> str:
-        return _SYSTEM
+        return _map_compose_system(self.triad)
 
     def user_brief(self, payload) -> str:
         clusters = payload.get("clusters") or []
@@ -118,14 +221,20 @@ class _MapComposeContract:
         n = int(payload.get("n", 3) or 3)
         concept = payload.get("concept", "")
         recency = str(payload.get("recency", "")).strip()
+        if self.triad:
+            compose_line = (f"Map every cluster, then compose {n} DISTINCT candidate builds (3 archetypes each, "
+                            "in a tension triangle, each with pair_lines covering all three pairs mapped to the "
+                            "three DISTINCT strategies, each with a win_condition).")
+        else:
+            compose_line = (f"Map every cluster, then compose {n} DISTINCT candidate builds (2 archetypes each, "
+                            "in tension, each with 2-3 strategic_lines covering at least 2 distinct strategies, "
+                            "each line with a win_condition).")
         return (
             'Theme: "' + str(concept).strip() + '"\n\n'
             "THE CONCEPT CLUSTERS:\n" + json.dumps(clusters, indent=2) + "\n\n"
             "THE ARCHETYPE CATALOG (use these ids only):\n" + catalog_block + "\n\n"
             + (recency + "\n\n" if recency else "")
-            + f"Map every cluster, then compose {n} DISTINCT candidate builds (2 archetypes each, in tension, "
-            "each with 2-3 strategic_lines covering at least 2 distinct strategies, each line with a "
-            "win_condition). Prefer BUILDABLE archetypes. Return only the JSON object."
+            + compose_line + " Prefer BUILDABLE archetypes. Return only the JSON object."
         )
 
     def repair_message(self, text: str, errors: list[str]) -> str:
@@ -139,7 +248,9 @@ class _MapComposeContract:
         catalog = payload.get("_catalog")
         bids = sorted(catalog.buildable_ids()) if catalog is not None else ["poison_attrition", "block_bulwark"]
         unbuildable = [e.id for e in (catalog.entries if catalog is not None else []) if not e.buildable]
-        a, b = (bids + ["poison_attrition", "block_bulwark"])[:2]
+        # Phase 2 (triad): a fake candidate carries THREE archetype ids + pair_lines; legacy stays two + lines.
+        fill = (bids + ["poison_attrition", "block_bulwark", "power_ramp"])
+        a, b, cc = fill[:3]
         clusters = payload.get("clusters") or [{"name": "Core"}, {"name": "Cost"}, {"name": "Payoff"}]
         cnames = [str(c.get("name", f"c{i}")) for i, c in enumerate(clusters)]
         # Two clusters map to the SAME archetype `a` -> exercises the collision/spine post-process.
@@ -148,20 +259,32 @@ class _MapComposeContract:
             {"cluster": cnames[1 % len(cnames)], "archetype_id": a, "metaphor": "fake resonance (spine)", "off_vocab": False},
             {"cluster": cnames[2 % len(cnames)], "archetype_id": b, "metaphor": "fake resonance", "off_vocab": False},
         ]
-        candidates = [
-            {"name": "Fake Buildable", "fantasy": "an offline buildable candidate",
-             "archetype_ids": [a, b], "tension": "a vs b", "strategic_lines": list(_FAKE_LINES),
-             "core_loop": "loop", "weakness": "weak", "suggested_max_hp": 72},
-        ]
+        if self.triad:
+            build_ids = [a, b, cc]
+            good = {"name": "Fake Buildable", "fantasy": "an offline buildable triad candidate",
+                    "archetype_ids": build_ids, "tension": "a/b/c triangle", "pair_lines": _fake_pair_lines(build_ids),
+                    "core_loop": "loop", "weakness": "weak", "suggested_max_hp": 72}
+        else:
+            good = {"name": "Fake Buildable", "fantasy": "an offline buildable candidate",
+                    "archetype_ids": [a, b], "tension": "a vs b", "strategic_lines": list(_FAKE_LINES),
+                    "core_loop": "loop", "weakness": "weak", "suggested_max_hp": 72}
+        candidates = [good]
         # Always compose a deliberately NEEDS-VOCAB second candidate so the picker has something to avoid
         # (exercises distinctive-among-buildable). Prefer a REAL NEEDS-VOCAB archetype; once the catalog is fully
         # buildable — every planned vocab gap shipped, as of Phase S / gap #1 — fall back to a sentinel id, which
         # hydrate_candidate marks NEEDS-VOCAB ("unknown archetype id"), keeping the contrast alive regardless.
         gap_arch = unbuildable[0] if unbuildable else "__needs_vocab_stub__"
-        candidates.append({"name": "Fake Distinctive", "fantasy": "an offline gap-bound candidate",
-                           "archetype_ids": [a, gap_arch], "tension": "a vs gap",
-                           "strategic_lines": list(_FAKE_LINES),
-                           "core_loop": "loop", "weakness": "weak", "suggested_max_hp": 70})
+        if self.triad:
+            gap_ids = [a, b, gap_arch]
+            candidates.append({"name": "Fake Distinctive", "fantasy": "an offline gap-bound triad candidate",
+                               "archetype_ids": gap_ids, "tension": "a/b/gap triangle",
+                               "pair_lines": _fake_pair_lines(gap_ids),
+                               "core_loop": "loop", "weakness": "weak", "suggested_max_hp": 70})
+        else:
+            candidates.append({"name": "Fake Distinctive", "fantasy": "an offline gap-bound candidate",
+                               "archetype_ids": [a, gap_arch], "tension": "a vs gap",
+                               "strategic_lines": list(_FAKE_LINES),
+                               "core_loop": "loop", "weakness": "weak", "suggested_max_hp": 70})
         return {"mappings": mappings, "candidates": candidates,
                 "gaps": [{"title": "Fake Gap", "fantasy": "offline", "sketch": "a missing mechanic"}]}
 
@@ -274,29 +397,50 @@ def validate_map_only(obj: dict) -> list[str]:
     return errs
 
 
-_COMPOSE_SYSTEM = """You are the convergent front-end of a class designer for "BLANK the spire", a Slay-the-Spire-like \
+# The compose-only system prompt (interactive path). Legacy is byte-for-byte today's; the triad variant swaps
+# the two-archetype ask for the tension-triangle + pair_lines, and the pick constraint stays (<=2 picks, filled
+# to three under triad). Built by a function so the flag picks the variant.
+def _compose_system(triad: bool = False) -> str:
+    if triad:
+        fuse = ("Your job: COMPOSE the requested number of candidate class builds. Each candidate fuses EXACTLY "
+                "THREE archetypes in a TENSION TRIANGLE — the three pull against each other and each PAIR "
+                "(AB/AC/BC) is a distinct game plan. STRONGLY prefer archetypes tagged BUILDABLE; you MAY use a "
+                "NEEDS-VOCAB archetype when it's the theme's most distinctive idea, but know it will be flagged. "
+                "Make the candidates genuinely DIFFERENT from each other — different triangles, different fantasies.")
+        pick = ("THE PLAYER MAY HAVE PICKED archetypes (the brief says so). When picks are present they are a HARD "
+                "constraint: EVERY candidate MUST include ALL picked archetype ids, filling the triangle to THREE "
+                "with partners from the theme's mappings. One pick = vary the OTHER TWO archetypes per candidate. "
+                "Two picks = every candidate fuses those two plus a varied third. No picks = compose freely from "
+                "the mappings.")
+        lines_ask, lines_schema = _PAIR_LINES_ASK, _PAIR_LINES_SCHEMA
+        ids_schema = '"archetype_ids": ["id_a", "id_b", "id_c"],\n      "tension": "how the three pull against each other (the triangle)",'
+    else:
+        fuse = ("Your job: COMPOSE the requested number of candidate class builds. Each candidate fuses EXACTLY "
+                "TWO archetypes that are in productive TENSION (they pull against each other — e.g. patience vs. "
+                "aggression, defense vs. sacrifice), which is what makes a class feel like a real identity instead "
+                "of a pile of synergies. STRONGLY prefer archetypes tagged BUILDABLE; you MAY use a NEEDS-VOCAB "
+                "archetype when it's the theme's most distinctive idea, but know it will be flagged. Make the "
+                "candidates genuinely DIFFERENT from each other — different spines, different fantasies.")
+        pick = ("THE PLAYER MAY HAVE PICKED archetypes (the brief says so). When picks are present they are a HARD "
+                "constraint: EVERY candidate MUST include ALL picked archetype ids. One pick = vary the SECOND "
+                "archetype per candidate (each partner in a different tension with the pick, drawn from the theme's "
+                "mappings where possible). Two picks = every candidate fuses exactly those two; differentiate the "
+                "candidates by fantasy, loop, and which archetype leads. No picks = compose freely from the mappings.")
+        lines_ask, lines_schema = _LINES_ASK, _LINES_SCHEMA
+        ids_schema = '"archetype_ids": ["id_a", "id_b"],\n      "tension": "how the two pull against each other",'
+    return """You are the convergent front-end of a class designer for "BLANK the spire", a Slay-the-Spire-like \
 deckbuilder. A theme has already been decomposed into concept CLUSTERS and MAPPED onto an ARCHETYPE CATALOG of \
-reusable mechanical engines. Your job: COMPOSE the requested number of candidate class builds. Each candidate \
-fuses EXACTLY TWO archetypes that are in productive TENSION (they pull against each other — e.g. patience vs. \
-aggression, defense vs. sacrifice), which is what makes a class feel like a real identity instead of a pile of \
-synergies. STRONGLY prefer archetypes tagged BUILDABLE; you MAY use a NEEDS-VOCAB archetype when it's the \
-theme's most distinctive idea, but know it will be flagged. Make the candidates genuinely DIFFERENT from each \
-other — different spines, different fantasies.
+reusable mechanical engines. """ + fuse + """
 
-THE PLAYER MAY HAVE PICKED archetypes (the brief says so). When picks are present they are a HARD constraint: \
-EVERY candidate MUST include ALL picked archetype ids. One pick = vary the SECOND archetype per candidate (each \
-partner in a different tension with the pick, drawn from the theme's mappings where possible). Two picks = every \
-candidate fuses exactly those two; differentiate the candidates by fantasy, loop, and which archetype leads. \
-No picks = compose freely from the mappings.
+""" + pick + """
 
-""" + _LINES_ASK + """
+""" + lines_ask + """
 
 Output EXACTLY ONE JSON object, nothing else:
 {
   "candidates": [
-    { "name": "<= 24 chars", "fantasy": "the class fantasy in one line", "archetype_ids": ["id_a", "id_b"],
-      "tension": "how the two pull against each other",
-""" + _LINES_SCHEMA + """
+    { "name": "<= 24 chars", "fantasy": "the class fantasy in one line", """ + ids_schema + """
+""" + lines_schema + """
       "core_loop": "the turn-to-turn play loop",
       "weakness": "where the class is vulnerable", "suggested_max_hp": 72 }
   ],
@@ -308,8 +452,11 @@ Return only the JSON object. "gaps" may be an empty list."""
 
 
 class _ComposeOnlyContract:
+    def __init__(self, triad: bool | None = None) -> None:
+        self.triad = triad_enabled(triad)
+
     def system_prompt(self) -> str:
-        return _COMPOSE_SYSTEM
+        return _compose_system(self.triad)
 
     def user_brief(self, payload) -> str:
         clusters = payload.get("clusters") or []
@@ -319,13 +466,26 @@ class _ComposeOnlyContract:
         concept = payload.get("concept", "")
         recency = str(payload.get("recency", "")).strip()
         picked = [str(p) for p in (payload.get("picked") or [])]
+        n_arch = 3 if self.triad else 2
         if picked:
+            if self.triad:
+                fill_how = ("all three of these plus a varied third" if len(picked) > 1 else
+                            "this archetype (fill the triangle with two varied partners per candidate)")
+            else:
+                fill_how = ("both of these archetypes." if len(picked) > 1 else
+                            "this archetype (vary its partner per candidate).")
             pick_line = ("THE PLAYER PICKED: " + ", ".join(picked) +
-                         " — every candidate MUST include " +
-                         ("both of these archetypes." if len(picked) > 1 else
-                          "this archetype (vary its partner per candidate)."))
+                         " — every candidate MUST include " + fill_how)
         else:
             pick_line = "THE PLAYER PICKED: nothing (compose freely from the mappings)."
+        if self.triad:
+            compose_line = (f"Compose {n} DISTINCT candidate builds (3 archetypes each, in a tension triangle, "
+                            "each with pair_lines covering all three pairs mapped to the three DISTINCT "
+                            "strategies, each with a win_condition).")
+        else:
+            compose_line = (f"Compose {n} DISTINCT candidate builds (2 archetypes each, in tension, each with 2-3 "
+                            "strategic_lines covering at least 2 distinct strategies, each line with a "
+                            "win_condition).")
         return (
             'Theme: "' + str(concept).strip() + '"\n\n'
             "THE CONCEPT CLUSTERS:\n" + json.dumps(clusters, indent=2) + "\n\n"
@@ -333,9 +493,7 @@ class _ComposeOnlyContract:
             "THE ARCHETYPE CATALOG (use these ids only):\n" + catalog_block + "\n\n"
             + pick_line + "\n\n"
             + (recency + "\n\n" if recency else "")
-            + f"Compose {n} DISTINCT candidate builds (2 archetypes each, in tension, each with 2-3 "
-            "strategic_lines covering at least 2 distinct strategies, each line with a win_condition). "
-            "Prefer BUILDABLE archetypes. Return only the JSON object."
+            + compose_line + " Prefer BUILDABLE archetypes. Return only the JSON object."
         )
 
     def repair_message(self, text: str, errors: list[str]) -> str:
@@ -349,7 +507,19 @@ class _ComposeOnlyContract:
         catalog = payload.get("_catalog")
         bids = sorted(catalog.buildable_ids()) if catalog is not None else ["poison_attrition", "block_bulwark"]
         picked = [str(p) for p in (payload.get("picked") or [])]
-        fill = [b for b in bids + ["poison_attrition", "block_bulwark"] if b not in picked]
+        fill = [b for b in bids + ["poison_attrition", "block_bulwark", "power_ramp"] if b not in picked]
+        if self.triad:
+            # Phase 2 (triad): fill each candidate's triangle to THREE, honoring every pick.
+            ids1 = (picked + fill)[:3]
+            ids2 = (picked + fill[1:])[:3] if len(picked) < 3 else list(ids1)
+            return {"candidates": [
+                {"name": "Fake Picked", "fantasy": "an offline triad candidate honoring the pick",
+                 "archetype_ids": ids1, "tension": "a/b/c triangle", "pair_lines": _fake_pair_lines(ids1),
+                 "core_loop": "loop", "weakness": "weak", "suggested_max_hp": 72},
+                {"name": "Fake Picked II", "fantasy": "a second offline triad candidate",
+                 "archetype_ids": ids2, "tension": "a/b/c triangle", "pair_lines": _fake_pair_lines(ids2),
+                 "core_loop": "loop", "weakness": "weak", "suggested_max_hp": 70},
+            ], "gaps": []}
         pair1 = (picked + fill)[:2]
         pair2 = (picked + fill[1:])[:2] if len(picked) < 2 else list(pair1)
         return {"candidates": [
@@ -362,10 +532,12 @@ class _ComposeOnlyContract:
         ], "gaps": []}
 
 
-def validate_compose_for(picked: list[str]):
+def validate_compose_for(picked: list[str], triad: bool | None = None):
     """Validator closure for the compose-only stage: structural checks + the player-pick hard constraint
-    (every candidate must include all picked ids) so a violation goes back through the repair loop."""
+    (every candidate must include all picked ids) so a violation goes back through the repair loop. `triad`
+    (default: triad_enabled()) switches candidate-line validation to the per-pair pair_lines (D3)."""
     need = [str(p) for p in (picked or [])]
+    is_triad = triad_enabled(triad)
 
     def _validate(obj: dict) -> list[str]:
         errs: list[str] = []
@@ -383,7 +555,7 @@ def validate_compose_for(picked: list[str]):
                 ids = []
             if not str(c.get("name", "")).strip():
                 errs.append(f"candidate[{i}] needs a name")
-            errs += _candidate_line_errors(c, i)
+            errs += _candidate_line_errors(c, i, triad=is_triad)
             for p in need:
                 if p not in [str(x) for x in ids]:
                     errs.append(f"candidate[{i}] must include the player's picked archetype '{p}'")
@@ -392,23 +564,37 @@ def validate_compose_for(picked: list[str]):
     return _validate
 
 
+def validate_map_for(triad: bool | None = None):
+    """Validator closure for the fused map+compose stage — the triad analogue of validate_compose_for. `triad`
+    (default: triad_enabled()) switches candidate-line validation to pair_lines. `validate_map` below is the
+    legacy (flag-off) default kept for callers that don't thread the flag."""
+    is_triad = triad_enabled(triad)
+
+    def _validate(obj: dict) -> list[str]:
+        errs: list[str] = []
+        if not isinstance(obj, dict):
+            return ["map output is not an object"]
+        if not isinstance(obj.get("mappings"), list):
+            errs.append("need a 'mappings' list")
+        cands = obj.get("candidates")
+        if not isinstance(cands, list) or not cands:
+            errs.append("need a non-empty 'candidates' list")
+        else:
+            for i, c in enumerate(cands):
+                if not isinstance(c, dict):
+                    errs.append(f"candidate[{i}] must be an object"); continue
+                ids = c.get("archetype_ids")
+                if not isinstance(ids, list) or not ids:
+                    errs.append(f"candidate[{i}] needs 'archetype_ids'")
+                if not str(c.get("name", "")).strip():
+                    errs.append(f"candidate[{i}] needs a name")
+                errs += _candidate_line_errors(c, i, triad=is_triad)
+        return errs
+
+    return _validate
+
+
 def validate_map(obj: dict) -> list[str]:
-    errs: list[str] = []
-    if not isinstance(obj, dict):
-        return ["map output is not an object"]
-    if not isinstance(obj.get("mappings"), list):
-        errs.append("need a 'mappings' list")
-    cands = obj.get("candidates")
-    if not isinstance(cands, list) or not cands:
-        errs.append("need a non-empty 'candidates' list")
-    else:
-        for i, c in enumerate(cands):
-            if not isinstance(c, dict):
-                errs.append(f"candidate[{i}] must be an object"); continue
-            ids = c.get("archetype_ids")
-            if not isinstance(ids, list) or not ids:
-                errs.append(f"candidate[{i}] needs 'archetype_ids'")
-            if not str(c.get("name", "")).strip():
-                errs.append(f"candidate[{i}] needs a name")
-            errs += _candidate_line_errors(c, i)
-    return errs
+    """Legacy (flag-off) fused map+compose validator. The builder now threads the flag via validate_map_for;
+    this bare function stays as the 2-archetype default for back-compat."""
+    return validate_map_for(False)(obj)

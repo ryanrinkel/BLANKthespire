@@ -722,10 +722,13 @@ for a second signature under the card cap)."""
                 "Return only the JSON blueprint object.")
 
     def _dossier_brief(self, brief) -> str:
-        """mode='dossier': the staged front-end has ALREADY decided the identity (name, fantasy, two archetypes
-        in tension, the class_kind, a keystone relic intent). Your job is the part the blueprint stage is good
-        at: turn that into validated card briefs + any pools, using the SAME output shape and ALL the rules."""
+        """mode='dossier': the staged front-end has ALREADY decided the identity (name, fantasy, two — or, under
+        triad, THREE — archetypes in tension, the class_kind, a keystone relic intent). Your job is the part the
+        blueprint stage is good at: turn that into validated card briefs + any pools, using the SAME output shape
+        and ALL the rules. Under triad the identity is a TRIANGLE OF PAIRS — the archetypes block lists three
+        engines and the strategy rows come from the candidate's per-PAIR pair_lines (D3)."""
         c = brief.candidate
+        is_triad = len(getattr(c, "archetype_ids", None) or []) >= 3
         kind_guidance = {
             "orb": ('This is an ORB CLASS: set "orb_slots" to 3 or 4, declare an "orb_pool" (base orbs and/or up '
                     'to 3 custom orbs — see THE ORB POOL), and make ONE archetype the orb engine.'),
@@ -750,16 +753,36 @@ for a second signature under the card cap)."""
             skin = (f'\nFLAVOR SKIN — the MECHANICS above come from the subject; DRESS this class in its flavor. '
                     f'Name the class and its cards to evoke {flav}, drawing on this imagery for names and feel '
                     f'(do NOT let it change any mechanics): {img}.')
-        # The compose stage declared the candidate's strategic lines — the pool must build a package for each.
+        # The compose stage declared the candidate's strategy lines — the pool must build a package for each.
+        # Triad (D3): the lines are PER-PAIR (each of the three pairs is a distinct game plan), and the brief
+        # asks the blueprint to declare them top-level as "pair_lines". Legacy: the flat strategic_lines.
         lines = ""
+        pls = [l for l in (getattr(c, "pair_lines", None) or []) if isinstance(l, dict)] if is_triad else []
         lns = [l for l in (getattr(c, "strategic_lines", None) or []) if isinstance(l, dict)]
-        if lns:
+        if pls:
+            rows = "\n".join(f'- {" + ".join(str(x) for x in (l.get("pair") or []))} -> '
+                             f'{str(l.get("strategy", "?")).strip().lower()}: {l.get("line", "")}'
+                             + (f' (win condition: {l.get("win_condition")})' if l.get("win_condition") else "")
+                             for l in pls)
+            lines = ('\nIts THREE PAIR-LINES — each PAIR of archetypes is a distinct game plan (D3). Build a full '
+                     'package for EACH (enablers at common, amplifiers at uncommon, >=1 rare FINISHER), tag every '
+                     'card with its line\'s "strategy", and declare the mapping top-level as "pair_lines" '
+                     '([{"pair": [id1, id2], "strategy": "aggro|control|combo"}, ...], three distinct strategies):\n'
+                     + rows + "\n")
+        elif lns:
             rows = "\n".join(f'- {str(l.get("strategy", "?")).strip().lower()}: {l.get("line", "")}'
                              + (f' (win condition: {l.get("win_condition")})' if l.get("win_condition") else "")
                              + (f' [plays like: {l.get("idiom")}]' if l.get("idiom") else "")
                              for l in lns)
             lines = ('\nIts STRATEGIC LINES (build a package for EACH — enablers at common, amplifiers at '
                      'uncommon, >=1 rare FINISHER — and tag the cards with "strategy"):\n' + rows + "\n")
+        n_word = "THREE" if is_triad else "TWO"
+        tension_label = (f'The {n_word} archetypes (a tension TRIANGLE of pairs — '
+                         f'{c.tension or "each pair pulls a different way"})' if is_triad else
+                         f'The {n_word} archetypes (in tension — {c.tension or "they pull against each other"})')
+        use_line = (f"Use these three archetypes as the blueprint's three archetypes (keep their ids). "
+                    if is_triad else
+                    f"Use these two archetypes as the blueprint's two archetypes (keep their ids). ")
         return (
             "A staged design front-end has already chosen this class identity. Build its blueprint — the card "
             "briefs and any pools — faithfully to it. Do NOT rename it or change its archetypes.\n\n"
@@ -768,9 +791,9 @@ for a second signature under the card cap)."""
             f'Suggested max_hp: {c.suggested_max_hp}\n'
             f'Core loop: {c.core_loop}\n'
             f'Weakness: {c.weakness}\n'
-            f'The TWO archetypes (in tension — {c.tension or "they pull against each other"}):\n{archs}\n'
+            f'{tension_label}:\n{archs}\n'
             f'{lines}{kind_guidance}{relic}{skin}\n\n'
-            f"Use these two archetypes as the blueprint's two archetypes (keep their ids). {self._pool_ask()}"
+            f"{use_line}{self._pool_ask()}"
             f"{self._featured_ask(brief)}{self._recency_status()}{self._archetype_recency(c.archetype_ids)}"
             f"{self._feedback_ask(f'{c.name} {c.fantasy} {c.core_loop} {archs}')}\n"
             "Return only the JSON blueprint object.")
@@ -804,10 +827,19 @@ for a second signature under the card cap)."""
         bp["archetypes"] = [{"id": ids[k], "name": ids[k], "description": descs[k]} for k in range(len(ids))]
         if getattr(brief, "relic_intent", None):
             bp["relic_intent"] = brief.relic_intent
+        # Phase 2 (triad): the seed _fake_blueprint tagged BOOLEAN bridges (2-archetype shape); a triad bp needs
+        # pairwise `[id1, id2]` tags. Clear the seed's bridge tags so _topup_blueprint_briefs -> _ensure_bridge_tags
+        # re-tags them as valid pairs (a boolean bridge on a three-archetype class is a validation ERROR).
+        if len(ids) >= 3:
+            for card in bp.get("cards") or []:
+                if isinstance(card, dict) and card.get("bridge") is True:
+                    card["bridge"] = False
         # The staged path validates the blueprint strictly (real path must pass _validate_blueprint), but the
         # _fake_blueprint seeds are light (the fake=True path relies on the post-gen safety nets). Top up so the
-        # fake bp also passes — every merchant type + the rare floor + the candidate's strategic-line packages.
-        declared = [l.get("strategy") for l in (getattr(c, "strategic_lines", None) or []) if isinstance(l, dict)]
+        # fake bp also passes — every merchant type + the rare floor + the candidate's strategy-line packages.
+        # A triad's declared strategies live in its per-pair pair_lines (D3); a 2-archetype class's in strategic_lines.
+        src = (getattr(c, "pair_lines", None) or []) if len(ids) >= 3 else (getattr(c, "strategic_lines", None) or [])
+        declared = [l.get("strategy") for l in src if isinstance(l, dict)]
         return _topup_blueprint_briefs(bp, strategies=declared)
 
 

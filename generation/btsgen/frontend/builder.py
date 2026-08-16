@@ -14,11 +14,11 @@ from __future__ import annotations
 import os
 from collections import Counter
 
-from ..class_forge import _BlueprintContract, _extract, validate_blueprint_for
+from ..class_forge import _BlueprintContract, _extract, triad_enabled, validate_blueprint_for
 from .dossier import Candidate, Dossier, DossierBrief
 from .stage_cloud import _CloudClusterContract, validate_cloud
 from .stage_map import (_ComposeOnlyContract, _MapComposeContract, _MapOnlyContract, validate_compose_for,
-                        validate_map, validate_map_only)
+                        validate_map_for, validate_map_only)
 from .stage_relic import _RelicIntentContract, validate_relic_intent
 
 # class_kind distinctiveness weight — a special pool (orb/summon/status) is a bolder identity than a generic
@@ -37,7 +37,8 @@ class BlueprintBuildError(RuntimeError):
 
 class BlueprintBuilder:
     def __init__(self, make_gen, *, catalog, on_event=None, checkpoint=None, auto: bool = True,
-                 gap_log_append=None, n_candidates: int = 3, archetype_checkpoint=None) -> None:
+                 gap_log_append=None, n_candidates: int = 3, archetype_checkpoint=None,
+                 triad: bool | None = None) -> None:
         self._make_gen = make_gen
         self._catalog = catalog
         self._on_event = on_event
@@ -45,6 +46,10 @@ class BlueprintBuilder:
         self._auto = auto
         self._gap_log_append = gap_log_append
         self._n = max(2, int(n_candidates))
+        # Phase 2 (triad experiment): when on, compose THREE archetypes in a tension triangle and reframe the
+        # blueprint stage in triad mode. Default reads BTS_TRIAD (triad_enabled); the web layer passes a
+        # per-request flag. Threaded into every stage contract + validator so the whole front-end is one mode.
+        self._triad = triad_enabled(triad)
         # Interactive forge mode: `archetype_checkpoint(options, dossier) -> list[archetype_id]` is called
         # between MAP and COMPOSE with the theme-matched archetypes; the player's picks (<=2) become a hard
         # compose constraint AND the fidelity drivers. None (default) = the fused autonomous map+compose.
@@ -163,11 +168,19 @@ class BlueprintBuilder:
             self._note(f"          loop: {c.core_loop}")
         if c.tension:
             self._note(f"          tension: {c.tension}")
-        for l in (c.strategic_lines or []):
-            if isinstance(l, dict) and l.get("strategy"):
-                win = f" -> wins by: {l['win_condition']}" if l.get("win_condition") else ""
-                idiom = f" [plays like: {l['idiom']}]" if l.get("idiom") else ""  # O-3 texture tag
-                self._note(f"          {l['strategy']} line: {l.get('line', '')}{win}{idiom}")
+        # Triad: narrate the three pair-lines (each pair its own game plan, D3); else the strategic_lines.
+        if getattr(c, "pair_lines", None):
+            for l in c.pair_lines:
+                if isinstance(l, dict) and l.get("strategy"):
+                    pr = " + ".join(str(x) for x in (l.get("pair") or []))
+                    win = f" -> wins by: {l['win_condition']}" if l.get("win_condition") else ""
+                    self._note(f"          {pr} ({l['strategy']}): {l.get('line', '')}{win}")
+        else:
+            for l in (c.strategic_lines or []):
+                if isinstance(l, dict) and l.get("strategy"):
+                    win = f" -> wins by: {l['win_condition']}" if l.get("win_condition") else ""
+                    idiom = f" [plays like: {l['idiom']}]" if l.get("idiom") else ""  # O-3 texture tag
+                    self._note(f"          {l['strategy']} line: {l.get('line', '')}{win}")
         if c.weakness:
             self._note(f"          weakness: {c.weakness}")
 
@@ -255,16 +268,17 @@ class BlueprintBuilder:
         if interactive:
             mc = self._map_compose_interactive(payload, dossier)  # narrates mappings before the pick
         else:
-            mc = self._run_stage(self._make_gen(_MapComposeContract(), max_tokens=12000),
-                                 payload, validate_map, "map/compose")
+            mc = self._run_stage(self._make_gen(_MapComposeContract(self._triad), max_tokens=12000),
+                                 payload, validate_map_for(self._triad), "map/compose")
         dossier.mappings = list(mc.get("mappings") or [])
         dossier.candidates = [self._catalog.hydrate_candidate(c) for c in (mc.get("candidates") or [])]
         self._apply_collision_check(dossier)
         if not interactive:
             self._narrate_mappings(dossier)
         self._log_gaps(dossier, mc)
+        fuse_desc = "three archetypes in a tension triangle" if self._triad else "two archetypes in tension"
         self._note(f"[3/6] compose: sketching {len(dossier.candidates)} class identities, each fusing "
-                   "two archetypes in tension:")
+                   f"{fuse_desc}:")
         for c in dossier.candidates:
             self._narrate_candidate(c)
 
@@ -290,10 +304,15 @@ class BlueprintBuilder:
         # reframed blueprint: dossier -> bp (identical shape; downstream untouched). Validated against the
         # candidate's DECLARED strategic lines — the pool must build the packages the compose stage promised.
         self._note(f"[6/6] blueprint: translating '{chosen.name}' into card briefs, pools, and numbers...")
-        declared = [l.get("strategy") for l in (chosen.strategic_lines or []) if isinstance(l, dict)]
+        # The declared strategies the pool must cover: a triad's come from its per-PAIR lines (D3 — three
+        # distinct), a 2-archetype class's from its strategic_lines. validate_blueprint_for checks each.
+        if self._triad and getattr(chosen, "pair_lines", None):
+            declared = [l.get("strategy") for l in chosen.pair_lines if isinstance(l, dict)]
+        else:
+            declared = [l.get("strategy") for l in (chosen.strategic_lines or []) if isinstance(l, dict)]
         dbrief = DossierBrief(candidate=chosen, relic_intent=dossier.relic_intent, concept=concept,
                               skin=dossier.skin_bank or None, featured=getattr(brief, "featured", None))
-        bp = self._run_stage(self._make_gen(_BlueprintContract(mode="dossier"), max_tokens=48000),
+        bp = self._run_stage(self._make_gen(_BlueprintContract(mode="dossier", triad=self._triad), max_tokens=48000),
                              dbrief, validate_blueprint_for(declared), "blueprint")
         # Phase N-4: stamp the AUTHORITATIVE catalog archetype ids (the 7B often echoes display names into
         # bp["archetypes"][*].id, which would make the ledger + novelty penalty compare names-vs-ids and
@@ -391,8 +410,8 @@ class BlueprintBuilder:
             self._note("      no pick made — the forge decides (autonomous compose)")
 
         cpayload = {**payload, "mappings": dossier.mappings, "picked": dossier.picked_archetypes}
-        co = self._run_stage(self._make_gen(_ComposeOnlyContract(), max_tokens=12000),
-                             cpayload, validate_compose_for(dossier.picked_archetypes), "compose")
+        co = self._run_stage(self._make_gen(_ComposeOnlyContract(self._triad), max_tokens=12000),
+                             cpayload, validate_compose_for(dossier.picked_archetypes, self._triad), "compose")
         return {"mappings": dossier.mappings, "candidates": list(co.get("candidates") or []),
                 "gaps": list(mo.get("gaps") or []) + list(co.get("gaps") or [])}
 

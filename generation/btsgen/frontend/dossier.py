@@ -8,18 +8,24 @@ from dataclasses import dataclass, field
 
 @dataclass
 class Candidate:
-    """One composed class build = two archetypes in tension, hydrated against the catalog."""
+    """One composed class build = two (or, under triad, THREE) archetypes in tension, hydrated against the
+    catalog. A triad candidate is a TRIANGLE of pairs: `tension` summarizes the triangle and `pair_lines`
+    assigns each pair its own strategy (D3)."""
     name: str
     fantasy: str
     archetype_ids: list[str]
     archetype_descs: list[str]
     core_loop: str = ""
     weakness: str = ""
-    tension: str = ""                    # how the two archetypes pull against each other
+    tension: str = ""                    # how the archetypes pull against each other (the triangle summary under triad)
     # 2-3 draftable game plans this ONE pool supports (the Ironclad test): [{strategy: aggro|control|combo,
     # line: how these two archetypes play it, win_condition: how that deck closes a fight}]. The blueprint
     # stage builds a card package (enablers/amplifiers/rare finisher) for each.
     strategic_lines: list[dict] = field(default_factory=list)
+    # Phase 2 (triad): the per-PAIR strategy mapping (D3) — [{pair: [id_a, id_b], strategy, line, win_condition}]
+    # for the three pairs of a triad; empty on a 2-archetype candidate. The reframed blueprint stage maps these
+    # onto the top-level `pair_lines` the triad validator (_validate_pair_lines) enforces.
+    pair_lines: list[dict] = field(default_factory=list)
     class_kind: str = "normal"           # normal | orb | status | summon (drives which pool the blueprint declares)
     suggested_max_hp: int = 72
     buildable: bool = True               # all referenced archetypes expressible in the live vocabulary
