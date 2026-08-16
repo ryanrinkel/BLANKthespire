@@ -243,6 +243,9 @@ never as a card's whole identity, and only when the brief itself asks for debuff
 names an archetype engine, the card's PRIMARY effect must serve that engine; prefer compositional \
 designs (multi, from_state, conditional, state-scaled amounts, X-cost, add_card recursion, lose_hp \
 costs) over another flat "damage + debuff" stat line.
+- BRIDGE cards: when the brief marks this card as a BRIDGE (fusion) card, it MUST visibly combine BOTH \
+named engines in the one design — one effect serving each, or one engine's mechanic gating/scaling the \
+other engine's payoff. A "bridge" that serves only one engine is a failed design; do not turn one in.
 - Give it character: a clear mechanical identity, plus optional one-line `flavor`."""
 
 

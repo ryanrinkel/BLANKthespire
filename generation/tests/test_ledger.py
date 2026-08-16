@@ -171,6 +171,45 @@ def test_featured_recency() -> None:
     check(ledger.featured_recency([{"archetype_ids": ["a"]}]) == {}, "legacy lines tolerated")
 
 
+def test_archetype_designs() -> None:
+    print("designs recorded per archetype + archetype_design_line() anti-convergence injection (O-2):")
+    _fresh()
+    bp = _bp(["forge_ramp", "temper"])
+    bp["cards"] = [
+        {"role": "pool", "name_hint": "Stoke", "archetype": "forge_ramp", "theme": "Deal 5. Forge 2."},
+        {"role": "pool", "name_hint": "Quench", "archetype": "temper", "theme": "Gain 8 Block."},
+        {"role": "basic_attack", "name_hint": "Strike", "archetype": "forge_ramp", "theme": "basic"},  # not pool
+        {"role": "pool", "name_hint": "NoArch", "archetype": None, "theme": "glue"},  # unassigned
+    ]
+    ledger.record_forge(_bundle("Smith", [{"op": "damage", "amount": 6}]), bp)
+    e = ledger.read_window()[-1]
+    check(e.get("designs", {}).get("forge_ramp") == ["Stoke: Deal 5. Forge 2."],
+          f"pool designs recorded per archetype: {e.get('designs')}")
+    check("temper" in e.get("designs", {}), "the second archetype records its own designs")
+    check(all("NoArch" not in ln for lns in e.get("designs", {}).values() for ln in lns),
+          "unassigned cards are skipped")
+    check(all("Strike" not in ln for lns in e.get("designs", {}).values() for ln in lns),
+          "non-pool roles are skipped")
+    # the cap: at most _DESIGNS_PER_ARCH lines per archetype
+    bp2 = _bp(["spam_arch", "other"])
+    bp2["cards"] = [{"role": "pool", "name_hint": f"C{i}", "archetype": "spam_arch", "theme": "t"}
+                    for i in range(ledger._DESIGNS_PER_ARCH + 5)]
+    ledger.record_forge(_bundle("Spam", [{"op": "damage", "amount": 6}]), bp2)
+    e2 = ledger.read_window()[-1]
+    check(len(e2["designs"]["spam_arch"]) == ledger._DESIGNS_PER_ARCH,
+          f"designs capped at {ledger._DESIGNS_PER_ARCH} per archetype: {len(e2['designs']['spam_arch'])}")
+
+    line = ledger.archetype_design_line(ledger.read_window(), ["forge_ramp", "unseen_arch"])
+    check("Stoke" in line and "forge_ramp" in line, f"the line surfaces the recent design: {line}")
+    check("do NOT redesign" in line, f"the line carries the anti-convergence instruction: {line}")
+    check("unseen_arch" not in line, "an archetype with no recorded designs contributes nothing")
+    check(ledger.archetype_design_line(ledger.read_window(), []) == "", "no ids -> empty string")
+    check(ledger.archetype_design_line([], ["forge_ramp"]) == "", "no window -> empty string")
+    check(ledger.archetype_design_line([{"archetype_ids": ["forge_ramp"]}], ["forge_ramp"]) == "",
+          "pre-O-2 entries (no 'designs') are tolerated and contribute nothing")
+    check(all(ord(ch) < 128 for ch in line), "the injection line is ASCII (Windows console)")
+
+
 def test_injection_lines() -> None:
     print("map/blueprint injection lines summarize the overused window:")
     check(ledger.payload_line([]) == "", "empty window -> empty payload line")
@@ -224,6 +263,7 @@ def main() -> int:
     test_penalty_math()
     test_corrupt_and_missing()
     test_featured_recency()
+    test_archetype_designs()
     test_injection_lines()
     test_picker_novelty_term()
     print(f"\n{_PASS} passed, {_FAIL} failed")

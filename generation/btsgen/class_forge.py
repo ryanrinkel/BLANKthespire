@@ -26,7 +26,8 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .bridges import MIN_BRIDGES  # Phase O-1: the required-bridge-card count (fusion enforcer)
+from . import bridges as _bridges_mod  # Phase O-2: proactive fusion directives on first generation
+from .bridges import MIN_BRIDGES, TARGET_BRIDGES  # Phase O-1: the required-bridge-card count (fusion enforcer)
 
 def _find_repo_root() -> Path:
     """Repo root = the directory that contains ``mod/contract/``. Resolve it robustly so the forge works
@@ -56,7 +57,7 @@ RELIC_VOCAB = CONTRACT / "RELIC_VOCABULARY.md"  # Phase L: the constrained forge
 # the forge FLOW changes (blueprint prompt, staged front-end, strategic lines, card pipeline, safety nets…) so
 # a log line lets you tell which harness produced a given forge — on the CLI and in the streamed browser log.
 # It's the FIRST line emitted by forge_class(). Bump on any harness tweak; a short "-what" suffix helps track.
-HARNESS_VERSION = "1.5-feedback-rag"  # player-feedback retrieval: similar past ratings ride the blueprint + card briefs
+HARNESS_VERSION = "1.6-synergy-weave"  # O-2: class/archetype context on every card call, proactive bridge fusion directives, fusion-shape variety, per-archetype design recency, deck-aware relic prompt hint
 
 # Forged-class pool target. A base StS2 class pool is 20 common / 35 uncommon / 25 rare (~80 non-basic
 # cards); we ship a lean, reward-functional subset — each non-basic brief is one card-generation (LLM)
@@ -506,10 +507,16 @@ Rare available, so never ship fewer.
 "combo", or null for generic glue). At least TWO distinct strategies must each get a full package: >={_LINE_MIN_CARDS} \
 tagged cards including >=1 rare finisher. A control line MUST include its finisher among those rares.
 - BRIDGE CARDS (REQUIRED — this is what makes the two archetypes ONE class, not two half-decks stapled \
-together): at least {MIN_BRIDGES} pool cards must be FUSION cards that combine BOTH archetypes' engines in a \
-SINGLE card (touch a signature mechanic of EACH — not one engine or the other). Mark each with "bridge": true, \
-and make AT LEAST ONE of them a RARE (the fusion's poster card). Weave them across the pool; a bridge still \
-carries a "strategy" tag and counts toward that line.
+together): aim for {TARGET_BRIDGES} pool cards (hard floor {MIN_BRIDGES}) that are FUSION cards combining \
+BOTH archetypes' engines in a SINGLE card (touch a signature mechanic of EACH — not one engine or the \
+other). Mark each with "bridge": true, make AT LEAST ONE a RARE (the fusion's poster card), and spread the \
+rest across common/uncommon so the fusion is draftable from the first reward. VARY THE FUSION SHAPE — no two \
+bridges should fuse the same way. The shapes: FUEL (engine A's income/resource enables engine B's payoff), \
+GATE (a `when` condition from one engine unlocks the other engine's effect), RIDER (a cheap card carrying \
+one small effect from EACH engine), CONVERTER (spend/cash one engine's resource into the other's currency), \
+COUPLER (a power whose trigger fires one engine's op every time the other engine acts). Write each bridge's \
+theme as the explicit interlock ("Forge 2; if your Forge is 5+, apply 3 Poison" — never a vague "does \
+both"). A bridge still carries a "strategy" tag and counts toward that line.
 - Every `theme` is a concrete, mechanically explicit one-liner the card generator can build from the \
 vocabulary (numbers optional). Reference the archetype's engine.
 - REPRINT HOMAGE (REQUIRED): exactly ONE pool card is a faithful recreation of a REAL card from base \
@@ -544,8 +551,10 @@ summon_pool may use those ops; summon / buff_summon ride self-target skills, sum
                  f"least two distinct strategies each get >={_LINE_MIN_CARDS} tagged cards including >=1 "
                  "rare finisher. Include the required reprint homage: one COMMON pool card faithfully "
                  "recreating a real base-game card, its theme written as 'Reprint of <Name> (base game): "
-                 f"<original effect>'. Include at least {MIN_BRIDGES} BRIDGE cards (\"bridge\": true) that "
-                 "fuse BOTH archetypes' engines into one card, at least one of them a rare.")
+                 f"<original effect>'. Include ~{TARGET_BRIDGES} BRIDGE cards (hard floor {MIN_BRIDGES}; "
+                 "\"bridge\": true) that fuse BOTH archetypes' engines into one card — each using a "
+                 "DIFFERENT fusion shape, at least one of them a rare, the rest spread across "
+                 "common/uncommon.")
 
     def user_brief(self, brief) -> str:
         return self._dossier_brief(brief) if self.mode == "dossier" else self._concept_brief(brief)
@@ -563,6 +572,18 @@ summon_pool may use those ops; summon / buff_summon ride self-target skills, sum
         try:
             from . import ledger
             return ledger.blueprint_status_line(ledger.read_window())
+        except Exception:
+            return ""
+
+    @staticmethod
+    def _archetype_recency(archetype_ids) -> str:
+        """O-2 anti-convergence: the pool designs RECENT forges already built for these SAME archetypes,
+        so a repeated archetype explores different corners of its engine instead of redesigning the same
+        cards. Dossier mode only (the concept path invents its archetypes, so there is nothing to match).
+        Guarded — empty string on any failure."""
+        try:
+            from . import ledger
+            return ledger.archetype_design_line(ledger.read_window(), archetype_ids)
         except Exception:
             return ""
 
@@ -632,7 +653,7 @@ summon_pool may use those ops; summon / buff_summon ride self-target skills, sum
             f'The TWO archetypes (in tension — {c.tension or "they pull against each other"}):\n{archs}\n'
             f'{lines}{kind_guidance}{relic}{skin}\n\n'
             f"Use these two archetypes as the blueprint's two archetypes (keep their ids). {self._POOL_ASK}"
-            f"{self._featured_ask(brief)}{self._recency_status()}"
+            f"{self._featured_ask(brief)}{self._recency_status()}{self._archetype_recency(c.archetype_ids)}"
             f"{self._feedback_ask(f'{c.name} {c.fantasy} {c.core_loop} {archs}')}\n"
             "Return only the JSON blueprint object.")
 
@@ -928,6 +949,28 @@ def _relic_balance_errors(relic: dict, made: list[dict], card_validator) -> list
         return []
 
 
+def _relic_deck_note(made: list[dict]) -> str:
+    """The PROACTIVE side of _relic_balance_errors: a deck-aware line for the relic PROMPT naming the
+    `when` condition this deck trivially satisfies, so the model avoids it up front instead of burning
+    both attempts learning it from the reject (the Coilfang Venom forge: a hand_size_ge keystone on a
+    retain class failed twice and shipped Burning Blood). Uses the SAME generous hand model as the gate
+    (min(5, round(10*share)) held cards) so prompt and gate never disagree. "" for lean decks — the
+    hand_size_ge read is the one deck-derived condition the gate prices. ASCII-only (injection-line rule)."""
+    try:
+        stats = _keystone_deck_stats(made)
+        held = min(5, round(10 * stats["share"]))
+        if held < 2:  # a lean deck genuinely pays for a hand-size gate; nothing to warn about
+            return ""
+        return (f"\nDECK NOTE: this class RETAINS heavily ({stats['start']} and {stats['pool']} carry "
+                f"Retain), so the player's turn-start hand is usually ~{5 + held} cards - a "
+                f"'hand_size_ge' condition up to {5 + held} is ~ALWAYS TRUE for this deck, earns no "
+                "balance discount, and the relic will be REJECTED as an unconditional payout. Either "
+                "keep the payout small enough to be always-on, gate the hook once_per_combat, or use a "
+                "condition this deck does NOT trivially satisfy.")
+    except Exception:  # noqa: BLE001 — advisory hint: never block a forge
+        return ""
+
+
 class _RelicContract:
     """Duck-typed contract for the keystone-relic LLM call. The 'brief' passed to first_attempt/repair is the
     BLUEPRINT dict (the class identity), so the relic is designed as that class's keystone."""
@@ -977,9 +1020,12 @@ abstract symbol.{forms_block}"""
         if intent:
             intent_line = (f'\nKEYSTONE INTENT (design toward this): "{intent.get("name", "")}" — '
                            f'{intent.get("effect_sketch", intent.get("fantasy", ""))}\n')
+        # forge_class stashes the deck-aware condition hint (_relic_deck_note) on the bp right before the
+        # relic call — the card set isn't part of the bp shape, so this key is the channel. "" when absent.
+        deck_note = str(bp.get("relic_deck_note") or "")
         return (f'Design the keystone STARTER relic for this new class:\n'
                 f'Name: "{bp.get("name", "the class")}"\nFantasy: {bp.get("description", "")}\n'
-                f'Archetypes:\n{arch_lines}\n{intent_line}\nCOMPOSE: {" ".join(compose)}\n\n'
+                f'Archetypes:\n{arch_lines}\n{intent_line}\nCOMPOSE: {" ".join(compose)}{deck_note}\n\n'
                 f'Return only the JSON relic object (tier "starter").')
 
     def repair_message(self, relic_text: str, errors: list[str]) -> str:
@@ -1604,6 +1650,48 @@ def _resolve_bridge_ctx(bp: dict):
         return None
 
 
+def _class_context(bp: dict) -> str:
+    """O-2 synergy weave: the compact CLASS CONTEXT block every pool-card generation call carries. Before
+    this, a card was generated from its one-line theme ALONE — the card model never saw the class or its two
+    engines, so 'synergy' could only survive if the blueprint's one-liner spelled it out. Kept short (a few
+    lines) since the vocabulary+schema dominate the prompt anyway."""
+    archs = [a for a in (bp.get("archetypes") or []) if isinstance(a, dict)]
+    lines = "\n".join(f"- {a.get('name') or a.get('id') or 'engine'}: "
+                      f"{str(a.get('description') or '').strip()}" for a in archs)
+    desc = str(bp.get("description") or "").strip()
+    return (f"CLASS CONTEXT — this card belongs to '{bp.get('name', '')}'"
+            + (f" ({desc})" if desc else "") + ".\n"
+            "Its TWO archetypes (one deck, two engines — serve the brief's engine, and where natural let "
+            f"the card nod to the partner engine too):\n{lines}")
+
+
+def _card_context(bp: dict, plan: dict, bridge_ctx=None, class_ctx: str | None = None) -> str:
+    """The full design context for ONE pool card: class block + this card's archetype/strategy assignment,
+    plus — on a bridge card — the fusion REQUIRED directive at FIRST generation (previously a bridge only
+    learned it must fuse after failing the witness check, one budget-capped repair later)."""
+    ctx = _class_context(bp) if class_ctx is None else class_ctx
+    aid = str(plan.get("archetype") or "").strip()
+    if aid:
+        name = next((str(a.get("name") or a.get("id"))
+                     for a in (bp.get("archetypes") or [])
+                     if isinstance(a, dict) and str(a.get("id") or "") == aid), aid)
+        ctx += f"\nThis card PRIMARILY serves the {name} archetype."
+    strat = str(plan.get("strategy") or "").strip().lower()
+    if strat in STRATEGIES:
+        ctx += f" Strategic line: {strat}."
+    if plan.get("bridge"):
+        if bridge_ctx:
+            ctx += "\n" + _bridges_mod.repair_directive(bridge_ctx["name_a"], bridge_ctx["name_b"],
+                                                        bridge_ctx["ops_a"], bridge_ctx["ops_b"])
+        else:
+            names = [str(a.get("name") or a.get("id") or "engine")
+                     for a in (bp.get("archetypes") or []) if isinstance(a, dict)]
+            a, b = (names + ["one engine", "the other"])[:2]
+            ctx += (f"\nREQUIRED: this is a BRIDGE card — it must FUSE the {a} and {b} engines in ONE card: "
+                    "one effect serving each, or one engine's mechanic gating/scaling the other's payoff.")
+    return ctx
+
+
 def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen=None, fake: bool = False,
                 on_event=None, front_end=None) -> ClassResult:
     """Orchestrate one class. `blueprint_gen` does the blueprint call; `card_gen_factory()` returns a fresh
@@ -1692,6 +1780,10 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
     validator = CardValidator(extra_orbs=_orb_pool_custom_names(bp),
                               extra_statuses=_status_pool_custom_names(bp),
                               extra_summons=_summon_pool_custom_names(bp))
+    # O-2: resolve the bridge witness context ONCE, up front — it now feeds the proactive per-card fusion
+    # directives here AND the coverage round's post-hoc witness check below.
+    bridge_ctx = _resolve_bridge_ctx(bp)
+    class_ctx = _class_context(bp)
     card_gen = card_gen_factory()
     made: list[dict] = []  # {plan, card} in slot order
     total = len(bp["cards"])
@@ -1713,7 +1805,8 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
         if plan.get("name_hint"):
             theme = f"{theme} (suggested name: {plan['name_hint']})"
         cbrief = CardBrief(card_type=plan.get("type", "attack"), rarity=plan.get("rarity", "common"),
-                           target_cost=plan.get("cost"), theme=theme)
+                           target_cost=plan.get("cost"), theme=theme,
+                           context=_card_context(bp, plan, bridge_ctx, class_ctx))
         note(f"card {i+1}/{total}: designing '{plan.get('name_hint', '?')}' - "
              f"{plan.get('rarity', '?')} {plan.get('type', '?')}, cost {plan.get('cost', '?')}"
              + (f" - {str(plan.get('theme'))[:90]}" if plan.get("theme") else ""))
@@ -1767,7 +1860,8 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
             theme = f"{theme} (suggested name: {plan['name_hint']})"
         theme = f"{theme}\n{directive}".strip()
         cbrief = CardBrief(card_type=plan.get("type", "attack"), rarity=plan.get("rarity", "common"),
-                           target_cost=plan.get("cost"), theme=theme)
+                           target_cost=plan.get("cost"), theme=theme,
+                           context=_card_context(bp, plan, bridge_ctx, class_ctx))
         pres = generate_card(cbrief, gen=card_gen, validator=validator)
         if not pres.ok or pres.card is None:
             return None
@@ -1797,7 +1891,7 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
     try:
         from . import coverage
         coverage.enforce_coverage(made, _regen_card, note, featured=_feat,
-                                  bridge_ctx=_resolve_bridge_ctx(bp))
+                                  bridge_ctx=bridge_ctx)
     except Exception as e:  # coverage is advisory — a bug here must never break a forge
         note(f"coverage: skipped (internal error: {e})")
 
@@ -1843,6 +1937,13 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
         relic = _fake_relic(bp)
     elif relic_gen is not None:
         note("designing the keystone starter relic...")
+        # Proactive deck hint: name the trivially-true condition BEFORE the model designs (the gate below
+        # still enforces it). Stashed on bp because the relic contract's brief IS the bp; bundle assembly
+        # reads explicit keys, so it never leaks into the shipped class.
+        deck_note = _relic_deck_note(made)
+        if deck_note:
+            bp["relic_deck_note"] = deck_note
+            note("relic deck note: retain-heavy deck - steering the keystone away from hand-size gates")
 
         def _relic_errors(r) -> list[str]:
             # structural gate (mirrors the C# importer), then — only on a structurally-sound relic —

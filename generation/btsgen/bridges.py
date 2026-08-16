@@ -20,7 +20,11 @@ from __future__ import annotations
 
 from . import census
 
-MIN_BRIDGES = 3
+# The validation FLOOR (hard: _validate_blueprint rejects below it) vs the prompt ASK (the TARGET_RARES /
+# MIN_RARES pattern): models land near the ask, the floor keeps a shortfall from aborting a forge. ~a quarter
+# of the pool fusing both engines is what makes a two-archetype class play as ONE deck.
+MIN_BRIDGES = 4
+TARGET_BRIDGES = 6
 
 
 def card_tokens(card: dict) -> set[str]:

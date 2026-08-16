@@ -101,6 +101,31 @@ def _class_kind(blueprint) -> str:
     return "normal"
 
 
+_DESIGNS_PER_ARCH = 8   # ledger-growth cap: at most this many pool-design lines per archetype per forge
+_GIST_LEN = 70          # a design line is "Name: theme-gist" — the gist trimmed to this many chars
+
+
+def _pool_designs(blueprint) -> dict:
+    """archetype id -> up to _DESIGNS_PER_ARCH compact 'Name: theme-gist' lines for the POOL cards the
+    blueprint assigned to that archetype (O-2 anti-convergence food for archetype_design_line). Cards with
+    no archetype assignment are skipped."""
+    out: dict[str, list[str]] = {}
+    for c in (blueprint or {}).get("cards") or []:
+        if not isinstance(c, dict) or c.get("role") != "pool":
+            continue
+        aid = str(c.get("archetype") or "").strip()
+        if not aid:
+            continue
+        # ASCII-only (the Windows-console rule every injection line follows) — themes may carry em dashes etc.
+        gist = " ".join(str(c.get("theme") or "").split())[:_GIST_LEN]
+        gist = gist.encode("ascii", "ignore").decode()
+        name = str(c.get("name_hint") or "").strip().encode("ascii", "ignore").decode() or "?"
+        bucket = out.setdefault(aid, [])
+        if len(bucket) < _DESIGNS_PER_ARCH:
+            bucket.append(f"{name}: {gist}" if gist else name)
+    return out
+
+
 def record_forge(bundle: dict, blueprint: dict, *, ts: float | None = None) -> bool:
     """Append one ledger line for a successful forge. Returns True on write, False on any failure (never
     raises). The census fields come from census.py so the ledger measures the SAME thing the quotas do."""
@@ -117,6 +142,9 @@ def record_forge(bundle: dict, blueprint: dict, *, ts: float | None = None) -> b
             "top_ops": [op for op, _ in cen.ops.most_common(6)],
             "statuses_used": sorted(cen.statuses),
             "trigger_kinds": sorted(cen.triggers),
+            # O-2 anti-convergence: which pool designs this forge built per archetype, so a LATER forge that
+            # picks the same archetype is told what already exists and explores a different corner of it.
+            "designs": _pool_designs(blueprint),
         }
         path = ledger_path()
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -207,6 +235,33 @@ def payload_line(window, *, k: int = 3) -> str:
         return ""
     return ("RECENTLY OVERUSED across the last few forges (prefer FRESH alternatives; do NOT just copy "
             f"these): archetype pairs [{', '.join(top_pairs)}]; ops [{', '.join(top_ops)}].")
+
+
+def archetype_design_line(window, archetype_ids, *, k: int = 5) -> str:
+    """O-2 anti-convergence line for the (dossier-mode) blueprint brief: the pool designs RECENT forges
+    already built for the SAME archetypes, newest first, capped at `k` per archetype. Empty string when
+    nothing matches (pre-O-2 ledger lines carry no 'designs' and simply contribute nothing)."""
+    ids = [str(i) for i in (archetype_ids or []) if i]
+    if not ids or not window:
+        return ""
+    parts: list[str] = []
+    for aid in ids:
+        seen: list[str] = []
+        for e in reversed(window):  # newest first — the freshest repeats are the worst offenders
+            for line in ((e.get("designs") or {}).get(aid) or []):
+                if line not in seen:
+                    seen.append(line)
+                if len(seen) >= k:
+                    break
+            if len(seen) >= k:
+                break
+        if seen:
+            parts.append(f"{aid}: " + "; ".join(seen))
+    if not parts:
+        return ""
+    return ("\nCARDS ALREADY FORGED for these same archetypes in recent forges - do NOT redesign them "
+            "(explore DIFFERENT mechanics and corners of each engine, not renames of these):\n"
+            + "\n".join(f"- {p}" for p in parts))
 
 
 def blueprint_status_line(window, *, k: int = 4) -> str:

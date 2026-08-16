@@ -198,6 +198,25 @@ def test_uptime_post_play_timing() -> None:
           "the realistic model must never exceed the generous power-gate model")
 
 
+def test_relic_deck_note() -> None:
+    print("_relic_deck_note(): the PROACTIVE prompt hint mirrors the gate's hand model:")
+    from btsgen.class_forge import _RelicContract, _relic_deck_note
+    note = _relic_deck_note(_made(retain_pool=5))
+    check("DECK NOTE" in note and "hand_size_ge" in note,
+          f"a retain-heavy deck yields the hand-size warning: {note[:80]}")
+    check("~10" in note, f"the note states the gate's expected hand (share 0.5 -> 5 held -> ~10): {note}")
+    check(all(ord(ch) < 128 for ch in note), "the note is ASCII (injection-line rule)")
+    check(_relic_deck_note(_made(retain_pool=0)) == "", "a retainless deck gets no note")
+    check(_relic_deck_note(_made(retain_pool=1)) == "", "one retain card in ten is below the warn threshold")
+    check(_relic_deck_note([]) == "", "an empty set never raises")
+    # the note rides the relic brief via bp["relic_deck_note"] (forge_class stashes it pre-call)
+    bp = {"name": "Coil", "description": "d", "archetypes": [], "relic_deck_note": note}
+    brief = _RelicContract().user_brief(bp)
+    check("DECK NOTE" in brief, "user_brief folds the stashed note into the relic prompt")
+    check("DECK NOTE" not in _RelicContract().user_brief({"name": "X", "archetypes": []}),
+          "no stashed note -> the brief is unchanged")
+
+
 def main() -> int:
     for t in (test_diamond_hands_rejected_on_retain_deck, test_same_relic_ok_on_retainless_deck,
               test_retain_basic_counts_as_starting_deck, test_unconditional_energy_rejected,
@@ -205,7 +224,7 @@ def main() -> int:
               test_per_turn_draw_engine_rejected, test_reactive_trigger_priced_per_event,
               test_uptime_and_stats_helpers, test_post_play_hand_gate_rejected,
               test_post_play_hand_gate_ok_low_value, test_never_true_condition_rejected,
-              test_uptime_post_play_timing):
+              test_uptime_post_play_timing, test_relic_deck_note):
         t()
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return 1 if _FAIL else 0

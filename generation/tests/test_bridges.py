@@ -153,6 +153,37 @@ def test_fake_path_bridge_tags() -> None:
           f"_ensure_bridge_tags backfills fillers incl a rare on a tiny pool: {len(br)}")
 
 
+# --------------------------------------------------------------- O-2 per-card context
+def test_card_context() -> None:
+    print("_card_context(): class block + archetype assignment + PROACTIVE bridge fusion directive:")
+    from btsgen.bridges import TARGET_BRIDGES
+    from btsgen.class_forge import _card_context, _class_context
+    check(TARGET_BRIDGES >= MIN_BRIDGES, "the prompt ask is at least the validation floor")
+    bp = {"name": "Testclass", "description": "a test fantasy",
+          "archetypes": [{"id": "forge_ramp", "name": "Forge", "description": "stoke the forge"},
+                         {"id": "counter_riposte", "name": "Riposte", "description": "punish attackers"}]}
+    cls = _class_context(bp)
+    check("Testclass" in cls and "stoke the forge" in cls and "punish attackers" in cls,
+          f"the class block names the class and BOTH engines: {cls}")
+    plain = {"role": "pool", "archetype": "forge_ramp", "strategy": "aggro", "theme": "x"}
+    ctx = _card_context(bp, plain)
+    check("PRIMARILY serves the Forge" in ctx, f"the card's own archetype is named (by display name): {ctx}")
+    check("Strategic line: aggro" in ctx, "the strategy tag rides along")
+    check("BRIDGE" not in ctx, "a non-bridge card gets no fusion directive")
+    bctx = {"ops_a": {"forge", "forged_ge"}, "ops_b": {"thorns", "attacked"},
+            "name_a": "Forge", "name_b": "Riposte"}
+    bridge = {"role": "pool", "archetype": None, "bridge": True}
+    ctx2 = _card_context(bp, bridge, bctx)
+    check("BRIDGE" in ctx2 and "forge" in ctx2 and "thorns" in ctx2,
+          f"a bridge gets the witness-token fusion directive at FIRST generation: {ctx2}")
+    ctx3 = _card_context(bp, bridge, None)
+    check("BRIDGE" in ctx3 and "Forge" in ctx3 and "Riposte" in ctx3,
+          f"unresolvable ctx -> generic fusion directive still naming both engines: {ctx3}")
+    # the precomputed class_ctx shortcut is honored (forge_class builds it once per class)
+    check(_card_context(bp, plain, None, "PRECOMPUTED").startswith("PRECOMPUTED"),
+          "a precomputed class block is reused, not rebuilt")
+
+
 # --------------------------------------------------------------- ctx resolution
 def test_resolve_bridge_ctx() -> None:
     print("_resolve_bridge_ctx(): resolves catalog ops, None on unknown ids:")
@@ -219,6 +250,7 @@ def main() -> int:
     test_repair_directive()
     test_validate_blueprint_bridge_rule()
     test_fake_path_bridge_tags()
+    test_card_context()
     test_resolve_bridge_ctx()
     test_enforce_bridge_repair_in_place()
     print(f"\n{_PASS} passed, {_FAIL} failed")
