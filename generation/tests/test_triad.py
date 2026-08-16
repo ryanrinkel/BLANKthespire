@@ -206,10 +206,40 @@ def test_coverage_routes_per_pair() -> None:
     check(any("3 pair-lanes" in l for l in log), "the status line names the three pair-lanes")
 
 
+def test_triad_skips_featured_roulette() -> None:
+    print("triad mode: the featured-mechanic roulette is OFF (legacy still rolls):")
+    import tempfile
+
+    from btsgen.class_forge import ClassBrief, _CardFake, forge_class
+
+    saved = os.environ.get("BTS_FORGE_LEDGER")
+    os.environ["BTS_FORGE_LEDGER"] = os.path.join(tempfile.mkdtemp(prefix="bts_triad_feat_"), "ledger.jsonl")
+    try:
+        res = forge_class(ClassBrief(concept="a frost mage who freezes then shatters"), blueprint_gen=None,
+                          card_gen_factory=lambda: _CardFake(), relic_gen=None, fake=True, triad=True)
+        check(res.ok, "triad fake forge succeeds")
+        check((res.blueprint or {}).get("featured") == [], "a triad forge carries NO featured mechanics")
+        check(not any("featured mechanics" in l for l in res.log), "no featured-roll line in the triad log")
+
+        res2 = forge_class(ClassBrief(concept="a frost mage who freezes then shatters"), blueprint_gen=None,
+                           card_gen_factory=lambda: _CardFake(), relic_gen=None, fake=True, triad=False)
+        check(res2.ok, "legacy fake forge succeeds")
+        check(len((res2.blueprint or {}).get("featured") or []) == 2,
+              "the legacy path still rolls 2 featured mechanics")
+        check(any(l.startswith("featured mechanics (rolled)") for l in res2.log),
+              "the legacy log still announces the roll")
+    finally:
+        if saved is None:
+            os.environ.pop("BTS_FORGE_LEDGER", None)
+        else:
+            os.environ["BTS_FORGE_LEDGER"] = saved
+
+
 def main() -> int:
     for t in (test_triad_enabled, test_harness_versions, test_pool_targets, test_prompt_mode,
               test_triad_validates_and_targets, test_all_three_lines_required,
-              test_forge_class_signature_cap, test_coverage_routes_per_pair):
+              test_forge_class_signature_cap, test_coverage_routes_per_pair,
+              test_triad_skips_featured_roulette):
         t()
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return 1 if _FAIL else 0

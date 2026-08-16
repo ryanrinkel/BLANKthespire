@@ -2080,18 +2080,27 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
     # Stamp every forge with the harness version up front — the first log line on both the CLI and the
     # browser stream, so you can tell which creative-harness produced a given class. See HARNESS_VERSION. The
     # triad experiment stamps its OWN version so every forge is attributable to the mode that produced it.
-    _harness = HARNESS_VERSION_TRIAD if triad_enabled(triad) else HARNESS_VERSION
+    _is_triad = triad_enabled(triad)
+    _harness = HARNESS_VERSION_TRIAD if _is_triad else HARNESS_VERSION
     note(f"forge harness v{_harness} (vocab v{VOCAB_VERSION})")
 
     # --- Phase N-2: roll the featured-mechanic roulette (seeded per concept) BEFORE stage 1 so both brief
     # modes REQUIRE them. The one-shot concept brief uses this BLIND roll as-is; the staged front-end may
     # RE-ROLL theme-aware after its cloud stage (Phase N-5) — brief.featured is re-resolved after build().
     # Missing picks are checked + repaired by the N-1 coverage round.
+    # TRIAD EXPERIMENT: the roulette is OFF (decided 2026-08-15, first triad forge). Three archetypes and
+    # three pair packages already spend the pool's identity budget, and the wild slot kept landing
+    # off-theme subsystems (a balance gauge on a gravekeeper). The baseline coverage floors (reactive /
+    # `when` / exotic / scaled minimums) still enforce mechanical variety on the triad path.
     from . import featured as _featured_mod
-    _feat = _featured_mod.roll_featured(brief.concept)
-    brief.featured = [f.id for f in _feat]
-    if _feat:
-        note("featured mechanics (rolled): " + "; ".join(f.id for f in _feat))
+    if _is_triad:
+        _feat = []
+        brief.featured = []
+    else:
+        _feat = _featured_mod.roll_featured(brief.concept)
+        brief.featured = [f.id for f in _feat]
+        if _feat:
+            note("featured mechanics (rolled): " + "; ".join(f.id for f in _feat))
 
     # --- stage 1: blueprint -------------------------------------------------
     if fake:

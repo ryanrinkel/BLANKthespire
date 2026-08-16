@@ -331,6 +331,11 @@ class BlueprintBuilder:
     def _reroll_featured(self, brief, cloud: dict, dossier: Dossier) -> None:
         """Phase N-5: replace the blind concept-hash roll with the theme-aware lottery. Wholly guarded —
         the re-roll is an enhancement, so ANY failure keeps the blind roll and never breaks the forge."""
+        if self._triad:
+            # TRIAD EXPERIMENT: the featured roulette is OFF (forge_class skips the blind roll too) — the
+            # wild slot kept landing off-theme subsystems. The cloud stage's nominations are ignored.
+            brief.featured = []
+            return
         try:
             from .. import featured as featured_mod
             raw = [e for e in (cloud.get("featured_resonance") or [])
