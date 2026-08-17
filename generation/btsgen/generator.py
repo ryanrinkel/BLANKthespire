@@ -186,11 +186,13 @@ class OpenAICompatGenerator:
     _completion_token_models: set[str] = set()
     # Endpoints that reject the OpenAI-only `stream_options` usage opt-in — same probe-and-remember pattern.
     _no_stream_options_models: set[str] = set()
+    # (model, extra_body key) pairs an endpoint has 400'd on — the key is silently omitted from then on.
+    _rejected_extra_keys: set[tuple[str, str]] = set()
 
     def __init__(self, base_url: str, api_key: str, model: str, contract_mod=None,
                  max_tokens: int = 4000, timeout: int = 180,
                  response_format: dict | None = None, temperature: float | None = None,
-                 on_usage=None) -> None:
+                 on_usage=None, extra_body: dict | None = None) -> None:
         if not (base_url and api_key and model):
             raise RuntimeError("OpenAI-compatible backend needs base_url, api_key, and model.")
         self.base_url = base_url.rstrip("/")
@@ -206,10 +208,18 @@ class OpenAICompatGenerator:
         self._response_format = response_format
         self._temperature = temperature
         self._on_usage = on_usage  # optional callback(usage_dict) for cost/telemetry; ignored otherwise
+        # Verbatim extra request fields (e.g. {"reasoning_effort": "none"} — hybrid-reasoning models like
+        # glm-5.2 otherwise burn 10-20k tokens of HIDDEN thinking against max_tokens before any content,
+        # truncating big responses mid-JSON). Keys an endpoint 400s on are dropped per-model (see
+        # `_adapt_params`), so a stricter fallback endpoint degrades gracefully instead of failing the call.
+        self._extra_body = dict(extra_body) if extra_body else {}
         self._contract = contract_mod or contract
         self._system = self._contract.system_prompt()
         self._token_param = ("max_completion_tokens"
                              if model in OpenAICompatGenerator._completion_token_models else "max_tokens")
+        # Diagnostics from the LAST completed call: {"finish_reason", "content_chars", "reasoning_chars"}.
+        # Callers use this to explain an unparseable response (truncated by max_tokens vs reasoning-only).
+        self.last_meta: dict = {}
 
     def _wants_usage_chunk(self) -> bool:
         """Whether to request the streamed usage chunk. `stream_options` is an OpenAI-only opt-in; once an
@@ -236,9 +246,19 @@ class OpenAICompatGenerator:
         )
         parts: list[str] = []
         usage: dict | None = None
+        reasoning_chars = 0
+        finish_reason: str | None = None
         with urllib.request.urlopen(req, timeout=self.timeout) as resp:
             if "text/event-stream" not in (resp.headers.get("Content-Type") or ""):
-                return json.loads(resp.read().decode("utf-8"))
+                data = json.loads(resp.read().decode("utf-8"))
+                try:
+                    msg = data["choices"][0]
+                    self.last_meta = {"finish_reason": msg.get("finish_reason"),
+                                      "content_chars": len(msg["message"].get("content") or ""),
+                                      "reasoning_chars": 0}
+                except (KeyError, IndexError, TypeError):
+                    self.last_meta = {}
+                return data
             for raw in resp:
                 line = raw.decode("utf-8", "replace").strip()
                 if not line.startswith("data:"):
@@ -255,9 +275,20 @@ class OpenAICompatGenerator:
                 if isinstance(chunk.get("usage"), dict):
                     usage = chunk["usage"]
                 for choice in chunk.get("choices") or []:
-                    piece = ((choice or {}).get("delta") or {}).get("content")
+                    delta = (choice or {}).get("delta") or {}
+                    piece = delta.get("content")
                     if isinstance(piece, str):
                         parts.append(piece)
+                    # Hidden thinking from hybrid-reasoning models (glm-5.2, kimi-k3, deepseek…). We never
+                    # parse it, but its VOLUME is the diagnostic: it bills against max_tokens before any
+                    # content, so heavy thinking + finish_reason "length" = the answer was truncated.
+                    for k in ("reasoning", "reasoning_content", "thinking"):
+                        if isinstance(delta.get(k), str):
+                            reasoning_chars += len(delta[k])
+                    if (choice or {}).get("finish_reason"):
+                        finish_reason = choice["finish_reason"]
+        self.last_meta = {"finish_reason": finish_reason, "content_chars": len("".join(parts)),
+                          "reasoning_chars": reasoning_chars}
         return {"choices": [{"message": {"content": "".join(parts)}}], "usage": usage}
 
     def _post_with_retry(self, payload: dict) -> dict:
@@ -305,6 +336,13 @@ class OpenAICompatGenerator:
         if "stream_options" in detail and self._wants_usage_chunk():
             OpenAICompatGenerator._no_stream_options_models.add(self.model)
             adapted = True
+        # An endpoint that rejects one of our extra_body fields by name (e.g. a fallback provider that
+        # doesn't know `reasoning_effort`): drop that field, remember per-model, retry without it.
+        for key in list(self._extra_body):
+            if key in detail and key in payload:
+                OpenAICompatGenerator._rejected_extra_keys.add((self.model, key))
+                payload.pop(key, None)
+                adapted = True
         return adapted
 
     def _complete(self, messages: list[dict]) -> str:
@@ -317,6 +355,9 @@ class OpenAICompatGenerator:
             payload["response_format"] = self._response_format
         if self._temperature is not None:
             payload["temperature"] = self._temperature
+        for key, value in self._extra_body.items():
+            if (self.model, key) not in OpenAICompatGenerator._rejected_extra_keys:
+                payload[key] = value
         try:
             data = self._post_translated(payload)
         except urllib.error.HTTPError as e:

@@ -226,12 +226,79 @@ def test_stream_options_dropped_on_400() -> None:
           "a remembered model must skip stream_options on the first try")
 
 
+def test_extra_body_and_last_meta() -> None:
+    print("extra_body forwarded + last_meta diagnostics...")
+    OpenAICompatGenerator._rejected_extra_keys.clear()
+    captured: list[dict] = []
+
+    def fake(req, timeout=None):
+        captured.append(json.loads(req.data.decode()))
+        return _FakeResp(_sse([
+            {"choices": [{"delta": {"reasoning": "let me think about this at great length"}}]},
+            {"choices": [{"delta": {"content": "par"}}]},
+            {"choices": [{"delta": {"content": "tial"}, "finish_reason": "length"}]},
+            "[DONE]",
+        ]))
+
+    gen = OpenAICompatGenerator("https://fake.test/v1", "sk-x", "m1", contract_mod=_Contract(),
+                                max_tokens=100, extra_body={"reasoning_effort": "none"})
+    text, _ = _with_urlopen(fake, lambda: gen.first_attempt("x"))
+    check(captured[0].get("reasoning_effort") == "none", "extra_body fields must ride the payload")
+    check(text == "partial", "content must still reassemble alongside reasoning deltas")
+    check(gen.last_meta.get("finish_reason") == "length", "last_meta must capture finish_reason")
+    check(gen.last_meta.get("reasoning_chars") == len("let me think about this at great length"),
+          "last_meta must count hidden-reasoning chars")
+    check(gen.last_meta.get("content_chars") == len("partial"), "last_meta must count content chars")
+
+    # A reasoning-only response (no visible content) must come back empty with the meta explaining it.
+    def fake_reasoning_only(req, timeout=None):
+        return _FakeResp(_sse([
+            {"choices": [{"delta": {"reasoning": "..."}, "finish_reason": "stop"}]},
+            "[DONE]",
+        ]))
+
+    text2, _ = _with_urlopen(fake_reasoning_only, lambda: gen.first_attempt("x"))
+    check(text2 == "", "reasoning-only response must yield empty text, not crash")
+    check(gen.last_meta.get("content_chars") == 0 and gen.last_meta.get("reasoning_chars") == 3,
+          "meta must reflect the reasoning-only shape")
+
+
+def test_extra_body_dropped_on_400() -> None:
+    print("extra_body key dropped for endpoints that reject it by name...")
+    OpenAICompatGenerator._rejected_extra_keys.clear()
+    captured: list[dict] = []
+
+    def fake(req, timeout=None):
+        payload = json.loads(req.data.decode())
+        captured.append(payload)
+        if "reasoning_effort" in payload:
+            raise _http_error(400, "Unrecognized request argument: reasoning_effort")
+        return _FakeResp(_sse([{"choices": [{"delta": {"content": "ok"}}]}, "[DONE]"]))
+
+    gen = OpenAICompatGenerator("https://fake.test/v1", "sk-x", "m1", contract_mod=_Contract(),
+                                max_tokens=100, extra_body={"reasoning_effort": "none"})
+    text, _ = _with_urlopen(fake, lambda: gen.first_attempt("x"))
+    check(text == "ok", "the retry without the rejected key must succeed")
+    check("reasoning_effort" not in captured[-1], "retry must drop the rejected extra_body key")
+    check(("m1", "reasoning_effort") in OpenAICompatGenerator._rejected_extra_keys,
+          "the rejection must be remembered per (model, key)")
+    captured.clear()
+    gen2 = OpenAICompatGenerator("https://fake.test/v1", "sk-x", "m1", contract_mod=_Contract(),
+                                 max_tokens=100, extra_body={"reasoning_effort": "none"})
+    _with_urlopen(fake, lambda: gen2.first_attempt("x"))
+    check(len(captured) == 1 and "reasoning_effort" not in captured[0],
+          "a remembered model must skip the key on the first try")
+    OpenAICompatGenerator._rejected_extra_keys.clear()
+
+
 def main() -> int:
     test_sse_reassembly_and_usage()
     test_plain_json_fallback()
     test_transient_retry()
     test_max_completion_tokens_swap()
     test_stream_options_dropped_on_400()
+    test_extra_body_and_last_meta()
+    test_extra_body_dropped_on_400()
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return 1 if _FAIL else 0
 

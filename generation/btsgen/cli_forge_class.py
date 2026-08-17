@@ -1,8 +1,8 @@
 """CLI: forge a whole CLASS -> a BTSC import code (the command behind the P3 website's generate endpoint).
 
     uv run btsgen-forge-class --concept "a frost mage who freezes then shatters" --fake   # offline, no key
-    uv run btsgen-forge-class --concept "..."                                              # our Anthropic key (.env)
-    uv run btsgen-forge-class --concept "..." --staged                                     # staged creative front-end
+    uv run btsgen-forge-class --concept "..."                    # DEFAULT: Ollama-Cloud mixture (OLLAMA_API_KEY in .env)
+    uv run btsgen-forge-class --concept "..." --anthropic        # force the Anthropic path (ANTHROPIC key in .env)
     uv run btsgen-forge-class --concept "..." --base-url https://api.openai.com/v1 \
         --api-key sk-... --model gpt-4o                                                     # BYOK (any OpenAI-compatible)
 
@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -55,13 +56,24 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--api-key", default=None, help="API key for the BYOK endpoint")
     ap.add_argument("--model", default=None, help="model id (BYOK, or override the Anthropic model)")
     ap.add_argument("--ollama", action="store_true",
-                    help="parallel Ollama-Cloud path: per-role model mixture (needs OLLAMA_API_KEY); implies --staged")
+                    help="Ollama-Cloud path: per-role model mixture (needs OLLAMA_API_KEY); implies --staged. "
+                         "This is the DEFAULT when OLLAMA_API_KEY is set and no other backend is chosen.")
     ap.add_argument("--ollama-config", default=None,
-                    help="with --ollama: path to a role map JSON (see ollama_roles.example.json)")
+                    help="with the ollama path: role map JSON (see ollama_roles.example.json)")
+    ap.add_argument("--anthropic", action="store_true",
+                    help="force the Anthropic (Claude) path even when OLLAMA_API_KEY is set")
     ap.add_argument("--out", default=None, help="output .btsc.txt path (default: scratch/<name>.btsc.txt)")
     args = ap.parse_args(argv)
 
     point_btsgen_at_mod_contract()
+
+    # Default backend (release): the Ollama-Cloud mixture, whenever its key is available and the user didn't
+    # explicitly pick another path. --anthropic / --fake / BYOK flags all opt out.
+    if not (args.fake or args.ollama or args.anthropic or args.base_url or args.api_key):
+        from .generator import load_env
+        load_env()
+        if os.environ.get("OLLAMA_API_KEY"):
+            args.ollama = True
 
     # Build (a) the one-shot blueprint generator + relic generator + card-generator factory AND (b) a `make_gen`
     # closure the staged front-end uses to spin up a generator for any stage (same backend, swapped contract).
@@ -128,8 +140,10 @@ def main(argv: list[str] | None = None) -> int:
     print(f"forging class: {brief.concept!r}{mode}")
     # When --staged, the front-end branch must run (fake=True would short-circuit it); offline-ness lives in the
     # fake make_gen/_CardFake instead. So only pass fake=True on the NON-staged path.
+    from .frontend import append_vocab_gaps as _card_gap_sink  # card-stage vocab-demand capture (same file)
     res = forge_class(brief, blueprint_gen=blueprint_gen, card_gen_factory=card_gen_factory,
-                      relic_gen=relic_gen, fake=(args.fake and front_end is None), front_end=front_end)
+                      relic_gen=relic_gen, fake=(args.fake and front_end is None), front_end=front_end,
+                      gap_log_append=None if args.fake else _card_gap_sink)
     for line in res.log:
         print(f"  {line}")
     if not res.ok or res.bundle is None:

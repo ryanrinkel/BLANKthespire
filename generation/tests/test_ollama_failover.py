@@ -141,6 +141,60 @@ def test_repair_routes_like_first_attempt():
     _reset_breaker()
 
 
+def test_extra_body_reaches_both_twins():
+    os.environ["OLLAMA_TEST_FB_KEY"] = "sk-test"
+    role_map = {"roles": {"cards": {"model": "m", "api_key": "k", "base_url": "https://o.example",
+                                    "extra_body": {"reasoning_effort": "none"}}},
+                "fallback": {"api_key": "${OLLAMA_TEST_FB_KEY}"}}
+    _, card_factory, _, _ = ollama_mix.build_ollama_mix(role_map)
+    gen = card_factory()
+    check(gen._primary._extra_body == {"reasoning_effort": "none"},
+          "role extra_body must reach the primary generator")
+    check(gen._fallback._extra_body == {"reasoning_effort": "none"},
+          "the fallback twin must carry the same extra_body (it degrades itself on a 400)")
+    os.environ.pop("OLLAMA_TEST_FB_KEY", None)
+
+
+def test_default_roles_disable_glm_thinking():
+    for role in ("structure", "cards"):
+        spec = ollama_mix.DEFAULT_ROLE_MAP["roles"][role]
+        check(spec.get("extra_body", {}).get("reasoning_effort") == "none",
+              f"default {role} role must pin reasoning_effort=none (glm-5.2 hidden thinking truncated "
+              "the triad blueprint — 2026-08-16)")
+    check("extra_body" not in ollama_mix.DEFAULT_ROLE_MAP["roles"]["brainstorm"],
+          "brainstorm (non-reasoning gemma) must not carry the knob")
+
+
+def test_last_meta_delegates_to_active_twin():
+    _reset_breaker()
+    primary, fallback = _Stub("primary"), _Stub("fallback")
+    primary.last_meta = {"finish_reason": "stop"}
+    fallback.last_meta = {"finish_reason": "length"}
+    gen = _FailoverGenerator(primary, fallback, cooldown_s=3600)
+    check(gen.last_meta == {"finish_reason": "stop"}, "last_meta should read from the primary when closed")
+    ollama_mix._trip_breaker(60, "test")
+    check(gen.last_meta == {"finish_reason": "length"}, "last_meta should read from the fallback when tripped")
+    _reset_breaker()
+
+
+def test_build_defaults_stage_attempts():
+    prior = os.environ.pop("BTS_STAGE_ATTEMPTS", None)
+    try:
+        role_map = {"roles": {"cards": {"model": "m", "api_key": "k", "base_url": "https://o.example"}},
+                    "fallback": None}
+        ollama_mix.build_ollama_mix(role_map)
+        check(os.environ.get("BTS_STAGE_ATTEMPTS") == "2",
+              "the ollama path should default the staged front-end to 2 attempts")
+        os.environ["BTS_STAGE_ATTEMPTS"] = "5"
+        ollama_mix.build_ollama_mix(role_map)
+        check(os.environ.get("BTS_STAGE_ATTEMPTS") == "5", "an explicit BTS_STAGE_ATTEMPTS must win")
+    finally:
+        if prior is None:
+            os.environ.pop("BTS_STAGE_ATTEMPTS", None)
+        else:
+            os.environ["BTS_STAGE_ATTEMPTS"] = prior
+
+
 def main() -> int:
     for name, fn in sorted(globals().items()):
         if name.startswith("test_") and callable(fn):

@@ -213,17 +213,43 @@ class BlueprintBuilder:
         for attempt in range(attempts):
             text, messages = gen.first_attempt(brief)
             obj = _extract(text)
+            if obj is None:
+                self._note_unparseable(gen, label)
             errs = validate(obj) if obj is not None else [f"unparseable {label}"]
             if errs:
                 self._note(f"{label}: {len(errs)} issue(s); repairing"
                            + (f" (attempt {attempt + 1}/{attempts})" if attempts > 1 else ""))
                 text, messages = gen.repair(messages, text, errs)
                 obj = _extract(text)
+                if obj is None:
+                    self._note_unparseable(gen, label)
                 errs = validate(obj) if obj is not None else [f"unparseable {label}"]
             if not errs:
                 return obj
             last_errs = errs
         raise BlueprintBuildError(f"{label} failed: " + "; ".join(last_errs[:4]))
+
+    def _note_unparseable(self, gen, label: str) -> None:
+        """Explain WHY a stage response had no parseable JSON, from the generator's last-call diagnostics
+        (OpenAICompatGenerator.last_meta). The distinction matters: finish 'length' means the token budget
+        ran out — on hybrid-reasoning models usually because HIDDEN thinking consumed it first (the
+        2026-08-16 'unparseable blueprint' failures) — while zero content with reasoning present means the
+        model never emitted a visible answer at all. Generators without diagnostics (Anthropic, fakes)
+        produce no note."""
+        meta = getattr(gen, "last_meta", None) or {}
+        if not meta:
+            return
+        parts = [f"finish={meta.get('finish_reason') or '?'}", f"content={meta.get('content_chars', 0)}ch"]
+        if meta.get("reasoning_chars"):
+            parts.append(f"hidden reasoning={meta['reasoning_chars']}ch")
+        why = ""
+        if meta.get("finish_reason") == "length":
+            why = " — token budget exhausted" + (
+                " (mostly by hidden reasoning)"
+                if meta.get("reasoning_chars", 0) > meta.get("content_chars", 0) else "")
+        elif not meta.get("content_chars") and meta.get("reasoning_chars"):
+            why = " — model returned only hidden reasoning, no visible content"
+        self._note(f"      {label}: no parseable JSON ({', '.join(parts)}){why}")
 
     # --- the build --------------------------------------------------------------------------------
     def build(self, brief) -> dict:

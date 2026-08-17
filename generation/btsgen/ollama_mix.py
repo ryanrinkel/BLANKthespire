@@ -19,7 +19,9 @@ complex nested candidate schema. A small hot model produces unparseable JSON for
 JSON mode); the strong schema-faithful model handles it reliably and fuses archetypes better. The truly
 divergent stage (the cloud) stays on the small permissive model.
 
-A role spec is {model, base_url?, api_key?, response_format?, temperature?, max_tokens_cap?}. `base_url` and
+A role spec is {model, base_url?, api_key?, response_format?, temperature?, max_tokens_cap?, extra_body?}.
+`extra_body` is merged verbatim into the request payload (e.g. {"reasoning_effort": "none"} to disable a
+hybrid-reasoning model's hidden thinking — see DEFAULT_ROLE_MAP's structure role). `base_url` and
 `api_key` default to the top-level `defaults` block (Ollama Cloud), but a role may override them — e.g. point
 `brainstorm` at a LOCAL `http://localhost:11434/v1` uncensored model while `cards` stay on cloud GLM.
 `${VAR}` values are expanded from the environment (so the key never sits in a committed file).
@@ -69,10 +71,19 @@ DEFAULT_ROLE_MAP: dict = {
         # parseable output, so any remaining SCHEMA mistake becomes a fixable validation error.
         "brainstorm": {"model": "gemma4:31b", "temperature": 0.9,
                        "response_format": {"type": "json_object"}},
-        # strong, schema-faithful model turns the dossier into card briefs; pin to JSON
-        "structure": {"model": "glm-5.2", "response_format": {"type": "json_object"}, "temperature": 0.4},
+        # strong, schema-faithful model turns the dossier into card briefs; pin to JSON.
+        # reasoning_effort "none": glm-5.2 is a HYBRID-REASONING model — left on, it burns 10-20k tokens of
+        # hidden thinking against max_tokens on big calls (the triad blueprint REPAIR re-emit hit ~20k of
+        # the 24k cap), truncating the visible answer mid-JSON ("unparseable blueprint", 2 of 3 forges on
+        # 2026-08-16). Probe-verified (scratch/probe_glm_nothink.py): "none" is honored by Ollama Cloud and
+        # zeroes the reasoning stream, while "low"/think=false/OpenRouter-style knobs are ignored. The
+        # structure/cards stages are convergent translation work — the creative divergence already happened
+        # upstream — so no-think costs nothing we rely on and returns the whole token budget to content.
+        "structure": {"model": "glm-5.2", "response_format": {"type": "json_object"}, "temperature": 0.4,
+                      "extra_body": {"reasoning_effort": "none"}},
         # GLM codes the cards: strict closed-vocab JSON, low temperature, pinned to a JSON body
-        "cards": {"model": "glm-5.2", "response_format": {"type": "json_object"}, "temperature": 0.3},
+        "cards": {"model": "glm-5.2", "response_format": {"type": "json_object"}, "temperature": 0.3,
+                  "extra_body": {"reasoning_effort": "none"}},
     },
     # Metered failover (see module docstring). Same model families via OpenRouter, per-token billed;
     # armed only when OPENROUTER_API_KEY is set. Slugs verified live 2026-07-10.
@@ -130,6 +141,10 @@ class _FailoverGenerator:
     @property
     def model(self) -> str:  # quarantine reports name the model that actually answered
         return self._fallback.model if _breaker_active() else self._primary.model
+
+    @property
+    def last_meta(self) -> dict:  # diagnostics from whichever twin actually answered (see OpenAICompat)
+        return self._fallback.last_meta if _breaker_active() else self._primary.last_meta
 
     def _call(self, method: str, *args):
         if _breaker_active():
@@ -241,6 +256,10 @@ def build_ollama_mix(role_map: dict | None = None, *, on_usage=None):
     """role_map -> (blueprint_gen, card_gen_factory, relic_gen, make_gen). Mirrors the tuple the existing
     forge paths consume; each role gets its own model/endpoint via OpenAICompatGenerator. `on_usage` (optional)
     is a callback(usage_dict) attached to every generator for cost/telemetry (used by the A/B harness)."""
+    # Open models whiff a staged stage (unparseable/invalid after its one repair) far more often than
+    # Claude, and a whole-stage re-roll usually lands — default the staged front-end to 2 attempts on this
+    # path. setdefault: an explicit BTS_STAGE_ATTEMPTS (env or caller) always wins.
+    os.environ.setdefault("BTS_STAGE_ATTEMPTS", "2")
     cfg = _normalize(role_map or DEFAULT_ROLE_MAP)
     cap = cfg["max_tokens_cap"]
     fb = cfg["fallback"]
@@ -259,17 +278,21 @@ def build_ollama_mix(role_map: dict | None = None, *, on_usage=None):
             response_format=spec.get("response_format"),
             temperature=spec.get("temperature"),
             on_usage=on_usage,
+            extra_body=spec.get("extra_body"),
         )
         if not fb:
             return primary
         # The fallback twin differs ONLY in endpoint + model slug — same contract, JSON pin, temperature,
-        # token budget and timeout — so a failed-over call exercises the identical harness.
+        # token budget, timeout and extra_body — so a failed-over call exercises the identical harness.
+        # (If the fallback endpoint rejects an extra_body key by name, the generator drops that key
+        # per-model and retries — it degrades to the old behavior instead of failing the call.)
         fallback = OpenAICompatGenerator(
             fb["base_url"], fb["api_key"], fb["models"][role],
             contract_mod=contract_mod, max_tokens=eff, timeout=spec["timeout"],
             response_format=spec.get("response_format"),
             temperature=spec.get("temperature"),
             on_usage=on_usage,
+            extra_body=spec.get("extra_body"),
         )
         return _FailoverGenerator(primary, fallback, fb["cooldown_s"])
 
@@ -299,6 +322,8 @@ def describe(role_map: dict | None = None) -> str:
             extras.append(f"t={s['temperature']}")
         if s.get("response_format"):
             extras.append("json")
+        if (s.get("extra_body") or {}).get("reasoning_effort") == "none":
+            extras.append("no-think")
         tail = f" ({', '.join(extras)})" if extras else ""
         lines.append(f"  {role:10s} -> {s['model']} @ {host}{tail}")
     fb = cfg["fallback"]
