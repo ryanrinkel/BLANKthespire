@@ -361,7 +361,7 @@ def forge_to_bundle(concept: str, *, key: dict | None = None, hosted: bool = Fal
                                              archetype_checkpoint=archetype_checkpoint, triad=triad)
             res = forge_class(brief, blueprint_gen=blueprint_gen, card_gen_factory=card_factory,
                               relic_gen=relic_gen, fake=False, front_end=front_end, on_event=on_event,
-                              triad=triad)
+                              triad=triad, gap_log_append=_append_captured_gaps)
             return _bundle_result(res)
 
         blueprint_gen, card_factory, relic_gen = _build_generators(key, hosted, fake, model)
@@ -380,7 +380,7 @@ def forge_to_bundle(concept: str, *, key: dict | None = None, hosted: bool = Fal
 
         res = forge_class(brief, blueprint_gen=blueprint_gen, card_gen_factory=card_factory, relic_gen=relic_gen,
                           fake=(fake and front_end is None), front_end=front_end, on_event=on_event,
-                          triad=triad)
+                          triad=triad, gap_log_append=None if fake else _append_captured_gaps)
         return _bundle_result(res)
 
 

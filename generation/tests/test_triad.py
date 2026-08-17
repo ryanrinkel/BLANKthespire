@@ -235,11 +235,65 @@ def test_triad_skips_featured_roulette() -> None:
             os.environ["BTS_FORGE_LEDGER"] = saved
 
 
+def test_trim_card_overflow() -> None:
+    print("cap-guard: an over-full blueprint is trimmed to the cap, protected rows intact:")
+    from btsgen.class_forge import _BLUEPRINT_CARD_CAP, _trim_card_overflow, validate_blueprint_for
+    bp = _triad_bp()
+    check(_validate_blueprint(bp) == [], "fixture must start valid")
+    # Fill to the cap, then overshoot it the way glm-5.2 does: surplus untagged commons past the pool ask.
+    pads = 0
+    while len(bp["cards"]) < _BLUEPRINT_CARD_CAP:
+        pads += 1
+        bp["cards"].append({"role": "pool", "name_hint": f"Pad {pads}", "type": "skill", "rarity": "common",
+                            "cost": 1, "deck_count": 0, "archetype": None, "strategy": None, "theme": "pad"})
+    for n in ("Surplus A", "Surplus B"):
+        bp["cards"].append({"role": "pool", "name_hint": n, "type": "skill", "rarity": "common", "cost": 1,
+                            "deck_count": 0, "archetype": _TRIAD_IDS[0], "strategy": None, "theme": "pad"})
+    over = len(bp["cards"])
+    check(over > _BLUEPRINT_CARD_CAP, "fixture must actually overflow for the test to mean anything")
+    before_bridges = sum(1 for c in bp["cards"] if c.get("bridge"))
+    before_rares = sum(1 for c in bp["cards"] if str(c.get("rarity", "")).lower() == "rare")
+    _trim_card_overflow(bp)
+    check(len(bp["cards"]) == _BLUEPRINT_CARD_CAP, f"trim must land exactly on the cap "
+          f"(got {len(bp['cards'])}, cap {_BLUEPRINT_CARD_CAP})")
+    check("trimmed" in bp.get("_trim_note", ""), "a trim must leave its note for the forge log")
+    check(sum(1 for c in bp["cards"] if c.get("bridge")) == before_bridges, "bridges must survive the trim")
+    check(sum(1 for c in bp["cards"] if str(c.get("rarity", "")).lower() == "rare") == before_rares,
+          "rares must survive the trim (boss floor + finishers)")
+    check(all(any(c.get("role") == r for c in bp["cards"]) for r in ("basic_attack", "basic_skill", "signature")),
+          "basics and signatures must survive the trim")
+    bp.pop("_trim_note", None)
+    check(_validate_blueprint(bp) == [], f"the trimmed blueprint must validate clean: {_validate_blueprint(bp)[:3]}")
+    # The staged validator applies the trim itself — an over-full bp must come back error-free.
+    bp2 = _triad_bp()
+    while len(bp2["cards"]) <= _BLUEPRINT_CARD_CAP:
+        bp2["cards"].append({"role": "pool", "name_hint": f"Pad2 {len(bp2['cards'])}", "type": "skill",
+                             "rarity": "common", "cost": 1, "deck_count": 0, "archetype": None,
+                             "strategy": None, "theme": "pad"})
+    errs = validate_blueprint_for(["aggro", "control", "combo"])(bp2)
+    check(not any("at most" in e for e in errs), f"staged validation must auto-trim, not error: {errs[:2]}")
+    check(len(bp2["cards"]) == _BLUEPRINT_CARD_CAP, "the staged validator's trim must land on the cap")
+    # An untrimmable overflow (every row protected) still errors rather than corrupting the pool.
+    pair = [_TRIAD_IDS[0], _TRIAD_IDS[1]]
+    bp3 = {"archetypes": copy.deepcopy(bp["archetypes"]),
+           "cards": [{"role": "basic_attack", "name_hint": "Strike", "type": "attack", "rarity": "basic",
+                      "cost": 1, "deck_count": 5, "archetype": None, "theme": "s"},
+                     {"role": "basic_skill", "name_hint": "Defend", "type": "skill", "rarity": "basic",
+                      "cost": 1, "deck_count": 4, "archetype": None, "theme": "d"}]
+           + [{"role": "pool", "name_hint": f"Locked {i}", "type": "attack", "rarity": "rare", "cost": 2,
+               "deck_count": 0, "archetype": _TRIAD_IDS[0], "strategy": "aggro", "bridge": pair,
+               "theme": "locked"} for i in range(_BLUEPRINT_CARD_CAP + 1)]}
+    n_before = len(bp3["cards"])
+    _trim_card_overflow(bp3)
+    check(len(bp3["cards"]) == n_before and "_trim_note" not in bp3,
+          "all-protected overflow must be left for validation to report")
+
+
 def main() -> int:
     for t in (test_triad_enabled, test_harness_versions, test_pool_targets, test_prompt_mode,
               test_triad_validates_and_targets, test_all_three_lines_required,
               test_forge_class_signature_cap, test_coverage_routes_per_pair,
-              test_triad_skips_featured_roulette):
+              test_triad_skips_featured_roulette, test_trim_card_overflow):
         t()
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return 1 if _FAIL else 0

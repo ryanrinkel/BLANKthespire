@@ -28,6 +28,10 @@ class PipelineResult:
     balance_repaired: bool = False      # an overtuned card was renumbered by the balance pass
     balance_repair: dict | None = None  # {attempted, accepted, score_before, score_after, ceiling}
     log: list[str] = field(default_factory=list)
+    # Every validation error this card drew, across ALL attempts — kept even when the repair SUCCEEDS,
+    # because an attempt-1 reach for a missing vocab token is demand signal (validator.vocab_misses)
+    # regardless of whether the model then settled for a legal card.
+    all_errors: list[str] = field(default_factory=list)
 
 
 # Balance repair fires only when the score clears the ceiling by this factor. The ceiling already sits
@@ -62,6 +66,7 @@ def generate_card(brief: Brief, gen: AnthropicGenerator | None = None,
             res.log.append("attempt 1: valid")
             _maybe_balance_repair(res, messages, gen, validator)
             return _quarantine(res, brief, gen.model, validator)
+    res.all_errors += errors
     res.log.append(f"attempt 1: {len(errors)} error(s)")
 
     # --- repair once (PRD §10.3 step 3) ---
@@ -80,6 +85,7 @@ def generate_card(brief: Brief, gen: AnthropicGenerator | None = None,
         _maybe_balance_repair(res, messages, gen, validator)
         return _quarantine(res, brief, gen.model, validator)
     res.result = vr2
+    res.all_errors += vr2.errors
     res.log.append(f"repair: still {len(vr2.errors)} error(s) -> discarded")
     return res
 

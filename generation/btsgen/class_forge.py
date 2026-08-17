@@ -307,7 +307,12 @@ sprinkle): LIFESTEAL — a `damage` card may then `heal` for the UNBLOCKED damag
 8 damage to ALL enemies. Heal HP equal to the unblocked damage dealt." FLECHETTES — a `damage` card may deal \
 damage equal to the debuffs on its target via `scale:"target_debuff_count"` (pairs with a Vulnerable/Weak/Frail/\
 Poison shell — more debuffs, bigger hit). GRAND FINALE — gate a splashy rare behind \
-`when:{{"kind":"draw_pile_empty"}}` (fires only once you've drawn your whole deck; pair with heavy draw). \
+`when:{{"kind":"draw_pile_empty"}}` (fires only once you've drawn your whole deck; pair with heavy draw or a \
+THIN deck — deck-thinning/purge and small-deck combo shells reach the empty pile fastest, and the balance \
+pass prices the hard gate in, so print genuinely BIG numbers on the gated line). SHAPE RULE for any gated \
+brief: a card carries ONE damage value, so gate the card's ONLY damage line ("Deal 40 damage. Only fires if \
+...") or put the conditional bonus on a DIFFERENT op (draw/block/a debuff) — NEVER "deal X, plus X more if \
+..." as two damage lines (that brief is uncompilable and costs the slot). \
 HP-SPENT THRESHOLD (Ice Shatter) — gate a payoff on `when:{{"kind":"hp_lost_ge","value":N}}` (true once you've \
 lost N+ HP THIS turn, 1-15): pair a self-damage `lose_hp` fuel effect earlier on the card with the gated payoff \
 ("Lose 3 HP. Deal 18 damage if you've lost 3+ HP this turn.").
@@ -684,7 +689,10 @@ same engine, never a three-way blend.
 
 POOL SIZE (D4): a base-class-sized-for-three pool — about {TARGET_COMMONS_TRIAD} commons, \
 {TARGET_UNCOMMONS_TRIAD} uncommons, {TARGET_RARES_TRIAD} rares (~{TARGET_POOL_TRIAD} pool cards), so \
-every lane drafts from a genuinely full pool. Per-lane rarity discipline: each archetype wants >=2-3 of \
+every lane drafts from a genuinely full pool. HARD CAP: {TARGET_POOL_TRIAD} pool cards is the CEILING, \
+not a floor — the mod holds at most {_BLUEPRINT_CARD_CAP} card rows TOTAL (basics + signatures + pool) \
+and {TARGET_POOL_TRIAD} pool cards already fills it, so COUNT your cards before returning and NEVER \
+exceed {TARGET_POOL_TRIAD} pool cards. Per-lane rarity discipline: each archetype wants >=2-3 of \
 its OWN commons. A FORGE class takes ONE signature at this pool size (the blade token row leaves no room \
 for a second signature under the card cap)."""
 
@@ -1473,13 +1481,77 @@ def _validate_bridges(bp: dict, cards, arch_ids: list[str]) -> list[str]:
     return errs
 
 
+def _trim_card_overflow(bp: dict) -> None:
+    """Blueprint-level cap-guard (2026-08-16): open models overshoot the triad's "~32 pool cards" ask by a
+    card or two, and 32 pool + basics + signatures leaves ZERO headroom under _BLUEPRINT_CARD_CAP — so an
+    otherwise-good 37-row blueprint was a hard abort after repair (glm-5.2 failed to shave the count both
+    attempts). When the blueprint is merely OVER-FULL, trimming the least load-bearing pool card is strictly
+    better than failing the forge, so drop trailing commons/uncommons until it fits — never a basic,
+    signature, blade, token, bridge (per-pair floors) or rare (boss floor + finishers); never the last
+    non-basic card of a merchant type bucket; never a card whose strategy line would fall below its floor.
+    Prefers the rarity bucket most over its target, then the LAST listed candidate (models front-load their
+    core designs). Mutates bp; stashes a log line in bp['_trim_note'] for the caller to surface and pop."""
+    cards = bp.get("cards") if isinstance(bp, dict) else None
+    if not isinstance(cards, list) or len(cards) <= _BLUEPRINT_CARD_CAP:
+        return
+    orig, trimmed = len(cards), []
+    commons_t, uncommons_t, *_ = _pool_targets(len(_archetype_ids(bp)))
+    targets = {"common": commons_t, "uncommon": uncommons_t}
+    protected_roles = _BASIC_ROLES | _SIGNATURE_ROLES | {_BLADE_ROLE}
+
+    def _rarity(c) -> str:
+        return str(c.get("rarity", "")).lower()
+
+    def _merchant_bucket(c) -> str | None:
+        if c.get("role") in _BASIC_ROLES or _rarity(c) in ("basic", "token") or c.get("token"):
+            return None
+        t = str(c.get("type", "")).lower()
+        return t if t in _MERCHANT_TYPES else None
+
+    while len(cards) > _BLUEPRINT_CARD_CAP:
+        by_strategy = _strategy_coverage(cards)[1]
+        merchant_counts = {t: 0 for t in _MERCHANT_TYPES}
+        for c in cards:
+            if isinstance(c, dict):
+                b = _merchant_bucket(c)
+                if b:
+                    merchant_counts[b] += 1
+        candidates: dict[str, list[int]] = {"common": [], "uncommon": []}
+        for i, c in enumerate(cards):
+            if not isinstance(c, dict) or c.get("role") in protected_roles or c.get("bridge") or c.get("token"):
+                continue
+            r = _rarity(c)
+            if r not in candidates:
+                continue  # rares (boss floor + finishers) and anything exotic stay
+            b = _merchant_bucket(c)
+            if b and merchant_counts[b] <= 1:
+                continue
+            tag = str(c.get("strategy") or "").strip().lower()
+            if tag in STRATEGIES and by_strategy.get(tag, {}).get("cards", 0) <= _LINE_MIN_CARDS:
+                continue
+            candidates[r].append(i)
+        counts = {r: sum(1 for c in cards if isinstance(c, dict) and _rarity(c) == r) for r in candidates}
+        order = sorted(candidates, key=lambda r: counts[r] - targets[r], reverse=True)
+        victim = next((candidates[r][-1] for r in order if candidates[r]), None)
+        if victim is None:
+            break  # nothing safely trimmable — let validation report the overflow as before
+        trimmed.append(str(cards[victim].get("name_hint", "?")))
+        del cards[victim]
+    if trimmed:
+        bp["_trim_note"] = (f"cap-guard: blueprint overflowed the {_BLUEPRINT_CARD_CAP}-row cap "
+                            f"({orig} cards) — trimmed {', '.join(trimmed)} to fit")
+
+
 def validate_blueprint_for(strategies) -> "callable":
     """Validator closure for the staged path (mirrors validate_compose_for): the generic blueprint checks
     PLUS the chosen candidate's DECLARED strategic lines — each declared strategy must be a covered package
-    in the pool, so the blueprint actually builds what the compose stage promised."""
+    in the pool, so the blueprint actually builds what the compose stage promised. Normalizes first: an
+    over-full pool is trimmed to the cap (see _trim_card_overflow) rather than treated as fatal."""
     need = [s for s in dict.fromkeys(str(x).strip().lower() for x in (strategies or [])) if s in STRATEGIES]
 
     def _validate(bp: dict) -> list[str]:
+        if isinstance(bp, dict):
+            _trim_card_overflow(bp)
         errs = _validate_blueprint(bp)
         if not isinstance(bp, dict) or not need:
             return errs
@@ -2062,10 +2134,18 @@ def _card_context(bp: dict, plan: dict, bridge_ctx=None, class_ctx: str | None =
 
 
 def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen=None, fake: bool = False,
-                on_event=None, front_end=None, triad: bool | None = None) -> ClassResult:
+                on_event=None, front_end=None, triad: bool | None = None,
+                gap_log_append=None) -> ClassResult:
     """Orchestrate one class. `blueprint_gen` does the blueprint call; `card_gen_factory()` returns a fresh
     card generator for the card pipeline (Anthropic / OpenAI-compatible / fake). `on_event(str)`, if given,
     is called with each progress line as it happens (the website streams these to the browser).
+
+    `gap_log_append` (optional, entries -> count): the vocab-demand sink. The CARD stage's validation
+    errors name every op/condition/scale/status token the model reached for that the vocabulary doesn't
+    have (validator.vocab_misses) — organic demand for mechanics that don't exist yet, mined across ALL
+    attempts (a reach counts even when the repair then settles legal). Same sink interface as the
+    front-end's map-stage capture: the CLI passes catalog.append_vocab_gaps (VOCABULARY_GAPS.md, deduped
+    with demand-count crediting), the website its JSONL appender, None disables capture.
 
     `front_end` (a BlueprintBuilder) opts into the STAGED creative front-end: instead of the single opaque
     blueprint call, it runs cloud->cluster->map->compose->relic-intent and produces the SAME `bp` dict. The
@@ -2078,7 +2158,7 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
     argument is purely for attribution."""
     from .contract import Brief as CardBrief
     from .pipeline import generate_card
-    from .validator import CardValidator
+    from .validator import CardValidator, vocab_misses
     from .bts1 import VOCAB_VERSION
 
     res = ClassResult(ok=False)
@@ -2138,17 +2218,25 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
         note("designing the class blueprint...")
         text, messages = blueprint_gen.first_attempt(brief)
         bp = _extract(text)
+        if bp is not None:
+            _trim_card_overflow(bp)
         errs = _validate_blueprint(bp) if bp is not None else ["unparseable blueprint"]
         if errs:
             note(f"blueprint attempt 1: {len(errs)} error(s); repairing")
             text, messages = blueprint_gen.repair(messages, text, errs)
             bp = _extract(text)
+            if bp is not None:
+                _trim_card_overflow(bp)
             errs = _validate_blueprint(bp) if bp is not None else ["unparseable blueprint"]
             if errs:
                 hint = (" (the model's response was likely cut off mid-JSON — usually a transient "
                         "thinking-heavy response; try again)") if errs == ["unparseable blueprint"] else ""
                 note("blueprint invalid after repair: " + "; ".join(errs[:5]) + hint)
                 return res
+    # Surface + strip the cap-guard's note (either path may have trimmed an over-full pool to the card cap).
+    trim_note = bp.pop("_trim_note", None) if isinstance(bp, dict) else None
+    if trim_note:
+        note(trim_note)
     res.blueprint = bp
     # Phase N-5: the FINAL featured ids ride the blueprint so the ledger records them (recency damping for
     # later themed rolls). Bundle assembly reads explicit keys, so this never leaks into the shipped class.
@@ -2171,6 +2259,7 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
     class_ctx = _class_context(bp)
     card_gen = card_gen_factory()
     made: list[dict] = []  # {plan, card} in slot order
+    vocab_demand: list[dict] = []  # missing-vocab reaches mined from card validation errors (see docstring)
     total = len(bp["cards"])
     for i, plan in enumerate(bp["cards"]):
         if plan.get("role") in _BASIC_ROLES:
@@ -2196,9 +2285,23 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
              f"{plan.get('rarity', '?')} {plan.get('type', '?')}, cost {plan.get('cost', '?')}"
              + (f" - {str(plan.get('theme'))[:90]}" if plan.get("theme") else ""))
         pres = generate_card(cbrief, gen=card_gen, validator=validator)
+        for kind, token in vocab_misses(pres.all_errors):
+            note(f"card {i+1} ({plan.get('name_hint','?')}): reached for missing {kind} `{token}` — "
+                 "recording as vocab demand")
+            vocab_demand.append({
+                "title": f"`{token}` ({kind}) — card-stage demand",
+                "surfaced_by": f"card stage ('{bp.get('name', '?')}' / '{plan.get('name_hint', '?')}')",
+                "fantasy": str(plan.get("theme", ""))[:200],
+                "sketch": f"the card model emitted `{token}` as a {kind} the vocabulary doesn't have "
+                          f"while implementing this brief — organic demand mined from validation errors.",
+            })
         if not pres.ok or pres.card is None:
             res.skipped.append(plan.get("name_hint", f"card {i+1}"))
-            note(f"card {i+1} ({plan.get('name_hint','?')}): failed, skipped")
+            # Name the killing errors (2026-08-16): a bare "failed, skipped" hid WHY slots died, which sent
+            # a whole debugging session down a wrong "off-vocabulary brief" theory. The last validation
+            # errors are in pres.result; parse-level failures only in pres.log.
+            why = "; ".join((pres.result.errors if pres.result else pres.log)[:2]) or "no detail"
+            note(f"card {i+1} ({plan.get('name_hint','?')}): failed, skipped — {why}")
             continue
         # Safety net: orb ops/Focus only belong to an orb class (orb_slots > 0). On a normal class they
         # do nothing, so drop any card the model snuck them onto.
@@ -2227,6 +2330,16 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
                  f"{br['score_before']:.0f} -> {br['score_after']:.0f} (budget ~{br['ceiling']:.0f})")
         note(f"card {i+1}/{total}: {pres.card.get('name')} ready "
              f"({pres.card.get('rarity')} {pres.card.get('type', '')})")
+
+    # Flush the mined vocab demand BEFORE the too-few-cards abort — a forge that died reaching for
+    # missing vocabulary is the richest demand signal there is. Never let a sink failure break a forge.
+    if vocab_demand and gap_log_append is not None:
+        try:
+            logged = gap_log_append(vocab_demand)
+            if logged:
+                note(f"vocab demand: recorded {logged} missing-mechanic reach(es) for triage")
+        except Exception as e:  # noqa: BLE001
+            note(f"vocab demand: could not record ({e})")
 
     if len(made) < 3:
         note("too few cards survived; aborting class")

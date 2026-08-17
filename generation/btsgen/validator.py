@@ -14,6 +14,7 @@ same split ContentValidator.gd makes.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -93,6 +94,41 @@ class ValidationResult:
     errors: list[str] = field(default_factory=list)      # hard rejects
     warnings: list[str] = field(default_factory=list)    # balance flags (don't reject)
     score: float = 0.0
+
+
+# --- vocab-demand mining (2026-08-16) ---------------------------------------------------------------
+# When the card model emits a token the vocabulary doesn't have — an op, a `when` kind, a scale, a
+# status — the validation error NAMES the token it reached for. That is organic demand for a mechanic
+# that doesn't exist yet, the best possible source of vocab-expansion ideas, and it used to be thrown
+# away with the error list. These patterns pull (kind, token) pairs back out of the error strings;
+# SHAPE mistakes (bad amounts, illegal combinations, balance) are deliberately not matched — a model
+# misusing an existing token is noise, a model asking for a missing one is signal.
+_MISS_SCHEMA_ENUM = re.compile(r"schema \[(?P<path>[^\]]*)\]: '(?P<tok>[^']+)' is not one of ")
+_MISS_SCHEMA_FIELD = {  # schema-path suffix -> the vocab surface the model reached for
+    "op": "op", "kind": "condition", "scale": "scale", "status": "status", "trigger": "trigger"}
+_MISS_TEXT = [(re.compile(r"unsupported scale '(?P<tok>[^']+)'"), "scale"),
+              (re.compile(r"unknown status '(?P<tok>[^']+)'"), "status")]
+_MISS_TOKEN_OK = re.compile(r"^[a-z][a-z0-9_]{1,31}$")  # slug-shaped reaches only; garbage isn't demand
+
+
+def vocab_misses(errors: list[str]) -> list[tuple[str, str]]:
+    """Extract (kind, token) vocabulary reaches from validation-error strings, deduped in order."""
+    out: list[tuple[str, str]] = []
+    for err in errors or []:
+        if not isinstance(err, str):
+            continue
+        m = _MISS_SCHEMA_ENUM.search(err)
+        if m:
+            field_name = m.group("path").rstrip("/").rsplit("/", 1)[-1]
+            kind = _MISS_SCHEMA_FIELD.get(field_name)
+            if kind and _MISS_TOKEN_OK.match(m.group("tok")) and (kind, m.group("tok")) not in out:
+                out.append((kind, m.group("tok")))
+            continue
+        for pat, kind in _MISS_TEXT:
+            m = pat.search(err)
+            if m and _MISS_TOKEN_OK.match(m.group("tok")) and (kind, m.group("tok")) not in out:
+                out.append((kind, m.group("tok")))
+    return out
 
 
 class CardValidator:
@@ -587,12 +623,26 @@ class CardValidator:
         return out
 
     # -- 3. balance (port of ContentValidator.gd) -------------------------
+    # Effect-level `when` gates discount an effect's score — a payoff that only sometimes fires is worth
+    # less than its printed line, and WITHOUT a discount the balance pass auto-tunes every gated bomb down
+    # to an always-on power level, killing the gated-payoff fantasy outright (found 2026-08-16). The generic
+    # gate matches the prototype `conditional` op's 0.6; `draw_pile_empty` is the archetypal HARD
+    # build-around gate (base-game Grand Finale prints ~2.5-3x an ungated card's numbers behind it — the
+    # player must draw/thin their whole deck first), so it earns the deepest discount.
+    _WHEN_DISCOUNT_DEFAULT = 0.6
+    _WHEN_DISCOUNT = {"draw_pile_empty": 0.35}
+
     def score_card(self, card: dict) -> float:
         return sum(self._score_effect(e) for e in card.get("effects", []))
 
     def _score_effect(self, eff) -> float:
         if not isinstance(eff, dict):
             return 0.0
+        when = eff.get("when")
+        if isinstance(when, dict):
+            gate = self._WHEN_DISCOUNT.get(str(when.get("kind", "")), self._WHEN_DISCOUNT_DEFAULT)
+            ungated = {k: v for k, v in eff.items() if k != "when"}
+            return gate * self._score_effect(ungated)
         amt = self._amt(eff.get("amount", 0))
         op = eff.get("op")
         # Phase M (gap #36): a scale:"forged" damage/block is worth its printed base PLUS the compounding

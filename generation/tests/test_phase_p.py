@@ -161,9 +161,29 @@ def test_version_gap_catalog() -> None:
         check(tok in live, f"{tok} must be a live (backticked) vocab token")
 
 
+def test_when_gate_balance_discount(v: CardValidator) -> None:
+    print("when-gated effects are score-discounted (draw_pile_empty deepest — the Grand-Finale budget):")
+    plain = {"op": "damage", "amount": 30}
+    gated = {"op": "damage", "amount": 30, "when": {"kind": "draw_pile_empty"}}
+    soft = {"op": "damage", "amount": 30, "when": {"kind": "turn_at_least", "value": 3}}
+    s_plain = v._score_effect(plain)
+    check(abs(v._score_effect(gated) - s_plain * 0.35) < 1e-9,
+          "draw_pile_empty gate must discount to 0.35x (base-game Grand Finale prints ~3x behind it)")
+    check(abs(v._score_effect(soft) - s_plain * 0.6) < 1e-9,
+          "a generic when gate must discount to 0.6x (matches the prototype conditional op)")
+    # The payoff of the discount: a Grand-Finale-strength bomb now fits its budget instead of being
+    # auto-tuned into an always-on stat line — while the same numbers UNGATED still trip the ceiling.
+    finale = _card([{"op": "damage", "amount": 40, "when": {"kind": "draw_pile_empty"}},
+                    {"op": "exhaust"}], rarity="rare", cost=2)
+    check(v.balance_warnings(finale) == [],
+          f"a 40-damage draw_pile_empty rare must fit the budget: {v.balance_warnings(finale)}")
+    ungated_bomb = _card([{"op": "damage", "amount": 40}, {"op": "exhaust"}], rarity="rare", cost=2)
+    check(v.balance_warnings(ungated_bomb) != [], "the same numbers UNGATED must still trip the ceiling")
+
+
 def main() -> int:
     v = CardValidator()
-    for t in (test_accepts, test_rejects, test_text, test_emit):
+    for t in (test_accepts, test_rejects, test_text, test_emit, test_when_gate_balance_discount):
         t(v)
     test_relic_on_hp_lost()
     test_version_gap_catalog()

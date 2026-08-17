@@ -430,3 +430,51 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Buildable today?** No — surfaced as off-vocabulary by the map stage.
 - **Priority:** unset (triage).
 - **Status:** captured
+
+### 43. Grave-plot cycling
+- **Surfaced by:** staged front-end ("a gravekeeper who tends a hungry garden ")
+- **Fantasy it serves:** digging the same grave twice — reburying and exhuming the dead as a recurring resource
+- **Mechanic sketch:** a dedicated graveyard/burial pile you send cards to and later dig back out, distinct from exhaust/discard, so 'the dead who will not stay buried' is a literal reusable zone
+- **Buildable today?** No — surfaced as off-vocabulary by the map stage.
+- **Priority:** unset (triage).
+- **Status:** captured
+
+### 44. Coin & Ledger economy
+- **Surfaced by:** staged front-end ("a stormchaser who bottles lightning and ")
+- **Fantasy it serves:** the storm-peddler who literally SELLS bottled thunder for a spendable in-combat currency
+- **Mechanic sketch:** an in-combat gold/coin resource earned by 'selling' (exhausting) charged cards, then spent to buy effects or bank on a persistent run-long ledger — no catalog archetype models a currency you accrue and spend.
+- **Buildable today?** No — surfaced as off-vocabulary by the map stage.
+- **Priority:** unset (triage).
+- **Status:** captured
+
+### 45. Contagion Transfer
+- **Surfaced by:** staged front-end ("a plague doctor who brews slow contagion")
+- **Fantasy it serves:** Patient zero — one infected enemy passing its sickness to the rest of the room.
+- **Mechanic sketch:** A mechanic that propagates a status (Poison) from an afflicted enemy onto adjacent/other enemies each turn, rather than the player applying it to each directly.
+- **Buildable today?** No — surfaced as off-vocabulary by the map stage.
+- **Priority:** unset (triage).
+- **Status:** captured
+
+### 46. Transmission
+- **Surfaced by:** staged front-end ("a plague doctor who brews slow contagion")
+- **Fantasy it serves:** Contagion that jumps from one enemy to another, spreading infection across the battlefield
+- **Mechanic sketch:** A mechanic where poison or debuffs on one enemy spread to adjacent enemies at turn start — chain-infection that rewards hitting multiple targets with a single seed
+- **Buildable today?** No — surfaced as off-vocabulary by the map stage.
+- **Priority:** unset (triage).
+- **Status:** captured
+
+### 47. Contagion Spread
+- **Surfaced by:** staged front-end ("a plague doctor who brews slow contagion")
+- **Fantasy it serves:** The disease leaping from one enemy to another — airborne spores, contagious touch
+- **Mechanic sketch:** A mechanic where a status on one enemy spreads to adjacent or all enemies when it reaches a threshold, modeling epidemic transmission
+- **Buildable today?** No — surfaced as off-vocabulary by the map stage.
+- **Priority:** unset (triage).
+- **Status:** captured
+
+### 48. Penance Counter
+- **Surfaced by:** staged front-end ("a penitent knight who bleeds for every m")
+- **Fantasy it serves:** The scourge as a wound that hurts you but also retaliates — self-inflicted damage that triggers holy thorns against the enemy
+- **Mechanic sketch:** A mechanic where taking self-damage from scourge cards also deals damage to the enemy, bridging self-sacrifice and counter_riposte without requiring enemy hits first
+- **Buildable today?** No — surfaced as off-vocabulary by the map stage.
+- **Priority:** unset (triage).
+- **Status:** captured
