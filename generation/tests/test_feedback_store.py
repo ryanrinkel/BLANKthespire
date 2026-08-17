@@ -93,7 +93,7 @@ def main() -> int:
             check("PLAYER FEEDBACK" not in bare, "no relevant ratings -> brief untouched")
 
             from btsgen.class_forge import ClassBrief, _BlueprintContract
-            bp = _BlueprintContract().user_brief(ClassBrief(concept="a venomous poison snake fang duelist"))
+            bp = _BlueprintContract(triad=False).user_brief(ClassBrief(concept="a venomous poison snake fang duelist"))
             check("PLAYER FEEDBACK ON SIMILAR PAST DESIGNS" in bp,
                   "blueprint concept brief folds in similar ratings")
 

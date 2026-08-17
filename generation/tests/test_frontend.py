@@ -153,7 +153,8 @@ def test_builder_pipeline() -> None:
     print("BlueprintBuilder pipeline (fake stages) -> a valid bp:")
     cat = load_catalog()
     events: list[str] = []
-    b = BlueprintBuilder(_fake_make_gen, catalog=cat, on_event=events.append, auto=True, gap_log_append=None)
+    b = BlueprintBuilder(_fake_make_gen, catalog=cat, on_event=events.append, auto=True, gap_log_append=None,
+                         triad=False)
     bp = b.build(ClassBrief(concept="a storm-calling gambler who channels luck"))
     check(_validate_blueprint(bp) == [], f"front-end bp must pass _validate_blueprint: {_validate_blueprint(bp)}")
     check(bp.get("relic_intent") is not None, "keystone relic intent must be threaded into bp")
@@ -181,7 +182,7 @@ def test_builder_pipeline() -> None:
 def test_picker_prefers_distinctive_buildable() -> None:
     print("picker prefers the distinctive (special-kind) buildable candidate:")
     cat = load_catalog()
-    b = BlueprintBuilder(_fake_make_gen, catalog=cat, auto=True)
+    b = BlueprintBuilder(_fake_make_gen, catalog=cat, auto=True, triad=False)
     normal = Candidate(name="Plain", fantasy="", archetype_ids=["poison_attrition", "block_bulwark"],
                        archetype_descs=["", ""], class_kind="normal", buildable=True)
     orb = Candidate(name="Bold", fantasy="", archetype_ids=["orb_channel", "slot_machine"],
@@ -257,7 +258,7 @@ def test_archetype_enrichment() -> None:
 
     # autonomous (fused) path: the map stage writes no title/pitch, but the fake bp's id-as-name
     # archetypes must normalize to the catalog's display names
-    b = BlueprintBuilder(_fake_make_gen, catalog=cat, auto=True, gap_log_append=None)
+    b = BlueprintBuilder(_fake_make_gen, catalog=cat, auto=True, gap_log_append=None, triad=False)
     bp = b.build(ClassBrief(concept="a storm-calling gambler"))
     archs = archetype_display(bp)
     check(len(archs) == 2, f"exactly two report archetypes: {archs}")
@@ -276,7 +277,7 @@ def test_archetype_enrichment() -> None:
         return [options[0]["id"]]
 
     bi = BlueprintBuilder(_fake_make_gen, catalog=cat, auto=True, gap_log_append=None,
-                          archetype_checkpoint=checkpoint)
+                          archetype_checkpoint=checkpoint, triad=False)
     archs2 = {a["id"]: a for a in archetype_display(bi.build(ClassBrief(concept="a storm-calling gambler")))}
     check(bool(picked) and picked[0] in archs2,
           f"the picked archetype must reach the bp: {picked} vs {sorted(archs2)}")
@@ -326,7 +327,7 @@ def test_catalog_expansion() -> None:
 # --------------------------------------------------------------- contract modes
 def test_blueprint_contract_modes() -> None:
     print("_BlueprintContract concept vs dossier user_brief:")
-    c = _BlueprintContract()
+    c = _BlueprintContract(triad=False)  # pinned: this test asserts the legacy 2-arch brief shapes
     check(c.mode == "concept", "default mode is concept")
     concept_brief = c.user_brief(ClassBrief(concept="a venom alchemist"))
     check("player concept" in concept_brief and "a venom alchemist" in concept_brief,
@@ -337,7 +338,7 @@ def test_blueprint_contract_modes() -> None:
                                       {"strategy": "combo", "line": "retain pieces", "win_condition": "full-hand payoff"}])
     from btsgen.frontend.dossier import DossierBrief
     dbrief = DossierBrief(candidate=cand, relic_intent={"name": "Coil", "effect_sketch": "x"}, concept="t")
-    dossier_brief = _BlueprintContract(mode="dossier").user_brief(dbrief)
+    dossier_brief = _BlueprintContract(mode="dossier", triad=False).user_brief(dbrief)
     check("already chosen" in dossier_brief and "The Tide" in dossier_brief,
           "dossier-mode brief hands over the decided identity")
     check("retain_hold" in dossier_brief and "Keystone relic intent" in dossier_brief,
@@ -350,7 +351,7 @@ def test_blueprint_contract_modes() -> None:
 def test_forge_class_staged_end_to_end() -> None:
     print("forge_class with front_end -> a full BTSC bundle (fake cards):")
     cat = load_catalog()
-    b = BlueprintBuilder(_fake_make_gen, catalog=cat, auto=True, gap_log_append=None)
+    b = BlueprintBuilder(_fake_make_gen, catalog=cat, auto=True, gap_log_append=None, triad=False)
     res = forge_class(ClassBrief(concept="a patient duelist who holds then strikes"),
                       blueprint_gen=None, card_gen_factory=lambda: _CardFake(), relic_gen=None,
                       fake=False, front_end=b)
@@ -380,7 +381,7 @@ class _RelicStub:
 
 def _run_staged_forge(relic_gen) -> object:
     cat = load_catalog()
-    b = BlueprintBuilder(_fake_make_gen, catalog=cat, auto=True, gap_log_append=None)
+    b = BlueprintBuilder(_fake_make_gen, catalog=cat, auto=True, gap_log_append=None, triad=False)
     return forge_class(ClassBrief(concept="a patient duelist who holds then strikes"),
                        blueprint_gen=None, card_gen_factory=lambda: _CardFake(), relic_gen=relic_gen,
                        fake=False, front_end=b)
@@ -445,7 +446,7 @@ def test_strategy_idioms() -> None:
                        strategic_lines=[{"strategy": "control", "line": "hold", "win_condition": "release", "idiom": "turtle-scale"},
                                         {"strategy": "aggro", "line": "rush", "win_condition": "fast"}])
     from btsgen.frontend.dossier import DossierBrief
-    brief = _BlueprintContract(mode="dossier").user_brief(DossierBrief(candidate=cand_i, concept="t"))
+    brief = _BlueprintContract(mode="dossier", triad=False).user_brief(DossierBrief(candidate=cand_i, concept="t"))
     check("[plays like: turtle-scale]" in brief, "dossier brief renders the idiom texture tag")
     check(brief.count("plays like:") == 1, "the line with no idiom renders no tag")
 

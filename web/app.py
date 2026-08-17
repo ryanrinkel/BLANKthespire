@@ -418,9 +418,10 @@ def forge_class_route():
     # behavior, untouched. It NEEDS the staged front-end, so asking for interactive implies staged — never
     # silently drop the player's explicit request over the other checkbox.
     interactive = bool(body.get("interactive", False))
-    # Triad EXPERIMENT (opt-in): forge a three-archetype class (tension triangle). Like interactive it NEEDS the
-    # staged front-end (the one-shot blueprint path has no triad prompt), so asking for triad implies staged.
-    triad = bool(body.get("triad", False))
+    # Triad (the DEFAULT since 2026-08-17): forge a three-archetype class (tension triangle). The UI sends
+    # triad=false for the "Classic pair" opt-out. Like interactive it NEEDS the staged front-end (the one-shot
+    # blueprint path has no triad prompt), so asking for triad implies staged.
+    triad = bool(body.get("triad", True))
     staged = bool(body.get("staged", True)) or interactive or triad
 
     # BYOK keys (OpenAI-compat or Anthropic) ride in the body, used once, never persisted.

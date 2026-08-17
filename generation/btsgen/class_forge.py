@@ -32,16 +32,17 @@ from .bridges import (MIN_BRIDGES, MIN_BRIDGES_PER_PAIR, TARGET_BRIDGES,  # Phas
 
 
 def triad_enabled(override: bool | None = None) -> bool:
-    """Phase 1 mode switch: is the TRIAD (three-archetype) creative path ON?
+    """Mode switch: is the TRIAD (three-archetype) creative path ON? Default: ON.
 
-    Triad is an EXPERIMENT behind a flag — OFF is exactly today's v1.6 two-archetype flow. The default reads
-    the `BTS_TRIAD` env var (any of 1/true/yes/on, case-insensitive); an explicit `override` argument wins so
-    the web layer can pass a per-request flag in Phase 2 without touching the process env. The flag drives the
-    PROMPT/target MODE only — validation itself keys off the blueprint's actual archetype count, so a 2- or
-    3-archetype blueprint validates the same regardless of this flag."""
+    Triad GRADUATED on 2026-08-17 (playtests preferred triad classes) — the flag is now a KILL-SWITCH, not an
+    experiment: `BTS_TRIAD` set to 0/false/no/off (case-insensitive) opts back into the v1.6 two-archetype
+    flow; anything else, including unset, is ON. An explicit `override` argument wins so the web layer can
+    pass a per-request flag without touching the process env. The flag drives the PROMPT/target MODE only —
+    validation itself keys off the blueprint's actual archetype count, so a 2- or 3-archetype blueprint
+    validates the same regardless of this flag."""
     if override is not None:
         return bool(override)
-    return str(os.environ.get("BTS_TRIAD", "")).strip().lower() in ("1", "true", "yes", "on")
+    return str(os.environ.get("BTS_TRIAD", "")).strip().lower() not in ("0", "false", "no", "off")
 
 def _find_repo_root() -> Path:
     """Repo root = the directory that contains ``mod/contract/``. Resolve it robustly so the forge works
@@ -72,9 +73,9 @@ RELIC_VOCAB = CONTRACT / "RELIC_VOCABULARY.md"  # Phase L: the constrained forge
 # a log line lets you tell which harness produced a given forge — on the CLI and in the streamed browser log.
 # It's the FIRST line emitted by forge_class(). Bump on any harness tweak; a short "-what" suffix helps track.
 HARNESS_VERSION = "1.6-synergy-weave"  # O-2: class/archetype context on every card call, proactive bridge fusion directives, fusion-shape variety, per-archetype design recency, deck-aware relic prompt hint
-# Phase 1 (triad experiment): the triad path stamps its OWN version so every forge is attributable to the
-# mode that produced it (see the Rollout / compat note). forge_class picks this when triad_enabled() is on.
-HARNESS_VERSION_TRIAD = "1.7-triad-exp"
+# Triad (the DEFAULT since 2026-08-17) stamps its OWN version so every forge is attributable to the mode
+# that produced it; the kill-switch path (BTS_TRIAD=0) keeps stamping the legacy HARNESS_VERSION above.
+HARNESS_VERSION_TRIAD = "1.7-triad"
 
 # Forged-class pool target. A base StS2 class pool is 20 common / 35 uncommon / 25 rare (~80 non-basic
 # cards); we ship a lean, reward-functional subset — each non-basic brief is one card-generation (LLM)
@@ -650,7 +651,7 @@ summon_pool may use those ops; summon / buff_summon ride self-target skills, sum
         bind to ONE archetype the other two bridge into (D6); the 9/16/7 pool ask (D4)."""
         return f"""
 
-========================= TRIAD OVERRIDE (three-archetype experiment) =========================
+========================= TRIAD OVERRIDE (three-archetype mode) =========================
 This class has THREE archetypes (A, B, C), not two — a TRIANGLE OF PAIRS (AB, AC, BC). The rules \
 above still hold EXCEPT where this block overrides them. The goal: each archetype is a standalone \
 draftable lane, and the player commits to a PAIR mid-run through what they draft. Everything must \
@@ -1265,7 +1266,7 @@ def _validate_blueprint(bp: dict) -> list[str]:
             errs.append(f"missing '{key}'")
     if errs:
         return errs
-    # Phase 1: accept 2 OR 3 archetypes (the triad experiment shares this codebase). All mode-dependent knobs
+    # Phase 1: accept 2 OR 3 archetypes (triad and the 2-arch kill-switch share this codebase). All mode-dependent knobs
     # below key off the ACTUAL archetype count, never the BTS_TRIAD flag, so a 2- or 3-archetype blueprint
     # validates identically whether or not the flag is set.
     if not isinstance(bp["archetypes"], list) or len(bp["archetypes"]) not in (2, 3):
@@ -2173,7 +2174,7 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
 
     # Stamp every forge with the harness version up front — the first log line on both the CLI and the
     # browser stream, so you can tell which creative-harness produced a given class. See HARNESS_VERSION. The
-    # triad experiment stamps its OWN version so every forge is attributable to the mode that produced it.
+    # triad path stamps its OWN version so every forge is attributable to the mode that produced it.
     _is_triad = triad_enabled(triad)
     _harness = HARNESS_VERSION_TRIAD if _is_triad else HARNESS_VERSION
     note(f"forge harness v{_harness} (vocab v{VOCAB_VERSION})")
@@ -2182,7 +2183,7 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
     # modes REQUIRE them. The one-shot concept brief uses this BLIND roll as-is; the staged front-end may
     # RE-ROLL theme-aware after its cloud stage (Phase N-5) — brief.featured is re-resolved after build().
     # Missing picks are checked + repaired by the N-1 coverage round.
-    # TRIAD EXPERIMENT: the roulette is OFF (decided 2026-08-15, first triad forge). Three archetypes and
+    # TRIAD: the roulette is OFF (decided 2026-08-15, first triad forge). Three archetypes and
     # three pair packages already spend the pool's identity budget, and the wild slot kept landing
     # off-theme subsystems (a balance gauge on a gravekeeper). The baseline coverage floors (reactive /
     # `when` / exotic / scaled minimums) still enforce mechanical variety on the triad path.

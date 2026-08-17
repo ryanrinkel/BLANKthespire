@@ -194,7 +194,7 @@ async function forge() {
   // based on the chosen provider, so the backend routing is unchanged.
   const stagedEl = el("staged");
   const interactiveEl = el("interactive");
-  const triadEl = el("triad");
+  const classicEl = el("classic");
   const stagedOn = stagedEl ? stagedEl.checked : true;
   const body = {
     concept,
@@ -202,8 +202,9 @@ async function forge() {
     staged: stagedOn,
     // interactive forge mode: mid-forge archetype pick (only meaningful with the staged front-end)
     interactive: !!(interactiveEl && interactiveEl.checked && stagedOn),
-    // triad EXPERIMENT: three-archetype tension triangle (needs the staged front-end, like interactive)
-    triad: !!(triadEl && triadEl.checked && stagedOn),
+    // triad (three-archetype tension triangle) is the DEFAULT; "Classic pair" opts out. It needs the
+    // staged front-end, like interactive, so one-shot forges are classic too.
+    triad: !!(stagedOn && !(classicEl && classicEl.checked)),
   };
   if (choice === "token") {
     if (!ME.unlimited) {
@@ -240,7 +241,7 @@ async function forge() {
   // Echo what we asked for, so a mode mishap (e.g. a stale page) is visible in the log immediately.
   appendLog(`• requested: ${body.mode} · ${body.staged ? "creative" : "one-shot"}`
             + (body.interactive ? " · interactive" : "")
-            + (body.triad ? " · triad (experimental)" : ""));
+            + (body.triad ? "" : " · classic pair"));
 
   try {
     const resp = await fetch("/api/forge-class", {
@@ -1014,12 +1015,13 @@ el("tokens").onclick = () => selectTab("account");  // the header chip doubles a
 el("forge-btn").onclick = forge;
 el("choice-go").onclick = () => sendChoice([...(choiceState?.picked || [])]);
 el("choice-skip").onclick = () => sendChoice([]);
-// interactive AND triad each need the staged front-end: keep the checkboxes honest instead of silently
-// ignoring one (checking either turns on staged; unchecking staged clears both dependents).
+// interactive AND triad (the default; "classic" unchecked) each need the staged front-end: keep the
+// checkboxes honest instead of silently ignoring one (asking for either turns on staged; unchecking
+// staged clears interactive and forces the classic pair, since one-shot forges are 2-archetype).
 el("interactive").onchange = () => { if (el("interactive").checked) el("staged").checked = true; };
-el("triad").onchange = () => { if (el("triad").checked) el("staged").checked = true; };
+el("classic").onchange = () => { if (!el("classic").checked) el("staged").checked = true; };
 el("staged").onchange = () => {
-  if (!el("staged").checked) { el("interactive").checked = false; el("triad").checked = false; }
+  if (!el("staged").checked) { el("interactive").checked = false; el("classic").checked = true; }
 };
 el("copy-code").onclick = () => copy(el("r-code").value);
 el("signout").onclick = async () => { await fetch("/logout"); location.href = "/"; };

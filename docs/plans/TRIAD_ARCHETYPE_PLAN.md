@@ -217,6 +217,12 @@ The 2-archetype path stays the untouched default until triad classes are verifie
 - Graduation criteria: forge 3–5 triad classes across kinds, playtest for pair
   distinctness + replay pull. If they clearly beat 2-archetype forges, flip the default
   (bump to `1.7-triad`) and keep `BTS_ARCHETYPE_COUNT=2` as the kill-switch.
+- **GRADUATED 2026-08-17** (per `TRIAD_PROMOTION_PLAN.md`): playtests preferred the triad
+  classes, so the default flipped — triad is ON everywhere (web, CLI, env). The harness
+  stamp dropped its suffix (`1.7-triad`); the legacy path keeps stamping
+  `1.6-synergy-weave`. One deviation from the criteria above: the kill-switch is
+  `BTS_TRIAD=0` (the existing flag with its default inverted; `--pair` on the CLI, the
+  "Classic pair" checkbox on the web) — NOT a new `BTS_ARCHETYPE_COUNT` var.
 
 ## Phase 4 (future, only if 32 feels cramped): raise the 40-slot ceiling
 

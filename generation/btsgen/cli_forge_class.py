@@ -10,6 +10,10 @@
 single one-shot blueprint call — more creative, same downstream safety (the bp it produces is identical). It is
 autonomous by default (picks the most distinctive BUILDABLE candidate); --checkpoint asks you to pick.
 
+Staged forges build a three-archetype TRIAD class by default (graduated 2026-08-17); --pair opts back into
+the classic two-archetype flow (--triad is the explicit no-op complement). The one-shot path is always a
+classic pair — triad lives in the staged front-end.
+
 On success it writes a `.btsc.txt` code file (hand it to the importer / paste it in-game) and prints a summary.
 """
 from __future__ import annotations
@@ -22,7 +26,7 @@ import sys
 from pathlib import Path
 
 from .class_forge import (ClassBrief, REPO, _BlueprintContract, _CardFake, _RelicContract, forge_class,
-                          point_btsgen_at_mod_contract)
+                          point_btsgen_at_mod_contract, triad_enabled)
 
 
 def _slug(name: str) -> str:
@@ -52,6 +56,11 @@ def main(argv: list[str] | None = None) -> int:
                     help="with --staged: pause to pick a candidate (default: autonomous)")
     ap.add_argument("--auto", action="store_true",
                     help="with --staged: autonomous candidate pick (the default; explicit no-op for clarity)")
+    tri = ap.add_mutually_exclusive_group()
+    tri.add_argument("--triad", action="store_true",
+                     help="three-archetype triad class (the default; explicit no-op for clarity)")
+    tri.add_argument("--pair", action="store_true",
+                     help="opt out of the triad default: forge a classic TWO-archetype class")
     ap.add_argument("--base-url", default=None, help="OpenAI-compatible base URL (BYOK)")
     ap.add_argument("--api-key", default=None, help="API key for the BYOK endpoint")
     ap.add_argument("--model", default=None, help="model id (BYOK, or override the Anthropic model)")
@@ -101,8 +110,9 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         from . import contract
         from .generator import OpenAICompatGenerator
+        # One-shot blueprint contract pinned to the classic 2-archetype mode (triad lives in the staged front-end).
         blueprint_gen = OpenAICompatGenerator(args.base_url, args.api_key, args.model,
-                                              contract_mod=_BlueprintContract(), max_tokens=8000)
+                                              contract_mod=_BlueprintContract(triad=False), max_tokens=8000)
         relic_gen = OpenAICompatGenerator(args.base_url, args.api_key, args.model,
                                           contract_mod=_RelicContract(), max_tokens=4000)
         card_gen_factory = lambda: OpenAICompatGenerator(  # noqa: E731
@@ -117,7 +127,7 @@ def main(argv: list[str] | None = None) -> int:
         try:
             # 48000: headroom for adaptive thinking + full-blueprint repair (one shared budget; truncation
             # there yields unparseable JSON). Under every current Claude output cap (Haiku/Sonnet 64K, Opus 128K).
-            blueprint_gen = AnthropicGenerator(model=args.model, contract_mod=_BlueprintContract(), max_tokens=48000)
+            blueprint_gen = AnthropicGenerator(model=args.model, contract_mod=_BlueprintContract(triad=False), max_tokens=48000)
             relic_gen = AnthropicGenerator(model=args.model, contract_mod=_RelicContract(), max_tokens=6000)
         except RuntimeError as e:
             print(f"ERROR: {e}\n(Use --fake to run without a key, or pass --base-url/--api-key/--model.)", file=sys.stderr)
@@ -126,6 +136,15 @@ def main(argv: list[str] | None = None) -> int:
         make_gen = lambda contract_mod, *, max_tokens: AnthropicGenerator(  # noqa: E731
             model=args.model, contract_mod=contract_mod, max_tokens=max_tokens)
 
+    # Triad is the DEFAULT (graduated 2026-08-17): --pair opts out, --triad is the explicit no-op complement,
+    # no flag reads the env (triad_enabled; BTS_TRIAD=0 is the kill-switch). Triad lives in the staged
+    # front-end — the one-shot path (contracts pinned triad=False above) stays a classic 2-archetype forge.
+    triad_flag = False if args.pair else (True if args.triad else None)
+    is_triad = triad_enabled(triad_flag) and bool(args.staged)
+    if triad_enabled(triad_flag) and not args.staged:
+        print("note: the one-shot path has no triad prompt — forging a classic 2-archetype class "
+              "(add --staged for a triad).")
+
     # Opt into the staged creative front-end (CLI-first, autonomous by default).
     front_end = None
     if args.staged:
@@ -133,17 +152,18 @@ def main(argv: list[str] | None = None) -> int:
         auto = not args.checkpoint
         front_end = BlueprintBuilder(make_gen, catalog=load_catalog(), on_event=lambda m: print(f"  {m}"),
                                      auto=auto, checkpoint=None if auto else _stdin_checkpoint,
-                                     gap_log_append=append_vocab_gaps)
+                                     gap_log_append=append_vocab_gaps, triad=is_triad)
 
     brief = ClassBrief(concept=args.concept, pool_cards_per_archetype=args.pool_per_archetype)
-    mode = "  [FAKE]" if args.fake else ("  [STAGED]" if args.staged else "")
+    staged_tag = "  [STAGED · TRIAD]" if is_triad else "  [STAGED · PAIR]"
+    mode = "  [FAKE]" if args.fake else (staged_tag if args.staged else "")
     print(f"forging class: {brief.concept!r}{mode}")
     # When --staged, the front-end branch must run (fake=True would short-circuit it); offline-ness lives in the
     # fake make_gen/_CardFake instead. So only pass fake=True on the NON-staged path.
     from .frontend import append_vocab_gaps as _card_gap_sink  # card-stage vocab-demand capture (same file)
     res = forge_class(brief, blueprint_gen=blueprint_gen, card_gen_factory=card_gen_factory,
                       relic_gen=relic_gen, fake=(args.fake and front_end is None), front_end=front_end,
-                      gap_log_append=None if args.fake else _card_gap_sink)
+                      triad=is_triad, gap_log_append=None if args.fake else _card_gap_sink)
     for line in res.log:
         print(f"  {line}")
     if not res.ok or res.bundle is None:

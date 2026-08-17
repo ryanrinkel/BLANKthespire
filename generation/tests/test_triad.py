@@ -60,17 +60,19 @@ def _triad_bp():
 
 # --------------------------------------------------------------- the mode switch
 def test_triad_enabled() -> None:
-    print("triad_enabled(): env-driven default, explicit override wins:")
+    print("triad_enabled(): ON by default (graduated), explicit off-values are the kill-switch, override wins:")
     saved = os.environ.pop("BTS_TRIAD", None)
     try:
-        check(triad_enabled() is False, "no BTS_TRIAD -> off")
+        check(triad_enabled() is True, "no BTS_TRIAD -> ON (triad is the default since graduation)")
         check(triad_enabled(True) is True and triad_enabled(False) is False, "an override wins over the env")
         for on in ("1", "true", "TRUE", "yes", "on"):
             os.environ["BTS_TRIAD"] = on
             check(triad_enabled() is True, f"BTS_TRIAD={on!r} -> on")
+        for off in ("0", "false", "FALSE", "no", "off"):
+            os.environ["BTS_TRIAD"] = off
+            check(triad_enabled() is False, f"BTS_TRIAD={off!r} -> off (the kill-switch)")
         os.environ["BTS_TRIAD"] = "0"
-        check(triad_enabled() is False, "BTS_TRIAD=0 -> off")
-        check(triad_enabled(False) is False, "an override still wins when the env is set")
+        check(triad_enabled(True) is True, "an override still wins when the env is set")
     finally:
         if saved is None:
             os.environ.pop("BTS_TRIAD", None)
@@ -80,8 +82,8 @@ def test_triad_enabled() -> None:
 
 def test_harness_versions() -> None:
     print("the triad path stamps its own attributable harness version:")
-    check(HARNESS_VERSION == "1.6-synergy-weave", "legacy version unchanged")
-    check(HARNESS_VERSION_TRIAD == "1.7-triad-exp", "the triad experiment stamps 1.7-triad-exp")
+    check(HARNESS_VERSION == "1.6-synergy-weave", "legacy version unchanged (the BTS_TRIAD=0 opt-out stamp)")
+    check(HARNESS_VERSION_TRIAD == "1.7-triad", "graduated triad stamps 1.7-triad (the -exp suffix dropped)")
 
 
 # --------------------------------------------------------------- mode-dependent targets
@@ -109,12 +111,17 @@ def test_prompt_mode() -> None:
           f"the triad pool ask carries 9/16/7: {on._pool_ask()}")
     check("7 commons" in off._pool_ask() and "12 uncommons" in off._pool_ask(),
           "the legacy pool ask keeps 7/12/4")
-    # default (no arg) reads the env — off by default in the suite
-    saved = os.environ.pop("BTS_TRIAD", None)
+    # default (no arg) reads the env — ON unless the kill-switch is set
+    saved = os.environ.get("BTS_TRIAD")
     try:
-        check("TRIAD OVERRIDE" not in _BlueprintContract().system_prompt(), "env-off default -> legacy prompt")
+        os.environ["BTS_TRIAD"] = "0"
+        check("TRIAD OVERRIDE" not in _BlueprintContract().system_prompt(), "BTS_TRIAD=0 -> legacy prompt")
+        os.environ.pop("BTS_TRIAD", None)
+        check("TRIAD OVERRIDE" in _BlueprintContract().system_prompt(), "unset env (the default) -> triad prompt")
     finally:
-        if saved is not None:
+        if saved is None:
+            os.environ.pop("BTS_TRIAD", None)
+        else:
             os.environ["BTS_TRIAD"] = saved
 
 
@@ -235,6 +242,37 @@ def test_triad_skips_featured_roulette() -> None:
             os.environ["BTS_FORGE_LEDGER"] = saved
 
 
+def test_default_harness_stamp() -> None:
+    print("forge_class env default: unset -> stamps 1.7-triad, BTS_TRIAD=0 -> stamps 1.6-synergy-weave:")
+    import tempfile
+
+    from btsgen.class_forge import ClassBrief, _CardFake, forge_class
+
+    saved_triad = os.environ.get("BTS_TRIAD")
+    saved_ledger = os.environ.get("BTS_FORGE_LEDGER")
+    os.environ["BTS_FORGE_LEDGER"] = os.path.join(tempfile.mkdtemp(prefix="bts_triad_stamp_"), "ledger.jsonl")
+    try:
+        os.environ.pop("BTS_TRIAD", None)
+        res = forge_class(ClassBrief(concept="a clockwork oracle"), blueprint_gen=None,
+                          card_gen_factory=lambda: _CardFake(), relic_gen=None, fake=True)
+        check(res.log and res.log[0].startswith(f"forge harness v{HARNESS_VERSION_TRIAD} "),
+              f"a default forge stamps the triad harness: {res.log[:1]}")
+        os.environ["BTS_TRIAD"] = "0"
+        res2 = forge_class(ClassBrief(concept="a clockwork oracle"), blueprint_gen=None,
+                           card_gen_factory=lambda: _CardFake(), relic_gen=None, fake=True)
+        check(res2.log and res2.log[0].startswith(f"forge harness v{HARNESS_VERSION} "),
+              f"the BTS_TRIAD=0 kill-switch stamps the legacy harness: {res2.log[:1]}")
+    finally:
+        if saved_triad is None:
+            os.environ.pop("BTS_TRIAD", None)
+        else:
+            os.environ["BTS_TRIAD"] = saved_triad
+        if saved_ledger is None:
+            os.environ.pop("BTS_FORGE_LEDGER", None)
+        else:
+            os.environ["BTS_FORGE_LEDGER"] = saved_ledger
+
+
 def test_trim_card_overflow() -> None:
     print("cap-guard: an over-full blueprint is trimmed to the cap, protected rows intact:")
     from btsgen.class_forge import _BLUEPRINT_CARD_CAP, _trim_card_overflow, validate_blueprint_for
@@ -293,7 +331,7 @@ def main() -> int:
     for t in (test_triad_enabled, test_harness_versions, test_pool_targets, test_prompt_mode,
               test_triad_validates_and_targets, test_all_three_lines_required,
               test_forge_class_signature_cap, test_coverage_routes_per_pair,
-              test_triad_skips_featured_roulette, test_trim_card_overflow):
+              test_triad_skips_featured_roulette, test_default_harness_stamp, test_trim_card_overflow):
         t()
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return 1 if _FAIL else 0

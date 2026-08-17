@@ -296,8 +296,10 @@ def build_ollama_mix(role_map: dict | None = None, *, on_usage=None):
         )
         return _FailoverGenerator(primary, fallback, fb["cooldown_s"])
 
-    # One-shot blueprint generator (only used when the staged front-end is OFF) + relic generator.
-    blueprint_gen = _gen("structure", _BlueprintContract(), 24000)
+    # One-shot blueprint generator (only used when the staged front-end is OFF) + relic generator. The
+    # one-shot path is the classic 2-archetype flow — triad lives in the staged front-end — so pin the
+    # contract off the (now default-on) triad env.
+    blueprint_gen = _gen("structure", _BlueprintContract(triad=False), 24000)
     relic_gen = _gen("cards", _RelicContract(), 4000)
     card_gen_factory = lambda: _gen("cards", _card_contract, 4000)  # noqa: E731
     make_gen = lambda contract_mod, *, max_tokens: _gen(  # noqa: E731

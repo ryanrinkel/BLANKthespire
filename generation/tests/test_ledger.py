@@ -268,7 +268,7 @@ def test_picker_novelty_term() -> None:
     from btsgen.frontend.fakes import _StageFake
 
     b = BlueprintBuilder(lambda cm, *, max_tokens: _StageFake(cm), catalog=load_catalog(),
-                         auto=True, gap_log_append=None)
+                         auto=True, gap_log_append=None, triad=False)
     over = Candidate(name="Over", fantasy="rot", archetype_ids=["poison_attrition", "self_sacrifice"],
                      archetype_descs=["", ""], class_kind="normal", buildable=True)
     dossier = Dossier(theme="t")

@@ -115,7 +115,8 @@ def _anthropic_builder(model: str):
         import os
         resolved = model or os.environ.get("BTSGEN_MODEL", DEFAULT_MODEL)  # so the cost lookup + label are real
         on_usage = lambda u: usage.append((getattr(u, "input_tokens", 0), getattr(u, "output_tokens", 0)))  # noqa: E731
-        bp = AnthropicGenerator(model=resolved, contract_mod=_BlueprintContract(), max_tokens=48000, on_usage=on_usage)
+        # One-shot blueprint contract pinned to the classic 2-archetype mode (triad lives in the staged front-end).
+        bp = AnthropicGenerator(model=resolved, contract_mod=_BlueprintContract(triad=False), max_tokens=48000, on_usage=on_usage)
         relic = AnthropicGenerator(model=resolved, contract_mod=_RelicContract(), max_tokens=6000, on_usage=on_usage)
         card_factory = lambda: AnthropicGenerator(model=resolved, on_usage=on_usage)  # noqa: E731
         make_gen = lambda cm, *, max_tokens: AnthropicGenerator(  # noqa: E731

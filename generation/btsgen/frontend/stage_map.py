@@ -5,9 +5,10 @@ catalog archetypes by metaphor resonance (explainable choices); concepts that fi
 as vocabulary gaps (never coded off-vocabulary — that's the closed-vocab safety guarantee). Then N candidate
 class builds are composed, each fusing TWO archetypes in tension.
 
-Phase 2 (triad experiment, opt-in behind `triad_enabled()`): a triad candidate fuses EXACTLY THREE archetypes
-in a TENSION TRIANGLE — three pairs (AB/AC/BC), each a distinct game plan via `pair_lines`. The flag-off path
-is byte-for-byte today's 2-archetype compose (same prompts, same `strategic_lines` schema).
+Phase 2 (triad — the DEFAULT since 2026-08-17, `triad_enabled()`; BTS_TRIAD=0 is the 2-archetype
+kill-switch): a triad candidate fuses EXACTLY THREE archetypes in a TENSION TRIANGLE — three pairs
+(AB/AC/BC), each a distinct game plan via `pair_lines`. The flag-off path is byte-for-byte the legacy
+2-archetype compose (same prompts, same `strategic_lines` schema).
 
 Output: {mappings:[...], candidates:[...], gaps:[...]} — one JSON object.
 """

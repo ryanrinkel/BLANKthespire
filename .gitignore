@@ -47,6 +47,12 @@ export_presets.cfg
 # ── Local research material (never committed) ────────────────────────
 /_modref/
 
+# ── Local planning docs + generated run reports (never committed) ────
+/_*_REPORT.html
+/_MIGRATION_REPORT.md
+docs/plans/TRIAD_PROMOTION_PLAN.md
+docs/plans/EXPERIMENTAL_UNLOCKABLE_CARDS.md
+
 # ── Machine-specific config ──────────────────────────────────────────
 settings.local.json
 .mcp.json

@@ -87,7 +87,7 @@ def test_brief_blocks() -> None:
     feats = featured.roll_featured("a tidal warden")
     ids = [f.id for f in feats]
     # concept mode
-    c = _BlueprintContract()  # default concept mode
+    c = _BlueprintContract(triad=False)  # concept mode, pinned to the legacy 2-arch prompt shape
     cb = ClassBrief(concept="a tidal warden", featured=ids)
     concept_brief = c.user_brief(cb)
     check("FEATURED MECHANICS (REQUIRED)" in concept_brief, "concept brief carries the featured block")
@@ -100,7 +100,7 @@ def test_brief_blocks() -> None:
                      archetype_descs=["turtle", "riposte"], class_kind="normal", suggested_max_hp=74,
                      strategic_lines=[{"strategy": "control", "line": "hold", "win_condition": "counter"}])
     db = DossierBrief(candidate=cand, concept="a tidal warden", featured=ids)
-    dossier_brief = _BlueprintContract(mode="dossier").user_brief(db)
+    dossier_brief = _BlueprintContract(mode="dossier", triad=False).user_brief(db)
     check("FEATURED MECHANICS (REQUIRED)" in dossier_brief, "dossier brief carries the featured block")
 
     # no featured -> no block, no crash

@@ -46,9 +46,10 @@ class BlueprintBuilder:
         self._auto = auto
         self._gap_log_append = gap_log_append
         self._n = max(2, int(n_candidates))
-        # Phase 2 (triad experiment): when on, compose THREE archetypes in a tension triangle and reframe the
-        # blueprint stage in triad mode. Default reads BTS_TRIAD (triad_enabled); the web layer passes a
-        # per-request flag. Threaded into every stage contract + validator so the whole front-end is one mode.
+        # Triad (the default since 2026-08-17): when on, compose THREE archetypes in a tension triangle and
+        # reframe the blueprint stage in triad mode. Default reads BTS_TRIAD (triad_enabled; BTS_TRIAD=0 is
+        # the 2-archetype kill-switch); the web layer passes a per-request flag. Threaded into every stage
+        # contract + validator so the whole front-end is one mode.
         self._triad = triad_enabled(triad)
         # Interactive forge mode: `archetype_checkpoint(options, dossier) -> list[archetype_id]` is called
         # between MAP and COMPOSE with the theme-matched archetypes; the player's picks (<=2) become a hard
@@ -358,7 +359,7 @@ class BlueprintBuilder:
         """Phase N-5: replace the blind concept-hash roll with the theme-aware lottery. Wholly guarded —
         the re-roll is an enhancement, so ANY failure keeps the blind roll and never breaks the forge."""
         if self._triad:
-            # TRIAD EXPERIMENT: the featured roulette is OFF (forge_class skips the blind roll too) — the
+            # TRIAD: the featured roulette is OFF (forge_class skips the blind roll too) — the
             # wild slot kept landing off-theme subsystems. The cloud stage's nominations are ignored.
             brief.featured = []
             return
