@@ -99,11 +99,20 @@ public static class TriggerRunner
                 case "channel_orb":
                 {
                     int count = Math.Max(1, e.Amount);
-                    for (int n = 0; n < count; n++)
-                    {
-                        var orbType = e.Orb == "random" ? EffectRunner.RandomOrbType(player) : EffectRunner.OrbTypeFor(e.Orb);
-                        await OrbCmd.Channel(ctx, ((OrbModel)ModelDb.Get(orbType)).ToMutable(0), player);
-                    }
+                    // A forged orb-class player resolves the orb name against ITS class's pool (base or custom),
+                    // and "random" rolls only within that pool — Phase-I parity with the card and relic channel_orb
+                    // paths. Without this, a trigger payload rolled the GLOBAL lightning/frost/dark pool (base orbs
+                    // a custom-orb class doesn't list), and a custom orb NAME here threw in OrbTypeFor. The class
+                    // has no card host at fire time, so it's read off the player (the heal_summon pattern below).
+                    int orbClass = ForgedCharacters.ClassIndexOfPlayer(player);
+                    if (ForgedCharacters.IsOrbClass(orbClass))
+                        await EffectRunner.ChannelForgedOrbs(orbClass, e.Orb, count, player, ctx);
+                    else
+                        for (int n = 0; n < count; n++)
+                        {
+                            var orbType = e.Orb == "random" ? EffectRunner.RandomOrbType(player) : EffectRunner.OrbTypeFor(e.Orb);
+                            await OrbCmd.Channel(ctx, ((OrbModel)ModelDb.Get(orbType)).ToMutable(0), player);
+                        }
                     break;
                 }
                 case "evoke":
