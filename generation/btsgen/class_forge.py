@@ -165,6 +165,10 @@ class ClassBrief:
     # Phase N-2: the featured-mechanic roulette picks (ids into btsgen.featured.FEATURED_MENU). forge_class
     # rolls these per concept before stage 1 and both brief modes REQUIRE the blueprint to weave them in.
     featured: list | None = None
+    # Creative harness v2 (Fix B): optional caller-supplied coverage nominations ({reactive: [...], when: [...],
+    # exotic: [...]}) — the blueprint's own `coverage_nominations` field wins when present; this is the fallback
+    # a caller (CLI / web / bench) may pre-nominate. Ignored with the flag off.
+    coverage_nominations: dict | None = None
 
     def describe(self) -> str:
         return f"concept: {self.concept}"
@@ -177,6 +181,9 @@ class ClassResult:
     blueprint: dict | None = None
     skipped: list[str] = field(default_factory=list)
     log: list[str] = field(default_factory=list)
+    # Per-forge counters for the bench (btsgen-bench): card attempts / first-attempt passes / coverage
+    # injection keys. Populated on every path (cheap; never serialized into the bundle).
+    stats: dict = field(default_factory=dict)
 
 
 def archetype_display(bp: dict | None) -> list[dict]:
@@ -208,13 +215,33 @@ class _BlueprintContract:
     block appended at the end (three archetypes, pairwise bridges, pair->strategy, neutral signatures, the
     9/16/7 pool ask) — the legacy f-string is untouched, so the flag-off path never changes."""
 
-    def __init__(self, mode: str = "concept", triad: bool | None = None) -> None:
+    def __init__(self, mode: str = "concept", triad: bool | None = None, *, seed: int | None = None,
+                 selected_ops=None, class_kind: str | None = None) -> None:
         self.mode = mode
         self.triad = triad_enabled(triad)
+        # Creative harness v2 (Fix D), all optional and only read under BTS_HARNESS_V2: `seed` rotates the
+        # homage examples per forge; `selected_ops` (the chosen archetypes' catalog ops) + `class_kind` prune
+        # the long archetype pitch sections down to the ones actually selected.
+        self.seed = seed
+        self.selected_ops = set(selected_ops) if selected_ops is not None else None
+        self.class_kind = class_kind
 
     def system_prompt(self) -> str:
+        from . import harness_v2
         base = self._system_prompt_legacy()
+        if harness_v2.enabled() and self.selected_ops is not None:
+            base = _prune_archetype_sections(base, self.selected_ops, self.class_kind)
         return base + self._triad_addendum() if self.triad else base
+
+    def _homage_examples(self) -> str:
+        """The REPRINT HOMAGE rule's examples: the fixed Deflect/Slice/Bludgeon trio (v1, byte-identical), or —
+        under harness v2 with a forge seed — three seeded draws from harness_v2.HOMAGE_POOL (Cause 4: the fixed
+        'Deflect' example became a card named Deflect in 2 of 5 runs)."""
+        from . import harness_v2
+        if harness_v2.enabled() and self.seed is not None:
+            return harness_v2.homage_examples(self.seed)
+        return ("Deflect: 0-cost skill, gain 4 Block; Slice: 0-cost attack, deal 6 damage; Bludgeon: 3-cost "
+                "attack, deal 32 damage")
 
     def _system_prompt_legacy(self) -> str:
         from . import paths
@@ -585,8 +612,7 @@ both"). A bridge still carries a "strategy" tag and counts toward that line.
 vocabulary (numbers optional). Reference the archetype's engine.
 - REPRINT HOMAGE (REQUIRED): exactly ONE pool card is a faithful recreation of a REAL card from base \
 Slay the Spire 2 — keep its name, and rebuild its exact effect from THIS vocabulary. Pick an iconic \
-base card that expresses cleanly in the vocabulary (e.g. Deflect: 0-cost skill, gain 4 Block; Slice: \
-0-cost attack, deal 6 damage; Bludgeon: 3-cost attack, deal 32 damage) and that flatters this class's \
+base card that expresses cleanly in the vocabulary (e.g. {self._homage_examples()}) and that flatters this class's \
 engine. Make it a COMMON, and write its theme as 'Reprint of <Name> (base game): <the original \
 effect, spelled out concretely>'. One familiar face among the strangers grounds the class for \
 returning players.
@@ -639,7 +665,11 @@ summon_pool may use those ops; summon / buff_summon ride self-target skills, sum
                        "per pair.")
 
     def _pool_ask(self) -> str:
-        return self._POOL_ASK_TRIAD if self.triad else self._POOL_ASK
+        ask = self._POOL_ASK_TRIAD if self.triad else self._POOL_ASK
+        from . import harness_v2
+        if harness_v2.enabled():
+            ask += _nomination_ask()
+        return ask
 
     @staticmethod
     def _triad_addendum() -> str:
@@ -752,6 +782,13 @@ for a second signature under the card cap)."""
         engines and the strategy rows come from the candidate's per-PAIR pair_lines (D3)."""
         c = brief.candidate
         is_triad = len(getattr(c, "archetype_ids", None) or []) >= 3
+        # Creative harness v2 (Fix C): the catalog's stock metaphor phrases stay in the cloud stage — strip
+        # them from every free-text field the blueprint sees (fantasy/loop/tension/descs/lines).
+        from . import harness_v2
+        _mets = getattr(brief, "metaphors", None) if harness_v2.enabled() else None
+
+        def _s(t) -> str:
+            return harness_v2.strip_metaphors(str(t or ""), _mets) if _mets else str(t or "")
         kind_guidance = {
             "orb": ('This is an ORB CLASS: set "orb_slots" to 3 or 4, declare an "orb_pool" (base orbs and/or up '
                     'to 3 custom orbs — see THE ORB POOL), and make ONE archetype the orb engine.'),
@@ -762,7 +799,7 @@ for a second signature under the card cap)."""
             "normal": ('This is a NORMAL class: "orb_slots": 0, OMIT orb_pool/status_pool/summon_pool, and do not use '
                        'their class-only ops.'),
         }.get(c.class_kind, "")
-        archs = "\n".join(f'- {aid}: {desc}' for aid, desc in zip(c.archetype_ids, c.archetype_descs))
+        archs = "\n".join(f'- {aid}: {_s(desc)}' for aid, desc in zip(c.archetype_ids, c.archetype_descs))
         relic = ""
         if brief.relic_intent:
             ri = brief.relic_intent
@@ -784,8 +821,8 @@ for a second signature under the card cap)."""
         lns = [l for l in (getattr(c, "strategic_lines", None) or []) if isinstance(l, dict)]
         if pls:
             rows = "\n".join(f'- {" + ".join(str(x) for x in (l.get("pair") or []))} -> '
-                             f'{str(l.get("strategy", "?")).strip().lower()}: {l.get("line", "")}'
-                             + (f' (win condition: {l.get("win_condition")})' if l.get("win_condition") else "")
+                             f'{str(l.get("strategy", "?")).strip().lower()}: {_s(l.get("line", ""))}'
+                             + (f' (win condition: {_s(l.get("win_condition"))})' if l.get("win_condition") else "")
                              for l in pls)
             lines = ('\nIts THREE PAIR-LINES — each PAIR of archetypes is a distinct game plan (D3). Build a full '
                      'package for EACH (enablers at common, amplifiers at uncommon, >=1 rare FINISHER), tag every '
@@ -793,16 +830,16 @@ for a second signature under the card cap)."""
                      '([{"pair": [id1, id2], "strategy": "aggro|control|combo"}, ...], three distinct strategies):\n'
                      + rows + "\n")
         elif lns:
-            rows = "\n".join(f'- {str(l.get("strategy", "?")).strip().lower()}: {l.get("line", "")}'
-                             + (f' (win condition: {l.get("win_condition")})' if l.get("win_condition") else "")
+            rows = "\n".join(f'- {str(l.get("strategy", "?")).strip().lower()}: {_s(l.get("line", ""))}'
+                             + (f' (win condition: {_s(l.get("win_condition"))})' if l.get("win_condition") else "")
                              + (f' [plays like: {l.get("idiom")}]' if l.get("idiom") else "")
                              for l in lns)
             lines = ('\nIts STRATEGIC LINES (build a package for EACH — enablers at common, amplifiers at '
                      'uncommon, >=1 rare FINISHER — and tag the cards with "strategy"):\n' + rows + "\n")
         n_word = "THREE" if is_triad else "TWO"
         tension_label = (f'The {n_word} archetypes (a tension TRIANGLE of pairs — '
-                         f'{c.tension or "each pair pulls a different way"})' if is_triad else
-                         f'The {n_word} archetypes (in tension — {c.tension or "they pull against each other"})')
+                         f'{_s(c.tension) or "each pair pulls a different way"})' if is_triad else
+                         f'The {n_word} archetypes (in tension — {_s(c.tension) or "they pull against each other"})')
         use_line = (f"Use these three archetypes as the blueprint's three archetypes (keep their ids). "
                     if is_triad else
                     f"Use these two archetypes as the blueprint's two archetypes (keep their ids). ")
@@ -810,10 +847,10 @@ for a second signature under the card cap)."""
             "A staged design front-end has already chosen this class identity. Build its blueprint — the card "
             "briefs and any pools — faithfully to it. Do NOT rename it or change its archetypes.\n\n"
             f'Name (use EXACTLY): "{c.name}"\n'
-            f'Fantasy (this is the description): {c.fantasy}\n'
+            f'Fantasy (this is the description): {_s(c.fantasy)}\n'
             f'Suggested max_hp: {c.suggested_max_hp}\n'
-            f'Core loop: {c.core_loop}\n'
-            f'Weakness: {c.weakness}\n'
+            f'Core loop: {_s(c.core_loop)}\n'
+            f'Weakness: {_s(c.weakness)}\n'
             f'{tension_label}:\n{archs}\n'
             f'{lines}{kind_guidance}{relic}{skin}\n\n'
             f"{use_line}{self._pool_ask()}"
@@ -864,6 +901,73 @@ for a second signature under the card cap)."""
         src = (getattr(c, "pair_lines", None) or []) if len(ids) >= 3 else (getattr(c, "strategic_lines", None) or [])
         declared = [l.get("strategy") for l in src if isinstance(l, dict)]
         return _topup_blueprint_briefs(bp, strategies=declared)
+
+
+# --- Creative harness v2 (Fix D): blueprint-prompt pruning + the coverage-nomination ask ---------------
+# Heading prefix -> (the vocabulary tokens whose presence among the SELECTED archetypes' ops keeps the section,
+# the class_kind that keeps it). Under BTS_HARNESS_V2 the long archetype "sales pitch" sections are included only
+# for archetypes actually chosen (the prompt shrinks by roughly a third, and examples the model must not use
+# are gone). Everything not listed here (triggers, scaled amounts, precision reads, strategic lines, the
+# format + rules) always stays.
+_ORB_TOKENS = frozenset({"channel_orb", "evoke", "gain_orb_slot", "focus", "orbs_match", "orb_count_ge"})
+_PRUNABLE_SECTIONS: list[tuple[str, frozenset, str | None]] = [
+    ("ORB CLASSES", _ORB_TOKENS, "orb"),
+    ("THE ORB POOL", _ORB_TOKENS, "orb"),
+    ("THE SLOT-MACHINE ARCHETYPE", _ORB_TOKENS, "orb"),
+    ("TAGGED SYNERGY", frozenset({"tag_cards_owned"}), None),
+    ("TOKEN GENERATION", frozenset({"add_card"}), None),
+    ("RAMPAGE", frozenset({"grow"}), None),
+    ("IN-RUN UPGRADE", frozenset({"upgrade_card"}), None),
+    ("DECK-THINNING", frozenset({"purge", "purge_card"}), None),
+    ("DISCARD / HAND-CHURN", frozenset({"discard", "scry", "on_discard"}), None),
+    ("CORRUPTION", frozenset({"corruption"}), None),
+    ("METAMORPH", frozenset({"transform_card", "graft_card"}), None),
+    ("THE FORGE / SIGNATURE-BLADE ARCHETYPE",
+     frozenset({"forge", "forged_ge", "blade_empower", "summon_blade", "on_blade_played"}), None),
+    ("THE BALANCE ARCHETYPE", frozenset({"balance_step"}), None),
+    ("THE STATUS POOL", frozenset({"apply_status_custom"}), "status"),
+    ("THE SUMMON POOL", frozenset({"summon", "summon_attack", "buff_summon", "heal_summon", "shield_summon"}),
+     "summon"),
+]
+# The generic half of the slot-machine section (conditions work on ANY class) survives pruning as this line.
+_CONDITIONS_PARAGRAPH = (
+    "CONDITIONAL PAYOFFS (`when` — on ANY class): give a card a real \"if X then bonus\" twist instead of a flat "
+    "stat line — `when:{\"kind\":\"hp_below_half\"}` (execute), `when:{\"kind\":\"no_block\"}` (reward "
+    "aggression), `when:{\"kind\":\"target_has_status\", \"status\":\"poison|vulnerable|weak|frail\"}` "
+    "(follow-up), `turn_at_least`, `enemy_count_ge`, `has_block`, `hand_size_ge`. Conditional payoffs are "
+    "swings, so put the splashy numbers at uncommon/rare. SHAPE RULE: a card carries ONE damage value, so gate "
+    "the card's only damage line or put the conditional bonus on a DIFFERENT op.")
+
+
+def _prune_archetype_sections(prompt: str, selected_ops, class_kind: str | None) -> str:
+    """Drop the pitch paragraphs for subsystems none of the selected archetypes use (see _PRUNABLE_SECTIONS)."""
+    ops = {str(o) for o in (selected_ops or [])}
+    out: list[str] = []
+    for para in prompt.split("\n\n"):
+        head = para.lstrip()
+        rule = next((r for r in _PRUNABLE_SECTIONS if head.startswith(r[0])), None)
+        if rule is None:
+            out.append(para)
+            continue
+        _, tokens, kind = rule
+        if (ops & tokens) or (kind is not None and class_kind == kind):
+            out.append(para)
+        elif rule[0] == "THE SLOT-MACHINE ARCHETYPE":
+            out.append(_CONDITIONS_PARAGRAPH)
+    return "\n\n".join(out)
+
+
+def _nomination_ask() -> str:
+    """Fix B: ask the blueprint to nominate, per class, which reactive triggers / `when` kinds / exotic statuses
+    fit the theme. The coverage pass may then only inject from that set (coverage.sanitize_nominations)."""
+    from . import coverage
+    react = ", ".join(k for k, _ in coverage.REACTIVE_MENU_V2)
+    when = ", ".join(k for k, _ in coverage.WHEN_MENU_V2)
+    exotic = ", ".join([k for k, _ in coverage.EXOTIC_MENU_V2] + ["thorns", "metallicize"])
+    return (' Also declare a top-level "coverage_nominations" object naming the mechanics that FIT this theme '
+            f'(a later set-level coverage pass may ONLY inject from these): {{"reactive": [3 of: {react}], '
+            f'"when": [4 of: {when}], "exotic": [3 of: {exotic}]}}. Pick the ones this identity would '
+            'genuinely reach for, not the first on the list.')
 
 
 # --- Phase L: the keystone starter relic (constrained to the mod's ForgedRelic runtime) -----------
@@ -2082,9 +2186,13 @@ def _class_context(bp: dict) -> str:
     engines, so 'synergy' could only survive if the blueprint's one-liner spelled it out. Kept short (a few
     lines) since the vocabulary+schema dominate the prompt anyway."""
     archs = [a for a in (bp.get("archetypes") or []) if isinstance(a, dict)]
+    # Creative harness v2 (Fix C): the catalog's stock metaphors never reach a card call — the card model gets
+    # the class's OWN fantasy line, with the catalog phrases (stamped on bp by the builder) stripped.
+    from . import harness_v2
+    _mets = bp.get("catalog_metaphors") if harness_v2.enabled() else None
     lines = "\n".join(f"- {a.get('name') or a.get('id') or 'engine'}: "
-                      f"{str(a.get('description') or '').strip()}" for a in archs)
-    desc = str(bp.get("description") or "").strip()
+                      f"{harness_v2.strip_metaphors(str(a.get('description') or '').strip(), _mets)}" for a in archs)
+    desc = harness_v2.strip_metaphors(str(bp.get("description") or "").strip(), _mets)
     # Phase 1: the wording flexes with the archetype count. A triad card serves ONE engine and may nod to ONE
     # partner (never all three) — that is what keeps the three pair-lanes distinct.
     if len(archs) >= 3:
@@ -2157,12 +2265,18 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
     BTS_TRIAD (triad_enabled). The prompt/target MODE is decided by the blueprint contract (which reads the
     same flag); validation + all downstream knobs key off the blueprint's ACTUAL archetype count, so this
     argument is purely for attribution."""
+    from . import contract as _card_contract
+    from . import harness_v2
     from .contract import Brief as CardBrief
     from .pipeline import generate_card
     from .validator import CardValidator, vocab_misses
     from .bts1 import VOCAB_VERSION
 
     res = ClassResult(ok=False)
+    res.stats = {"cards_attempted": 0, "cards_first_ok": 0, "cards_ok": 0, "injections": []}
+    # Creative harness v2 (BTS_HARNESS_V2=1): read ONCE per forge; every v2 branch below keys off this.
+    _v2 = harness_v2.enabled()
+    _v2_seed = harness_v2.seed_for(brief.concept) if _v2 else 0
 
     def note(m: str) -> None:
         res.log.append(m)
@@ -2177,7 +2291,7 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
     # triad path stamps its OWN version so every forge is attributable to the mode that produced it.
     _is_triad = triad_enabled(triad)
     _harness = HARNESS_VERSION_TRIAD if _is_triad else HARNESS_VERSION
-    note(f"forge harness v{_harness} (vocab v{VOCAB_VERSION})")
+    note(f"forge harness v{_harness} (vocab v{VOCAB_VERSION})" + (" [creative harness v2]" if _v2 else ""))
 
     # --- Phase N-2: roll the featured-mechanic roulette (seeded per concept) BEFORE stage 1 so both brief
     # modes REQUIRE them. The one-shot concept brief uses this BLIND roll as-is; the staged front-end may
@@ -2258,8 +2372,43 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
     # directives here AND the coverage round's post-hoc witness check below.
     bridge_ctx = _resolve_bridge_ctx(bp)
     class_ctx = _class_context(bp)
-    card_gen = card_gen_factory()
+    # Creative harness v2 (Fix A): the class identity rides the per-card SYSTEM prompt. The card generators
+    # cache system_prompt() at construction, so bind the identity scope around card_gen_factory() only
+    # (a ContextVar — thread-local, so concurrent web forges never see each other's class).
+    _scope_tok = None
+    if _v2:
+        _scope_tok = _card_contract.set_class_scope(
+            {"identity": harness_v2.identity_block(bp, bp.get("catalog_metaphors"))})
+    try:
+        card_gen = card_gen_factory()
+    finally:
+        if _scope_tok is not None:
+            _card_contract.reset_class_scope(_scope_tok)
     made: list[dict] = []  # {plan, card} in slot order
+    _v2_triples: set = set()  # exemplar id-sets already dealt in this class (never the same three twice)
+    _v2_arch_ids = _archetype_ids(bp)
+    _v2_kind = ("orb" if int(bp.get("orb_slots", 0) or 0) > 0 else "status" if bp.get("status_pool")
+                else "summon" if bp.get("summon_pool") else "normal")
+
+    def _v2_brief(cb, plan: dict, salt: str) -> None:
+        """Fix A per-card material: 2-3 rotating class-appropriate exemplars (archetype + rarity matched, seeded,
+        never the same set twice in this class) + the class's already-used shapes line."""
+        if not _v2:
+            return
+        prefer = [str(plan.get("archetype"))] if plan.get("archetype") else []
+        ex = harness_v2.pick_exemplars(prefer + list(_v2_arch_ids), str(plan.get("rarity", "common")), _v2_seed,
+                                       class_kind=_v2_kind, salt=salt, avoid_triples=_v2_triples)
+        _v2_triples.add(frozenset(c.get("id") for c in ex))
+        cb.exemplars = ex
+        cb.used_shapes = harness_v2.used_shapes_line(made)
+        cb.archetype_ids = list(_v2_arch_ids)
+
+    def _count(pres) -> None:
+        res.stats["cards_attempted"] += 1
+        if pres.ok:
+            res.stats["cards_ok"] += 1
+            if not pres.repaired:
+                res.stats["cards_first_ok"] += 1
     vocab_demand: list[dict] = []  # missing-vocab reaches mined from card validation errors (see docstring)
     total = len(bp["cards"])
     for i, plan in enumerate(bp["cards"]):
@@ -2282,10 +2431,12 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
         cbrief = CardBrief(card_type=plan.get("type", "attack"), rarity=plan.get("rarity", "common"),
                            target_cost=plan.get("cost"), theme=theme,
                            context=_card_context(bp, plan, bridge_ctx, class_ctx))
+        _v2_brief(cbrief, plan, f"card{i}")
         note(f"card {i+1}/{total}: designing '{plan.get('name_hint', '?')}' - "
              f"{plan.get('rarity', '?')} {plan.get('type', '?')}, cost {plan.get('cost', '?')}"
              + (f" - {str(plan.get('theme'))[:90]}" if plan.get("theme") else ""))
         pres = generate_card(cbrief, gen=card_gen, validator=validator)
+        _count(pres)
         for kind, token in vocab_misses(pres.all_errors):
             note(f"card {i+1} ({plan.get('name_hint','?')}): reached for missing {kind} `{token}` — "
                  "recording as vocab demand")
@@ -2361,7 +2512,9 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
         cbrief = CardBrief(card_type=plan.get("type", "attack"), rarity=plan.get("rarity", "common"),
                            target_cost=plan.get("cost"), theme=theme,
                            context=_card_context(bp, plan, bridge_ctx, class_ctx))
+        _v2_brief(cbrief, plan, "regen:" + str((old_card or {}).get("id", "")))
         pres = generate_card(cbrief, gen=card_gen, validator=validator)
+        _count(pres)
         if not pres.ok or pres.card is None:
             return None
         new = pres.card
@@ -2389,10 +2542,47 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
 
     try:
         from . import coverage
-        coverage.enforce_coverage(made, _regen_card, note, featured=_feat,
-                                  bridge_ctx=bridge_ctx)
+        _nominated: dict | None = None
+        if _v2:
+            # Fix B: the blueprint's per-class nominations (else the caller's) restrict the coverage menus;
+            # with none, each menu is shuffled on the concept seed so no two classes share an injection order.
+            _nominated = coverage.sanitize_nominations(bp.get("coverage_nominations")
+                                                       or getattr(brief, "coverage_nominations", None))
+            if _nominated:
+                note("coverage nominations: " + "; ".join(f"{k}=[{', '.join(v)}]" for k, v in _nominated.items()))
+            else:
+                note("coverage nominations: none declared; menus shuffled on the concept seed")
+        _cov = coverage.enforce_coverage(made, _regen_card, note, featured=_feat,
+                                         bridge_ctx=bridge_ctx, nominated=_nominated,
+                                         seed=_v2_seed if _v2 else None)
+        res.stats["injections"] = [str(j.get("key")) for j in (_cov.get("injections") or []) if j.get("ok")]
+        if _v2 and res.stats["injections"]:
+            note("coverage injections (ledger): " + ", ".join(res.stats["injections"]))
     except Exception as e:  # coverage is advisory — a bug here must never break a forge
         note(f"coverage: skipped (internal error: {e})")
+
+    # --- Creative harness v2 (Fix D): the name post-pass — reject names used in the user's last 12 forges (the
+    # ledger's v2 `card_names`) or on the global top-50 list; ask for a rename in ONE cheap call. Fake-safe:
+    # the fakes echo the same card back, which the pass logs as a no-op.
+    if _v2:
+        try:
+            from . import ledger as _ledger_mod
+            _banned = harness_v2.banned_names(_ledger_mod.read_window())
+
+            def _rename(card: dict, reason: str):
+                prev = json.dumps(card, separators=(",", ":"))
+                msgs = [{"role": "user", "content": "Rename this card (names only)."},
+                        {"role": "assistant", "content": prev}]
+                text, _ = card_gen.repair(msgs, prev, [reason + " -- return the SAME card JSON with ONLY the "
+                                                        "`name` changed (keep every effect and number)"])
+                obj = _extract(text)
+                return obj.get("name") if isinstance(obj, dict) else None
+
+            _n = harness_v2.rename_pass(made, _banned, _rename, note)
+            if _n:
+                note(f"name pass: {_n} card(s) renamed away from recent/overused names")
+        except Exception as e:  # noqa: BLE001 — the name pass is advisory
+            note(f"name pass: skipped (internal error: {e})")
 
     # Merchant safety net: guarantee the non-basic pool has a card of every type the shop wants (Attack/Skill/
     # Power). Generation can drop the planned Power, leaving an empty bucket that hangs the merchant in-game.
@@ -2565,7 +2755,13 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
     # must NEVER break a shipped class). Later forges read the window to steer away from recent repeats.
     try:
         from . import ledger
-        if ledger.record_forge(res.bundle, bp):
+        _extra = None
+        if _v2:
+            _extra = {"harness": "v2",
+                      "card_names": [str(m["card"].get("name", "")) for m in made
+                                     if m["plan"].get("role") not in _BASIC_ROLES and not m["card"].get("token")],
+                      "injections": list(res.stats.get("injections") or [])}
+        if ledger.record_forge(res.bundle, bp, extra=_extra):
             note("recorded this forge in the cross-forge usage ledger")
     except Exception:
         pass

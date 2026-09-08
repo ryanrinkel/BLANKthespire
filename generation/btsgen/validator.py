@@ -1029,6 +1029,13 @@ class CardValidator:
             msg = ("functional reprint of %s: the same effect skeleton with identical-or-"
                    "nudged numbers at the same-or-adjacent cost" % ", ".join(sorted(reprints)))
             if rarity in ("uncommon", "rare"):
+                # Creative harness v2 (BTS_HARNESS_V2=1): the per-card brief already lists the class's used
+                # shapes up front (Fix A), so at UNCOMMON the gate downgrades to a warning — late cards in a
+                # class are no longer pushed into gimmicks or dropped. Rare keeps the hard error.
+                from . import harness_v2
+                if rarity == "uncommon" and harness_v2.enabled():
+                    return [], [msg + " -- tolerated at uncommon under harness v2 (the brief carried the "
+                                "used shapes), but it adds nothing new"]
                 return [msg + " -- redesign with a mechanically different composition "
                         "(different ops / conditions / scaling), not just different numbers"], []
             return [], [msg + " -- tolerated at common, but it adds nothing new"]

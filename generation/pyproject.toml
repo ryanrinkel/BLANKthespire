@@ -18,6 +18,9 @@ web = [
     "sqlalchemy>=2.0",
     "pymysql>=1.1",
     "python-dotenv>=1.0",
+    "requests>=2.31",   # authlib's OAuth client imports it at runtime
+    "gunicorn>=21.0",   # WSGI server on the droplet
+    "stripe>=9.0",      # token-pack purchases (Checkout + webhook)
 ]
 
 [project.scripts]
@@ -32,6 +35,7 @@ btsgen-character-review = "btsgen.cli_character_review:main"
 btsgen-autoslay-smoke = "btsgen.cli_autoslay_smoke:main"
 btsgen-forge-splash = "btsgen.cli_forge_splash:main"
 btsgen-census = "btsgen.cli_census:main"
+btsgen-bench = "btsgen.cli_bench:main"
 
 [dependency-groups]
 dev = [

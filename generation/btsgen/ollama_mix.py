@@ -252,6 +252,28 @@ def _normalize_fallback(fb: dict | None) -> dict | None:
             "api_key": api_key, "models": models, "cooldown_s": int(fb.get("cooldown_s", 3600))}
 
 
+# Creative harness v2 (BTS_HARNESS_V2=1, the temperature half of Fix E): warm the STRUCTURE role (map/compose +
+# blueprint) from 0.4 to 0.6 on the token path. Cards stay at 0.3 (the encode step must be convergent). Applied
+# to the built-in map only — an explicit --ollama-config keeps whatever it says.
+HARNESS_V2_TEMPERATURES = {"structure": 0.6}
+
+
+def effective_role_map(role_map: dict | None = None) -> dict:
+    """The role map build_ollama_mix / describe should use: the caller's map verbatim, or DEFAULT_ROLE_MAP with
+    the harness-v2 temperature bump applied when the flag is on (read at call time, so the flag governs)."""
+    if role_map is not None:
+        return role_map
+    from . import harness_v2
+    if not harness_v2.enabled():
+        return DEFAULT_ROLE_MAP
+    import copy
+    out = copy.deepcopy(DEFAULT_ROLE_MAP)
+    for role, temp in HARNESS_V2_TEMPERATURES.items():
+        if role in out.get("roles", {}):
+            out["roles"][role]["temperature"] = temp
+    return out
+
+
 def build_ollama_mix(role_map: dict | None = None, *, on_usage=None):
     """role_map -> (blueprint_gen, card_gen_factory, relic_gen, make_gen). Mirrors the tuple the existing
     forge paths consume; each role gets its own model/endpoint via OpenAICompatGenerator. `on_usage` (optional)
@@ -260,9 +282,17 @@ def build_ollama_mix(role_map: dict | None = None, *, on_usage=None):
     # Claude, and a whole-stage re-roll usually lands — default the staged front-end to 2 attempts on this
     # path. setdefault: an explicit BTS_STAGE_ATTEMPTS (env or caller) always wins.
     os.environ.setdefault("BTS_STAGE_ATTEMPTS", "2")
-    cfg = _normalize(role_map or DEFAULT_ROLE_MAP)
+    cfg = _normalize(effective_role_map(role_map))
     cap = cfg["max_tokens_cap"]
     fb = cfg["fallback"]
+
+    def _tagged(role: str, model: str):
+        """Wrap on_usage so each usage dict also says which role/model produced it (the web's per-forge cost
+        ledger groups by these). The original keys are untouched, so callers reading prompt_tokens etc. work."""
+        if on_usage is None:
+            return None
+        return lambda u, _r=role, _m=model: on_usage(
+            {**u, "_role": _r, "_model": _m} if isinstance(u, dict) else u)
 
     def _gen(role: str, contract_mod, max_tokens: int):
         spec = cfg["roles"][role]
@@ -277,7 +307,7 @@ def build_ollama_mix(role_map: dict | None = None, *, on_usage=None):
             contract_mod=contract_mod, max_tokens=eff, timeout=spec["timeout"],
             response_format=spec.get("response_format"),
             temperature=spec.get("temperature"),
-            on_usage=on_usage,
+            on_usage=_tagged(role, spec["model"]),
             extra_body=spec.get("extra_body"),
         )
         if not fb:
@@ -291,7 +321,7 @@ def build_ollama_mix(role_map: dict | None = None, *, on_usage=None):
             contract_mod=contract_mod, max_tokens=eff, timeout=spec["timeout"],
             response_format=spec.get("response_format"),
             temperature=spec.get("temperature"),
-            on_usage=on_usage,
+            on_usage=_tagged(role, fb["models"][role]),
             extra_body=spec.get("extra_body"),
         )
         return _FailoverGenerator(primary, fallback, fb["cooldown_s"])
@@ -314,7 +344,7 @@ def load_role_map(path: str | os.PathLike) -> dict:
 
 def describe(role_map: dict | None = None) -> str:
     """One-line-per-role summary for the CLI banner (no secrets — just role -> model @ host)."""
-    cfg = _normalize(role_map or DEFAULT_ROLE_MAP)
+    cfg = _normalize(effective_role_map(role_map))
     lines = []
     for role in ("brainstorm", "structure", "cards"):
         s = cfg["roles"][role]

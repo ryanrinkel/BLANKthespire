@@ -25,6 +25,11 @@ from . import census
 
 LEDGER_WINDOW = 12
 _NOVELTY_MAX = 2.0            # picker penalty ceiling; STRICTLY below _FIDELITY_WEIGHT (10.0)
+# Creative harness v2 (Fix C): a 10x fidelity weight with a 2.0 cap means novelty NEVER wins; at 6.0 it wins
+# whenever fidelity is within 0.6 of the best candidate. Still below the fidelity weight (a fully off-theme
+# candidate can't be rescued by novelty alone).
+_NOVELTY_MAX_V2 = 6.0
+USAGE_WINDOW = 200            # how far back "global" archetype usage (the cold set) looks
 _PAIR_W = 0.8                 # weight of a recent pair-repeat (any C(n,2) pair the candidate shares)
 _ARCH_W = 0.3                 # weight of each shared archetype
 _TRIPLE_W = 1.2              # extra weight when the WHOLE triple recurs (a triad repeat is worse than a pair)
@@ -128,9 +133,11 @@ def _pool_designs(blueprint) -> dict:
     return out
 
 
-def record_forge(bundle: dict, blueprint: dict, *, ts: float | None = None) -> bool:
+def record_forge(bundle: dict, blueprint: dict, *, ts: float | None = None, extra: dict | None = None) -> bool:
     """Append one ledger line for a successful forge. Returns True on write, False on any failure (never
-    raises). The census fields come from census.py so the ledger measures the SAME thing the quotas do."""
+    raises). The census fields come from census.py so the ledger measures the SAME thing the quotas do.
+    `extra` (harness v2 only): additional fields merged into the entry — `card_names` (the name post-pass's
+    recent set), `injections` (every coverage-pass injection key), `harness`. Absent => the v1 line shape."""
     try:
         cen = census.census_bundle(bundle)
         entry = {
@@ -148,6 +155,9 @@ def record_forge(bundle: dict, blueprint: dict, *, ts: float | None = None) -> b
             # picks the same archetype is told what already exists and explores a different corner of it.
             "designs": _pool_designs(blueprint),
         }
+        if extra:
+            for k, v in extra.items():
+                entry[str(k)] = v
         path = ledger_path()
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("a", encoding="utf-8") as fh:
@@ -187,6 +197,41 @@ def _recency_weights(window) -> list[float]:
     return [(k + 1) / L for k in range(L)] if L else []
 
 
+def novelty_max() -> float:
+    """The live novelty-penalty cap: 6.0 under harness v2 (BTS_HARNESS_V2=1), else the historical 2.0."""
+    from . import harness_v2
+    return _NOVELTY_MAX_V2 if harness_v2.enabled() else _NOVELTY_MAX
+
+
+def archetype_usage(window) -> Counter:
+    """archetype id -> number of ledger entries that used it (UNweighted — the 'global usage' the cold set
+    ranks by). Entries without archetype ids contribute nothing."""
+    out: Counter = Counter()
+    for e in window or []:
+        for aid in {str(i) for i in (e.get("archetype_ids") or []) if i}:
+            out[aid] += 1
+    return out
+
+
+def cold_archetypes(all_ids, usage: Counter, k: int, seed: int = 0) -> list[str]:
+    """The `k` least-used archetype ids (ties broken by a seeded shuffle so a fresh ledger doesn't always
+    surface the same alphabetical few). Fix C: the picker requires one of these per forge."""
+    from . import harness_v2
+    ids = harness_v2.seeded_shuffle([str(i) for i in (all_ids or [])], int(seed), "cold")
+    ids.sort(key=lambda i: usage.get(i, 0))  # stable: seeded order survives among equal usage
+    return ids[:max(0, int(k))]
+
+
+def recent_card_names(window) -> set[str]:
+    """Lower-cased card names recorded by recent (v2) ledger entries — the name post-pass's recent set."""
+    out: set[str] = set()
+    for e in window or []:
+        for n in (e.get("card_names") or []):
+            if isinstance(n, str) and n.strip():
+                out.add(n.strip().lower())
+    return out
+
+
 def pair_penalty(archetype_ids, window) -> float:
     """A novelty penalty in [0, _NOVELTY_MAX]: recency-weighted overlap of this candidate's archetypes/pairs
     with the recent window. 0 when nothing overlaps; grows with recent PAIR repeats (each of the candidate's
@@ -212,7 +257,7 @@ def pair_penalty(archetype_ids, window) -> float:
         if len(full) >= 3 and frozenset(eids) == full:  # the WHOLE triple recurred — the worst kind of repeat
             triple_hits += w
         arch_hits += w * len(ids & eids)
-    return min(_NOVELTY_MAX, _PAIR_W * pair_hits + _TRIPLE_W * triple_hits + _ARCH_W * arch_hits)
+    return min(novelty_max(), _PAIR_W * pair_hits + _TRIPLE_W * triple_hits + _ARCH_W * arch_hits)
 
 
 def featured_recency(window) -> dict:

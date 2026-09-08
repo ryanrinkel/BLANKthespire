@@ -49,6 +49,25 @@ EXOTIC_MENU = [
     ("temp_strength", 'REQUIRED: apply_status temp_strength (a burst of Strength for this turn only).'),
     ("blur", 'REQUIRED: apply_status blur (your Block is not removed next turn).'),
 ]
+# Creative harness v2 (BTS_HARNESS_V2=1, Fix B): the default exotic menu WITHOUT thorns/metallicize at its head
+# (the two most generic entries in the vocabulary — they were injected into 5 of 14 ledger forges each) and a
+# few more distinct statuses. Under v2 every menu is either filtered to the blueprint's per-class NOMINATIONS
+# or shuffled with a seed derived from the concept hash, so two classes never receive the same injection order.
+EXOTIC_MENU_V2 = [
+    ("regen", 'REQUIRED: apply_status regen (heal at the end of your turn).'),
+    ("temp_strength", 'REQUIRED: apply_status temp_strength (a burst of Strength for this turn only).'),
+    ("blur", 'REQUIRED: apply_status blur (your Block is not removed next turn).'),
+    ("artifact", 'REQUIRED: apply_status artifact (negate the next debuff applied to you).'),
+    ("buffer", 'REQUIRED: apply_status buffer (prevent the next instance of HP loss).'),
+    ("temp_dexterity", 'REQUIRED: apply_status temp_dexterity (a burst of Dexterity for this turn only).'),
+]
+REACTIVE_MENU_V2 = REACTIVE_MENU + [
+    ("on_card_drawn", 'REQUIRED: add an ongoing power (op "add_trigger", trigger "on_card_drawn", once_per_turn) that rewards drawing a card.'),
+    ("on_damage_dealt", 'REQUIRED: add an ongoing power (op "add_trigger", trigger "on_damage_dealt", once_per_turn) that rewards dealing damage.'),
+]
+WHEN_MENU_V2 = WHEN_MENU + [
+    ("hand_size_ge", 'REQUIRED: gate a bonus with `when` hand_size_ge value:4 (a full-hand payoff).'),
+]
 SCALE_DIRECTIVE = ('REQUIRED: make one damage or block amount scale (scale "cards_in_hand" or '
                    '"cards_retained") instead of a flat number.')
 NONPLAIN_DIRECTIVE = ('REQUIRED: this card must NOT be a plain stat line - build it around a distinctive '
@@ -58,6 +77,69 @@ NONPLAIN_DIRECTIVE = ('REQUIRED: this card must NOT be a plain stat line - build
 # Flat key -> directive lookup so the N-2 featured roulette shares this one phrasebook (roulette + repair).
 DIRECTIVE_BY_KEY = {key: d for key, d in (REACTIVE_MENU + WHEN_MENU + EXOTIC_MENU)}
 DIRECTIVE_BY_KEY["scale"] = SCALE_DIRECTIVE
+# v2 keys (thorns/metallicize stay reachable by NOMINATION only — they are gone from the default v2 head)
+for _k, _d in (REACTIVE_MENU_V2 + WHEN_MENU_V2 + EXOTIC_MENU_V2):
+    DIRECTIVE_BY_KEY.setdefault(_k, _d)
+_KEY_BY_DIRECTIVE = {d: k for k, d in DIRECTIVE_BY_KEY.items()}
+
+# The per-class nomination categories the blueprint may declare (Fix B): category -> the v2 menu it filters.
+NOMINATION_CATEGORIES = ("reactive", "when", "exotic")
+NOMINATION_MAX = {"reactive": 3, "when": 4, "exotic": 3}
+
+
+def sanitize_nominations(raw) -> dict:
+    """Normalize a blueprint's optional `coverage_nominations` ({reactive:[..], when:[..], exotic:[..]}) to known
+    directive keys only, per-category capped. Unknown/malformed input -> {} (the seeded-shuffle default)."""
+    if not isinstance(raw, dict):
+        return {}
+    known = {"reactive": {k for k, _ in REACTIVE_MENU_V2}, "when": {k for k, _ in WHEN_MENU_V2},
+             "exotic": {k for k, _ in EXOTIC_MENU_V2} | {"thorns", "metallicize"}}
+    out: dict = {}
+    for cat in NOMINATION_CATEGORIES:
+        vals = raw.get(cat)
+        if not isinstance(vals, list):
+            continue
+        keep: list[str] = []
+        for v in vals:
+            k = str(v).strip().lower()
+            if k in known[cat] and k not in keep:
+                keep.append(k)
+        if keep:
+            out[cat] = keep[:NOMINATION_MAX[cat]]
+    return out
+
+
+def _menus(nominated: dict | None, seed: int | None) -> tuple[list, list, list]:
+    """The (reactive, when, exotic) menus the repair walker uses. v1 (flag off): the fixed ordered menus,
+    byte-for-byte. v2: each menu is filtered to that category's nominated keys (in nominated order) when the
+    blueprint nominated any; otherwise the v2 menu shuffled with the concept seed."""
+    from . import harness_v2
+    if not harness_v2.enabled():
+        return list(REACTIVE_MENU), list(WHEN_MENU), list(EXOTIC_MENU)
+    nominated = nominated or {}
+    out = []
+    for cat, menu, salt in (("reactive", REACTIVE_MENU_V2, "reactive"), ("when", WHEN_MENU_V2, "when"),
+                            ("exotic", EXOTIC_MENU_V2, "exotic")):
+        keys = nominated.get(cat)
+        if keys:
+            out.append([(k, DIRECTIVE_BY_KEY[k]) for k in keys if k in DIRECTIVE_BY_KEY])
+        elif seed is not None:
+            out.append(harness_v2.seeded_shuffle(menu, seed, salt))
+        else:
+            out.append(list(menu))
+    return out[0], out[1], out[2]
+
+
+def directive_key(directive: str) -> str:
+    """The short menu key for a directive line ('attacked', 'thorns', 'scale', 'nonplain', 'bridge', or
+    'featured') — what the ledger + bench count as an injected mechanic."""
+    if directive in _KEY_BY_DIRECTIVE:
+        return _KEY_BY_DIRECTIVE[directive]
+    if directive == NONPLAIN_DIRECTIVE:
+        return "nonplain"
+    if "BRIDGE" in directive or "fuse" in directive.lower():
+        return "bridge"
+    return "featured"
 
 
 @dataclass
@@ -223,9 +305,13 @@ def measure(made: list[dict]) -> PoolReport:
     return rep
 
 
-def plan_repairs(rep: PoolReport, budget: int = REPAIR_BUDGET) -> list[str]:
+def plan_repairs(rep: PoolReport, budget: int = REPAIR_BUDGET, *, nominated: dict | None = None,
+                 seed: int | None = None) -> list[str]:
     """Ordered directive lines to inject (one per victim), capped at `budget`. Projects coverage forward as
-    it assigns so it never over-requests a mechanic already covered by an earlier directive."""
+    it assigns so it never over-requests a mechanic already covered by an earlier directive. `nominated` /
+    `seed` (harness v2 only) pick the menus: the blueprint's per-class nominations, else a concept-seeded
+    shuffle (see _menus). Flag off: the fixed v1 menus, unchanged."""
+    reactive_menu, when_menu, exotic_menu = _menus(nominated, seed)
     directives: list[str] = []
     proj_reactive = set(rep.reactive_kinds)
     proj_when = set(rep.when_kinds)
@@ -235,21 +321,21 @@ def plan_repairs(rep: PoolReport, budget: int = REPAIR_BUDGET) -> list[str]:
     def room() -> bool:
         return len(directives) < budget
 
-    for key, d in REACTIVE_MENU:
+    for key, d in reactive_menu:
         if len(proj_reactive) >= MIN_REACTIVE_TRIGGER_KINDS or not room():
             break
         if key in proj_reactive:
             continue
         directives.append(d)
         proj_reactive.add(key)
-    for key, d in WHEN_MENU:
+    for key, d in when_menu:
         if len(proj_when) >= MIN_WHEN_KINDS or not room():
             break
         if key in proj_when:
             continue
         directives.append(d)
         proj_when.add(key)
-    for key, d in EXOTIC_MENU:
+    for key, d in exotic_menu:
         if len(proj_exotic) >= MIN_EXOTIC_STATUSES or not room():
             break
         if key in proj_exotic:
@@ -280,14 +366,18 @@ def _featured_missing(made: list[dict], featured) -> list:
 
 
 def enforce_coverage(made: list[dict], regen_card, note, *, featured=None, bridge_ctx=None,
-                     budget: int = REPAIR_BUDGET) -> dict:
+                     budget: int = REPAIR_BUDGET, nominated: dict | None = None,
+                     seed: int | None = None) -> dict:
     """Census the pool, run ONE bounded repair round, stream a summary + WARNING notes. Mutates `made`
     in place (swapping repaired cards). `regen_card(plan, old_card, directive) -> card|None` rebuilds one
     card. `featured` = the N-2 rolled mechanics (each missing one is a quota item with its own directive).
     `bridge_ctx` (O-1) = {ops_a, ops_b, name_a, name_b} or None: when present, bridge cards that do NOT fuse
     both engines are repaired IN PLACE with a fusion directive, ahead of the featured + generic directives
-    (bridges are the class identity). Returns a summary dict (also handy for tests). Never raises through to
-    the caller's forge — the caller wraps this, but we keep it self-contained too."""
+    (bridges are the class identity). `nominated` / `seed` (harness v2): the blueprint's per-class menu
+    nominations + the concept seed for the shuffled fallback (see plan_repairs). Returns a summary dict (also
+    handy for tests) whose `injections` list records every injected mechanic ({key, old, new, ok}) so the
+    ledger + bench can count them. Never raises through to the caller's forge — the caller wraps this, but we
+    keep it self-contained too."""
     featured = list(featured or [])
     before = measure(made)
     note(f"coverage: pool {before.pool_size} cards - plain {before.plain_share:.0%} (max {MAX_PLAIN_SHARE:.0%}), "
@@ -320,7 +410,7 @@ def enforce_coverage(made: list[dict], regen_card, note, *, featured=None, bridg
 
     summary = {"before": before, "repaired": 0, "attempted": 0, "after": before,
                "featured_missing_before": [f.id for f in feat_missing],
-               "bridge_fail_before": list(bridge_fail)}
+               "bridge_fail_before": list(bridge_fail), "injections": []}
     violations = (list(before.violations)
                   + [f"featured '{f.id}' not woven in" for f in feat_missing]
                   + ([f"{len(bridge_fail)} bridge card(s) do not fuse both engines"] if bridge_fail else []))
@@ -342,7 +432,7 @@ def enforce_coverage(made: list[dict], regen_card, note, *, featured=None, bridg
 
     remaining = max(0, budget - len(pairs))
     directives: list[str] = []
-    for d in [f.directive for f in feat_missing] + plan_repairs(before, remaining):
+    for d in [f.directive for f in feat_missing] + plan_repairs(before, remaining, nominated=nominated, seed=seed):
         if d not in directives:
             directives.append(d)
     directives = directives[:remaining]
@@ -364,13 +454,16 @@ def enforce_coverage(made: list[dict], regen_card, note, *, featured=None, bridg
             new_card = regen_card(made[idx].get("plan") or {}, old, directive)
         except Exception as e:  # a repair failure must never break the forge
             note(f"coverage repair: '{old_name}' regeneration errored ({e}); keeping original")
+        key = directive_key(directive)
         if new_card:
             made[idx]["card"] = new_card
             summary["repaired"] += 1
             gist = directive.replace("REQUIRED:", "").strip()[:64]
             note(f"coverage repair: '{old_name}' -> '{new_card.get('name', '?')}' ({gist})")
+            summary["injections"].append({"key": key, "old": old_name, "new": new_card.get("name", "?"), "ok": True})
         else:
             note(f"coverage repair: '{old_name}' could not be improved; keeping original")
+            summary["injections"].append({"key": key, "old": old_name, "new": None, "ok": False})
 
     after = measure(made)
     feat_missing_after = _featured_missing(made, featured)

@@ -56,6 +56,9 @@ class DossierBrief:
     concept: str = ""
     skin: dict | None = None
     featured: list | None = None   # Phase N-2 roulette picks, threaded from the ClassBrief for the brief block
+    # Creative harness v2 (Fix C): the chosen archetypes' catalog metaphor phrases, so the blueprint brief can
+    # strip them (they belong to the cloud stage only). None/empty = nothing to strip (the v1 brief).
+    metaphors: list | None = None
 
 
 @dataclass

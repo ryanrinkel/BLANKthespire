@@ -9,11 +9,32 @@ so the contract is carried in the prompt and enforced afterward by CardValidator
 """
 from __future__ import annotations
 
+import contextvars
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from . import paths
+
+# --- Creative harness v2 (BTS_HARNESS_V2=1): the per-forge class scope --------------------------------
+# The card generators cache system_prompt() at CONSTRUCTION, and forge_class constructs its card generator
+# inside the forge (card_gen_factory()), so the class identity can ride the system prompt only through a
+# scope set just before that construction. A ContextVar (thread/async-local, like ledger.ledger_scope) keeps
+# concurrent web forges from seeing each other's class. None => no class identity (a bare card call).
+_v2_scope: contextvars.ContextVar = contextvars.ContextVar("bts_card_class_scope", default=None)
+
+
+def set_class_scope(scope: dict | None):
+    """Bind the v2 class scope ({identity: str}) for the current context; returns a token for reset_class_scope."""
+    return _v2_scope.set(dict(scope) if scope else None)
+
+
+def reset_class_scope(token) -> None:
+    _v2_scope.reset(token)
+
+
+def class_scope() -> dict | None:
+    return _v2_scope.get()
 
 # --- DESIGN_HEURISTICS.md loader -----------------------------------------------------------------
 # The forge's design rules live as editable prose in mod/contract/DESIGN_HEURISTICS.md (one source the
@@ -65,6 +86,12 @@ class Brief:
     theme: str = ""                  # free-text flavor/mechanical nudge, e.g. "block-and-counter"
     context: str = ""                # extra design context (e.g. the class/set a card belongs to);
                                      # appended to the user message by the character set-generator
+    # Creative harness v2 (BTS_HARNESS_V2=1) per-card material, rendered by user_brief only under the flag:
+    # `exemplars` = 2-3 pool cards drawn for THIS brief (archetype/rarity-matched, seeded, rotating);
+    # `used_shapes` = the class's already-used effect skeletons (the card must differ in at least one op).
+    exemplars: list | None = None
+    used_shapes: str = ""
+    archetype_ids: list = field(default_factory=list)   # the class's archetype ids (exemplar selection)
 
     def describe(self) -> str:
         parts = [f"type: {self.card_type}", f"rarity: {self.rarity}"]
@@ -193,6 +220,13 @@ def feedback_section(max_entries: int = 20) -> str:
 
 
 def system_prompt() -> str:
+    from . import harness_v2
+    if harness_v2.enabled():
+        return _system_prompt_v2()
+    return _system_prompt_v1()
+
+
+def _system_prompt_v1() -> str:
     paths.assert_project_present()
     vocab = paths.VOCABULARY.read_text(encoding="utf-8")
     schema = paths.CARD_SCHEMA.read_text(encoding="utf-8")
@@ -249,10 +283,94 @@ other engine's payoff. A "bridge" that serves only one engine is a failed design
 - Give it character: a clear mechanical identity, plus optional one-line `flavor`."""
 
 
+def _system_prompt_v2() -> str:
+    """Creative harness v2 (Fix A): the class identity replaces the 'Ironclad-like' framing in the SYSTEM prompt;
+    the fixed Strike/Defend/Bash exemplars are gone (each brief carries its own rotating, class-appropriate
+    exemplars — see user_brief); the compositional clause is generated from the live vocabulary so it names
+    only ops that exist; and the brief's 'shapes already used' line is a first-class rule."""
+    from . import harness_v2
+    paths.assert_project_present()
+    vocab = paths.VOCABULARY.read_text(encoding="utf-8")
+    schema = paths.CARD_SCHEMA.read_text(encoding="utf-8")
+    scope = class_scope() or {}
+    identity = str(scope.get("identity") or "").strip()
+    if identity:
+        who = "ONE forged class — the class described under THE CLASS below"
+        identity_section = f"# THE CLASS (design for THIS class; every card serves one of its engines)\n{identity}\n\n"
+    else:
+        who = "a forged class described in the brief"
+        identity_section = ""
+    return f"""You are a card designer for "BLANK the spire", a Slay-the-Spire-like deckbuilder. You design cards for \
+{who}. You compose cards as JSON, drawn ONLY from a closed effect vocabulary. You never invent ops, statuses, \
+states, or targets — if a mechanic isn't expressible with the vocabulary below, you pick a different design \
+that is.
+
+{identity_section}# THE VOCABULARY (authoring reference)
+{vocab}
+
+# THE JSON SCHEMA (the hard contract — your output is validated against this)
+```json
+{schema}
+```
+
+{rarity_ladder()}
+
+{reprint_section()}
+
+{loop_discipline()}
+
+{hp_economy()}
+{feedback_section()}
+# YOUR TASK
+Design ONE new card matching the brief. Requirements:
+- Output a SINGLE JSON object, schema-valid, and NOTHING else — no prose, no markdown fences, no comments.
+- Use a fresh, unique snake_case `id` and a short human `name`. Never reuse an exemplar's id or name.
+- Compose `effects` only from the vocabulary ops; reference only declared statuses \
+({", ".join(declared_status_ids())}) and existing card ids.
+- Design for the class in the brief's context and set the `character` / `archetype` fields it specifies.
+- Set `"source": "llm"`.
+- Include an `upgrade` (the Rest-site/reward improvement) when it fits the design.
+- Aim for the power level implied by the cost/rarity balance guidance — neither overtuned nor weak.
+- The brief carries EXEMPLAR CARDS (validated forged cards in this style): match their level of composition \
+and balance, never copy them.
+- The brief lists the SHAPES ALREADY USED in this class: this card MUST differ from every one of them in at \
+least one op, status, gate, or scale. Two cards with the same skeleton and nudged numbers are one card.
+- No functional reprints: check THE EXISTING CARD POOL above before settling on a design. ONE exception: \
+when the brief itself asks for a 'Reprint of <Name> (base game)', recreate THAT base-game card faithfully \
+in the vocabulary — keep its name and stay close to its original numbers.
+- Creativity discipline: vulnerable/weak are the game's most generic filler — reach for them LAST, never as \
+a card's whole identity, and only when the brief itself asks for debuffs. Poison is this harness's most \
+overused status: do not default to it. If the brief names an archetype engine, the card's PRIMARY effect must \
+serve that engine; {harness_v2.compositional_clause(vocab)}
+- BRIDGE cards: when the brief marks this card as a BRIDGE (fusion) card, it MUST visibly combine BOTH \
+named engines in the one design — one effect serving each, or one engine's mechanic gating/scaling the \
+other engine's payoff. A "bridge" that serves only one engine is a failed design; do not turn one in.
+- Give it character: a clear mechanical identity, plus optional one-line `flavor`."""
+
+
+def _v2_brief_extras(brief: Brief) -> str:
+    """The v2 per-card material appended to the user message: rotating exemplars + the used-shapes line."""
+    from . import harness_v2
+    ex = brief.exemplars
+    if ex is None:
+        ex = harness_v2.pick_exemplars(brief.archetype_ids, brief.rarity,
+                                        harness_v2.seed_for(f"{brief.theme}|{brief.context}"))
+    out = ""
+    block = harness_v2.exemplar_block(ex)
+    if block:
+        out += "\n" + block + "\n"
+    if brief.used_shapes:
+        out += "\n" + brief.used_shapes + "\n"
+    return out
+
+
 def user_brief(brief: Brief) -> str:
+    from . import harness_v2
     msg = f"Design a card with — {brief.describe()}.\n"
     if brief.context:
         msg += f"\n{brief.context}\n"
+    if harness_v2.enabled():
+        msg += _v2_brief_extras(brief)
     # Targeted feedback fold-in: past player ratings on designs SIMILAR to this brief (the system
     # prompt's feedback section is recency-global; this one is per-card). Empty string when nothing
     # relevant has been rated, so most briefs are untouched.

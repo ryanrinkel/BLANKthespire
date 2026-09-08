@@ -13,8 +13,10 @@ concepts the map stage surfaces, so the gap log stays a first-class roadmap inpu
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
+from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -204,16 +206,85 @@ _KIND_PRIORITY = {"orb": 3, "summon": 2, "status": 1, "normal": 0}
 IDIOM_MAXLEN = 32
 
 
+# Creative harness v2 (Fix C): the per-forge catalog WINDOW. Instead of all 34 archetypes on every forge, the map
+# stage sees 14-16: the cluster matches + a seeded random fill + at least WINDOW_MIN_COLD from the coldest set
+# (lowest global ledger usage). Fewer options with rotation beats a long list with a "prefer buildable" nudge.
+WINDOW_SIZE = 15
+WINDOW_MIN, WINDOW_MAX = 14, 16
+WINDOW_MIN_COLD = 4
+_WORD_RE = re.compile(r"[a-z][a-z\-']{3,}")
+_STOP = frozenset({"with", "that", "this", "from", "your", "into", "then", "them", "they", "when", "what",
+                   "than", "over", "have", "more", "each", "every", "their", "there", "where", "which", "while",
+                   "about", "after", "before", "cards", "card", "class", "enemy", "enemies", "damage", "block"})
+
+
+def _words(*texts) -> set[str]:
+    out: set[str] = set()
+    for t in texts:
+        for w in _WORD_RE.findall(str(t or "").lower()):
+            if w not in _STOP:
+                out.add(w)
+    return out
+
+
 class ArchetypeCatalog:
     def __init__(self, entries: list[ArchetypeEntry]) -> None:
         self.entries = entries
         self.by_id = {e.id: e for e in entries}
 
-    # -- the MAP-stage prompt block (the catalog the LLM matches clusters against) -----------------
-    def prompt_block(self) -> str:
-        lines: list[str] = []
+    # -- Creative harness v2: the rotating catalog window ------------------------------------------
+    def cold_set(self, usage: Counter, seed: int = 0, k: int | None = None) -> list[str]:
+        """The coldest archetypes by global ledger usage: the bottom third of the catalog (at least
+        WINDOW_MIN_COLD), ties broken by a seeded shuffle."""
+        from .. import ledger
+        n = len(self.entries)
+        kk = k if k is not None else max(WINDOW_MIN_COLD, math.ceil(n / 3))
+        return ledger.cold_archetypes([e.id for e in self.entries], usage, min(kk, n), seed)
+
+    def window_ids(self, clusters, seed: int, usage: Counter, *, size: int = WINDOW_SIZE,
+                   min_cold: int = WINDOW_MIN_COLD) -> tuple[list[str], list[str]]:
+        """(window ids, cold ids inside the window). Cluster matches first (token overlap between the cloud
+        stage's cluster names/feelings/concepts and each archetype's name/description/metaphors, best first),
+        then enough of the cold set to hold `min_cold`, then a seeded random fill up to `size`. A catalog no
+        larger than `size` is returned whole."""
+        from .. import harness_v2
+        ids = [e.id for e in self.entries]
+        cold = self.cold_set(usage, seed)
+        if len(ids) <= size:
+            return list(ids), [i for i in ids if i in cold]
+        want = _words(*[f"{c.get('name', '')} {c.get('feeling', '')} {' '.join(c.get('concepts') or [])}"
+                        for c in (clusters or []) if isinstance(c, dict)])
+        scored = []
         for e in self.entries:
+            have = _words(e.name, e.description, " ".join(e.metaphors))
+            scored.append((len(want & have), e.id))
+        order = {i: k for k, i in enumerate(harness_v2.seeded_shuffle(ids, seed, "window"))}
+        scored.sort(key=lambda t: (-t[0], order[t[1]]))
+        matched = [i for sc, i in scored if sc > 0][:max(0, size - min_cold)]
+        window = list(matched)
+        for c in cold:  # top up the cold quota (cold matches already in the window count)
+            if sum(1 for i in window if i in cold) >= min_cold:
+                break
+            if c not in window:
+                window.append(c)
+        for i in harness_v2.seeded_shuffle(ids, seed, "fill"):
+            if len(window) >= size:
+                break
+            if i not in window:
+                window.append(i)
+        return window[:max(size, WINDOW_MIN)], [i for i in window if i in cold]
+
+    # -- the MAP-stage prompt block (the catalog the LLM matches clusters against) -----------------
+    def prompt_block(self, ids=None, cold_ids=()) -> str:
+        """The catalog block. `ids` (harness v2) restricts it to a window, in the window's order; `cold_ids`
+        tags the rarely-used entries the compose stage must include one of per candidate."""
+        entries = self.entries if ids is None else [self.by_id[i] for i in ids if i in self.by_id]
+        cold = set(cold_ids or ())
+        lines: list[str] = []
+        for e in entries:
             tag = "BUILDABLE" if e.buildable else f"NEEDS-VOCAB ({'; '.join(e.block_reasons) or 'gap'})"
+            if e.id in cold:
+                tag += ", COLD: rarely used lately - every candidate must include at least one COLD archetype"
             lines.append(f"- {e.id} | {e.name} [{tag}] (class_kind: {e.class_kind})")
             lines.append(f"    engine: {e.description}")
             lines.append(f"    metaphors: {', '.join(e.metaphors)}")

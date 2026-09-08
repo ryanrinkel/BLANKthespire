@@ -230,11 +230,13 @@ class _MapComposeContract:
             compose_line = (f"Map every cluster, then compose {n} DISTINCT candidate builds (2 archetypes each, "
                             "in tension, each with 2-3 strategic_lines covering at least 2 distinct strategies, "
                             "each line with a win_condition).")
+        cold_line = str(payload.get("cold_line", "")).strip()
         return (
             'Theme: "' + str(concept).strip() + '"\n\n'
             "THE CONCEPT CLUSTERS:\n" + json.dumps(clusters, indent=2) + "\n\n"
             "THE ARCHETYPE CATALOG (use these ids only):\n" + catalog_block + "\n\n"
             + (recency + "\n\n" if recency else "")
+            + (cold_line + "\n\n" if cold_line else "")
             + compose_line + " Prefer BUILDABLE archetypes. Return only the JSON object."
         )
 
@@ -249,6 +251,12 @@ class _MapComposeContract:
         catalog = payload.get("_catalog")
         bids = sorted(catalog.buildable_ids()) if catalog is not None else ["poison_attrition", "block_bulwark"]
         unbuildable = [e.id for e in (catalog.entries if catalog is not None else []) if not e.buildable]
+        # Harness v2: the builder shows a catalog WINDOW (payload["window_ids"]); the fake composes from it
+        # (window order, buildable first) so the offline path exercises the window like the real model would.
+        # Absent (v1) -> the historical sorted-buildable pick.
+        window = [str(i) for i in (payload.get("window_ids") or []) if str(i) in set(bids)]
+        if window:
+            bids = window + [b for b in bids if b not in window]
         # Phase 2 (triad): a fake candidate carries THREE archetype ids + pair_lines; legacy stays two + lines.
         fill = (bids + ["poison_attrition", "block_bulwark", "power_ramp"])
         a, b, cc = fill[:3]
@@ -494,6 +502,7 @@ class _ComposeOnlyContract:
             "THE ARCHETYPE CATALOG (use these ids only):\n" + catalog_block + "\n\n"
             + pick_line + "\n\n"
             + (recency + "\n\n" if recency else "")
+            + (str(payload.get("cold_line", "")).strip() + "\n\n" if str(payload.get("cold_line", "")).strip() else "")
             + compose_line + " Prefer BUILDABLE archetypes. Return only the JSON object."
         )
 

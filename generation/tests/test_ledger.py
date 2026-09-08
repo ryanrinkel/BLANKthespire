@@ -20,6 +20,18 @@ os.environ["BTS_FORGE_LEDGER"] = os.path.join(_TMP, "ledger.jsonl")
 
 from btsgen import ledger  # noqa: E402  (import AFTER the env is set)
 
+
+# These tests pin the v1 numbers (novelty cap 2.0, hard reprint gate at uncommon); harness v2 changes them by
+# design and has its own tests in test_harness_v2.py — so pin the flag OFF here regardless of the ambient env.
+try:
+    import pytest
+
+    @pytest.fixture(autouse=True)
+    def _pin_harness_v1(monkeypatch):
+        monkeypatch.delenv("BTS_HARNESS_V2", raising=False)
+except ImportError:  # standalone `python -m tests.<name>` runs without pytest
+    pass
+
 _PASS = 0
 _FAIL = 0
 

@@ -14,6 +14,7 @@ from __future__ import annotations
 import os
 from collections import Counter
 
+from .. import harness_v2
 from ..class_forge import _BlueprintContract, _extract, triad_enabled, validate_blueprint_for
 from .dossier import Candidate, Dossier, DossierBrief
 from .stage_cloud import _CloudClusterContract, validate_cloud
@@ -29,6 +30,11 @@ _KIND_WEIGHT = {"orb": 3.0, "summon": 2.0, "status": 1.5, "normal": 0.0}
 # distinctiveness ceiling (~6.0: max _KIND_WEIGHT 3.0 + uniqueness ~2.0 + spine 1.0) so a fully-faithful
 # candidate always outranks an off-theme one — distinctiveness only breaks ties among the equally faithful.
 _FIDELITY_WEIGHT = 10.0
+
+# Creative harness v2 (Fix C): the picker REQUIRES one of the chosen archetypes to come from the cold set
+# (lowest global ledger usage) — a hard constraint on the candidate filter, not prompt prose — unless the best
+# cold candidate's fidelity to the concept would drop below this floor.
+_COLD_FIDELITY_FLOOR = 0.5
 
 
 class BlueprintBuildError(RuntimeError):
@@ -59,6 +65,9 @@ class BlueprintBuilder:
         # Phase N-4 recency signals (populated per build() from the cross-forge ledger).
         self._recency_window: list = []
         self._recency_line: str = ""
+        # Creative harness v2 (Fix C): the per-forge catalog window + the cold set (populated per build()).
+        self._cold_ids: set = set()
+        self._window_ids: list = []
 
     # --- progress + the universal per-stage loop ------------------------------------------------
     def _note(self, m: str) -> None:
@@ -292,6 +301,7 @@ class BlueprintBuilder:
         payload = {"concept": concept, "clusters": dossier.clusters,
                    "catalog_block": self._catalog.prompt_block(), "n": self._n, "_catalog": self._catalog,
                    "recency": self._recency_line}
+        self._apply_window(payload, dossier, concept)
         if interactive:
             mc = self._map_compose_interactive(payload, dossier)  # narrates mappings before the pick
         else:
@@ -339,8 +349,29 @@ class BlueprintBuilder:
             declared = [l.get("strategy") for l in (chosen.strategic_lines or []) if isinstance(l, dict)]
         dbrief = DossierBrief(candidate=chosen, relic_intent=dossier.relic_intent, concept=concept,
                               skin=dossier.skin_bank or None, featured=getattr(brief, "featured", None))
-        bp = self._run_stage(self._make_gen(_BlueprintContract(mode="dossier", triad=self._triad), max_tokens=48000),
+        bp_contract = _BlueprintContract(mode="dossier", triad=self._triad)
+        metaphors: list[str] = []
+        if harness_v2.enabled():
+            # Fix C/D: the catalog's stock metaphors stay in the cloud stage (strip them from the brief);
+            # the blueprint prompt rotates its homage examples on the concept seed and carries the long
+            # archetype pitches ONLY for the archetypes actually chosen.
+            metaphors = self._catalog_metaphors(chosen)
+            dbrief.metaphors = metaphors
+            selected_ops: set = set()
+            for aid in chosen.archetype_ids:
+                e = self._catalog.by_id.get(aid)
+                if e is not None:
+                    selected_ops |= set(e.ops)
+            bp_contract = _BlueprintContract(mode="dossier", triad=self._triad,
+                                             seed=harness_v2.seed_for(concept), selected_ops=selected_ops,
+                                             class_kind=chosen.class_kind)
+        bp = self._run_stage(self._make_gen(bp_contract, max_tokens=48000),
                              dbrief, validate_blueprint_for(declared), "blueprint")
+        if harness_v2.enabled():
+            # thread the v2 identity material to the card stage: the strategy lines (for the per-card system
+            # prompt's identity block) + the metaphors to strip from every card-call context.
+            bp["v2_strategy_lines"] = self._strategy_lines(chosen)
+            bp["catalog_metaphors"] = metaphors
         # Phase N-4: stamp the AUTHORITATIVE catalog archetype ids (the 7B often echoes display names into
         # bp["archetypes"][*].id, which would make the ledger + novelty penalty compare names-vs-ids and
         # silently never match). The chosen candidate's ids are the catalog ids the picker also uses.
@@ -354,6 +385,54 @@ class BlueprintBuilder:
             bp["skin"] = dossier.skin_bank
         self._enrich_archetypes(bp, dossier)
         return bp
+
+    # --- Creative harness v2 (Fix C): the catalog window + cold set ------------------------------------
+    def _apply_window(self, payload: dict, dossier: Dossier, concept: str) -> None:
+        """Under BTS_HARNESS_V2, replace the full 34-archetype catalog block with a 14-16 window (cluster
+        matches + seeded fill + >=4 cold) and remember the cold set for the picker's hard constraint. Wholly
+        guarded — any failure keeps the full catalog (the v1 behavior)."""
+        if not harness_v2.enabled():
+            return
+        try:
+            from .. import ledger
+            usage = ledger.archetype_usage(ledger.read_window(ledger.USAGE_WINDOW))
+            seed = harness_v2.seed_for(concept)
+            window, cold_in = self._catalog.window_ids(dossier.clusters, seed, usage)
+            self._cold_ids = set(self._catalog.cold_set(usage, seed))
+            self._window_ids = list(window)
+            payload["catalog_block"] = self._catalog.prompt_block(window, cold_in)
+            payload["window_ids"] = list(window)
+            payload["cold_line"] = ("HARD RULE: every candidate must include at least ONE archetype tagged COLD "
+                                    "(" + ", ".join(cold_in) + ") - the rarely-used engines are how classes "
+                                    "stay distinct from each other.")
+            self._note(f"      catalog window: {len(window)} of {len(self._catalog.entries)} archetypes shown "
+                       f"({len(cold_in)} cold: {', '.join(cold_in)})")
+        except Exception as e:  # noqa: BLE001 — the window is an enhancement; never break the forge
+            self._note(f"      catalog window skipped ({e}); showing the full catalog")
+
+    def _catalog_metaphors(self, c: Candidate) -> list[str]:
+        out: list[str] = []
+        for aid in c.archetype_ids:
+            e = self._catalog.by_id.get(aid)
+            if e is not None:
+                out += [m for m in e.metaphors if m not in out]
+        return out
+
+    @staticmethod
+    def _strategy_lines(c: Candidate) -> list[str]:
+        """Compact 'a + b (strategy): line -> wins by ...' strings for the per-card identity block."""
+        out: list[str] = []
+        for l in (getattr(c, "pair_lines", None) or []):
+            if isinstance(l, dict) and l.get("strategy"):
+                pr = " + ".join(str(x) for x in (l.get("pair") or []))
+                win = f" -> wins by: {l['win_condition']}" if l.get("win_condition") else ""
+                out.append(f"{pr} ({l['strategy']}): {l.get('line', '')}{win}")
+        if not out:
+            for l in (c.strategic_lines or []):
+                if isinstance(l, dict) and l.get("strategy"):
+                    win = f" -> wins by: {l['win_condition']}" if l.get("win_condition") else ""
+                    out.append(f"{l['strategy']}: {l.get('line', '')}{win}")
+        return out
 
     def _reroll_featured(self, brief, cloud: dict, dossier: Dossier) -> None:
         """Phase N-5: replace the blind concept-hash roll with the theme-aware lottery. Wholly guarded —
@@ -536,6 +615,7 @@ class BlueprintBuilder:
         pool = buildable if buildable else cands
         if not buildable:
             self._note("front-end: no fully-buildable candidate; picking the closest (some cards may substitute)")
+        pool = self._cold_filter(pool, dossier)
         # Phase N-4: log the novelty penalty per candidate so the recency pressure is visible in the log.
         if self._recency_window:
             for c in pool:
@@ -552,6 +632,26 @@ class BlueprintBuilder:
             self._note(f"      fidelity: '{chosen.name}' draws {self._fidelity(chosen, dossier):.0%} of its "
                        "mechanics from the theme's driver(s) — the verb-rich subject leads the loop")
         return chosen
+
+    def _cold_filter(self, pool: list[Candidate], dossier: Dossier) -> list[Candidate]:
+        """Creative harness v2 (Fix C): keep only candidates that use at least one COLD archetype, unless no
+        candidate does or the best cold candidate's fidelity falls below _COLD_FIDELITY_FLOOR (then the
+        constraint is waived and logged). Flag off / no cold set: the pool is returned untouched."""
+        if not harness_v2.enabled() or not self._cold_ids or not pool:
+            return pool
+        cold_pool = [c for c in pool if set(c.archetype_ids) & self._cold_ids]
+        if not cold_pool:
+            self._note("      cold rule: no candidate uses a cold archetype; constraint not applicable")
+            return pool
+        best_cold = max(self._fidelity(c, dossier) for c in cold_pool)
+        if best_cold < _COLD_FIDELITY_FLOOR:
+            self._note(f"      cold rule waived: the best cold candidate is only {best_cold:.0%} faithful to the "
+                       f"concept (floor {_COLD_FIDELITY_FLOOR:.0%})")
+            return pool
+        if len(cold_pool) < len(pool):
+            self._note(f"      cold rule: {len(cold_pool)} of {len(pool)} candidate(s) carry a cold archetype; "
+                       "picking among those")
+        return cold_pool
 
     def _score(self, c: Candidate, dossier: Dossier, all_cands: list[Candidate]) -> float:
         """FIDELITY dominates (does the candidate's engine come from the theme's driver subject?), then
