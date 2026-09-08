@@ -1,0 +1,46 @@
+# CI: the generator's offline suite and the web app's Flask-test-client suite. Neither needs an API key, the
+# game, or a network — both run against fakes and a throwaway SQLite file.
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  generation:
+    name: generation (btsgen) tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Sync deps
+        working-directory: generation
+        run: uv sync --extra web
+      - name: pytest
+        working-directory: generation
+        env:
+          PYTHONPATH: ${{ github.workspace }}/generation
+        run: uv run pytest -q -p no:cacheprovider
+
+  web:
+    name: web (Flask) tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Sync deps
+        working-directory: generation
+        run: uv sync --extra web
+      - name: pytest
+        env:
+          PYTHONPATH: ${{ github.workspace }}/generation
+        run: generation/.venv/bin/python -m pytest web/tests -q -p no:cacheprovider
+      - name: JS syntax
+        run: for f in web/static/*.js; do node --check "$f"; done

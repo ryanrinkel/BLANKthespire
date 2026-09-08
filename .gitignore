@@ -58,6 +58,11 @@ settings.local.json
 .mcp.json
 generation/ollama_roles.local.json
 
+# ── Steam Workshop workspace (content/ is staged by workshop/build_workspace.ps1;
+#    workshop.json, image.png, previews/, mod_id.txt ARE committed) ──
+workshop/workspace/content/
+mod-uploader.log
+
 # ── Release artifacts + generated splash art (user content on server) ─
 /release/*.zip
 /web/static/releases/*.zip
