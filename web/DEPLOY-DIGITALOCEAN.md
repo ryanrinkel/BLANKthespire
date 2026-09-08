@@ -151,6 +151,11 @@ In Google Cloud Console → Credentials → your OAuth client → **Authorized r
   and all token forges by a global daily kill-switch (`BTSWEB_TOKEN_DAILY_CAP`, default 1000; `0` disables).
   One forge per account at a time, across all modes; token forges dequeue ahead of BYOK forges. All of it is
   process-local — keep gunicorn at one worker.
+- A forge can never cost a token without delivering a class: every attempt is a `forge_jobs` row settled
+  exactly once by the worker thread (not the browser stream), so a closed tab still gets its class saved or
+  its token refunded; jobs left running by a restart are refunded at boot; a forge running past
+  `BTSWEB_FORGE_MAX_SECONDS` (default 1200) is abandoned and refunded, and if it finishes late the class
+  still lands in the library.
 - `mode=hosted` (our Anthropic key) is retired and answers 410 — nothing can spend that key any more.
 - Deploy with `web/deploy/deploy.sh` (pull, install if requirements changed, run web tests, restart, curl
   `/healthz`). `/healthz` returns 503 when the DB is unreachable — point the uptime monitor at it.

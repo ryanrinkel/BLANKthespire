@@ -33,7 +33,7 @@ from billing import init_billing  # noqa: E402
 from db import db_ping, init_db, session_scope  # noqa: E402
 from forge import (ELEMENT_KINDS, VALID_FEEDBACK_CATEGORIES, ForgeError, UsageMeter,  # noqa: E402
                    append_card_feedback, append_element_feedback, forge_to_bundle, list_models)
-from models import (ForgeUsage, ForgedCard, ForgedClass, User, free_token_available,  # noqa: E402
+from models import (ForgeJob, ForgeUsage, ForgedCard, ForgedClass, User, free_token_available,  # noqa: E402
                     new_slug, spend_token, unspend_token)
 
 # Splash art (Track 2/3): generated at persist time, written to static/forged/<id>/, served by nginx,
@@ -129,6 +129,7 @@ if _sentry_dsn:
 init_db()
 init_auth(app)
 init_billing(app)
+# (forge-job reconciliation runs below, once the settle helpers are defined — see _reconcile_forge_jobs.)
 
 
 # --- hosted-path guardrails: per-IP daily cap on FREE forges + a global daily kill-switch -------------
@@ -201,6 +202,9 @@ def _client_ip() -> str:
 FORGE_MAX_CONCURRENT = int(os.environ.get("BTSWEB_FORGE_MAX_CONCURRENT", "3"))
 FORGE_MAX_QUEUE = int(os.environ.get("BTSWEB_FORGE_MAX_QUEUE", "12"))
 FORGE_QUEUE_TIMEOUT_S = int(os.environ.get("BTSWEB_FORGE_QUEUE_TIMEOUT_S", "1800"))
+# Wall-clock cap on a RUNNING forge. Past it the job is settled as failed (token refunded, user slot freed)
+# and the stream told; the worker thread finishes on its own and, if it succeeds late, still saves the class.
+FORGE_MAX_SECONDS = float(os.environ.get("BTSWEB_FORGE_MAX_SECONDS", "1200"))
 
 _forge_admit_lock = threading.Lock()
 _forge_running = 0
@@ -544,16 +548,53 @@ def _reserve_token(user_id: int) -> tuple[str, dict] | None:
         return kind, _token_state(u)
 
 
-def _refund_token(user_id: int, kind: str, day: str) -> dict | None:
-    """Give back the token a failed forge reserved (see models.unspend_token). Returns the new token state,
-    or None if the user vanished."""
+def _open_forge_job(forge_id: str, user_id: int, *, mode: str, token_kind: str | None, token_day: str,
+                    concept: str) -> None:
     with session_scope() as s:
-        u = s.query(User).filter_by(id=user_id).one_or_none()
-        if u is None:
-            return None
-        unspend_token(u, kind, day)
-        s.flush()
-        return _token_state(u)
+        s.add(ForgeJob(id=forge_id, user_id=user_id, mode=mode, token_kind=token_kind, token_day=token_day,
+                       concept=concept[:2000], status="running"))
+
+
+def _settle_forge_job(forge_id: str, *, ok: bool, class_id: int | None = None,
+                      error: str = "") -> tuple[bool, dict | None]:
+    """Move a job from running to done/failed EXACTLY ONCE, and on failure refund the reserved token in the
+    same transaction. The guarded UPDATE (status='running') is what makes the worker, the wall-clock watchdog
+    and boot reconciliation safe to race: only the caller whose UPDATE hit a row owns the transition.
+    Returns (transitioned, token_state-after-refund or None)."""
+    from datetime import datetime, timezone
+    with session_scope() as s:
+        n = (s.query(ForgeJob)
+             .filter(ForgeJob.id == forge_id, ForgeJob.status == "running")
+             .update({"status": "done" if ok else "failed", "class_id": class_id, "error": (error or "")[:500],
+                      "finished_at": datetime.now(timezone.utc).replace(tzinfo=None)},
+                     synchronize_session=False))
+        if not n:
+            return False, None
+        state = None
+        if not ok:
+            job = s.query(ForgeJob).filter_by(id=forge_id).one()
+            if job.token_kind in ("free", "paid"):
+                u = s.query(User).filter_by(id=job.user_id).one_or_none()
+                if u is not None:
+                    unspend_token(u, job.token_kind, job.token_day or "")
+                    job.refunded = 1
+                    s.flush()
+                    state = _token_state(u)
+        return True, state
+
+
+def _reconcile_forge_jobs() -> int:
+    """Boot-time sweep: any job still 'running' died with the previous process (a deploy restart mid-forge).
+    Settle each as failed, which refunds its token. Returns the number reconciled."""
+    with session_scope() as s:
+        ids = [j.id for j in s.query(ForgeJob).filter_by(status="running").all()]
+    n = 0
+    for fid in ids:
+        done, _ = _settle_forge_job(fid, ok=False, error="the server restarted mid-forge — token refunded")
+        n += int(done)
+    if n:
+        app.logger.warning("reconciled %d forge job(s) left running by a restart (tokens refunded)", n)
+    return n
 
 
 # Estimated provider prices in USD per MILLION tokens: (input, output, cache-read). Only the token path is our
@@ -656,7 +697,7 @@ def forge_class_route():
 
     # The "Use a token" path forges on our server-side Ollama mixture and spends one of the user's tokens —
     # today's free token first, else a paid one — unless they're on the unlimited master list. Reserve it up
-    # front so we can 402 BEFORE streaming; a forge that then fails refunds it in the stream below.
+    # front so we can 402 BEFORE streaming; a forge that then fails is refunded by the worker (see finish_failed).
     ollama_mix = mode == "token"
     unlimited = ollama_mix and is_unlimited(user.get("email", ""))
     reserved = False
@@ -694,76 +735,142 @@ def forge_class_route():
     forge_id = uuid.uuid4().hex
     meter = UsageMeter(default_model=(key or {}).get("model", "") if key else "", default_role=mode)
     usage_mode = "byok" if mode in ("byok", "anthropic") else mode
+    _open_forge_job(forge_id, user["id"], mode=usage_mode, token_kind=token_kind, token_day=token_day,
+                    concept=concept)
+
+    # Everything that MUST happen (save the class, refund the token, record usage) happens on the worker
+    # thread via settle()/finish_*(), never in the SSE generator: the generator only runs while the browser is
+    # still reading, and a closed tab must not cost anyone a class or a token.
+    q: queue.Queue = queue.Queue()
+    choice_meta: dict = {}  # what was offered / picked — stamped into the bundle for the fun experiment
+
+    def refund_state(state: dict | None) -> dict:
+        """After a refund: un-count the free-forge IP cap and return the balance fields for the browser."""
+        if counted_free:
+            free_limiter.uncount(ip, free=True)
+        return dict(state or {})
+
+    def finish_failed(message: str) -> None:
+        """Settle the job as failed (refunding the token if this is the first settlement) and tell the stream."""
+        transitioned, state = _settle_forge_job(forge_id, ok=False, error=message)
+        data = {"error": message}
+        if transitioned and reserved:
+            data.update(refund_state(state))
+        _record_usage(meter, user_id=user["id"], forge_id=forge_id, mode=usage_mode,
+                      token_kind=token_kind, class_id=None, ok=False)
+        q.put(("error", data))
+
+    def finish_done(out: dict) -> None:
+        """Persist the class, then settle the job as done. A save failure is a failed forge (refund). If the
+        job was already settled (wall-clock cap fired), the class is still saved — it's theirs — but nothing
+        about tokens changes and the stream has already been told."""
+        try:
+            forge_meta = None
+            if interactive:
+                forge_meta = {"interactive": True,
+                              "offered_archetypes": choice_meta.get("offered", []),
+                              "picked_archetypes": choice_meta.get("picked", []),
+                              "answered": choice_meta.get("answered", False)}
+            saved = _persist_class(user["id"], concept, out, forge_meta=forge_meta)
+        except Exception as e:
+            finish_failed(f"forged, but saving failed: {e}")
+            return
+        transitioned, _ = _settle_forge_job(forge_id, ok=True, class_id=saved.get("id"))
+        _record_usage(meter, user_id=user["id"], forge_id=forge_id, mode=usage_mode,
+                      token_kind=token_kind, class_id=saved.get("id"), ok=True)
+        if not transitioned:
+            app.logger.info("forge %s finished after its job was settled — class %s saved late",
+                            forge_id, saved.get("id"))
+            with session_scope() as s:  # keep the audit trail honest
+                s.query(ForgeJob).filter_by(id=forge_id).update({"class_id": saved.get("id")})
+        if reserved and token_state:  # tell the browser the new balance so the header updates now
+            saved.update(token_state)
+        if saved.get("slug"):
+            saved["share_url"] = f"{PUBLIC_BASE_URL}/api/deck/{saved['slug']}"
+        q.put(("result", saved))
+
+    def on_wall_clock() -> None:
+        """Watchdog: the forge has run past FORGE_MAX_SECONDS. Refund now and free the user's slot; the worker
+        keeps going and a late success still lands in the library."""
+        transitioned, state = _settle_forge_job(
+            forge_id, ok=False, error=f"the forge ran past {int(FORGE_MAX_SECONDS)}s and was abandoned")
+        if transitioned:
+            data = {"error": "this forge is taking far too long — it's been abandoned and your token "
+                             "refunded. If it does finish, the class will appear in My Classes."}
+            if reserved:
+                data.update(refund_state(state))
+            _user_end(user["id"])
+            q.put(("error", data))
+
+    def archetype_checkpoint(options, dossier) -> list:
+        """Runs on the forge worker thread: surface the options as a 'choice' SSE event, then block
+        until /api/forge/answer sets the event or the timeout fires (empty picks = the forge decides)."""
+        entry = {"event": threading.Event(), "answer": None, "user_id": user["id"]}
+        with _choices_lock:
+            _pending_choices[forge_id] = entry
+        q.put(("choice", {"forge_id": forge_id, "options": options, "timeout_s": CHOICE_TIMEOUT_S}))
+        answered = entry["event"].wait(timeout=CHOICE_TIMEOUT_S)
+        with _choices_lock:
+            _pending_choices.pop(forge_id, None)
+        picks = [str(p) for p in (entry["answer"] or [])][:2] if answered else []
+        choice_meta.update({"offered": [o.get("id") for o in options], "picked": picks,
+                            "answered": bool(answered)})
+        return picks
+
+    def on_event(msg: str) -> None:
+        q.put(("progress", msg))
+
+    def worker() -> None:
+        # Admission: wait for a forge slot, narrating queue position over SSE. (If the player closes the tab
+        # while queued, this thread still waits its turn and the forge runs to completion unseen — the class
+        # is saved to their library regardless — bounded by the queue timeout.)
+        ticket = _forge_enqueue(priority=ollama_mix)
+        if not ticket.is_set():
+            last_pos = _forge_position(ticket)
+            q.put(("progress", f"the forge is busy — you're in line at position {last_pos} "
+                               f"(your spot is held, hang tight)…"))
+            deadline = time.time() + FORGE_QUEUE_TIMEOUT_S
+            while not ticket.wait(timeout=5):
+                if time.time() >= deadline:
+                    if _forge_abandon(ticket):
+                        finish_failed("the forge stayed at capacity too long — nothing was forged (and "
+                                      "no token was spent); please try again later.")
+                        _user_end(user["id"])
+                        return
+                    break  # a slot arrived in the same instant — we own it now, proceed
+                pos = _forge_position(ticket)
+                if pos and pos != last_pos:
+                    last_pos = pos
+                    q.put(("progress", f"in line: position {pos}…"))
+            q.put(("progress", "it's your turn — forging now…"))
+        watchdog = threading.Timer(FORGE_MAX_SECONDS, on_wall_clock)
+        watchdog.daemon = True
+        watchdog.start()
+        try:
+            out = forge_to_bundle(
+                concept, key=key, hosted=hosted, fake=fake, model=model,
+                pool_per_archetype=pool_per, staged=staged, ollama_mix=ollama_mix, on_event=on_event,
+                archetype_checkpoint=archetype_checkpoint if interactive else None,
+                user_id=user["id"], triad=triad, on_usage=meter)
+        except ForgeError as e:
+            watchdog.cancel()
+            finish_failed(str(e))
+        except Exception as e:  # never leak a stack trace to the browser
+            watchdog.cancel()
+            finish_failed(f"unexpected error: {e}")
+        else:
+            watchdog.cancel()
+            finish_done(out)
+        finally:
+            _forge_release()
+            _user_end(user["id"])
+
+    threading.Thread(target=worker, daemon=True).start()
 
     def stream():
-        q: queue.Queue = queue.Queue()
-        result: dict = {}
-        choice_meta: dict = {}  # what was offered / picked — stamped into the bundle for the fun experiment
+        """Pure observer: relays the worker's events to the browser. Closing the tab closes this generator and
+        nothing else — the worker settles the job either way."""
 
-        def archetype_checkpoint(options, dossier) -> list:
-            """Runs on the forge worker thread: surface the options as a 'choice' SSE event, then block
-            until /api/forge/answer sets the event or the timeout fires (empty picks = the forge decides)."""
-            entry = {"event": threading.Event(), "answer": None, "user_id": user["id"]}
-            with _choices_lock:
-                _pending_choices[forge_id] = entry
-            q.put(("choice", {"forge_id": forge_id, "options": options, "timeout_s": CHOICE_TIMEOUT_S}))
-            answered = entry["event"].wait(timeout=CHOICE_TIMEOUT_S)
-            with _choices_lock:
-                _pending_choices.pop(forge_id, None)
-            picks = [str(p) for p in (entry["answer"] or [])][:2] if answered else []
-            choice_meta.update({"offered": [o.get("id") for o in options], "picked": picks,
-                                "answered": bool(answered)})
-            return picks
-
-        def on_event(msg: str) -> None:
-            q.put(("progress", msg))
-
-        def worker() -> None:
-            # Admission: wait for a forge slot, narrating queue position over SSE. On queue timeout the
-            # "error" event below refunds any reserved token via the stream's normal error path. (If the
-            # player closes the tab while queued, this thread still waits its turn and the forge runs to
-            # completion unseen — same as a mid-forge disconnect today — bounded by the queue timeout.)
-            ticket = _forge_enqueue()
-            if not ticket.is_set():
-                last_pos = _forge_position(ticket)
-                q.put(("progress", f"the forge is busy — you're in line at position {last_pos} "
-                                   f"(your spot is held, hang tight)…"))
-                deadline = time.time() + FORGE_QUEUE_TIMEOUT_S
-                while not ticket.wait(timeout=5):
-                    if time.time() >= deadline:
-                        if _forge_abandon(ticket):
-                            q.put(("error", "the forge stayed at capacity too long — nothing was "
-                                            "forged (and no token was spent); please try again later."))
-                            return
-                        break  # a slot arrived in the same instant — we own it now, proceed
-                    pos = _forge_position(ticket)
-                    if pos and pos != last_pos:
-                        last_pos = pos
-                        q.put(("progress", f"in line: position {pos}…"))
-                q.put(("progress", "it's your turn — forging now…"))
-            try:
-                result["out"] = forge_to_bundle(
-                    concept, key=key, hosted=hosted, fake=fake, model=model,
-                    pool_per_archetype=pool_per, staged=staged, ollama_mix=ollama_mix, on_event=on_event,
-                    archetype_checkpoint=archetype_checkpoint if interactive else None,
-                    user_id=user["id"], triad=triad, on_usage=meter)
-                q.put(("done", None))
-            except ForgeError as e:
-                q.put(("error", str(e)))
-            except Exception as e:  # never leak a stack trace to the browser
-                q.put(("error", f"unexpected error: {e}"))
-            finally:
-                _forge_release()
-                _user_end(user["id"])
-
-        def refund() -> dict:
-            """The forge failed after we charged a token — give it back (and un-count the free-forge cap)."""
-            if counted_free:
-                free_limiter.uncount(ip, free=True)
-            st = _refund_token(user["id"], token_kind or "paid", token_day)
-            return st or {}
-
-        threading.Thread(target=worker, daemon=True).start()
         # Carry the post-reserve balance on the FIRST event so the header chip ticks down the moment the
         # forge starts (the token is already spent server-side); an error event refunds it back visibly.
         first = {"message": "starting… (interactive forge: you'll pick the engines after the map stage)"
@@ -784,37 +891,10 @@ def forge_class_route():
             elif kind == "choice":
                 yield _sse("choice", payload)
             elif kind == "error":
-                data = {"error": payload}
-                if reserved:  # the forge failed after we charged a token — give it back
-                    data.update(refund())
-                _record_usage(meter, user_id=user["id"], forge_id=forge_id, mode=usage_mode,
-                              token_kind=token_kind, class_id=None, ok=False)
-                yield _sse("error", data)
+                yield _sse("error", payload)
                 return
-            elif kind == "done":
-                try:
-                    forge_meta = None
-                    if interactive:
-                        forge_meta = {"interactive": True,
-                                      "offered_archetypes": choice_meta.get("offered", []),
-                                      "picked_archetypes": choice_meta.get("picked", []),
-                                      "answered": choice_meta.get("answered", False)}
-                    saved = _persist_class(user["id"], concept, result["out"], forge_meta=forge_meta)
-                except Exception as e:
-                    data = {"error": f"forged, but saving failed: {e}"}
-                    if reserved:  # forged but couldn't save — don't charge for a class they never got
-                        data.update(refund())
-                    _record_usage(meter, user_id=user["id"], forge_id=forge_id, mode=usage_mode,
-                                  token_kind=token_kind, class_id=None, ok=False)
-                    yield _sse("error", data)
-                    return
-                _record_usage(meter, user_id=user["id"], forge_id=forge_id, mode=usage_mode,
-                              token_kind=token_kind, class_id=saved.get("id"), ok=True)
-                if reserved and token_state:  # tell the browser the new balance so the header updates now
-                    saved.update(token_state)
-                if saved.get("slug"):
-                    saved["share_url"] = f"{PUBLIC_BASE_URL}/api/deck/{saved['slug']}"
-                yield _sse("result", saved)
+            elif kind == "result":
+                yield _sse("result", payload)
                 return
 
     headers = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
@@ -1043,6 +1123,10 @@ def element_feedback_route():
     if not ok:
         return jsonify({"error": "could not record feedback"}), 503
     return jsonify({"ok": True})
+
+
+# Refund the tokens of any forge the previous process took down with it (deploy restarts).
+_reconcile_forge_jobs()
 
 
 if __name__ == "__main__":

@@ -221,3 +221,24 @@ class ForgeUsage(Base):
     est_cost_micros: Mapped[int | None] = mapped_column(Integer, default=None, nullable=True)
     ok: Mapped[int] = mapped_column(Integer, default=1)  # 1 = the forge succeeded
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+class ForgeJob(Base):
+    """One row per forge attempt, written when the token is reserved and settled exactly once when the forge
+    finishes — by the worker thread, NOT the SSE stream, so a browser that disconnects mid-forge still gets its
+    class saved (or its token refunded). Rows still "running" at boot are casualties of a restart and are
+    refunded by app._reconcile_forge_jobs. Brand-new table: created by create_all, no migration needed."""
+    __tablename__ = "forge_jobs"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)  # the forge id (uuid hex)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    mode: Mapped[str] = mapped_column(String(16), default="token")
+    token_kind: Mapped[str | None] = mapped_column(String(10), default=None, nullable=True)  # free|paid|unlimited
+    token_day: Mapped[str | None] = mapped_column(String(10), default=None, nullable=True)   # UTC day reserved
+    concept: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(16), default="running", index=True)  # running|done|failed
+    refunded: Mapped[int] = mapped_column(Integer, default=0)
+    class_id: Mapped[int | None] = mapped_column(Integer, default=None, nullable=True)
+    error: Mapped[str] = mapped_column(String(500), default="")
+    started_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, default=None, nullable=True)
