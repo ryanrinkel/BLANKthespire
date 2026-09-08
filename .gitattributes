@@ -1,0 +1,6 @@
+# Files that run on the Linux droplet must never pick up Windows line endings.
+*.sh text eol=lf
+*.service text eol=lf
+*.timer text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf

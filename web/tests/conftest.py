@@ -25,6 +25,7 @@ for p in (str(WEB_DIR), str(REPO / "generation")):
 _TMP = Path(tempfile.mkdtemp(prefix="btsweb-tests-"))
 DB_PATH = _TMP / "test.db"
 
+os.environ["BTSWEB_NO_DOTENV"] = "1"  # never load a real web/.env (the droplet has one)
 os.environ["BTSWEB_DATABASE_URL"] = f"sqlite:///{DB_PATH.as_posix()}"
 os.environ["BTSWEB_DEV_AUTH"] = "1"
 os.environ.pop("GOOGLE_CLIENT_ID", None)

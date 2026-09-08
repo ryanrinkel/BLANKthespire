@@ -24,7 +24,9 @@ from dotenv import load_dotenv
 from flask import Flask, Response, jsonify, redirect, request, send_from_directory
 
 WEB_DIR = Path(__file__).resolve().parent
-load_dotenv(WEB_DIR / ".env")  # local secrets; in prod these come from the service environment
+if os.environ.get("BTSWEB_NO_DOTENV", "").strip() not in ("1", "true", "yes"):
+    load_dotenv(WEB_DIR / ".env")  # local secrets; in prod these come from the service environment
+# (BTSWEB_NO_DOTENV=1 keeps the test suite hermetic on a box whose web/.env holds real credentials.)
 
 from auth import current_user, init_auth, is_unlimited, require_login  # noqa: E402
 from billing import init_billing  # noqa: E402
