@@ -60,14 +60,21 @@ BTSWEB_DATABASE_URL=mysql+pymysql://USER:PASSWORD@DBHOST:25060/btsweb
 BTSWEB_DB_SSL_CA=/opt/btsweb/web/do-mysql-ca.crt
 GOOGLE_CLIENT_ID=...apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=...
-ANTHROPIC_API_KEY=sk-ant-...        # powers the hosted "try it" path
-BTSWEB_HOSTED_ALLOWLIST=you@example.com   # set to your own admin email; comma-separated. EMPTY = open to any signed-in user.
-# --- Stripe donations (pay-what-you-want; key absent = donate UI hidden, daily free token still works) ---
+OLLAMA_API_KEY=...                  # powers the "Use a token" path (our hosted Ollama mix; see btsgen/ollama_mix.py)
+# (ANTHROPIC_API_KEY / BTSWEB_HOSTED_ALLOWLIST are retired: `mode=hosted` is rejected outright — the public
+#  paths are the token forge and bring-your-own-key.)
+BTSWEB_UNLIMITED_EMAILS=you@example.com   # accounts that forge on the token path without spending tokens
+BTSWEB_FREE_IP_DAILY_CAP=5          # free-token forges per IP per UTC day (throwaway-account farms); 0 = off
+BTSWEB_TOKEN_DAILY_CAP=1000         # global kill-switch on all token-path forges per day; 0 = off
+# --- Stripe token packs (key absent = buy UI hidden, daily free token + BYOK still work) ---
 STRIPE_SECRET_KEY=sk_live_...       # sk_test_... while testing; test/live are separate Stripe universes
 STRIPE_WEBHOOK_SECRET=whsec_...     # from the DASHBOARD webhook endpoint (https://blankthespire.com/webhook/stripe,
                                     # events: checkout.session.completed + charge.refunded) — NOT the CLI's secret
-# BTSWEB_DONATION_PRESETS=300,500,1000   # optional: suggested donation amounts in cents (this is the default)
-# (BTSWEB_STRIPE_PACKS is retired — donations use ad-hoc price_data, no Stripe Price objects needed.)
+# BTSWEB_TOKEN_PACKS=5:500,11:1000,24:2000,65:5000   # tokens:cents — optional override of billing.DEFAULT_PACKS
+# BTSWEB_STRIPE_TAX=1                # enable Stripe Tax on checkout — register Tax + origin address in the
+#                                    # Stripe dashboard FIRST or session creation fails
+# BTSWEB_DONATIONS=1                 # keep the legacy donate route live (no tokens granted); off by default
+# SENTRY_DSN=https://...             # optional: error reporting (pip install sentry-sdk[flask])
 # Do NOT set BTSWEB_DEV_AUTH in prod.
 ```
 
@@ -125,7 +132,7 @@ In Google Cloud Console → Credentials → your OAuth client → **Authorized r
 ## 8. Verify
 
 1. Open `https://YOURDOMAIN.com` → **Sign in with Google** (real OAuth, not dev-login).
-2. Forge with **Try it free** (hosted key) and with **BYOK** (your own key) — progress should stream live.
+2. Forge with **Use a token** (our hosted models) and with **Bring your own key** — progress should stream live.
 3. Confirm a second Google account sees only its own **My Classes**.
 4. Copy a class code, import it in-game, restart, play it.
 
@@ -139,7 +146,14 @@ In Google Cloud Console → Credentials → your OAuth client → **Authorized r
   `BTSWEB_FORGE_MAX_QUEUE` (12) wait in a FIFO line with live queue-position progress in the stream;
   beyond that `/api/forge-class` answers 503 up front (no token spent). Process-local — keep
   gunicorn at 1 worker or the limits silently double and the line splits.
-- "Try it free" is unlimited per user; the only hosted-key guard is a global daily kill-switch
-  (`BTSWEB_HOSTED_DAILY_CAP`, default 1000; `0` disables it) plus the optional invite-only allowlist
-  (`BTSWEB_HOSTED_ALLOWLIST`). With a single gunicorn process group the counter is process-local, which is
-  fine here.
+- Token-path guards: every account gets one free token per UTC day (tracked separately from the paid
+  balance, spent first); free-token forges are capped per IP per day (`BTSWEB_FREE_IP_DAILY_CAP`, default 5)
+  and all token forges by a global daily kill-switch (`BTSWEB_TOKEN_DAILY_CAP`, default 1000; `0` disables).
+  One forge per account at a time, across all modes; token forges dequeue ahead of BYOK forges. All of it is
+  process-local — keep gunicorn at one worker.
+- `mode=hosted` (our Anthropic key) is retired and answers 410 — nothing can spend that key any more.
+- Deploy with `web/deploy/deploy.sh` (pull, install if requirements changed, run web tests, restart, curl
+  `/healthz`). `/healthz` returns 503 when the DB is unreachable — point the uptime monitor at it.
+- Nightly backups of the un-versioned server data (forged art, feedback + gap logs): `web/deploy/backup.sh`
+  + `btsweb-backup.timer` sync them to a DO Space via rclone. Managed MySQL keeps its own daily backups —
+  verify the retention setting in the DO console.

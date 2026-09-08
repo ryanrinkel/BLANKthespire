@@ -1,0 +1,14 @@
+# Nightly off-box backup of forged art + feedback/gap logs (see backup.sh). Install next to btsweb-prune.*:
+#   sudo cp web/deploy/btsweb-backup.{service,timer} /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now btsweb-backup.timer
+[Unit]
+Description=BLANK the spire: sync forged art and logs to the backup Space
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=btsweb
+Group=btsweb
+WorkingDirectory=/opt/btsweb/web
+EnvironmentFile=-/opt/btsweb/web/.env
+ExecStart=/usr/bin/env bash /opt/btsweb/web/deploy/backup.sh

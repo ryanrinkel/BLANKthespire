@@ -16,7 +16,7 @@ import os
 from flask import jsonify, redirect, request, session, url_for
 
 from db import session_scope
-from models import User, grant_daily_token
+from models import User, free_token_available
 
 GOOGLE_METADATA = "https://accounts.google.com/.well-known/openid-configuration"
 _oauth = None  # set by init_auth when real OAuth is configured
@@ -115,8 +115,9 @@ def init_auth(app) -> None:
         _login_session(user)
         return redirect("/app")
 
-    @app.route("/logout", methods=["POST", "GET"])
+    @app.route("/logout", methods=["POST"])
     def logout():
+        """POST-only: a GET link on a third-party page must not be able to sign someone out (CSRF)."""
         session.clear()
         return redirect("/")
 
@@ -126,10 +127,10 @@ def init_auth(app) -> None:
         if user is not None:
             with session_scope() as s:
                 row = s.query(User).filter_by(id=user["id"]).one_or_none()
-                if row is not None:
-                    grant_daily_token(row)  # donation model: refill an empty balance once per day
                 bal = int(row.token_balance) if row is not None else 0
-            user = {**user, "token_balance": bal, "unlimited": is_unlimited(user.get("email", ""))}
+                free = bool(row is not None and free_token_available(row))
+            user = {**user, "token_balance": bal, "free_token_available": free,
+                    "unlimited": is_unlimited(user.get("email", ""))}
         return jsonify({"user": user, "dev_auth": _dev_auth_enabled()})
 
     if _dev_auth_enabled():

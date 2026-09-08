@@ -47,6 +47,51 @@ class ForgeError(RuntimeError):
     """Generation could not start or did not produce a class (bad key, endpoint down, empty result)."""
 
 
+class UsageMeter:
+    """Collects per-call LLM usage for one forge, keyed by (role, model), from btsgen's `on_usage` callback.
+    Accepts both shapes the generators emit: OpenAI-compatible dicts ({prompt_tokens, completion_tokens,
+    prompt_tokens_details.cached_tokens}, tagged by ollama_mix with _role/_model) and Anthropic usage objects
+    (input_tokens, output_tokens, cache_read_input_tokens). Thread-safe; never raises (the generators already
+    swallow callback errors, but a meter must not lose a forge's numbers to a bad payload either)."""
+
+    def __init__(self, default_model: str = "", default_role: str = "") -> None:
+        import threading
+        self._lock = threading.Lock()
+        self._rows: dict[tuple[str, str], dict] = {}
+        self.default_model = default_model or ""
+        self.default_role = default_role or ""
+
+    def __call__(self, usage) -> None:
+        try:
+            if isinstance(usage, dict):
+                role = str(usage.get("_role") or self.default_role)
+                model = str(usage.get("_model") or self.default_model)
+                inp = int(usage.get("prompt_tokens") or usage.get("input_tokens") or 0)
+                out = int(usage.get("completion_tokens") or usage.get("output_tokens") or 0)
+                det = usage.get("prompt_tokens_details") or {}
+                cached = int((det.get("cached_tokens") if isinstance(det, dict) else 0)
+                             or usage.get("cache_read_input_tokens") or 0)
+            else:  # anthropic.types.Usage
+                role, model = self.default_role, self.default_model
+                inp = int(getattr(usage, "input_tokens", 0) or 0)
+                out = int(getattr(usage, "output_tokens", 0) or 0)
+                cached = int(getattr(usage, "cache_read_input_tokens", 0) or 0)
+        except (TypeError, ValueError, AttributeError):
+            return
+        with self._lock:
+            row = self._rows.setdefault((role, model), {"role": role, "model": model, "calls": 0,
+                                                        "input_tokens": 0, "output_tokens": 0,
+                                                        "cached_tokens": 0})
+            row["calls"] += 1
+            row["input_tokens"] += inp
+            row["output_tokens"] += out
+            row["cached_tokens"] += cached
+
+    def rows(self) -> list[dict]:
+        with self._lock:
+            return [dict(r) for r in self._rows.values()]
+
+
 def _guard_outbound_url(base_url: str) -> None:
     """SSRF guard for user-supplied BYOK endpoints: http(s) only, and the host must not resolve to a
     loopback/private/link-local address — blocks the cloud metadata service (169.254.169.254) and the
@@ -76,7 +121,7 @@ def _guard_outbound_url(base_url: str) -> None:
                              "use a public provider endpoint.")
 
 
-def _build_generators(key: dict | None, hosted: bool, fake: bool, model: str | None = None):
+def _build_generators(key: dict | None, hosted: bool, fake: bool, model: str | None = None, on_usage=None):
     """Return (blueprint_gen, card_gen_factory, relic_gen) for the requested path. Raises ForgeError on bad
     config. `relic_gen` forges the class's keystone relic (non-fatal — if it fails, the class still ships,
     just without a custom relic); it mirrors the CLI's wiring so the website forges relics too.
@@ -100,25 +145,30 @@ def _build_generators(key: dict | None, hosted: bool, fake: bool, model: str | N
         # (now default-on) triad env instead of letting it drift with BTS_TRIAD.
         try:
             blueprint_gen = AnthropicGenerator(model=model, api_key=api_key,
-                                               contract_mod=_BlueprintContract(triad=False), max_tokens=48000)
+                                               contract_mod=_BlueprintContract(triad=False), max_tokens=48000,
+                                               on_usage=on_usage)
         except RuntimeError as e:
             raise ForgeError(f"Anthropic generation unavailable: {e}") from e
         relic_gen = AnthropicGenerator(model=model, api_key=api_key,
-                                       contract_mod=_RelicContract(), max_tokens=6000)
-        return blueprint_gen, (lambda: AnthropicGenerator(model=model, api_key=api_key)), relic_gen
+                                       contract_mod=_RelicContract(), max_tokens=6000, on_usage=on_usage)
+        return (blueprint_gen, (lambda: AnthropicGenerator(model=model, api_key=api_key, on_usage=on_usage)),
+                relic_gen)
 
     if key:  # BYOK — any OpenAI-compatible /chat/completions endpoint
         base_url, api_key, model = key.get("base_url"), key.get("api_key"), key.get("model")
         if not (base_url and api_key and model):
             raise ForgeError("BYOK needs base_url, api_key, and model together.")
+        _guard_outbound_url(base_url)  # same SSRF guard as the staged path — no path may skip it
         from btsgen import contract
         from btsgen.generator import OpenAICompatGenerator
         blueprint_gen = OpenAICompatGenerator(base_url, api_key, model,
-                                              contract_mod=_BlueprintContract(triad=False), max_tokens=8000)
+                                              contract_mod=_BlueprintContract(triad=False), max_tokens=8000,
+                                              on_usage=on_usage)
         relic_gen = OpenAICompatGenerator(base_url, api_key, model,
-                                          contract_mod=_RelicContract(), max_tokens=4000)
+                                          contract_mod=_RelicContract(), max_tokens=4000, on_usage=on_usage)
         card_factory = lambda: OpenAICompatGenerator(base_url, api_key, model,  # noqa: E731
-                                                     contract_mod=contract, max_tokens=4000)
+                                                     contract_mod=contract, max_tokens=4000,
+                                                     on_usage=on_usage)
         return blueprint_gen, card_factory, relic_gen
 
     if hosted:  # our Anthropic key (server-side secret, never sent to the browser)
@@ -247,7 +297,7 @@ def append_element_feedback(*, category: str, element_kind: str, element: dict, 
         return False
 
 
-def _make_gen_factory(key: dict | None, hosted: bool, fake: bool, model: str | None = None):
+def _make_gen_factory(key: dict | None, hosted: bool, fake: bool, model: str | None = None, on_usage=None):
     """Return a `make_gen(contract_mod, *, max_tokens)` closure for the selected backend — the staged creative
     front-end uses it to spin up a generator for each stage (same backend, swapped contract). Mirrors
     `_build_generators`' backend selection so BYOK / hosted / fake all work for the front-end too."""
@@ -260,7 +310,7 @@ def _make_gen_factory(key: dict | None, hosted: bool, fake: bool, model: str | N
             raise ForgeError("Anthropic BYOK needs api_key and model together.")
         from btsgen.generator import AnthropicGenerator
         return lambda contract_mod, *, max_tokens: AnthropicGenerator(
-            model=m, api_key=api_key, contract_mod=contract_mod, max_tokens=max_tokens)
+            model=m, api_key=api_key, contract_mod=contract_mod, max_tokens=max_tokens, on_usage=on_usage)
     if key:
         base_url, api_key, m = key.get("base_url"), key.get("api_key"), key.get("model")
         if not (base_url and api_key and m):
@@ -270,7 +320,8 @@ def _make_gen_factory(key: dict | None, hosted: bool, fake: bool, model: str | N
         # 300s (vs the 180s default), matching the Ollama path: the front-end's heavy stages (map/compose,
         # reframed blueprint) can sit a long time before the first streamed chunk when the provider is loaded.
         return lambda contract_mod, *, max_tokens: OpenAICompatGenerator(
-            base_url, api_key, m, contract_mod=contract_mod, max_tokens=max_tokens, timeout=300)
+            base_url, api_key, m, contract_mod=contract_mod, max_tokens=max_tokens, timeout=300,
+            on_usage=on_usage)
     if hosted:
         from btsgen.generator import AnthropicGenerator
         return lambda contract_mod, *, max_tokens: AnthropicGenerator(
@@ -305,7 +356,7 @@ def list_models(base_url: str, api_key: str) -> list[str]:
 def forge_to_bundle(concept: str, *, key: dict | None = None, hosted: bool = False,
                     fake: bool = False, model: str | None = None, pool_per_archetype: int = 4,
                     staged: bool = True, ollama_mix: bool = False, on_event=None,
-                    archetype_checkpoint=None, user_id=None, triad: bool = True) -> dict:
+                    archetype_checkpoint=None, user_id=None, triad: bool = True, on_usage=None) -> dict:
     """Forge a whole class from `concept`. Returns
     {character, cards, blueprint, code, skipped, log}. Raises ForgeError on failure.
 
@@ -325,6 +376,8 @@ def forge_to_bundle(concept: str, *, key: dict | None = None, hosted: bool = Fal
     blueprint call — same downstream safety, identical bundle shape. `ollama_mix` (the hosted "Use a token"
     path) ignores key/hosted/model and runs the server-side Ollama per-role mixture (ministral brainstorm +
     glm-5.2 cards, on OLLAMA_API_KEY). `on_event(str)` (optional) receives each progress line, for SSE.
+
+    `on_usage(usage)` (optional) receives every LLM call's usage payload (see UsageMeter) for cost tracking.
 
     `archetype_checkpoint(options, dossier) -> list[archetype_id]` (optional; needs `staged`) switches the
     front-end to INTERACTIVE forge mode: it's called mid-forge with the theme-matched archetypes and blocks
@@ -362,7 +415,7 @@ def forge_to_bundle(concept: str, *, key: dict | None = None, hosted: bool = Fal
         if ollama_mix:
             try:
                 from btsgen.ollama_mix import build_ollama_mix
-                blueprint_gen, card_factory, relic_gen, make_gen = build_ollama_mix()
+                blueprint_gen, card_factory, relic_gen, make_gen = build_ollama_mix(on_usage=on_usage)
             except RuntimeError as e:
                 raise ForgeError(f"hosted Ollama generation unavailable: {e}") from e
             if staged:
@@ -375,13 +428,13 @@ def forge_to_bundle(concept: str, *, key: dict | None = None, hosted: bool = Fal
                               triad=triad, gap_log_append=_append_captured_gaps)
             return _bundle_result(res)
 
-        blueprint_gen, card_factory, relic_gen = _build_generators(key, hosted, fake, model)
+        blueprint_gen, card_factory, relic_gen = _build_generators(key, hosted, fake, model, on_usage=on_usage)
 
         # Opt into the staged creative front-end (autonomous: picks the most distinctive BUILDABLE candidate). The
         # bp it produces is identical in shape, so the card set / safety nets / assembly below are untouched.
         if staged:
             from btsgen.frontend import BlueprintBuilder, load_catalog
-            make_gen = _make_gen_factory(key, hosted, fake, model)
+            make_gen = _make_gen_factory(key, hosted, fake, model, on_usage=on_usage)
             # The website READS the git-managed VOCABULARY_GAPS.md (for buildability) but never WRITES it (a server
             # append would dirty the tracked file and block deploy.sh's `git pull --ff-only`). Live-surfaced gaps go
             # to the SEPARATE untracked side log (_append_captured_gaps) for later human triage into git.

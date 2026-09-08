@@ -18,7 +18,7 @@ This project has three parts:
 |-----------|-----------|
 | **`mod/`** | The Slay the Spire 2 mod itself — a C# assembly (built with the community modding SDK + [BaseLib-StS2](https://github.com/Alchyr/BaseLib-StS2) + Harmony) that adds a data-driven runtime so a forged class defined as pure data becomes a playable character. The card/relic/status "vocabulary" the generator is allowed to use lives in `mod/contract/`. |
 | **`generation/`** | `btsgen`, the Python LLM harness that turns a concept sentence into a validated class blueprint (cards, relic, starter deck) that conforms to the mod's contract. Multi-stage creative pipeline with schema validation so generated content is guaranteed playable. |
-| **`web/`** | The Flask website behind [blankthespire.com](https://blankthespire.com): sign in, forge a class (hosted, or bring your own API key), share results at `/deck/<id>`, and download the mod. |
+| **`web/`** | The Flask website behind [blankthespire.com](https://blankthespire.com): sign in, forge a class (hosted, or bring your own API key), share results at `/api/deck/<slug>`, and download the mod. Forging is free with your own API key, one free hosted forge a day otherwise, and paid token packs beyond that (tokens buy generation compute — the mod itself is free). |
 
 ## Play it (no building required)
 

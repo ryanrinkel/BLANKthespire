@@ -15,7 +15,7 @@
       <button id="nav-account" class="tab">Account</button>
       <a class="tab" href="/download">Get the mod ⬇</a>
       <span class="spacer"></span>
-      <span id="tokens" class="tokens hidden" title="Tokens are spent by the 'Use a token' forge option — every account gets a free token each day."></span>
+      <span id="tokens" class="tokens hidden" title="Tokens are spent by the 'Use a token' forge option — one free token every day, plus any you buy. Bring your own key and forging is free."></span>
       <span id="who" class="who"></span>
       <button id="signout" class="ghost hidden">Sign out</button>
     </nav>
@@ -44,7 +44,7 @@
           <label id="mode-fake-label" class="hidden"><input type="radio" name="mode" value="fake" /> Offline demo (no key)</label>
         </div>
         <div id="token-fields">
-          <p class="hint" id="token-status">Forges on our models — one token per class.</p>
+          <p class="hint" id="token-status">Forges on our hosted models — one token per class.</p>
         </div>
         <div id="byok-fields" style="display:none">
           <label class="lbl small" for="provider">Provider</label>
@@ -123,36 +123,37 @@
     </section>
   </main>
 
-  <!-- Account view: balance, donations (pay-what-you-want), donation history -->
+  <!-- Account view: balance, token packs, purchase history -->
   <main id="view-account" class="hidden">
     <section class="card">
       <h2>Account</h2>
       <p id="acct-email" class="muted"></p>
-      <p class="acct-balance-row"><span id="acct-balance" class="acct-balance"></span> <span class="muted">tokens</span></p>
-      <p class="hint">One token forges one class with the "Use a token" option. Every account gets a
-        <b>free token each day</b> its balance is empty — forging never costs money.</p>
+      <p class="acct-balance-row"><span id="acct-balance" class="acct-balance"></span> <span class="muted">paid tokens</span></p>
+      <p id="acct-free" class="hint"></p>
+      <p class="hint">How forging is paid for:</p>
+      <ul class="pricing">
+        <li><b>Bring your own API key</b> (Anthropic, OpenAI, and other providers) — <b>free and unlimited</b>.
+          Your provider bills you; your key never leaves your browser except for that one request.</li>
+        <li><b>Use a token</b> on our hosted models — <b>one free token every day</b> (UTC), whether or not you
+          hold paid tokens. The free token is always spent first.</li>
+        <li><b>Buy tokens</b> for more forges — paid tokens never expire.</li>
+      </ul>
     </section>
 
     <section class="card">
-      <h2>Support the forge</h2>
-      <p class="hint">BLANK the spire is donation-based: your daily token is free, and donations keep the
-        servers running. As a thank-you, every $1 donated adds a bonus token to your balance.</p>
-      <div id="donate" class="donate hidden">
-        <div id="donate-presets" class="donate-presets"></div>
-        <div class="donate-custom">
-          <input id="donate-amount" class="in" type="number" min="1" step="1" inputmode="numeric"
-                 placeholder="Custom amount (USD)" />
-          <button id="donate-btn" class="btn primary">Donate</button>
-        </div>
-      </div>
-      <p id="donate-note" class="hint hidden">Donations aren't available right now — your free daily token
-        and BYOK forging both keep working.</p>
-      <p class="hint">Payments are handled by Stripe — we never see your card details.</p>
+      <h2>Buy tokens</h2>
+      <p class="hint">Tokens pay for the compute of a hosted forge — one token, one class. The mod itself is
+        free and open source.</p>
+      <div id="packs" class="packs"></div>
+      <p id="packs-note" class="hint hidden">Token purchases aren't available right now — your free daily token
+        and bring-your-own-key forging both keep working.</p>
+      <p class="hint">Payments are handled by Stripe — we never see your card details. Unspent tokens are
+        refundable within 14 days (see <a href="/terms">Terms</a>).</p>
     </section>
 
     <section class="card">
-      <h2>Donation history</h2>
-      <p id="purchases-empty" class="muted hidden">No donations yet.</p>
+      <h2>Purchase history</h2>
+      <p id="purchases-empty" class="muted hidden">No purchases yet.</p>
       <ul id="purchase-list" class="lib"></ul>
     </section>
   </main>
@@ -178,6 +179,7 @@
   <footer class="foot">
     <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> ·
     <a href="mailto:ryan.r.rinkel@gmail.com">Support</a>
+    <p class="foot-note">Unofficial fan project — not affiliated with or endorsed by Mega Crit.</p>
   </footer>
 
   <script src="/static/app.js"></script>

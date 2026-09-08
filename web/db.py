@@ -12,7 +12,7 @@ from pathlib import Path
 from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.orm import sessionmaker
 
-from models import INITIAL_TOKENS, Base
+from models import INITIAL_TOKENS, Base, new_slug
 
 WEB_DIR = Path(__file__).resolve().parent
 
@@ -81,8 +81,8 @@ def _ensure_user_columns() -> None:
             conn.execute(text(
                 f"ALTER TABLE users ADD COLUMN token_balance INTEGER NOT NULL DEFAULT {int(INITIAL_TOKENS)}"))
     if "last_free_token_day" not in cols:
-        # Donation-based pricing: the UTC day each account last got its free daily token. NULL (the
-        # backfill for existing rows) = never granted, so everyone is eligible immediately.
+        # The UTC day each account last SPENT its free daily token. NULL (the backfill for existing rows) =
+        # never, so everyone is eligible immediately.
         with engine.begin() as conn:
             conn.execute(text("ALTER TABLE users ADD COLUMN last_free_token_day VARCHAR(10)"))
 
@@ -99,6 +99,23 @@ def _ensure_class_columns() -> None:
         if col not in cols:
             with engine.begin() as conn:
                 conn.execute(text(f"ALTER TABLE classes ADD COLUMN {col} VARCHAR(64)"))
+    if "slug" not in cols:
+        # Unguessable share handle (/api/deck/<slug>). Add the column, then give every existing row a slug so
+        # old classes stay shareable, then add the unique index (MySQL can't add a UNIQUE column with NULLs
+        # filled in the same statement across engines, so it's three steps).
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE classes ADD COLUMN slug VARCHAR(32)"))
+        _backfill_slugs()
+        with engine.begin() as conn:
+            conn.execute(text("CREATE UNIQUE INDEX ix_classes_slug ON classes (slug)"))
+
+
+def _backfill_slugs() -> None:
+    """Give every class row without a slug a fresh random one (idempotent; safe on every boot)."""
+    with engine.begin() as conn:
+        ids = [r[0] for r in conn.execute(text("SELECT id FROM classes WHERE slug IS NULL")).fetchall()]
+        for cid in ids:
+            conn.execute(text("UPDATE classes SET slug = :slug WHERE id = :id"), {"slug": new_slug(), "id": cid})
 
 
 def init_db() -> None:
@@ -106,6 +123,17 @@ def init_db() -> None:
     Base.metadata.create_all(engine)
     _ensure_user_columns()
     _ensure_class_columns()
+    _backfill_slugs()  # rows inserted by code paths that predate the slug (belt and braces)
+
+
+def db_ping() -> bool:
+    """One trivial round-trip; False if the database is unreachable (used by /healthz)."""
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return True
+    except Exception:
+        return False
 
 
 @contextmanager

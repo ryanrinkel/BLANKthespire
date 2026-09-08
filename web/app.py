@@ -6,7 +6,8 @@ Run locally:
     # open http://localhost:5000 , click "Dev sign-in", forge with the offline FAKE generator (no key)
 
 Deploy: gunicorn + nginx on a plain Linux host (see DEPLOY-DIGITALOCEAN.md); set the env secrets
-(GOOGLE_CLIENT_ID/SECRET, ANTHROPIC_API_KEY, BTSWEB_DATABASE_URL, BTSWEB_SECRET_KEY — see .env.example).
+(GOOGLE_CLIENT_ID/SECRET, OLLAMA_API_KEY, BTSWEB_DATABASE_URL, BTSWEB_SECRET_KEY, STRIPE_* — see
+DEPLOY-DIGITALOCEAN.md). Pricing: free with your own key; one free token per UTC day; paid token packs.
 """
 from __future__ import annotations
 
@@ -27,10 +28,11 @@ load_dotenv(WEB_DIR / ".env")  # local secrets; in prod these come from the serv
 
 from auth import current_user, init_auth, is_unlimited, require_login  # noqa: E402
 from billing import init_billing  # noqa: E402
-from db import init_db, session_scope  # noqa: E402
-from forge import (ELEMENT_KINDS, VALID_FEEDBACK_CATEGORIES, ForgeError,  # noqa: E402
+from db import db_ping, init_db, session_scope  # noqa: E402
+from forge import (ELEMENT_KINDS, VALID_FEEDBACK_CATEGORIES, ForgeError, UsageMeter,  # noqa: E402
                    append_card_feedback, append_element_feedback, forge_to_bundle, list_models)
-from models import ForgedCard, ForgedClass, User, grant_daily_token  # noqa: E402
+from models import (ForgeUsage, ForgedCard, ForgedClass, User, free_token_available,  # noqa: E402
+                    new_slug, spend_token, unspend_token)
 
 # Splash art (Track 2/3): generated at persist time, written to static/forged/<id>/, served by nginx,
 # its URL embedded in the import code so the mod can fetch it. Backend is chosen by BTSGEN_IMAGE_BACKEND
@@ -64,48 +66,127 @@ if os.environ.get("BTSWEB_BEHIND_PROXY", "").strip() in ("1", "true", "yes"):
 
 # Mark the session cookie Secure ONLY once HTTPS is actually serving (set this after certbot). Over plain
 # HTTP — e.g. IP-only before a domain/TLS — a Secure cookie is never sent, so sessions would silently break.
-if os.environ.get("BTSWEB_SECURE_COOKIES", "").strip() in ("1", "true", "yes"):
+SECURE_COOKIES = os.environ.get("BTSWEB_SECURE_COOKIES", "").strip() in ("1", "true", "yes")
+if SECURE_COOKIES:
     app.config["SESSION_COOKIE_SECURE"] = True
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+
+# Request bodies are small JSON (a concept sentence, a BYOK key, a feedback note) — 256 KB is generous.
+# Anything bigger is a mistake or an attack; werkzeug answers 413 before the view runs.
+app.config["MAX_CONTENT_LENGTH"] = 256 * 1024
+
+# BYOK keys live in the browser's localStorage, so a DOM XSS here is API-key theft. The CSP allows only our own
+# scripts/styles (style attributes need 'unsafe-inline'; there are no inline <script>s). Art is same-origin
+# (data: for any inlined placeholder). No framing, no form posts elsewhere.
+CONTENT_SECURITY_POLICY = (
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; "
+    "font-src 'self'; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; "
+    "form-action 'self'")
+
+
+@app.after_request
+def _security_headers(resp):
+    h = resp.headers
+    h.setdefault("X-Content-Type-Options", "nosniff")
+    h.setdefault("X-Frame-Options", "DENY")
+    h.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    h.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()")
+    h.setdefault("Content-Security-Policy", CONTENT_SECURITY_POLICY)
+    if SECURE_COOKIES:  # only once TLS is really serving, or an http-only staging box locks itself out
+        h.setdefault("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+    return resp
+
+
+# CSRF: every mutating /api/* call must carry `X-Requested-With: fetch`. A cross-site HTML form can't set a
+# custom header, and cross-origin fetch() would need a CORS preflight we never answer — so the header proves
+# the request came from our own page's JS (app.js patches fetch() to add it). SameSite=Lax on the session
+# cookie is the first line; this is the second. The Stripe webhook isn't under /api/ (its signature IS its auth).
+CSRF_HEADER = "X-Requested-With"
+CSRF_VALUE = "fetch"
+
+
+@app.before_request
+def _csrf_guard():
+    if request.method in ("POST", "PUT", "PATCH", "DELETE") and request.path.startswith("/api/"):
+        if request.headers.get(CSRF_HEADER, "") != CSRF_VALUE:
+            return jsonify({"error": "missing X-Requested-With header (cross-site request blocked)"}), 403
+    return None
+
+
+# Error reporting: forge failures used to vanish into journald. With SENTRY_DSN set (and sentry-sdk installed),
+# unhandled exceptions and the worker threads' logged warnings/errors reach Sentry; without it, nothing changes.
+_sentry_dsn = os.environ.get("SENTRY_DSN", "").strip()
+if _sentry_dsn:
+    try:
+        import sentry_sdk
+        sentry_sdk.init(dsn=_sentry_dsn, traces_sample_rate=0.0, send_default_pii=False,
+                        environment=os.environ.get("BTSWEB_ENV", "production"))
+    except ImportError:
+        app.logger.warning("SENTRY_DSN is set but sentry-sdk is not installed (pip install 'sentry-sdk[flask]')")
 
 init_db()
 init_auth(app)
 init_billing(app)
 
 
-# --- hosted-key guardrails: per-IP rate limit + a global daily cap kill-switch -------------------
+# --- hosted-path guardrails: per-IP daily cap on FREE forges + a global daily kill-switch -------------
 
-class HostedLimiter:
-    """Wallet backstop for the free hosted path (BYOK is unmetered — it's the user's own key).
+class FreeForgeLimiter:
+    """Abuse backstop for the token path, which spends OUR provider budget.
 
-    The "Try it free" option is intentionally unlimited per user: there's no per-minute throttle. The only
-    guard is a global daily cap — a runaway-bill kill-switch on our key, invisible to normal use. Set the
-    cap to 0 (BTSWEB_HOSTED_DAILY_CAP=0) to disable it entirely for truly unlimited forging.
+    Per IP, per UTC day, at most `ip_daily_cap` forges may be paid for with the FREE daily token — the obvious
+    abuse is a farm of throwaway Google accounts behind one address, each claiming its free forge. Paid tokens
+    are not IP-capped (a household buying a pack should never hit it). On top, `daily_cap` is a global
+    kill-switch on ALL token-path forges (free or paid) so a runaway day can't run up the bill; 0 disables
+    either limit. Process-local, like forge admission — keep gunicorn at one worker.
     """
 
-    def __init__(self, daily_cap: int = 1000) -> None:
+    def __init__(self, ip_daily_cap: int = 5, daily_cap: int = 1000) -> None:
+        self.ip_daily_cap = ip_daily_cap
         self.daily_cap = daily_cap
         self._day = -1
         self._day_count = 0
+        self._ip_counts: dict[str, int] = {}
         self._lock = threading.Lock()
 
-    def check(self, ip: str) -> str | None:
-        """Return an error string if the global daily cap is reached, else None."""
-        if self.daily_cap <= 0:  # disabled ⇒ truly unlimited
-            return None
+    def _roll(self, now: float) -> None:
+        day = int(now // 86400)
+        if day != self._day:
+            self._day, self._day_count, self._ip_counts = day, 0, {}
+
+    def check(self, ip: str, *, free: bool) -> str | None:
+        """Admit one token-path forge from `ip` (`free` = paid with the daily free token), counting it. Returns
+        an error string if a cap is hit (nothing counted), else None."""
         now = time.time()
         with self._lock:
-            day = int(now // 86400)
-            if day != self._day:
-                self._day, self._day_count = day, 0
-            if self._day_count >= self.daily_cap:
-                return "the free daily limit is reached — use your own API key (BYOK) to keep forging."
+            self._roll(now)
+            if self.daily_cap > 0 and self._day_count >= self.daily_cap:
+                return "the hosted forge has hit its daily limit — bring your own API key to keep forging today."
+            if free and self.ip_daily_cap > 0 and self._ip_counts.get(ip, 0) >= self.ip_daily_cap:
+                return ("this network has used its free forges for today — buy tokens or bring your own API "
+                        "key to keep forging.")
             self._day_count += 1
+            if free:
+                self._ip_counts[ip] = self._ip_counts.get(ip, 0) + 1
             return None
 
+    def uncount(self, ip: str, *, free: bool) -> None:
+        """Undo a check() that admitted a forge which never ran (e.g. the token reserve failed after it)."""
+        with self._lock:
+            self._roll(time.time())
+            self._day_count = max(0, self._day_count - 1)
+            if free and ip in self._ip_counts:
+                self._ip_counts[ip] = max(0, self._ip_counts[ip] - 1)
 
-hosted_limiter = HostedLimiter(
-    daily_cap=int(os.environ.get("BTSWEB_HOSTED_DAILY_CAP", "1000")),
+
+free_limiter = FreeForgeLimiter(
+    ip_daily_cap=int(os.environ.get("BTSWEB_FREE_IP_DAILY_CAP", "5")),
+    daily_cap=int(os.environ.get("BTSWEB_TOKEN_DAILY_CAP", os.environ.get("BTSWEB_HOSTED_DAILY_CAP", "1000"))),
 )
+
+
+def _client_ip() -> str:
+    return request.headers.get("X-Forwarded-For", request.remote_addr or "?").split(",")[0].strip()
 
 
 # --- forge admission control: bounded concurrency + a FIFO wait line -----------------------------
@@ -121,20 +202,30 @@ FORGE_QUEUE_TIMEOUT_S = int(os.environ.get("BTSWEB_FORGE_QUEUE_TIMEOUT_S", "1800
 
 _forge_admit_lock = threading.Lock()
 _forge_running = 0
-_forge_waiting: list[threading.Event] = []  # FIFO; each entry is one queued forge's turn signal
+# Two FIFO lines, served token-first: paying (token-path) forges never wait behind free BYOK forges. Each entry
+# is one queued forge's turn signal.
+_forge_waiting_token: list[threading.Event] = []
+_forge_waiting_byok: list[threading.Event] = []
+_forge_priority: dict[int, bool] = {}  # id(ticket) -> in the token line?
 
 
-def _forge_enqueue() -> threading.Event:
-    """Join the forge line. The returned Event is set once this forge may run (immediately when a
-    slot is free). Once it IS set, the holder owes exactly one _forge_release()."""
+def _waiting_total() -> int:
+    return len(_forge_waiting_token) + len(_forge_waiting_byok)
+
+
+def _forge_enqueue(priority: bool = False) -> threading.Event:
+    """Join the forge line (`priority` = the token line, dequeued first). The returned Event is set once this
+    forge may run (immediately when a slot is free and nobody is ahead). Once it IS set, the holder owes
+    exactly one _forge_release()."""
     global _forge_running
     ticket = threading.Event()
     with _forge_admit_lock:
-        if _forge_running < FORGE_MAX_CONCURRENT and not _forge_waiting:
+        if _forge_running < FORGE_MAX_CONCURRENT and not _waiting_total():
             _forge_running += 1
             ticket.set()
         else:
-            _forge_waiting.append(ticket)
+            (_forge_waiting_token if priority else _forge_waiting_byok).append(ticket)
+            _forge_priority[id(ticket)] = priority
     return ticket
 
 
@@ -142,45 +233,67 @@ def _forge_abandon(ticket: threading.Event) -> bool:
     """Leave the line (queue-wait timeout). True = removed while still queued (no release owed);
     False = a slot was granted concurrently, so the caller now owes a _forge_release()."""
     with _forge_admit_lock:
-        if ticket in _forge_waiting:
-            _forge_waiting.remove(ticket)
-            return True
+        for line in (_forge_waiting_token, _forge_waiting_byok):
+            if ticket in line:
+                line.remove(ticket)
+                _forge_priority.pop(id(ticket), None)
+                return True
     return False
 
 
 def _forge_release() -> None:
-    """Free a slot: hand it straight to the head of the line (running count unchanged), or if
-    nobody waits, decrement the running count."""
+    """Free a slot: hand it straight to the head of the token line, else the BYOK line (running count
+    unchanged), or if nobody waits, decrement the running count."""
     global _forge_running
     with _forge_admit_lock:
-        if _forge_waiting:
-            _forge_waiting.pop(0).set()
+        if _forge_waiting_token:
+            t = _forge_waiting_token.pop(0)
+        elif _forge_waiting_byok:
+            t = _forge_waiting_byok.pop(0)
         else:
             _forge_running -= 1
+            return
+        _forge_priority.pop(id(t), None)
+        t.set()
 
 
 def _forge_position(ticket: threading.Event) -> int:
-    """1-based place in the wait line; 0 = not queued (running, or already granted)."""
+    """1-based place in the overall wait line (token line first); 0 = not queued (running/granted)."""
     with _forge_admit_lock:
-        try:
-            return _forge_waiting.index(ticket) + 1
-        except ValueError:
-            return 0
-
-# Invite-only gate for the hosted path (spends OUR Anthropic key; retired from the UI — the public paths
-# are the daily free token and BYOK). Comma-separated Google emails in BTSWEB_HOSTED_ALLOWLIST. Fail
-# closed: empty/unset ⇒ NOBODY may forge on our key via a hand-crafted `mode=hosted` POST.
-HOSTED_ALLOWLIST = {
-    e.strip().lower()
-    for e in os.environ.get("BTSWEB_HOSTED_ALLOWLIST", "").split(",")
-    if e.strip()
-}
+        if ticket in _forge_waiting_token:
+            return _forge_waiting_token.index(ticket) + 1
+        if ticket in _forge_waiting_byok:
+            return len(_forge_waiting_token) + _forge_waiting_byok.index(ticket) + 1
+        return 0
 
 
-def _hosted_allowed(email: str) -> bool:
-    """True only if this email is explicitly invited (empty allowlist = closed, not open)."""
-    return bool(HOSTED_ALLOWLIST) and ((email or "").strip().lower() in HOSTED_ALLOWLIST)
+# Per-user concurrency: ONE forge (running or queued) per account across all modes. Without it, one BYOK user
+# on a slow endpoint can hold every forge slot. Entries carry their start time so a forge whose worker never
+# ran (client vanished before the stream started) can't lock the account forever.
+_user_active: dict[int, float] = {}
+_user_active_lock = threading.Lock()
+USER_ACTIVE_STALE_S = FORGE_QUEUE_TIMEOUT_S + 900
 
+
+def _user_begin(user_id: int) -> bool:
+    """Claim the user's single forge slot. False if they already have a forge in flight."""
+    now = time.time()
+    with _user_active_lock:
+        started = _user_active.get(user_id)
+        if started is not None and now - started < USER_ACTIVE_STALE_S:
+            return False
+        _user_active[user_id] = now
+        return True
+
+
+def _user_end(user_id: int) -> None:
+    with _user_active_lock:
+        _user_active.pop(user_id, None)
+
+
+# The hosted path on our ANTHROPIC key (`mode=hosted`) is retired: it is no longer reachable by any request
+# (it used to be an allowlisted invite path, but a hand-crafted POST could still aim Opus-class spend at our
+# key). The public paths are the token forge (our Ollama mix) and BYOK.
 
 # --- pages --------------------------------------------------------------------------------------
 
@@ -199,10 +312,32 @@ def app_view():
     return send_from_directory(app.static_folder, "index.html")
 
 
+def mod_version() -> str:
+    """The current mod version, read from the mod manifest (mod/BlankTheSpire.json) so the download page and
+    the release zip name can't drift from what was actually built. Falls back to the newest release zip on disk,
+    then to a placeholder."""
+    try:
+        with open(_REPO_ROOT / "mod" / "BlankTheSpire.json", encoding="utf-8-sig") as f:
+            v = str(json.load(f).get("version") or "").strip()
+        if v:
+            return v if v.startswith("v") else f"v{v}"
+    except (OSError, ValueError):
+        pass
+    zips = sorted((WEB_DIR / "static" / "releases").glob("BlankTheSpire-v*.zip"))
+    if zips:
+        return zips[-1].stem.split("-", 1)[1]
+    return "v0.0.0"
+
+
+_REPO_ROOT = WEB_DIR.parent
+
+
 @app.route("/download")
 def download():
-    """Public install + download page (no login). The release zip lives under static/releases/."""
-    return send_from_directory(app.static_folder, "download.html")
+    """Public install + download page (no login). The release zip lives under static/releases/; the version
+    is stamped from the mod manifest at request time (the page is a tiny template with one placeholder)."""
+    html = (WEB_DIR / "static" / "download.html").read_text(encoding="utf-8").replace("{{VERSION}}", mod_version())
+    return Response(html, mimetype="text/html")
 
 
 @app.route("/terms")
@@ -215,6 +350,18 @@ def terms():
 def privacy():
     """Public privacy policy — what we store (and what we deliberately don't, e.g. BYOK keys)."""
     return send_from_directory(app.static_folder, "privacy.html")
+
+
+@app.route("/healthz")
+def healthz():
+    """Liveness + readiness for the uptime monitor and deploy.sh: a DB round-trip plus forge queue depth.
+    503 when the database is unreachable (nginx keeps serving static, but forging and sign-in are down)."""
+    ok = db_ping()
+    with _forge_admit_lock:
+        running, waiting = _forge_running, _waiting_total()
+    body = {"ok": ok, "db": ok, "forge_running": running, "forge_waiting": waiting,
+            "forge_max_concurrent": FORGE_MAX_CONCURRENT}
+    return jsonify(body), (200 if ok else 503)
 
 
 # --- forge (SSE stream over POST; BYOK key stays in the body, never a URL) -----------------------
@@ -322,6 +469,7 @@ def _persist_class(user_id: int, concept: str, out: dict, forge_meta: dict | Non
             vocab_version=VOCAB_VERSION,
             bundle_json=json.dumps(bundle, separators=(",", ":")),
             code=out["code"],
+            slug=new_slug(),
         )
         for i, card in enumerate(out["cards"]):
             cls.cards.append(ForgedCard(card_json=json.dumps(card, separators=(",", ":")), ordinal=i))
@@ -374,36 +522,79 @@ def api_models():
     return jsonify({"models": ids})
 
 
-# Models the allowlisted hosted path may use (runs on our Anthropic key). Whitelisted so a user can't
-# inject an arbitrary/expensive/unavailable model; Opus is deliberately excluded (too costly to expose).
-HOSTED_MODELS = {"claude-haiku-4-5", "claude-sonnet-4-6"}
-HOSTED_DEFAULT_MODEL = "claude-sonnet-4-6"
+def _token_state(u: User) -> dict:
+    """What the browser shows: the PAID balance plus whether today's free token is still unspent."""
+    return {"token_balance": int(u.token_balance), "free_token_available": free_token_available(u)}
 
 
-def _reserve_token(user_id: int) -> int | None:
-    """Atomically spend one token: decrement if balance > 0, returning the REMAINING balance; return None if
-    the user is out of tokens (caller should 402). The daily free grant runs first in the SAME transaction —
-    so an empty account that hasn't claimed today can always forge, even if it never hit /api/me. The
-    decrement + read happen in one transaction so two concurrent forges can't both spend the last token."""
+def _reserve_token(user_id: int) -> tuple[str, dict] | None:
+    """Atomically spend one token for a hosted forge — the free daily token first, else one paid token — and
+    return (kind, token_state). None = nothing to spend (caller 402s). The read + write happen in one
+    transaction so two concurrent forges can't both spend the last token."""
     with session_scope() as s:
         u = s.query(User).filter_by(id=user_id).one_or_none()
         if u is None:
             return None
-        grant_daily_token(u)  # donation model: may top the empty balance up to 1
-        if u.token_balance <= 0:
+        kind = spend_token(u)
+        if kind is None:
             return None
-        u.token_balance -= 1
-        return int(u.token_balance)
+        s.flush()
+        return kind, _token_state(u)
 
 
-def _refund_token(user_id: int) -> int | None:
-    """Give one token back (a reserved forge failed). Returns the new balance, or None if the user vanished."""
+def _refund_token(user_id: int, kind: str, day: str) -> dict | None:
+    """Give back the token a failed forge reserved (see models.unspend_token). Returns the new token state,
+    or None if the user vanished."""
     with session_scope() as s:
         u = s.query(User).filter_by(id=user_id).one_or_none()
         if u is None:
             return None
-        u.token_balance += 1
-        return int(u.token_balance)
+        unspend_token(u, kind, day)
+        s.flush()
+        return _token_state(u)
+
+
+# Estimated provider prices in USD per MILLION tokens: (input, output, cache-read). Only the token path is our
+# cost; models on the Ollama flat plan are 0 until the plan's ceiling, OpenRouter overflow slugs carry the plan's
+# glm-5.2 rates. Override/extend with BTSWEB_MODEL_PRICES='{"model": [in, out, cached], ...}'. Unknown model
+# => est_cost NULL (recorded, not priced).
+MODEL_PRICES: dict[str, tuple[float, float, float]] = {
+    "gemma4:31b": (0.0, 0.0, 0.0),
+    "glm-5.2": (0.0, 0.0, 0.0),
+    "z-ai/glm-5.2": (0.49, 1.56, 0.09),
+    "google/gemma-4-31b-it": (0.10, 0.30, 0.0),
+}
+try:
+    MODEL_PRICES.update({k: tuple(float(x) for x in v)  # type: ignore[misc]
+                         for k, v in json.loads(os.environ.get("BTSWEB_MODEL_PRICES", "{}")).items()})
+except (ValueError, TypeError, AttributeError):
+    pass
+
+
+def _record_usage(meter: UsageMeter, *, user_id: int, forge_id: str, mode: str, token_kind: str | None,
+                  class_id: int | None, ok: bool) -> None:
+    """Write one forge_usage row per (role, model) the forge touched. Best-effort: never raises (telemetry
+    must not break a forge that already succeeded)."""
+    try:
+        rows = meter.rows()
+        if not rows:
+            return
+        with session_scope() as s:
+            for r in rows:
+                cost = None
+                if mode == "token":
+                    price = MODEL_PRICES.get(r["model"])
+                    if price is not None:
+                        uncached = max(0, r["input_tokens"] - r["cached_tokens"])
+                        usd = (uncached * price[0] + r["output_tokens"] * price[1]
+                               + r["cached_tokens"] * price[2]) / 1_000_000
+                        cost = int(round(usd * 1_000_000))
+                s.add(ForgeUsage(user_id=user_id, class_id=class_id, forge_id=forge_id, mode=mode,
+                                 token_kind=token_kind, role=r["role"], model=r["model"], calls=r["calls"],
+                                 input_tokens=r["input_tokens"], output_tokens=r["output_tokens"],
+                                 cached_tokens=r["cached_tokens"], est_cost_micros=cost, ok=1 if ok else 0))
+    except Exception as e:  # noqa: BLE001
+        app.logger.warning("forge_usage write failed (forge %s): %s", forge_id, e)
 
 
 @app.route("/api/forge-class", methods=["POST"])
@@ -437,51 +628,74 @@ def forge_class_route():
     if not concept:
         return jsonify({"error": "describe a class first."}), 400
 
-    if mode == "hosted":
-        if not _hosted_allowed(user.get("email", "")):
-            return jsonify({"error": "free hosted forging is invite-only — "
-                                     "use your own API key (BYOK) to forge."}), 403
-        ip = request.headers.get("X-Forwarded-For", request.remote_addr or "?").split(",")[0].strip()
-        denied = hosted_limiter.check(ip)
-        if denied:
-            return jsonify({"error": denied}), 429
+    if mode == "hosted":  # retired: never spend our Anthropic key on a hand-crafted POST
+        return jsonify({"error": "the hosted Anthropic path is retired — use a token or bring your own "
+                                 "API key."}), 410
+    if mode not in ("token", "byok", "anthropic", "fake"):
+        return jsonify({"error": "unknown forge mode."}), 400
+    if mode == "fake" and not os.environ.get("BTSWEB_DEV_AUTH", "").strip() in ("1", "true", "yes"):
+        return jsonify({"error": "the offline demo forge is dev-only."}), 403
 
     fake = mode == "fake"
-    hosted = mode == "hosted"
-
-    # Hosted runs on our key → whitelist the model (default cheapest). BYOK supplies its own model via `key`,
-    # so model stays None there and forge_to_bundle ignores it.
+    hosted = False
     model = None
-    if hosted:
-        model = body.get("model") if body.get("model") in HOSTED_MODELS else HOSTED_DEFAULT_MODEL
 
     # Full line ⇒ turn the forge away NOW, before a token is reserved (soft cap: a race past it just
     # means one extra spot in line, never a lost token).
     with _forge_admit_lock:
-        line_len = len(_forge_waiting)
+        line_len = _waiting_total()
     if line_len >= FORGE_MAX_QUEUE:
         return jsonify({"error": "the forge is at full capacity right now — please try again in a few "
                                  "minutes."}), 503
 
-    # The "Use a token" path forges on our server-side Ollama mixture and spends one of the user's tokens
-    # (unless they're on the unlimited master list). Reserve it up front so we can 402 BEFORE streaming; a
-    # forge that then fails refunds the token in the stream below.
+    # One forge per account at a time, across every mode.
+    if not _user_begin(user["id"]):
+        return jsonify({"error": "you already have a forge in progress — wait for it to finish."}), 429
+
+    # The "Use a token" path forges on our server-side Ollama mixture and spends one of the user's tokens —
+    # today's free token first, else a paid one — unless they're on the unlimited master list. Reserve it up
+    # front so we can 402 BEFORE streaming; a forge that then fails refunds it in the stream below.
     ollama_mix = mode == "token"
     unlimited = ollama_mix and is_unlimited(user.get("email", ""))
     reserved = False
-    remaining = None
+    token_kind: str | None = "unlimited" if unlimited else None
+    token_day = time.strftime("%Y-%m-%d", time.gmtime())
+    token_state: dict | None = None
+    ip = _client_ip()
+    counted_free = False
     if ollama_mix and not unlimited:
-        remaining = _reserve_token(user["id"])
-        if remaining is None:
-            return jsonify({"error": "you're out of tokens for today — your free daily token arrives "
-                                     "tomorrow, or bring your own API key (BYOK) to keep forging.",
-                            "token_balance": 0}), 402
+        # Would this forge be paid with the free token? Decide the IP cap on that BEFORE spending anything.
+        with session_scope() as s:
+            u = s.query(User).filter_by(id=user["id"]).one_or_none()
+            would_be_free = bool(u is not None and free_token_available(u))
+            has_any = bool(u is not None and (would_be_free or u.token_balance > 0))
+        if not has_any:
+            _user_end(user["id"])
+            return jsonify({"error": "you're out of tokens — your free daily token arrives tomorrow (UTC), "
+                                     "or buy a pack, or bring your own API key to keep forging.",
+                            "token_balance": 0, "free_token_available": False}), 402
+        denied = free_limiter.check(ip, free=would_be_free)
+        if denied:
+            _user_end(user["id"])
+            return jsonify({"error": denied}), 429
+        counted_free = would_be_free
+        res = _reserve_token(user["id"])
+        if res is None:  # lost a race for the last token
+            free_limiter.uncount(ip, free=would_be_free)
+            _user_end(user["id"])
+            return jsonify({"error": "you're out of tokens — your free daily token arrives tomorrow (UTC), "
+                                     "or buy a pack, or bring your own API key to keep forging.",
+                            "token_balance": 0, "free_token_available": False}), 402
+        token_kind, token_state = res
         reserved = True
+
+    forge_id = uuid.uuid4().hex
+    meter = UsageMeter(default_model=(key or {}).get("model", "") if key else "", default_role=mode)
+    usage_mode = "byok" if mode in ("byok", "anthropic") else mode
 
     def stream():
         q: queue.Queue = queue.Queue()
         result: dict = {}
-        forge_id = uuid.uuid4().hex if interactive else None
         choice_meta: dict = {}  # what was offered / picked — stamped into the bundle for the fun experiment
 
         def archetype_checkpoint(options, dossier) -> list:
@@ -530,7 +744,7 @@ def forge_class_route():
                     concept, key=key, hosted=hosted, fake=fake, model=model,
                     pool_per_archetype=pool_per, staged=staged, ollama_mix=ollama_mix, on_event=on_event,
                     archetype_checkpoint=archetype_checkpoint if interactive else None,
-                    user_id=user["id"], triad=triad)
+                    user_id=user["id"], triad=triad, on_usage=meter)
                 q.put(("done", None))
             except ForgeError as e:
                 q.put(("error", str(e)))
@@ -538,14 +752,22 @@ def forge_class_route():
                 q.put(("error", f"unexpected error: {e}"))
             finally:
                 _forge_release()
+                _user_end(user["id"])
+
+        def refund() -> dict:
+            """The forge failed after we charged a token — give it back (and un-count the free-forge cap)."""
+            if counted_free:
+                free_limiter.uncount(ip, free=True)
+            st = _refund_token(user["id"], token_kind or "paid", token_day)
+            return st or {}
 
         threading.Thread(target=worker, daemon=True).start()
         # Carry the post-reserve balance on the FIRST event so the header chip ticks down the moment the
         # forge starts (the token is already spent server-side); an error event refunds it back visibly.
         first = {"message": "starting… (interactive forge: you'll pick the engines after the map stage)"
                             if interactive else "starting…"}
-        if reserved:
-            first["token_balance"] = remaining
+        if reserved and token_state:
+            first.update(token_state)
         yield _sse("progress", first)
         while True:
             try:
@@ -562,9 +784,9 @@ def forge_class_route():
             elif kind == "error":
                 data = {"error": payload}
                 if reserved:  # the forge failed after we charged a token — give it back
-                    bal = _refund_token(user["id"])
-                    if bal is not None:
-                        data["token_balance"] = bal
+                    data.update(refund())
+                _record_usage(meter, user_id=user["id"], forge_id=forge_id, mode=usage_mode,
+                              token_kind=token_kind, class_id=None, ok=False)
                 yield _sse("error", data)
                 return
             elif kind == "done":
@@ -579,13 +801,17 @@ def forge_class_route():
                 except Exception as e:
                     data = {"error": f"forged, but saving failed: {e}"}
                     if reserved:  # forged but couldn't save — don't charge for a class they never got
-                        bal = _refund_token(user["id"])
-                        if bal is not None:
-                            data["token_balance"] = bal
+                        data.update(refund())
+                    _record_usage(meter, user_id=user["id"], forge_id=forge_id, mode=usage_mode,
+                                  token_kind=token_kind, class_id=None, ok=False)
                     yield _sse("error", data)
                     return
-                if reserved:  # tell the browser the new balance so the header updates immediately
-                    saved["token_balance"] = remaining
+                _record_usage(meter, user_id=user["id"], forge_id=forge_id, mode=usage_mode,
+                              token_kind=token_kind, class_id=saved.get("id"), ok=True)
+                if reserved and token_state:  # tell the browser the new balance so the header updates now
+                    saved.update(token_state)
+                if saved.get("slug"):
+                    saved["share_url"] = f"{PUBLIC_BASE_URL}/api/deck/{saved['slug']}"
                 yield _sse("result", saved)
                 return
 
@@ -675,25 +901,48 @@ def delete_class(class_id: int):
     return jsonify({"ok": True})
 
 
-# --- id-as-key resolver (public) ----------------------------------------------------------------
-# Resolve a shared class by id — the foundation for blankthespire.com/deck/<id> sharing and the mod
-# fetching a class's package by key. PUBLIC by design (friends import without an account), so it
-# exposes only the playable bundle + splash. NOTE: ids are the enumerable per-user autoincrement
-# (anyone can walk them) — fine for a public gallery, revisit before launch if privacy is wanted
-# (see the id-scheme open decision in SPLASH_ART_PLAN.md).
+# --- share resolver (public) -------------------------------------------------------------------------
+# Resolve a shared class by its unguessable slug — the foundation for blankthespire.com/deck/<slug> sharing
+# and the mod fetching a class's package by key. PUBLIC by design (friends import without an account), so it
+# exposes only the playable bundle + art. The numeric id is enumerable and stays internal.
 
-@app.route("/api/deck/<int:class_id>")
-def deck_resolve(class_id: int):
+@app.route("/api/deck/<slug>")
+def deck_resolve(slug: str):
+    slug = (slug or "").strip()
+    if not slug or len(slug) > 32:
+        return jsonify({"error": "not found"}), 404
     with session_scope() as s:
-        cls = s.query(ForgedClass).filter_by(id=class_id).one_or_none()
+        cls = s.query(ForgedClass).filter_by(slug=slug).one_or_none()
         if cls is None:
             return jsonify({"error": "not found"}), 404
         detail = cls.detail()
+        detail.pop("id", None)  # public shape: never leak the internal enumerable id
         if cls.splash_hash:
             detail["splash_url"] = _splash_url(cls.id, cls.splash_hash)
         if cls.sprite_hash:
             detail["sprite_url"] = _sprite_url(cls.id, cls.sprite_hash)
         return jsonify(detail)
+
+
+# --- feedback rate limit (free text reaches the generator's prompts) ----------------------------------
+FEEDBACK_HOURLY_CAP = int(os.environ.get("BTSWEB_FEEDBACK_HOURLY_CAP", "60"))
+_feedback_hits: dict[int, list[float]] = {}
+_feedback_lock = threading.Lock()
+
+
+def _feedback_allowed(user_id: int) -> bool:
+    """Sliding one-hour window per user. Notes are capped at 500 chars by the routes below; this caps volume."""
+    if FEEDBACK_HOURLY_CAP <= 0:
+        return True
+    now = time.time()
+    with _feedback_lock:
+        hits = [t for t in _feedback_hits.get(user_id, []) if now - t < 3600]
+        if len(hits) >= FEEDBACK_HOURLY_CAP:
+            _feedback_hits[user_id] = hits
+            return False
+        hits.append(now)
+        _feedback_hits[user_id] = hits
+        return True
 
 
 # --- per-card feedback -------------------------------------------------------------------------
@@ -718,6 +967,8 @@ def card_feedback_route():
         return jsonify({"error": "unknown feedback category"}), 400
     if not card_id:
         return jsonify({"error": "card_id is required"}), 400
+    if not _feedback_allowed(user["id"]):
+        return jsonify({"error": "too much feedback too fast — try again in a while."}), 429
 
     with session_scope() as s:
         cls = _owned(s, user["id"], class_id)
@@ -772,6 +1023,8 @@ def element_feedback_route():
         return jsonify({"error": "unknown feedback category"}), 400
     if kind not in ELEMENT_KINDS:
         return jsonify({"error": "unknown element kind"}), 400
+    if not _feedback_allowed(user["id"]):
+        return jsonify({"error": "too much feedback too fast — try again in a while."}), 429
 
     with session_scope() as s:
         cls = _owned(s, user["id"], class_id)

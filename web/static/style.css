@@ -139,11 +139,19 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 /* --- account: donations (pay-what-you-want) + donation history ----------------------------------- */
 .acct-balance-row { margin: 4px 0 2px; }
 .acct-balance { font-size: 34px; font-weight: 700; color: var(--accent); }
-.donate { margin: 12px 0 6px; }
-.donate-presets { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
-.donate-presets .donate-preset { min-width: 92px; font-size: 16px; font-weight: 600; }
-.donate-custom { display: flex; gap: 10px; align-items: center; }
-.donate-custom .in { max-width: 220px; margin: 0; }
+.packs { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin: 12px 0 8px; }
+.pack { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 10px;
+        border: 1px solid var(--accent2); border-radius: 10px; background: var(--panel); color: var(--ink);
+        cursor: pointer; font: inherit; }
+.pack:hover:not(:disabled) { border-color: var(--accent); }
+.pack:disabled { opacity: .55; cursor: not-allowed; }
+.pack-tokens { font-size: 16px; font-weight: 700; }
+.pack-price { font-size: 20px; font-weight: 700; color: var(--accent); }
+.pack-per { font-size: 11px; color: var(--muted); }
+.pricing { margin: 6px 0 0; padding-left: 18px; font-size: 14px; line-height: 1.5; }
+.pricing li { margin-bottom: 6px; }
+.pricing-section .pricing { max-width: 640px; margin: 8px auto 0; text-align: left; }
+.foot-note { margin: 8px 0 0; font-size: 11px; }
 .refunded { color: var(--danger); }
 
 /* an inline, link-styled button (e.g. the out-of-tokens "support the forge" CTA inside hint text) */
