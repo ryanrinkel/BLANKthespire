@@ -251,6 +251,85 @@ def test_relic() -> None:
     check(_validate_relic(bad) != [], "forge relic hook with amount 0 must be rejected")
 
 
+
+# --------------------------------------------------------------- W2.4: character-level knobs
+def test_character_knobs() -> None:
+    print("W2.4: max_energy / color ride the blueprint into the bundle; ranges + caps enforced:")
+    import os
+    import tempfile
+
+    from btsgen import class_forge
+    from btsgen.class_forge import (ClassBrief, _CardFake, _fake_blueprint, _validate_blueprint, forge_class,
+                                    parse_color)
+
+    # parse_color: palette names, degrees, numeric strings, {hue}, {h,s,v}; rejects junk
+    check(parse_color("azure") == {"h": round(215 / 360, 4), "s": 0.8, "v": 1.0}, "palette name -> h/s/v")
+    check(parse_color("AMBER")["h"] == round(35 / 360, 4), "palette lookup is case-insensitive")
+    check(parse_color(0) == {"h": 0.0, "s": 0.8, "v": 1.0} and parse_color("359")["h"] == round(359 / 360, 4),
+          "degrees as int / numeric string")
+    check(parse_color({"hue": 180}) == {"h": 0.5, "s": 0.8, "v": 1.0}, "{hue} object")
+    check(parse_color({"h": 0.25, "s": 0.5, "v": 0.9}) == {"h": 0.25, "s": 0.5, "v": 0.9}, "{h,s,v} passthrough")
+    for bad in ("plaid", 400, -1, {"hue": "x"}, {"h": 2}, {"s": 0.5}, True, [1, 2]):
+        try:
+            parse_color(bad)
+            check(False, f"color {bad!r} must be rejected")
+        except ValueError:
+            check(True, "rejected")
+
+    # the validator: max_hp 55..100, max_energy 2..4, color, orb_slots 0..5, summon max_hp <= 100
+    bp = _fake_blueprint(ClassBrief(concept="a molten forge sovereign"))
+    def errs_for(**over):
+        return _validate_blueprint({**bp, **over})
+    def has(errs, needle):
+        return any(needle in e for e in errs)
+    check(not has(errs_for(), "max_energy") and not has(errs_for(), "color:"), "the forge fake (energy 3, amber) is clean")
+    check(has(errs_for(max_energy=5), "max_energy must be 2..4"), "max_energy 5 rejected")
+    check(has(errs_for(max_energy=1), "max_energy must be 2..4"), "max_energy 1 rejected")
+    check(has(errs_for(max_energy="lots"), "max_energy must be an integer"), "non-integer max_energy rejected")
+    check(not has(errs_for(max_energy=2), "max_energy") and not has(errs_for(max_energy=4), "max_energy"),
+          "max_energy 2 and 4 accepted")
+    check(not has(errs_for(max_energy=None), "max_energy"), "a missing max_energy defaults to 3")
+    check(has(errs_for(color="plaid"), "color: unknown color"), "an unknown color name is rejected")
+    check(has(errs_for(color=400), "color: color hue"), "hue 400 rejected")
+    check(not has(errs_for(color={"hue": 300}), "color:"), "{hue: 300} accepted")
+    check(has(errs_for(max_hp=54), "max_hp must be 55..100") and has(errs_for(max_hp=101), "max_hp must be 55..100"),
+          "max_hp band 55..100")
+    check(not has(errs_for(max_hp=55), "max_hp") and not has(errs_for(max_hp=100), "max_hp"), "55 and 100 accepted")
+    check(has(errs_for(orb_slots=6), "orb_slots must be 0..5") and not has(errs_for(orb_slots=5), "orb_slots"),
+          "orb_slots cap 5")
+    check(class_forge._SUMMON_MAX_HP == 100, "summon max_hp cap 100")
+    sp_err = class_forge._validate_summon_pool([{"name": "Golem", "max_hp": 100, "description": "a wall"}])
+    check(not any("max_hp" in e for e in sp_err), f"summon max_hp 100 accepted: {sp_err}")
+    sp_err2 = class_forge._validate_summon_pool([{"name": "Golem", "max_hp": 101, "description": "a wall"}])
+    check(any("max_hp must be 1..100" in e for e in sp_err2), "summon max_hp 101 rejected")
+
+    # the prompt names the knobs (one-line rule + format fields)
+    sp = class_forge._BlueprintContract(triad=False).system_prompt()
+    check('"max_energy": 3,' in sp and '"color": "azure",' in sp, "the blueprint format shows max_energy + color")
+    check('"max_energy": 3 normally; 4 ONLY' in sp and "crimson/amber" in sp, "the one-line rule names the palette")
+    check("3-5 ONLY for an orb class" in sp and '"max_hp" (1-100' in sp, "orb-slot + summon-HP caps in the prompt")
+
+    # assembly: the fake forge bundle carries max_energy and the parsed color
+    saved = os.environ.get("BTS_FORGE_LEDGER")
+    os.environ["BTS_FORGE_LEDGER"] = os.path.join(tempfile.mkdtemp(prefix="bts_w24_"), "ledger.jsonl")
+    try:
+        res = forge_class(ClassBrief(concept="a molten forge sovereign"), blueprint_gen=None,
+                          card_gen_factory=lambda: _CardFake(), relic_gen=None, fake=True, triad=False)
+        check(res.ok, "fake forge succeeds")
+        ch = (res.bundle or {}).get("character") or {}
+        check(ch.get("max_energy") == 3, f"bundle carries max_energy, got {ch.get('max_energy')}")
+        check(ch.get("color") == parse_color("amber"), f"bundle carries the parsed color, got {ch.get('color')}")
+        res2 = forge_class(ClassBrief(concept="a storm channeler"), blueprint_gen=None,
+                           card_gen_factory=lambda: _CardFake(), relic_gen=None, fake=True, triad=False)
+        ch2 = (res2.bundle or {}).get("character") or {}
+        check(ch2.get("color") == {"h": round(200 / 360, 4), "s": 0.8, "v": 1.0}, f"orb fake carries {{hue:200}}: {ch2.get('color')}")
+    finally:
+        if saved is None:
+            os.environ.pop("BTS_FORGE_LEDGER", None)
+        else:
+            os.environ["BTS_FORGE_LEDGER"] = saved
+
+
 def main() -> int:
     v = CardValidator()
     test_accepts(v)
@@ -263,6 +342,7 @@ def main() -> int:
     test_blade_manipulation(v)
     test_vocab_version()
     test_relic()
+    test_character_knobs()
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return 1 if _FAIL else 0
 

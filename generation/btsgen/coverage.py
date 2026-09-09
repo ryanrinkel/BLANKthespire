@@ -9,6 +9,14 @@ Advisory, NEVER fatal — surviving shortfalls stream as `WARNING:` notes and th
 The directive phrasebook here is shared with the N-2 featured-mechanic roulette (one phrasebook for
 roulette and repair). Repair targets plain stat-line commons/uncommons first and NEVER touches a basic,
 the signature blade, a signature, the reprint homage, or (post-O-1) a bridge card.
+
+W2.2 (vocab-gap remediation, 2026-09-09) widened the v2 menus so the repair round can reach the WHOLE
+vocabulary: four more `when` kinds, class-kind-GATED `when` entries (forged_ge for a forge class, the
+Balance gauge reads for a balance class, the orb reads for an orb class), a SCALE menu in place of the one
+fixed scale directive, three nominate-only rare-tier exotics (ritual / barricade / intangible — repair
+never injects them, the blueprint may nominate one), and a KEYWORD menu (retain / innate / ethereal /
+multi-hit) with its own quota. All of it rides the creative-harness-v2 path (BTS_HARNESS_V2=1); the v1
+menus and quotas stay byte-for-byte so the live A/B baseline is untouched.
 """
 from __future__ import annotations
 
@@ -23,6 +31,7 @@ MIN_WHEN_KINDS = 3               # distinct `when` kinds (orb-only kinds count f
 MIN_EXOTIC_STATUSES = 2          # distinct statuses from census.EXOTIC_STATUSES
 MAX_GENERIC_DEBUFF_SHARE = 0.25   # pool cards applying vulnerable/weak
 MIN_SCALED_OR_X = 1              # cards with any `scale` or X-cost
+MIN_KEYWORD_KINDS = 2            # W2.2 (v2 only): distinct card-shape keywords (retain/innate/ethereal/exhaust/multi_hit)
 REPAIR_BUDGET = 6               # max card regenerations, ONE round
 
 
@@ -67,9 +76,62 @@ REACTIVE_MENU_V2 = REACTIVE_MENU + [
 ]
 WHEN_MENU_V2 = WHEN_MENU + [
     ("hand_size_ge", 'REQUIRED: gate a bonus with `when` hand_size_ge value:4 (a full-hand payoff).'),
+    # W2.2: the rest of the base-vocab `when` kinds the repair round could never reach before.
+    ("retained_last_turn", 'REQUIRED: give this card op "retain" and gate a bonus with `when` retained_last_turn '
+                           '(the on-hold payoff: stronger if you held it in hand since last turn).'),
+    ("draw_pile_empty", 'REQUIRED: gate a very strong effect with `when` draw_pile_empty (the Grand Finale: it only '
+                        'fires once you have drawn your whole deck).'),
+    ("hp_lost_ge", 'REQUIRED: put a small lose_hp self-cost FIRST on this card, then gate a big payoff with `when` '
+                   'hp_lost_ge value:3 (the Ice Shatter threshold: pay HP, cash it the same turn).'),
+    ("target_has_status", 'REQUIRED: gate a bonus with `when` target_has_status status:vulnerable (an exploit payoff '
+                          'against an enemy you already debuffed).'),
+]
+# W2.2: class-kind-GATED `when` entries — (key, directive, kind). Dealt only to a class whose kind set (see
+# harness_v2.pool_kind: the blueprint's orb/status/summon kind UNIONED with the selected archetypes' mechanic_kind)
+# contains `kind`; a nomination of one of these on the wrong class kind is dropped.
+WHEN_MENU_KIND = [
+    ("forged_ge", 'REQUIRED: gate a payoff with `when` forged_ge value:5 (a Forge threshold: "if your Forge is 5+, ...").', "forge"),
+    ("dark_ge", 'REQUIRED: gate a payoff with `when` dark_ge value:3 (a Dark-pole Balance payoff).', "balance"),
+    ("light_ge", 'REQUIRED: gate a payoff with `when` light_ge value:3 (a Light-pole Balance payoff).', "balance"),
+    ("centered", 'REQUIRED: gate a payoff with `when` centered value:1 (the knife\'s-edge Balance payoff: only while '
+                 'the gauge sits within 1 of center).', "balance"),
+    ("orbs_match", 'REQUIRED: gate a payoff with `when` orbs_match (the jackpot: every orb you hold is the same type).', "orb"),
+    ("orb_count_ge", 'REQUIRED: gate a payoff with `when` orb_count_ge value:2 (a payoff for a full rack of orbs).', "orb"),
 ]
 SCALE_DIRECTIVE = ('REQUIRED: make one damage or block amount scale (scale "cards_in_hand" or '
                    '"cards_retained") instead of a flat number.')
+# W2.2: the SCALE menu (v2) — one entry per scale source instead of the single fixed directive above (v1 keeps it).
+SCALE_MENU = [
+    ("cards_in_hand", 'REQUIRED: make one damage or block amount scale "cards_in_hand" (equal to the OTHER cards in '
+                      'your hand) instead of a flat number.'),
+    ("cards_retained", 'REQUIRED: make one damage or block amount scale "cards_retained" (equal to the cards you held '
+                       'into this turn) instead of a flat number.'),
+    ("unspent_energy_last_turn", 'REQUIRED: make one damage, block or draw amount scale "unspent_energy_last_turn" '
+                                 '(reward the energy you left over last turn).'),
+    ("target_debuff_count", 'REQUIRED: make one damage amount scale "target_debuff_count" (deal damage equal to the '
+                            'number of debuffs on the struck enemy - flechettes).'),
+    ("damage_dealt_unblocked", 'REQUIRED: put a damage effect FIRST, then a heal with scale "damage_dealt_unblocked" '
+                               '(lifesteal: heal for the unblocked damage this card dealt).'),
+]
+SCALE_MENU_KIND = [
+    ("tag_cards_owned", 'REQUIRED: make one damage or block amount scale "tag_cards_owned" with a matching "tag" '
+                        '(printed amount PLUS 1 per card you own carrying that tag; the tag must sit on 3-5 cards).', "tags"),
+    ("forged", 'REQUIRED: make one damage or block amount scale "forged" (its printed amount PLUS your Forge counter).', "forge"),
+]
+# W2.2: NOMINATE-ONLY rare-tier exotics — repair never injects them off the shuffled menu; the blueprint may
+# nominate one (coverage_nominations.exotic) and then the repair round can reach it.
+EXOTIC_NOMINATE_ONLY = [
+    ("ritual", 'REQUIRED: apply_status ritual on a RARE power (gain Strength at the end of every turn; small amount).'),
+    ("barricade", 'REQUIRED: apply_status barricade on a RARE power (your Block is no longer removed at end of turn).'),
+    ("intangible", 'REQUIRED: apply_status intangible amount 1 on a RARE card (all damage you take is reduced to 1 for a turn).'),
+]
+# W2.2: the KEYWORD menu (v2) — card-shape keywords with their own quota (MIN_KEYWORD_KINDS).
+KEYWORD_MENU = [
+    ("retain", 'REQUIRED: give this card op "retain" (it stays in your hand at end of turn) and make HOLDING it matter.'),
+    ("innate", 'REQUIRED: give this card op "innate" (it starts in your opening hand every combat) - an opener.'),
+    ("ethereal", 'REQUIRED: give this card op "ethereal" (it exhausts if still in hand at end of turn) and over-stat it.'),
+    ("hits", 'REQUIRED: make this a MULTI-HIT attack: ONE damage effect carrying "hits": 2-4 (deal amount damage that many times).'),
+]
 NONPLAIN_DIRECTIVE = ('REQUIRED: this card must NOT be a plain stat line - build it around a distinctive '
                       'mechanic (an add_trigger, a `when` gate, an exotic status, or a scaled amount), '
                       'not just damage / block / apply Vulnerable or Weak.')
@@ -80,7 +142,53 @@ DIRECTIVE_BY_KEY["scale"] = SCALE_DIRECTIVE
 # v2 keys (thorns/metallicize stay reachable by NOMINATION only — they are gone from the default v2 head)
 for _k, _d in (REACTIVE_MENU_V2 + WHEN_MENU_V2 + EXOTIC_MENU_V2):
     DIRECTIVE_BY_KEY.setdefault(_k, _d)
+# W2.2 keys: gated `when`, the scale menus, the nominate-only exotics, the keyword menu.
+for _k, _d, _kind in (WHEN_MENU_KIND + SCALE_MENU_KIND):
+    DIRECTIVE_BY_KEY.setdefault(_k, _d)
+for _k, _d in (SCALE_MENU + EXOTIC_NOMINATE_ONLY + KEYWORD_MENU):
+    DIRECTIVE_BY_KEY.setdefault(_k, _d)
 _KEY_BY_DIRECTIVE = {d: k for k, d in DIRECTIVE_BY_KEY.items()}
+
+
+# W2.2: one census DETECTOR per menu key — callable(census.CardCensus) -> bool, "this card carries the mechanic
+# the directive asks for". The repair planner projects coverage with these and the tests assert every key has one.
+def _det_trigger(k):
+    return lambda cc: k in cc.triggers
+
+
+def _det_when(k):
+    return lambda cc: k in cc.whens
+
+
+def _det_status(k):
+    return lambda cc: k in cc.statuses
+
+
+def _det_scale(k):
+    return lambda cc: k in cc.scales
+
+
+def _det_keyword(k):
+    kk = census.MULTI_HIT_KIND if k == "hits" else k
+    return lambda cc: kk in cc.keyword_kinds
+
+
+CENSUS_DETECTOR: dict = {}
+for _k, _d in REACTIVE_MENU_V2:
+    CENSUS_DETECTOR[_k] = _det_trigger(_k)
+for _k, _d in WHEN_MENU_V2:
+    CENSUS_DETECTOR[_k] = _det_when(_k)
+for _k, _d, _kind in WHEN_MENU_KIND:
+    CENSUS_DETECTOR[_k] = _det_when(_k)
+for _k, _d in (EXOTIC_MENU + EXOTIC_MENU_V2 + EXOTIC_NOMINATE_ONLY):
+    CENSUS_DETECTOR[_k] = _det_status(_k)
+for _k, _d in SCALE_MENU:
+    CENSUS_DETECTOR[_k] = _det_scale(_k)
+for _k, _d, _kind in SCALE_MENU_KIND:
+    CENSUS_DETECTOR[_k] = _det_scale(_k)
+for _k, _d in KEYWORD_MENU:
+    CENSUS_DETECTOR[_k] = _det_keyword(_k)
+CENSUS_DETECTOR["scale"] = lambda cc: cc.scaled_or_x  # the v1 fixed scale directive
 
 # The per-class nomination categories the blueprint may declare (Fix B): category -> the v2 menu it filters.
 # W0.5 adds "sections": blueprint-prompt section KEYS a CALLER (CLI / web / bench via ClassBrief.coverage_nominations)
@@ -88,8 +196,10 @@ _KEY_BY_DIRECTIVE = {d: k for k, d in DIRECTIVE_BY_KEY.items()}
 # class_forge.SECTION_KEYS (kept as a literal here to avoid a circular import; tests assert they match).
 SECTION_KEYS = frozenset({"orb", "tags", "tokens", "rampage", "upgrade", "purge", "discard", "corruption",
                           "transform", "forge", "balance", "status", "summon"})
-NOMINATION_CATEGORIES = ("reactive", "when", "exotic", "sections")
-NOMINATION_MAX = {"reactive": 3, "when": 4, "exotic": 3, "sections": 4}
+NOMINATION_CATEGORIES = ("reactive", "when", "exotic", "scale", "keyword", "sections")
+NOMINATION_MAX = {"reactive": 3, "when": 4, "exotic": 3, "scale": 2, "keyword": 2, "sections": 4}
+# W2.2: key -> the class kind it needs ("" = any class). Gated keys are dropped from a class that lacks the kind.
+KEY_KIND = {k: kind for k, _d, kind in (WHEN_MENU_KIND + SCALE_MENU_KIND)}
 
 
 def sanitize_nominations(raw) -> dict:
@@ -98,8 +208,11 @@ def sanitize_nominations(raw) -> dict:
     seeded-shuffle default)."""
     if not isinstance(raw, dict):
         return {}
-    known = {"reactive": {k for k, _ in REACTIVE_MENU_V2}, "when": {k for k, _ in WHEN_MENU_V2},
-             "exotic": {k for k, _ in EXOTIC_MENU_V2} | {"thorns", "metallicize"},
+    known = {"reactive": {k for k, _ in REACTIVE_MENU_V2},
+             "when": {k for k, _ in WHEN_MENU_V2} | {k for k, _d, _kind in WHEN_MENU_KIND},
+             "exotic": {k for k, _ in EXOTIC_MENU_V2} | {"thorns", "metallicize"} | {k for k, _ in EXOTIC_NOMINATE_ONLY},
+             "scale": {k for k, _ in SCALE_MENU} | {k for k, _d, _kind in SCALE_MENU_KIND},
+             "keyword": {k for k, _ in KEYWORD_MENU},
              "sections": set(SECTION_KEYS)}
     out: dict = {}
     for cat in NOMINATION_CATEGORIES:
@@ -116,25 +229,51 @@ def sanitize_nominations(raw) -> dict:
     return out
 
 
-def _menus(nominated: dict | None, seed: int | None) -> tuple[list, list, list]:
+def _kind_ok(key: str, kinds) -> bool:
+    """W2.2: may this menu key be dealt to a class with kind set `kinds`? Ungated keys always; a gated key only
+    when the class carries its kind. `kinds` None = the caller doesn't know the class (gated keys are out)."""
+    need = KEY_KIND.get(key, "")
+    return not need or (kinds is not None and need in kinds)
+
+
+def _pick(cat: str, menu: list, nominated: dict, seed: int | None, kinds, salt: str) -> list:
+    """One v2 menu: the category's nominated keys (in nominated order, kind-gated) when the blueprint nominated
+    any; otherwise `menu` (already kind-gated) shuffled with the concept seed."""
+    from . import harness_v2
+    keys = nominated.get(cat)
+    if keys:
+        return [(k, DIRECTIVE_BY_KEY[k]) for k in keys if k in DIRECTIVE_BY_KEY and _kind_ok(k, kinds)]
+    if seed is not None:
+        return harness_v2.seeded_shuffle(menu, seed, salt)
+    return list(menu)
+
+
+def _menus(nominated: dict | None, seed: int | None, kinds=None) -> tuple[list, list, list]:
     """The (reactive, when, exotic) menus the repair walker uses. v1 (flag off): the fixed ordered menus,
     byte-for-byte. v2: each menu is filtered to that category's nominated keys (in nominated order) when the
-    blueprint nominated any; otherwise the v2 menu shuffled with the concept seed."""
+    blueprint nominated any; otherwise the v2 menu shuffled with the concept seed. W2.2: the v2 `when` menu
+    also carries the class-kind-gated entries (WHEN_MENU_KIND) whose kind is in `kinds`."""
     from . import harness_v2
     if not harness_v2.enabled():
         return list(REACTIVE_MENU), list(WHEN_MENU), list(EXOTIC_MENU)
     nominated = nominated or {}
-    out = []
-    for cat, menu, salt in (("reactive", REACTIVE_MENU_V2, "reactive"), ("when", WHEN_MENU_V2, "when"),
-                            ("exotic", EXOTIC_MENU_V2, "exotic")):
-        keys = nominated.get(cat)
-        if keys:
-            out.append([(k, DIRECTIVE_BY_KEY[k]) for k in keys if k in DIRECTIVE_BY_KEY])
-        elif seed is not None:
-            out.append(harness_v2.seeded_shuffle(menu, seed, salt))
-        else:
-            out.append(list(menu))
-    return out[0], out[1], out[2]
+    when_menu = list(WHEN_MENU_V2) + [(k, d) for k, d, kind in WHEN_MENU_KIND if _kind_ok(k, kinds)]
+    return (_pick("reactive", REACTIVE_MENU_V2, nominated, seed, kinds, "reactive"),
+            _pick("when", when_menu, nominated, seed, kinds, "when"),
+            _pick("exotic", EXOTIC_MENU_V2, nominated, seed, kinds, "exotic"))
+
+
+def _menus_w2(nominated: dict | None, seed: int | None, kinds=None) -> tuple[list, list]:
+    """W2.2: the (scale, keyword) menus. v1: the single fixed SCALE_DIRECTIVE (key "scale") and NO keyword menu
+    (the keyword quota is v2-only). v2: the scale menu (+ kind-gated sources) and the keyword menu, each
+    nominated-or-shuffled like the others."""
+    from . import harness_v2
+    if not harness_v2.enabled():
+        return [("scale", SCALE_DIRECTIVE)], []
+    nominated = nominated or {}
+    scale_menu = list(SCALE_MENU) + [(k, d) for k, d, kind in SCALE_MENU_KIND if _kind_ok(k, kinds)]
+    return (_pick("scale", scale_menu, nominated, seed, kinds, "scale"),
+            _pick("keyword", KEYWORD_MENU, nominated, seed, kinds, "keyword"))
 
 
 def directive_key(directive: str) -> str:
@@ -160,6 +299,8 @@ class PoolReport:
     exotic_kinds: set = field(default_factory=set)
     generic_debuff_cards: int = 0
     scaled_or_x: int = 0
+    scale_kinds: set = field(default_factory=set)     # W2.2: distinct scale sources in use
+    keyword_kinds: set = field(default_factory=set)   # W2.2: distinct card-shape keywords (census.keyword_kinds)
     violations: list = field(default_factory=list)   # human-readable
 
     @property
@@ -291,6 +432,8 @@ def measure(made: list[dict]) -> PoolReport:
             rep.generic_debuff_cards += 1
         if cc.scaled_or_x:
             rep.scaled_or_x += 1
+        rep.scale_kinds |= set(cc.scales)
+        rep.keyword_kinds |= cc.keyword_kinds
         if not _is_reprint(plan):
             rep.plain_denom += 1
             if cc.plain:
@@ -309,21 +452,33 @@ def measure(made: list[dict]) -> PoolReport:
         v.append(f"generic-debuff share {rep.generic_debuff_share:.0%} > {MAX_GENERIC_DEBUFF_SHARE:.0%}")
     if rep.scaled_or_x < MIN_SCALED_OR_X:
         v.append(f"{rep.scaled_or_x} scaled/X card(s) < {MIN_SCALED_OR_X}")
+    if _keyword_quota_on() and len(rep.keyword_kinds) < MIN_KEYWORD_KINDS:
+        v.append(f"only {len(rep.keyword_kinds)} keyword kind(s) < {MIN_KEYWORD_KINDS}")
     return rep
 
 
+def _keyword_quota_on() -> bool:
+    """W2.2: the keyword quota rides the creative-harness-v2 path only (the v1 baseline is the live A/B control)."""
+    from . import harness_v2
+    return harness_v2.enabled()
+
+
 def plan_repairs(rep: PoolReport, budget: int = REPAIR_BUDGET, *, nominated: dict | None = None,
-                 seed: int | None = None) -> list[str]:
+                 seed: int | None = None, kinds=None) -> list[str]:
     """Ordered directive lines to inject (one per victim), capped at `budget`. Projects coverage forward as
     it assigns so it never over-requests a mechanic already covered by an earlier directive. `nominated` /
     `seed` (harness v2 only) pick the menus: the blueprint's per-class nominations, else a concept-seeded
-    shuffle (see _menus). Flag off: the fixed v1 menus, unchanged."""
-    reactive_menu, when_menu, exotic_menu = _menus(nominated, seed)
+    shuffle (see _menus). `kinds` (W2.2, v2) = the class's kind set (harness_v2.pool_kind) that unlocks the
+    class-kind-gated `when` / scale entries. Flag off: the fixed v1 menus, unchanged."""
+    reactive_menu, when_menu, exotic_menu = _menus(nominated, seed, kinds)
+    scale_menu, keyword_menu = _menus_w2(nominated, seed, kinds)
     directives: list[str] = []
     proj_reactive = set(rep.reactive_kinds)
     proj_when = set(rep.when_kinds)
     proj_exotic = set(rep.exotic_kinds)
     proj_scaled = rep.scaled_or_x
+    proj_scale_kinds = set(rep.scale_kinds)
+    proj_keyword = set(rep.keyword_kinds)
 
     def room() -> bool:
         return len(directives) < budget
@@ -349,9 +504,22 @@ def plan_repairs(rep: PoolReport, budget: int = REPAIR_BUDGET, *, nominated: dic
             continue
         directives.append(d)
         proj_exotic.add(key)
-    if proj_scaled < MIN_SCALED_OR_X and room():
-        directives.append(SCALE_DIRECTIVE)
+    for key, d in scale_menu:  # v1: the one fixed SCALE_DIRECTIVE; v2 (W2.2): the first scale source not in use
+        if proj_scaled >= MIN_SCALED_OR_X or not room():
+            break
+        if key in proj_scale_kinds:
+            continue
+        directives.append(d)
         proj_scaled += 1
+        proj_scale_kinds.add(key)
+    for key, d in keyword_menu:  # W2.2, v2 only (the v1 keyword menu is empty)
+        if len(proj_keyword) >= MIN_KEYWORD_KINDS or not room():
+            break
+        kk = census.MULTI_HIT_KIND if key == "hits" else key
+        if kk in proj_keyword:
+            continue
+        directives.append(d)
+        proj_keyword.add(kk)
 
     # plain-share / generic-debuff: every directive above converts a plain victim to non-plain. Add generic
     # NONPLAIN directives for the residual plain excess, up to budget.
@@ -369,12 +537,21 @@ def _featured_missing(made: list[dict], featured) -> list:
     if not featured:
         return []
     ccs = [census.walk_card((made[i].get("card") or {})) for i in measurable_indices(made)]
-    return [f for f in featured if not any(f.detect(cc) for cc in ccs)]
+    return [f for f in featured if not _carried(f, ccs)]
+
+
+def _carried(f, ccs) -> bool:
+    """Is featured entry `f` carried by the pool? W2.3 entries may define `carried_by(ccs)` (a pool-level
+    detector / a min-card count); older duck-typed entries expose only the per-card `detect`."""
+    carried_by = getattr(f, "carried_by", None)
+    if callable(carried_by):
+        return bool(carried_by(ccs))
+    return any(f.detect(cc) for cc in ccs)
 
 
 def enforce_coverage(made: list[dict], regen_card, note, *, featured=None, bridge_ctx=None,
                      budget: int = REPAIR_BUDGET, nominated: dict | None = None,
-                     seed: int | None = None) -> dict:
+                     seed: int | None = None, kinds=None) -> dict:
     """Census the pool, run ONE bounded repair round, stream a summary + WARNING notes. Mutates `made`
     in place (swapping repaired cards). `regen_card(plan, old_card, directive) -> card|None` rebuilds one
     card. `featured` = the N-2 rolled mechanics (each missing one is a quota item with its own directive).
@@ -384,15 +561,16 @@ def enforce_coverage(made: list[dict], regen_card, note, *, featured=None, bridg
     nominations + the concept seed for the shuffled fallback (see plan_repairs). Returns a summary dict (also
     handy for tests) whose `injections` list records every injected mechanic ({key, old, new, ok}) so the
     ledger + bench can count them. Never raises through to the caller's forge — the caller wraps this, but we
-    keep it self-contained too."""
+    keep it self-contained too. `kinds` (W2.2) = the class's kind set for the class-kind-gated menus."""
     featured = list(featured or [])
     before = measure(made)
+    kw = (f", keywords {len(before.keyword_kinds)} (min {MIN_KEYWORD_KINDS})" if _keyword_quota_on() else "")
     note(f"coverage: pool {before.pool_size} cards - plain {before.plain_share:.0%} (max {MAX_PLAIN_SHARE:.0%}), "
          f"reactive kinds {len(before.reactive_kinds)} (min {MIN_REACTIVE_TRIGGER_KINDS}), "
          f"`when` kinds {len(before.when_kinds)} (min {MIN_WHEN_KINDS}), "
          f"exotic {len(before.exotic_kinds)} (min {MIN_EXOTIC_STATUSES}), "
          f"debuff {before.generic_debuff_share:.0%} (max {MAX_GENERIC_DEBUFF_SHARE:.0%}), "
-         f"scaled/X {before.scaled_or_x} (min {MIN_SCALED_OR_X})")
+         f"scaled/X {before.scaled_or_x} (min {MIN_SCALED_OR_X})" + kw)
 
     feat_missing = _featured_missing(made, featured)
     if featured:
@@ -439,7 +617,8 @@ def enforce_coverage(made: list[dict], regen_card, note, *, featured=None, bridg
 
     remaining = max(0, budget - len(pairs))
     directives: list[str] = []
-    for d in [f.directive for f in feat_missing] + plan_repairs(before, remaining, nominated=nominated, seed=seed):
+    for d in [f.directive for f in feat_missing] + plan_repairs(before, remaining, nominated=nominated, seed=seed,
+                                                                 kinds=kinds):
         if d not in directives:
             directives.append(d)
     directives = directives[:remaining]
@@ -489,5 +668,6 @@ def enforce_coverage(made: list[dict], regen_card, note, *, featured=None, bridg
         note("coverage: all quotas met after repair")
     note(f"coverage: after repair - plain {after.plain_share:.0%}, reactive kinds {len(after.reactive_kinds)}, "
          f"`when` kinds {len(after.when_kinds)}, exotic {len(after.exotic_kinds)}, "
-         f"debuff {after.generic_debuff_share:.0%}, scaled/X {after.scaled_or_x}")
+         f"debuff {after.generic_debuff_share:.0%}, scaled/X {after.scaled_or_x}"
+         + (f", keywords {len(after.keyword_kinds)}" if _keyword_quota_on() else ""))
     return summary

@@ -51,6 +51,36 @@ which is a separate decision; those four tests now pin the prototype contract th
 the mod has no concept of). Tests: `tests/test_phase_ajb.py`; `test_contract_binding` updated (env-clean default =
 mod); suite 372 passed; every test file also runs standalone.
 
+**STATUS (2026-09-09): Wave 2 EXECUTED (no vocab bump)** — all four items landed. **W2.1** `census.py` now counts
+multi-hit (`hits` ≥ 2 on damage / summon_attack — and a multi-hit card is no longer "plain"), the four keywords
+(exhaust / retain / innate / ethereal, with `multi_hit` joining them as a keyword KIND), `apply_status_custom`
+statuses, `buff_summon` statuses (default strength), the poison / frail / focus SPECIALTY bucket (neither generic nor
+exotic), `tags`, `upgrade.cost`, `once_per_turn`, `ripen` amounts and targeted trigger payloads; `format_report` prints
+every counter (fixed baseline columns first, then the full tally). **W2.2** `coverage.py`: `WHEN_MENU_V2` +
+retained_last_turn / draw_pile_empty / hp_lost_ge / target_has_status; `WHEN_MENU_KIND` (forged_ge → forge, dark_ge /
+light_ge / centered → balance, orbs_match / orb_count_ge → orb) gated by the class's kind set
+(`harness_v2.pool_kind`, the blueprint kind ∪ the selected archetypes' `mechanic_kind`); `SCALE_MENU` (5 sources) +
+`SCALE_MENU_KIND` (tag_cards_owned → tags, forged → forge) replace the one fixed scale directive; `EXOTIC_NOMINATE_ONLY`
+(ritual / barricade / intangible — never dealt off the shuffle, reachable by nomination); `KEYWORD_MENU` (retain /
+innate / ethereal / hits) with `MIN_KEYWORD_KINDS = 2`; `NOMINATION_CATEGORIES` += scale / keyword; a `CENSUS_DETECTOR`
+per menu key; the blueprint's nomination ask names every category and the class-kind keys. **Deviation, deliberate:**
+the widened menus and the keyword quota ride the creative-harness-v2 path only — the v1 menus / quotas stay
+byte-for-byte because `BTS_HARNESS_V2` is the live A/B and the control arm must not move. **W2.3** `featured.py`:
+`FEATURED_CLASS_KIND` (orb / status / summon / forge / balance / discard / transform — 12 entries), `roll_class_kind`
+(one pick per class, seeded on the concept with its own salt, kind-order-proof), `Featured.carried_by` (`min_cards` = 3
+for the custom-status spread, `detect_pool` for the scry + on_discard loop). The pick is dealt AFTER the blueprint (the
+kind is only known then) and enforced by the coverage round like any featured miss. It is dealt on the triad path too:
+the 2026-08-15 triad exclusion was about the wild slot landing off-theme subsystems, and these entries only exist for
+the class's own kind (`test_triad` updated: no base-menu ids under triad, exactly one class-kind id on an orb fake).
+**W2.4** `class_forge.py`: blueprint `max_energy` (2..4; assembly default 3) and `color` (a hue 0-359, a palette name
+crimson/amber/gold/emerald/teal/azure/violet/magenta, `{hue}` or `{h,s,v}` — emitted as the importer's `{h,s,v}`;
+omitted → the engine's per-slot hue), `max_hp` 55..100, `orb_slots` ≤ 5, summon `max_hp` ≤ 100 (the C# ranges stay the
+hard ceiling); the prompt grew two format fields + one rule line; the legacy `character_validator` bands follow.
+Tests: W2 checks appended to `tests/test_census.py` (68), `test_coverage.py` (215), `test_featured.py` (153),
+`test_forge.py` (88); suite **380 passed**; four v2 fake forges verified end-to-end (forge → blade_recall, summon →
+summon_drill, orb → orb_focus_power, normal → none; colors + energy in the bundle). NOT in this wave: the cross-cutting
+"vocab drift" / "prompt-vs-vocab" tests.
+
 ---
 
 ## 0. Ground rules

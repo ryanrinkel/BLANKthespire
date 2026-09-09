@@ -140,12 +140,117 @@ def test_bundle_and_decode() -> None:
     check(len(solo.get("cards", [])) == 1, "a BTS1 card code becomes a one-card bundle")
 
 
+
+# --------------------------------------------------------------- W2.1: count what exists
+def test_w2_counters() -> None:
+    print("W2.1: multi-hit, keywords, custom statuses, summon buffs, specialty bucket, tags, upgrade.cost, "
+          "once_per_turn, ripen amounts, targeted payloads:")
+    # multi-hit is NON-plain and a keyword KIND
+    mh = _card("mh", [{"op": "damage", "amount": 4, "hits": 3}])
+    cc = census.walk_card(mh)
+    check(cc.multi_hit == 1, f"hits>=2 on damage counts as multi_hit, got {cc.multi_hit}")
+    check(not cc.plain, "a multi-hit card is NOT plain (W2.1)")
+    check(census.MULTI_HIT_KIND in cc.keyword_kinds, "multi_hit is a keyword kind")
+    check(census.walk_card(_card("h1", [{"op": "damage", "amount": 4, "hits": 1}])).multi_hit == 0,
+          "hits:1 is not multi-hit")
+    sa = _card("sa", [{"op": "summon_attack", "amount": 3, "hits": 2}])
+    check(census.walk_card(sa).multi_hit == 1, "summon_attack with hits counts as multi-hit (Phase AJ)")
+
+    # the four keywords
+    kw = _card("kw", [{"op": "exhaust"}, {"op": "retain"}, {"op": "damage", "amount": 6}],
+               upgrade=[{"op": "innate"}, {"op": "ethereal"}, {"op": "damage", "amount": 9}])
+    cc = census.walk_card(kw)
+    check(cc.keywords == {"exhaust": 1, "retain": 1, "innate": 1, "ethereal": 1},
+          f"all four keywords counted across base+upgrade, got {dict(cc.keywords)}")
+    check(cc.keyword_kinds == {"exhaust", "retain", "innate", "ethereal"}, f"keyword_kinds, got {cc.keyword_kinds}")
+
+    # apply_status_custom statuses + buff_summon statuses (default strength)
+    cs = _card("cs", [{"op": "apply_status_custom", "status_name": "Rust", "amount": 2},
+                      {"op": "buff_summon", "amount": 2},
+                      {"op": "buff_summon", "amount": 1, "status": "dexterity"}])
+    cc = census.walk_card(cs)
+    check(cc.custom_statuses == {"rust": 1}, f"custom status counted (lowercased), got {dict(cc.custom_statuses)}")
+    check(cc.summon_buffs == {"strength": 1, "dexterity": 1},
+          f"buff_summon statuses counted (default strength), got {dict(cc.summon_buffs)}")
+
+    # poison / frail / focus: their own bucket, neither generic nor exotic
+    sp = _card("sp", [{"op": "apply_status", "status": "poison", "amount": 3},
+                      {"op": "apply_status", "status": "frail", "amount": 1},
+                      {"op": "apply_status", "status": "focus", "amount": 1}])
+    cc = census.walk_card(sp)
+    check(cc.specialty_status_kinds == {"poison", "frail", "focus"}, f"specialty bucket, got {cc.specialty_status_kinds}")
+    check(not cc.uses_generic_debuff and not cc.exotic_status_kinds, "specialty statuses are neither generic nor exotic")
+    check(census.SPECIALTY_STATUSES.isdisjoint(census.EXOTIC_STATUSES)
+          and census.SPECIALTY_STATUSES.isdisjoint(census.GENERIC_DEBUFFS), "the three buckets are disjoint")
+
+    # tags, upgrade.cost, once_per_turn, ripen amounts, targeted payloads
+    rich = _card("rich", [{"op": "add_trigger", "trigger": "ripen", "amount": 2,
+                           "effects": [{"op": "damage", "amount": 12, "target": "enemy"}]},
+                          {"op": "add_trigger", "trigger": "on_card_played", "once_per_turn": True,
+                           "effects": [{"op": "block", "amount": 2}]}],
+                 upgrade=[{"op": "add_trigger", "trigger": "ripen", "amount": 3,
+                           "effects": [{"op": "damage", "amount": 16, "target": "all_enemies"}]}])
+    rich["tags"] = ["fuse"]
+    rich["upgrade"]["cost"] = 0
+    cc = census.walk_card(rich)
+    check(cc.tagged, "a card with tags is tagged")
+    check(cc.upgrade_cost, "an upgrade with an absolute cost is counted")
+    check(cc.once_per_turn == 1, f"once_per_turn triggers counted, got {cc.once_per_turn}")
+    check(cc.ripen_amounts == {2: 1, 3: 1}, f"ripen amounts counted, got {dict(cc.ripen_amounts)}")
+    check(cc.targeted_payloads == 2, f"targeted payload effects counted, got {cc.targeted_payloads}")
+    # a top-level targeted effect is NOT a targeted payload
+    top = _card("top", [{"op": "damage", "amount": 6, "target": "enemy"}])
+    check(census.walk_card(top).targeted_payloads == 0, "a top-level target is not a payload target")
+    check(not census.walk_card(_card("nt", [{"op": "damage", "amount": 6}])).tagged, "no tags -> not tagged")
+    check(not census.walk_card(_card("nu", [{"op": "damage", "amount": 6}], [{"op": "damage", "amount": 9}])).upgrade_cost,
+          "no upgrade.cost -> not counted")
+
+    # aggregate carries every counter + merge folds them
+    cen = census.census_cards([mh, kw, cs, sp, rich])
+    check(cen.multi_hit == 1 and cen.keywords["retain"] == 1 and cen.custom_statuses["rust"] == 1
+          and cen.summon_buffs["strength"] == 1 and cen.tagged_cards == 1 and cen.upgrade_cost_cards == 1
+          and cen.once_per_turn == 1 and cen.ripen_amounts[2] == 1 and cen.targeted_payloads == 2,
+          "census_cards aggregates every W2.1 counter")
+    check(cen.keyword_kinds == {"exhaust", "retain", "innate", "ethereal", census.MULTI_HIT_KIND},
+          f"aggregate keyword_kinds, got {cen.keyword_kinds}")
+    check(cen.specialty_status_kinds == {"poison", "frail", "focus"}, "aggregate specialty kinds")
+    agg = census.Census()
+    agg.merge(cen)
+    agg.merge(census.census_cards([mh]))
+    check(agg.total == 6 and agg.multi_hit == 2 and agg.tagged_cards == 1, "merge sums counters")
+
+
+def test_w2_report_prints_every_counter() -> None:
+    print("W2.1: format_report prints every counter, not a fixed subset:")
+    cards = [
+        _card("a", [{"op": "damage", "amount": 4, "hits": 2}, {"op": "retain"}]),
+        _card("b", [{"op": "apply_status", "status": "poison", "amount": 3},
+                    {"op": "apply_status_custom", "status_name": "Rust", "amount": 1},
+                    {"op": "buff_summon", "amount": 2}]),
+        _card("c", [{"op": "add_trigger", "trigger": "ripen", "amount": 2, "once_per_turn": True,
+                     "effects": [{"op": "damage", "amount": 9, "target": "enemy"}]},
+                    {"op": "scry", "amount": 2}]),
+        _card("d", [{"op": "block", "amount": 3, "scale": "cards_retained", "when": {"kind": "draw_pile_empty"}}]),
+    ]
+    cards[0]["tags"] = ["fuse"]
+    cards[3]["upgrade"] = {"cost": 0, "effects": [{"op": "block", "amount": 5}]}
+    rep = census.format_report([("Klass", census.census_cards(cards))])
+    for needle in ("multi_hit=1", "retain=1", "poison=1", "rust=1", "strength=1", "once_per_turn=1",
+                   "targeted_payloads=1", "2=1", "draw_pile_empty=1", "cards_retained=1", "tagged_cards=1",
+                   "upgrade_cost_cards=1", "scry=1", "keywords=2"):
+        check(needle in rep, f"report carries '{needle}'")
+    # the untouched-vocabulary columns still print as zeros (the N-0 baseline table stays readable)
+    check("vulnerable=0" in rep and "turn_at_least=0" in rep, "fixed baseline columns still print")
+
+
 def main() -> int:
     test_plain_flag()
     test_nested_and_upgrade_walk()
     test_innate_ethereal_ops()
     test_aggregate()
     test_bundle_and_decode()
+    test_w2_counters()
+    test_w2_report_prints_every_counter()
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return 1 if _FAIL else 0
 

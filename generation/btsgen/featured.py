@@ -13,6 +13,13 @@ Phase N-5 adds the THEME-AWARE roll (themed_roll): the staged front-end's cloud 
 resonance shortlist off menu_block(), and a seeded, recency-damped lottery fills slot 1 from that
 shortlist (theme fit) and the remaining slot(s) wild off the whole menu (deliberate forced-collision
 spice). The model only ever NOMINATES — code makes the final picks, so its favorites can't converge.
+
+W2.3 (vocab-gap remediation, 2026-09-09) adds a SECOND menu, FEATURED_CLASS_KIND: class-only mechanics keyed by
+the kind that unlocks them (orb / status / summon from the blueprint; forge / balance / discard / transform from
+a selected archetype's `mechanic_kind`). roll_class_kind() deals ONE entry per class off the union of the
+menus its kind set matches (harness_v2.pool_kind) — a normal class with no such archetype is dealt nothing.
+The base menu stays as it is; the class-kind pick is enforced by the same coverage round (a missing pick is a
+repair directive), never by the blueprint prompt, because the class kind is only known once the blueprint is in.
 """
 from __future__ import annotations
 
@@ -22,6 +29,7 @@ from dataclasses import dataclass
 from . import coverage
 
 N_FEATURED = 2
+N_CLASS_KIND = 1            # W2.3: class-kind entries dealt per class (0 when no menu matches its kind set)
 
 
 @dataclass(frozen=True)
@@ -30,7 +38,18 @@ class Featured:
     injection: str          # the compact phrase for the REQUIRED brief block
     directive: str          # the repair directive if the mechanic is missing after the pool is built
     detect: object          # callable(census.CardCensus) -> bool
-    exclusion: str = ""     # a note (e.g. "rare-tier"); no hard class-kind exclusions on this menu
+    exclusion: str = ""     # a note (e.g. "rare-tier"); no hard class-kind exclusions on the BASE menu
+    # W2.3: pool-level presence. `min_cards` = how many pool cards must carry the mechanic (a status class
+    # "spreads" its custom status over >= 3 cards); `detect_pool` = callable(list[CardCensus]) -> bool for a
+    # mechanic that is a PAIR of cards (scry + on_discard) rather than one card's shape.
+    min_cards: int = 1
+    detect_pool: object = None
+
+    def carried_by(self, ccs) -> bool:
+        """Is this mechanic carried by the pool (a list of census.CardCensus readings)?"""
+        if callable(self.detect_pool):
+            return bool(self.detect_pool(ccs))
+        return sum(1 for cc in ccs if self.detect(cc)) >= max(1, int(self.min_cards))
 
 
 def _d(key: str) -> str:
@@ -139,7 +158,79 @@ FEATURED_MENU: list[Featured] = [
              lambda cc: "graft_card" in cc.ops),
 ]
 
+# --- W2.3: the class-kind menu — kind -> entries dealt ONLY to a class whose kind set carries that kind. ---------
+# Every directive here uses a class-only op, which is exactly why these can never sit on the base menu.
+FEATURED_CLASS_KIND: dict[str, list[Featured]] = {
+    "orb": [
+        Featured("orb_evoke_burst", 'an orb-class BURST card that evokes several orbs at once (op "evoke", amount 2-3)',
+                 'REQUIRED: add a burst card with op "evoke" (amount 2-3) that cashes your orb rack in one go; '
+                 'pair it with the channel income the class already has.',
+                 lambda cc: "evoke" in cc.ops),
+        Featured("orb_slot_growth", 'an orb-class card that GROWS the rack (op "gain_orb_slot")',
+                 'REQUIRED: add a skill or power with op "gain_orb_slot" (amount 1-2) so the class can widen its '
+                 'orb rack mid-combat.',
+                 lambda cc: "gain_orb_slot" in cc.ops),
+        Featured("orb_focus_power", 'an orb-class POWER that raises Focus (apply_status focus)',
+                 'REQUIRED: add a POWER that applies focus (apply_status focus, amount 1-2) so every orb the class '
+                 'channels hits harder.',
+                 lambda cc: "focus" in cc.statuses),
+    ],
+    "status": [
+        Featured("custom_status_spread", 'the class\'s OWN status applied across at least three cards (apply_status_custom)',
+                 'REQUIRED: apply one of THIS class\'s own status_pool statuses by name (op "apply_status_custom", '
+                 'status_name + amount) - the signature status should ride at least three cards.',
+                 lambda cc: "apply_status_custom" in cc.ops, min_cards=3),
+    ],
+    "summon": [
+        Featured("summon_medic", 'a summon-class MEDIC card that heals or shields the minion (op "heal_summon" / "shield_summon")',
+                 'REQUIRED: add a skill with op "heal_summon" (amount 1-9) or "shield_summon" (amount 1-12) that keeps '
+                 'the minion alive - the selfless medic card.',
+                 lambda cc: "heal_summon" in cc.ops or "shield_summon" in cc.ops),
+        Featured("summon_drill", 'a summon-class card that BUFFS the minion (op "buff_summon")',
+                 'REQUIRED: add a card with op "buff_summon" (amount 1-3, status strength by default) so the minion\'s '
+                 'summon_attack hits harder over the fight.',
+                 lambda cc: "buff_summon" in cc.ops),
+    ],
+    "forge": [
+        Featured("blade_empower_burst", 'a forge-class BURST that multiplies the signature blade this turn (op "blade_empower")',
+                 'REQUIRED: add a skill or power with op "blade_empower" (amount 2-3) - for the rest of this turn the '
+                 'signature blade deals that many times its damage.',
+                 lambda cc: "blade_empower" in cc.ops),
+        Featured("blade_recall", 'a forge-class RECALL that puts the signature blade into your hand from anywhere (op "summon_blade")',
+                 'REQUIRED: add a cheap skill with op "summon_blade" (no amount) that retrieves the signature blade '
+                 'from any pile into your hand.',
+                 lambda cc: "summon_blade" in cc.ops),
+        Featured("blade_rider", 'a forge-class POWER that fires whenever you play the signature blade (add_trigger "on_blade_played")',
+                 'REQUIRED: add a POWER with op "add_trigger", trigger "on_blade_played" whose payload rewards each '
+                 'swing of the signature blade (block, draw, or forge income).',
+                 lambda cc: "on_blade_played" in cc.triggers),
+    ],
+    "balance": [
+        Featured("knife_edge", 'a balance-class KNIFE\'S-EDGE payoff gated on `when` centered (the gauge near 0)',
+                 'REQUIRED: gate a strong payoff with `when` centered value:1 (it only fires while the Balance gauge '
+                 'sits within 1 of center) - the reward for walking the line between Light and Dark.',
+                 lambda cc: "centered" in cc.whens),
+    ],
+    "discard": [
+        Featured("discard_loop", 'a discard-class LOOP: one card SCRIES (op "scry") and another pays off when DISCARDED (add_trigger "on_discard")',
+                 'REQUIRED: this card must be one half of a discard loop - EITHER op "scry" (amount 2-3; look at the '
+                 'top of the draw pile and discard any) OR op "add_trigger", trigger "on_discard" (a payload that '
+                 'fires when this card is discarded by an effect). The class needs one of each.',
+                 lambda cc: "scry" in cc.ops or "on_discard" in cc.triggers,
+                 detect_pool=lambda ccs: any("scry" in cc.ops for cc in ccs)
+                 and any("on_discard" in cc.triggers for cc in ccs)),
+    ],
+    "transform": [
+        Featured("transform_graft", 'a transform-class GRAFT that lets you reforge a chosen card in hand into a strong one (op "graft_card")',
+                 'REQUIRED: add a card with op "graft_card" naming a STRONG card in this class ("card_id") - you pick '
+                 'a card in hand and it permanently becomes that card for the rest of the run.',
+                 lambda cc: "graft_card" in cc.ops),
+    ],
+}
+CLASS_KIND_MENU: list[Featured] = [f for kind in sorted(FEATURED_CLASS_KIND) for f in FEATURED_CLASS_KIND[kind]]
+
 _BY_ID = {f.id: f for f in FEATURED_MENU}
+_BY_ID.update({f.id: f for f in CLASS_KIND_MENU})
 
 
 def _seed_val(text: str) -> int:
@@ -208,8 +299,28 @@ def themed_roll(concept: str, resonant_ids, recent=None, n: int = N_FEATURED) ->
     return picks
 
 
+def roll_class_kind(concept: str, kinds, n: int = N_CLASS_KIND) -> list[Featured]:
+    """W2.3: deal up to `n` entries off the class-kind menus whose kind is in `kinds` (the class's kind set from
+    harness_v2.pool_kind — the blueprint's orb/status/summon kind UNIONED with the selected archetypes'
+    mechanic_kind). A class whose kind set matches no menu is dealt NOTHING. Seeded ONLY by the concept (a
+    distinct salt from the base roll, so the two rolls never move in lockstep); the candidate list is
+    canonical (kind order, then menu order) so the caller's kind-set ordering cannot change the draw."""
+    pool = [f for kind in sorted({str(k) for k in (kinds or [])}) for f in FEATURED_CLASS_KIND.get(kind, [])]
+    if not pool or n <= 0:
+        return []
+    val = _seed_val((concept or "") + "|class-kind")
+    picks: list[Featured] = []
+    while pool and len(picks) < n:
+        j = val % len(pool)
+        val //= len(pool)
+        picks.append(pool.pop(j))
+        if val == 0:
+            val = int.from_bytes(hashlib.sha256(picks[-1].id.encode()).digest(), "big")
+    return picks
+
+
 def resolve(ids) -> list[Featured]:
-    """Featured entries for a list of ids (silently drops unknown ids)."""
+    """Featured entries for a list of ids (silently drops unknown ids). Knows both menus (W2.3)."""
     return [_BY_ID[i] for i in (ids or []) if i in _BY_ID]
 
 
@@ -237,5 +348,5 @@ def presence(made: list[dict], feats: list[Featured]) -> dict:
     ccs = [census.walk_card((made[i].get("card") or {})) for i in measurable_indices(made)]
     out = {}
     for f in feats:
-        out[f.id] = any(f.detect(cc) for cc in ccs)
+        out[f.id] = f.carried_by(ccs)
     return out

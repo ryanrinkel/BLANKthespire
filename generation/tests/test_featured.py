@@ -212,6 +212,103 @@ def test_coverage_targets_featured() -> None:
     check(any("burst_window=present" in l for l in log2), "featured status line reports it present")
 
 
+
+# --------------------------------------------------------------- W2.3: class-kind-aware roulette
+def test_class_kind_roulette() -> None:
+    print("W2.3: roll_class_kind deals only from the menus matching the class's kind set:")
+    base_ids = {f.id for f in featured.FEATURED_MENU}
+    kind_ids = {f.id for f in featured.CLASS_KIND_MENU}
+    check(not (base_ids & kind_ids), "class-kind ids never collide with the base menu")
+    check(set(featured.FEATURED_CLASS_KIND) == {"orb", "status", "summon", "forge", "balance", "discard", "transform"},
+          f"the seven class-kind menus, got {sorted(featured.FEATURED_CLASS_KIND)}")
+    for kind, entries in featured.FEATURED_CLASS_KIND.items():
+        check(len(entries) >= 1, f"menu '{kind}' is non-empty")
+    # a summon-kind class rolls a summon entry; a normal class rolls NOTHING
+    summon_ids = {f.id for f in featured.FEATURED_CLASS_KIND["summon"]}
+    for concept in ("a necromancer and her bone thrall", "a beast tamer", "a puppeteer"):
+        picks = featured.roll_class_kind(concept, {"", "summon"})
+        check(len(picks) == featured.N_CLASS_KIND and picks[0].id in summon_ids,
+              f"summon class rolls a summon entry: {[f.id for f in picks]}")
+        check(featured.roll_class_kind(concept, {""}) == [], "a normal class rolls no class-kind entry")
+        check(featured.roll_class_kind(concept, None) == [], "no kind set -> nothing")
+    # deterministic per concept, order-proof over the kind set, and the two rolls don't move in lockstep
+    a = featured.roll_class_kind("a storm-forger", {"", "orb", "forge"})
+    b = featured.roll_class_kind("a storm-forger", {"forge", "orb", ""})
+    check([f.id for f in a] == [f.id for f in b] and a[0].id in {f.id for f in featured.FEATURED_CLASS_KIND["orb"]}
+          | {f.id for f in featured.FEATURED_CLASS_KIND["forge"]}, "deterministic and kind-order-proof")
+    spread = {featured.roll_class_kind(c, {"", "forge"})[0].id for c in
+              ("an anvil priest", "a molten duelist", "a sovereign smith", "a furnace knight", "a hammer saint",
+               "a blacksmith", "a forge witch", "an ember warden")}
+    check(len(spread) >= 2, f"different concepts spread across the forge menu: {spread}")
+    # the base roll never picks a class-kind entry; resolve knows both menus
+    check(all(f.id in base_ids for f in featured.roll_featured("a summoner")), "roll_featured stays on the base menu")
+    check([f.id for f in featured.resolve(["summon_medic", "x_dump", "nope"])] == ["summon_medic", "x_dump"],
+          "resolve() knows class-kind ids")
+    check("summon_medic" not in featured.menu_block(), "menu_block (the cloud rating surface) lists the base menu only")
+
+
+def test_class_kind_detectors_and_presence() -> None:
+    print("W2.3: every class-kind detector round-trips; min_cards + detect_pool presence:")
+    samples = {
+        "orb_evoke_burst": _card([{"op": "evoke", "amount": 2}]),
+        "orb_slot_growth": _card([{"op": "gain_orb_slot", "amount": 1}]),
+        "orb_focus_power": _card([{"op": "apply_status", "status": "focus", "amount": 1}]),
+        "custom_status_spread": _card([{"op": "apply_status_custom", "status_name": "Rust", "amount": 2}]),
+        "summon_medic": _card([{"op": "heal_summon", "amount": 4}]),
+        "summon_drill": _card([{"op": "buff_summon", "amount": 2}]),
+        "blade_empower_burst": _card([{"op": "blade_empower", "amount": 2}]),
+        "blade_recall": _card([{"op": "summon_blade"}]),
+        "blade_rider": _card([{"op": "add_trigger", "trigger": "on_blade_played", "effects": [{"op": "block", "amount": 3}]}]),
+        "knife_edge": _card([{"op": "damage", "amount": 12, "when": {"kind": "centered", "value": 1}}]),
+        "discard_loop": _card([{"op": "scry", "amount": 2}]),
+        "transform_graft": _card([{"op": "graft_card", "card_id": "ember"}]),
+    }
+    check(set(samples) == {f.id for f in featured.CLASS_KIND_MENU}, "a sample exists for every class-kind entry")
+    plain = census.walk_card(_card([{"op": "damage", "amount": 6}]))
+    for f in featured.CLASS_KIND_MENU:
+        check(f.detect(census.walk_card(samples[f.id])), f"detector '{f.id}' fires")
+        check(not f.detect(plain), f"detector '{f.id}' silent on a plain card")
+        check(f.directive.startswith("REQUIRED:"), f"'{f.id}' carries a REQUIRED directive")
+    # min_cards: the status spread needs THREE carriers
+    spread = next(f for f in featured.CLASS_KIND_MENU if f.id == "custom_status_spread")
+    one = [census.walk_card(samples["custom_status_spread"])]
+    check(not spread.carried_by(one), "one apply_status_custom card is not a spread")
+    check(spread.carried_by(one * 3), "three carriers satisfy the spread")
+    # detect_pool: the discard loop needs BOTH halves
+    loop = next(f for f in featured.CLASS_KIND_MENU if f.id == "discard_loop")
+    scry = census.walk_card(samples["discard_loop"])
+    reflex = census.walk_card(_card([{"op": "add_trigger", "trigger": "on_discard", "effects": [{"op": "block", "amount": 5}]}]))
+    check(not loop.carried_by([scry, scry]) and not loop.carried_by([reflex]), "half a loop is not carried")
+    check(loop.carried_by([scry, reflex]), "scry + on_discard together carry the loop")
+    # presence() + the coverage round use carried_by (so a missing spread is repaired)
+    made = [{"plan": {"role": "common"}, "card": samples["custom_status_spread"]}]
+    check(featured.presence(made, [spread]) == {"custom_status_spread": False}, "presence honors min_cards")
+    log: list[str] = []
+    asked: list[str] = []
+
+    def stub(plan, old, directive):
+        asked.append(directive)
+        return None
+    good = [{"plan": {"role": "common", "rarity": "common"}, "card": c} for c in (
+        _card([{"op": "add_trigger", "trigger": "attacked", "effects": [{"op": "damage", "amount": 4}]}]),
+        _card([{"op": "add_trigger", "trigger": "on_hp_lost", "effects": [{"op": "block", "amount": 3}]}]),
+        _card([{"op": "damage", "amount": 6, "when": {"kind": "hp_below_half"}}]),
+        _card([{"op": "block", "amount": 6, "when": {"kind": "turn_at_least"}}]),
+        _card([{"op": "damage", "amount": 6, "when": {"kind": "no_block"}}]),
+        _card([{"op": "apply_status", "status": "thorns", "amount": 3, "when": {"kind": "has_block"}}]),
+        _card([{"op": "apply_status", "status": "regen", "amount": 3, "when": {"kind": "has_block"}}]),
+        _card([{"op": "damage", "amount": 1, "scale": "cards_in_hand"}]),
+        _card([{"op": "damage", "amount": 6}]),
+    )]
+    for i, m in enumerate(good):
+        m["card"]["id"] = f"g{i}"
+        m["card"]["name"] = f"G{i}"
+    s = coverage.enforce_coverage(good, stub, log.append, featured=[loop])
+    check("discard_loop" in s["featured_missing_before"], "a missing class-kind pick is a quota item")
+    check(any(d == loop.directive for d in asked), "its directive is injected")
+    check(any("featured 'discard_loop' not woven in" in l for l in log), "and the WARNING names it")
+
+
 def main() -> int:
     test_roll_reproducible()
     test_themed_roll()
@@ -219,6 +316,8 @@ def main() -> int:
     test_detectors_round_trip()
     test_exclusion_and_presence()
     test_coverage_targets_featured()
+    test_class_kind_roulette()
+    test_class_kind_detectors_and_presence()
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return 1 if _FAIL else 0
 

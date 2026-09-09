@@ -224,15 +224,25 @@ def test_triad_skips_featured_roulette() -> None:
     try:
         res = forge_class(ClassBrief(concept="a frost mage who freezes then shatters"), blueprint_gen=None,
                           card_gen_factory=lambda: _CardFake(), relic_gen=None, fake=True, triad=True)
+        from btsgen import featured as _featured
+        base_ids = {f.id for f in _featured.FEATURED_MENU}
+        kind_ids = {f.id for f in _featured.CLASS_KIND_MENU}
         check(res.ok, "triad fake forge succeeds")
-        check((res.blueprint or {}).get("featured") == [], "a triad forge carries NO featured mechanics")
-        check(not any("featured mechanics" in l for l in res.log), "no featured-roll line in the triad log")
+        # W2.3: the BASE roulette (wild slot) stays OFF under triad; the class-kind menu (on-theme by construction)
+        # is dealt on both paths — the frost fake is an ORB class, so it draws exactly one orb entry.
+        feat = (res.blueprint or {}).get("featured") or []
+        check(not (set(feat) & base_ids), f"a triad forge carries NO base-menu featured mechanics: {feat}")
+        check(set(feat) <= kind_ids and len(feat) == 1, f"a triad orb forge carries one class-kind pick: {feat}")
+        check(not any("featured mechanics (rolled)" in l for l in res.log), "no base-roll line in the triad log")
+        check(any(l.startswith("featured class-kind mechanic (rolled)") for l in res.log),
+              "the triad log announces the class-kind pick")
 
         res2 = forge_class(ClassBrief(concept="a frost mage who freezes then shatters"), blueprint_gen=None,
                            card_gen_factory=lambda: _CardFake(), relic_gen=None, fake=True, triad=False)
         check(res2.ok, "legacy fake forge succeeds")
-        check(len((res2.blueprint or {}).get("featured") or []) == 2,
-              "the legacy path still rolls 2 featured mechanics")
+        feat2 = (res2.blueprint or {}).get("featured") or []
+        check(len(set(feat2) & base_ids) == 2, f"the legacy path still rolls 2 base featured mechanics: {feat2}")
+        check(len(set(feat2) & kind_ids) == 1, f"the legacy path also carries the class-kind pick: {feat2}")
         check(any(l.startswith("featured mechanics (rolled)") for l in res2.log),
               "the legacy log still announces the roll")
     finally:

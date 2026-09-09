@@ -286,7 +286,7 @@ coverage gate enforces that share), and never as a card's whole identity.
 ORB CLASSES (optional — only when the concept fits): the vocabulary includes a Defect-style ORB subsystem \
 (see the "Orbs" section above). If — and ONLY if — the concept is an elemental/channeling/"slot-machine"/ \
 alchemist identity (storm-caller, elementalist, gambler, etc.), you MAY make this an ORB CLASS: set top-level \
-"orb_slots" to 3 or 4, declare an "orb_pool" (below), make ONE archetype the orb engine (briefs that \
+"orb_slots" to 3, 4 or 5, declare an "orb_pool" (below), make ONE archetype the orb engine (briefs that \
 channel_orb + evoke + a `focus` payoff), and use the orb ops/`focus` freely in THAT archetype's briefs. For \
 every NON-orb concept, set "orb_slots": 0, OMIT "orb_pool", and do NOT use channel_orb / evoke / gain_orb_slot \
 / focus anywhere — they do nothing without orb slots.
@@ -529,7 +529,7 @@ NECROMANCER / beastmaster / conjurer / commander who fights THROUGH a single loy
 statuses, or raw cards. The minion works EXACTLY like the base game's Osty: ONE on board at a time; it is PASSIVE \
 (it does NOTHING on its own turn); it is a MEAT-SHIELD with an HP bar that soaks the enemy hits aimed at you; it \
 clears at combat end. The class's OFFENSE comes from cards that strike THROUGH the minion. The pool entry is just \
-{{ "name", "max_hp" (1-60, its starting HP), "description" }} — NO moves, NO attackable flag, NO on_summon / \
+{{ "name", "max_hp" (1-100, its starting HP), "description" }} — NO moves, NO attackable flag, NO on_summon / \
 on_death. Three card ops drive the minion (all SUMMON-CLASS ONLY):
   • `summon` (summon_name:"<the minion>", amount = HP): the base-game Summon keyword. If the minion is NOT on \
     board, summon it with `amount` HP (omit amount to use its max_hp). If it IS already on board, this instead \
@@ -579,6 +579,8 @@ a deep class from a pile of synergies.
   "name": "<= 24 chars",
   "description": "<= 160 chars, the class fantasy",
   "max_hp": 70,
+  "max_energy": 3,
+  "color": "azure",
   "orb_slots": 0,
   "orb_pool": [],
   "status_pool": [],
@@ -639,7 +641,9 @@ from the class's NON-basic pool, so every class MUST include at least one non-ba
 of EACH type: ≥1 Attack, ≥1 Skill, and ≥1 Power. A class with no non-basic Power card hangs the game at a \
 merchant. Powers are the build-around engines (use `add_trigger` per-turn effects, or a lasting self-buff like \
 Strength/Dexterity) — give every class one or two regardless of theme.
-- "orb_slots": 0 for a normal class; 3-4 ONLY for an orb class (then one archetype must be the orb engine).
+- "orb_slots": 0 for a normal class; 3-5 ONLY for an orb class (then one archetype must be the orb engine).
+- "max_energy": 3 normally; 4 ONLY with a smaller HP pool (max_hp <= 65); 2 ONLY for a big-energy / X-cost class \
+whose cards cost 0-1. "color": the class's hue 0-359 or a palette name ({_PALETTE_NAMES}) — its card-frame tint.
 - "orb_pool": [] for a normal class; for an orb class, list every orb it channels — base name strings and/or \
 up to 3 custom orb objects (see THE ORB POOL). Channel-card briefs must reference orbs by their pool name.
 - "status_pool": [] unless the class's identity is its OWN signature buff/debuff(s); then declare up to 4 custom \
@@ -806,7 +810,7 @@ for a second signature under the card cap)."""
         def _s(t) -> str:
             return harness_v2.strip_metaphors(str(t or ""), _mets) if _mets else str(t or "")
         kind_guidance = {
-            "orb": ('This is an ORB CLASS: set "orb_slots" to 3 or 4, declare an "orb_pool" (base orbs and/or up '
+            "orb": ('This is an ORB CLASS: set "orb_slots" to 3, 4 or 5, declare an "orb_pool" (base orbs and/or up '
                     'to 3 custom orbs — see THE ORB POOL), and make ONE archetype the orb engine.'),
             "status": ('This is a STATUS CLASS: declare a "status_pool" (up to 4 custom statuses — see THE STATUS '
                        'POOL) and have cards apply them by name with apply_status_custom. "orb_slots": 0.'),
@@ -1004,12 +1008,17 @@ def _nomination_ask() -> str:
     fit the theme. The coverage pass may then only inject from that set (coverage.sanitize_nominations)."""
     from . import coverage
     react = ", ".join(k for k, _ in coverage.REACTIVE_MENU_V2)
-    when = ", ".join(k for k, _ in coverage.WHEN_MENU_V2)
-    exotic = ", ".join([k for k, _ in coverage.EXOTIC_MENU_V2] + ["thorns", "metallicize"])
+    when = ", ".join([k for k, _ in coverage.WHEN_MENU_V2] + [k for k, _d, _kind in coverage.WHEN_MENU_KIND])
+    exotic = ", ".join([k for k, _ in coverage.EXOTIC_MENU_V2] + ["thorns", "metallicize"]
+                       + [k for k, _ in coverage.EXOTIC_NOMINATE_ONLY])
+    scale = ", ".join([k for k, _ in coverage.SCALE_MENU] + [k for k, _d, _kind in coverage.SCALE_MENU_KIND])
+    keyword = ", ".join(k for k, _ in coverage.KEYWORD_MENU)
+    gated = ", ".join(f"{k} ({kind})" for k, kind in coverage.KEY_KIND.items())
     return (' Also declare a top-level "coverage_nominations" object naming the mechanics that FIT this theme '
             f'(a later set-level coverage pass may ONLY inject from these): {{"reactive": [3 of: {react}], '
-            f'"when": [4 of: {when}], "exotic": [3 of: {exotic}]}}. Pick the ones this identity would '
-            'genuinely reach for, not the first on the list.')
+            f'"when": [4 of: {when}], "exotic": [3 of: {exotic}], "scale": [2 of: {scale}], '
+            f'"keyword": [2 of: {keyword}]}}. Pick the ones this identity would genuinely reach for, not the '
+            f'first on the list; the class-kind keys ({gated}) only on a class of that kind.')
 
 
 # --- Phase L: the keystone starter relic (constrained to the mod's ForgedRelic runtime) -----------
@@ -1403,6 +1412,65 @@ def _bridge_pair(card, arch_ids: list[str]):
     return "invalid"
 
 
+# --- W2.4: character-level knobs + generation caps (the C# importer's ranges stay the hard ceiling:
+#     max_hp 1..999, max_energy 1..10, orb_slots 0..10, summon max_hp 1..999) --------------------------------
+_MAX_HP_RANGE = (55, 100)           # was 60..95
+_MAX_ENERGY_RANGE = (2, 4)          # assembly default 3; the blueprint may now vary it
+_ORB_SLOTS_MAX = 5                  # was 4
+# Named palette entries a blueprint may use for "color" (hue in degrees). A bare int/float 0-359, a numeric
+# string, or {"hue": 0-359} / {"h": 0..1[, "s", "v"]} are accepted too (see parse_color).
+_PALETTE = {"crimson": 0, "amber": 35, "gold": 55, "emerald": 130, "teal": 175, "azure": 215,
+            "violet": 270, "magenta": 315}
+_PALETTE_NAMES = "/".join(_PALETTE)
+
+
+def parse_color(value) -> dict:
+    """Normalize a blueprint `color` to the C# importer's {h, s, v} (h/s/v floats in 0..1; ForgedCharacters.cs
+    reads `color.h/s/v`). Accepts a palette name, a hue in degrees (int/float/numeric string, 0-359), or an
+    object with `hue` (degrees) or `h` (0..1) plus optional `s` / `v` (0..1). Raises ValueError on anything else."""
+    s, v = 0.8, 1.0
+    if isinstance(value, bool):
+        raise ValueError("color must be a hue 0-359, a palette name, or {hue} / {h,s,v}")
+    if isinstance(value, str):
+        key = value.strip().lower()
+        if key in _PALETTE:
+            hue = float(_PALETTE[key])
+        else:
+            try:
+                hue = float(key)
+            except ValueError:
+                raise ValueError(f"unknown color '{value}' (use a hue 0-359 or one of {_PALETTE_NAMES})") from None
+    elif isinstance(value, (int, float)):
+        hue = float(value)
+    elif isinstance(value, dict):
+        if "hue" in value:
+            hue = value.get("hue")
+            if isinstance(hue, bool) or not isinstance(hue, (int, float)):
+                raise ValueError("color.hue must be a number 0-359")
+            hue = float(hue)
+        elif "h" in value:
+            h = value.get("h")
+            if isinstance(h, bool) or not isinstance(h, (int, float)) or not (0.0 <= float(h) <= 1.0):
+                raise ValueError("color.h must be a number 0..1")
+            hue = float(h) * 360.0
+        else:
+            raise ValueError("color object needs `hue` (0-359) or `h` (0..1)")
+        for k in ("s", "v"):
+            if k in value:
+                x = value.get(k)
+                if isinstance(x, bool) or not isinstance(x, (int, float)) or not (0.0 <= float(x) <= 1.0):
+                    raise ValueError(f"color.{k} must be a number 0..1")
+                if k == "s":
+                    s = float(x)
+                else:
+                    v = float(x)
+    else:
+        raise ValueError("color must be a hue 0-359, a palette name, or {hue} / {h,s,v}")
+    if not (0.0 <= hue <= 359.0) and hue != 360.0:
+        raise ValueError(f"color hue {hue:g} out of range (0-359)")
+    return {"h": round((hue % 360.0) / 360.0, 4), "s": round(s, 4), "v": round(v, 4)}
+
+
 def _validate_blueprint(bp: dict) -> list[str]:
     errs: list[str] = []
     if not isinstance(bp, dict):
@@ -1471,16 +1539,30 @@ def _validate_blueprint(bp: dict) -> list[str]:
     # overall. The post-generation witness detector (bridges.py, coverage round) checks they actually fuse;
     # this is the blueprint-stage tag-count + rare floor + per-pair floor.
     errs += _validate_bridges(bp, cards, arch_ids)
-    if not (60 <= int(bp.get("max_hp", 0)) <= 95):
-        errs.append("max_hp must be 60..95")
+    if not (_MAX_HP_RANGE[0] <= int(bp.get("max_hp", 0)) <= _MAX_HP_RANGE[1]):
+        errs.append(f"max_hp must be {_MAX_HP_RANGE[0]}..{_MAX_HP_RANGE[1]}")
+    # W2.4: the character-level knobs the generator never touched — energy (C# allows 1..10; the forge allows
+    # 2..4) and the pool color (an explicit hue; else the engine spreads a default hue per class slot).
+    try:
+        max_energy = int(bp.get("max_energy", 3) if bp.get("max_energy") is not None else 3)
+    except (TypeError, ValueError):
+        errs.append("max_energy must be an integer (2, 3 or 4)")
+    else:
+        if not (_MAX_ENERGY_RANGE[0] <= max_energy <= _MAX_ENERGY_RANGE[1]):
+            errs.append(f"max_energy must be {_MAX_ENERGY_RANGE[0]}..{_MAX_ENERGY_RANGE[1]} (3 is the norm)")
+    if bp.get("color") is not None:
+        try:
+            parse_color(bp.get("color"))
+        except ValueError as e:
+            errs.append(f"color: {e}")
     orb_slots = 0
     try:
         orb_slots = int(bp.get("orb_slots", 0) or 0)
     except (TypeError, ValueError):
-        errs.append("orb_slots must be an integer (0 for a normal class, 3-4 for an orb class)")
+        errs.append(f"orb_slots must be an integer (0 for a normal class, 3-{_ORB_SLOTS_MAX} for an orb class)")
     else:
-        if not (0 <= orb_slots <= 4):
-            errs.append("orb_slots must be 0..4")
+        if not (0 <= orb_slots <= _ORB_SLOTS_MAX):
+            errs.append(f"orb_slots must be 0..{_ORB_SLOTS_MAX}")
     if "orb_pool" in bp and bp.get("orb_pool"):
         errs += _validate_orb_pool(bp.get("orb_pool"), orb_slots)
     if "status_pool" in bp and bp.get("status_pool"):
@@ -1877,7 +1959,7 @@ _SUMMON_ENEMY_STATUSES = {"vulnerable", "weak", "frail", "poison"}
 # v15 true-Osty: a summon class declares EXACTLY ONE passive Osty-style minion (the engine still allows 2, kept
 # dormant). The K-3 custom-summon fields (moves/attackable/on_summon/on_death) are no longer emitted (see below).
 _MAX_SUMMONS = 1
-_SUMMON_MAX_HP = 60                 # generation cap on the minion's starting HP (the engine itself allows 1..999)
+_SUMMON_MAX_HP = 100                # generation cap on the minion's starting HP (W2.4: 60 -> 100; the engine allows 1..999)
 # The K-3 autonomous-move caps below are now DORMANT (the generator no longer emits minion moves); kept for the
 # dormant engine path / possible re-add (see _validate_summon_actions, no longer called for pools).
 _SUMMON_ACTION_CAPS = {"attack": 20, "block": 12, "apply_status": 6, "heal_self": 12}
@@ -2431,6 +2513,17 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
     _v2_arch_ids = _archetype_ids(bp)
     _v2_kind = ("orb" if int(bp.get("orb_slots", 0) or 0) > 0 else "status" if bp.get("status_pool")
                 else "summon" if bp.get("summon_pool") else "normal")
+    # W2.2/W2.3: the class's KIND SET (blueprint kind UNION the selected archetypes' mechanic_kind) unlocks the
+    # class-kind-gated coverage menus and deals the class-kind featured roulette. Dealt on BOTH the legacy and
+    # the triad path: unlike the base roulette's wild slot (OFF under triad since 2026-08-15 for landing
+    # off-theme subsystems), these entries are on-theme by construction — they only exist for the class's own kind.
+    _kinds = harness_v2.pool_kind(_v2_kind, _v2_arch_ids)
+    _ck = _featured_mod.roll_class_kind(brief.concept, _kinds)
+    if _ck:
+        _have = {f.id for f in _feat}
+        _feat = list(_feat) + [f for f in _ck if f.id not in _have]
+        bp["featured"] = [f.id for f in _feat]
+        note("featured class-kind mechanic (rolled): " + "; ".join(f.id for f in _ck))
 
     def _v2_brief(cb, plan: dict, salt: str) -> None:
         """Fix A per-card material: 2-3 rotating class-appropriate exemplars (archetype + rarity matched, seeded,
@@ -2596,7 +2689,7 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
                 note("coverage nominations: none declared; menus shuffled on the concept seed")
         _cov = coverage.enforce_coverage(made, _regen_card, note, featured=_feat,
                                          bridge_ctx=bridge_ctx, nominated=_nominated,
-                                         seed=_v2_seed if _v2 else None)
+                                         seed=_v2_seed if _v2 else None, kinds=_kinds)
         res.stats["injections"] = [str(j.get("key")) for j in (_cov.get("injections") or []) if j.get("ok")]
         if _v2 and res.stats["injections"]:
             note("coverage injections (ledger): " + ", ".join(res.stats["injections"]))
@@ -2769,10 +2862,16 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
         "name": bp["name"],
         "description": bp.get("description", ""),
         "max_hp": int(bp.get("max_hp", 70)),
-        "max_energy": int(bp.get("max_energy", 3)),
+        "max_energy": int(bp.get("max_energy", 3) or 3),
         "orb_slots": orb_slots,
         "starting_deck": starting_deck,
     }
+    # W2.4: the pool color — emitted as the importer's {h, s, v}; omitted -> the engine's per-slot default hue.
+    if bp.get("color") is not None:
+        try:
+            character["color"] = parse_color(bp.get("color"))
+        except ValueError as e:  # the validator already rejected a bad color on the LLM path; fakes/callers may skip it
+            note(f"color: ignored ({e})")
     # Phase I: carry the forged orb pool (only meaningful on an orb class). The C# importer re-validates it.
     orb_pool = bp.get("orb_pool") or []
     if orb_slots > 0 and orb_pool:
@@ -2965,6 +3064,8 @@ def _fake_blueprint_variant(brief: ClassBrief) -> dict:
             "name": "Test Forge",
             "description": f"Offline fake FORGE class for: {brief.concept[:60]}",
             "max_hp": 74,
+            "max_energy": 3,
+            "color": "amber",
             "orb_slots": 0,
             "archetypes": [
                 {"id": "forge_ramp", "name": "Forge Ramp", "description": "stoke the Forge, swing the growing blade"},
@@ -2993,6 +3094,8 @@ def _fake_blueprint_variant(brief: ClassBrief) -> dict:
             "name": "Test Tempest",
             "description": f"Offline fake ORB class for: {brief.concept[:60]}",
             "max_hp": 70,
+            "max_energy": 3,
+            "color": {"hue": 200},
             "orb_slots": 3,
             # MIXED pool: base lightning + a custom Ember orb (exercises the Phase I forged-orb path offline).
             "orb_pool": [

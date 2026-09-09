@@ -206,6 +206,12 @@ def _pool_kind(bp_kind: str, archetype_ids) -> set[str]:
     return ok
 
 
+def pool_kind(bp_kind: str, archetype_ids) -> set[str]:
+    """W2.2/W2.3: the PUBLIC name for _pool_kind — the class's kind set (blueprint kind UNION selected archetypes'
+    mechanic_kind) that coverage.py's class-kind-gated menus and featured.roll_class_kind key off."""
+    return _pool_kind(bp_kind, archetype_ids)
+
+
 def pick_exemplars(archetype_ids, rarity: str, seed: int, *, class_kind: str = "normal", salt: str = "",
                    avoid_triples=None, n: int = 3) -> list[dict]:
     """Pick `n` exemplar cards for a card brief: class-appropriate (archetype match first, then rarity match),

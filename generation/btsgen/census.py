@@ -23,6 +23,12 @@ the 36-class overnight run (`generation/scratch/overnight-2026-07-06/codes/`, 96
 
 `btsgen-census <paths...>` decodes `.btsc.txt` codes (or reads bundle .json) and prints per-class + an
 aggregate table — run it over the codes dir above to reproduce these numbers (the N-0 gate).
+
+W2.1 (vocab-gap remediation, 2026-09-09) widened what the census COUNTS so coverage.py / featured.py have a
+detector for the whole vocabulary, not a slice: multi-hit (`hits` >= 2, now NON-plain), the four card
+keywords (exhaust / retain / innate / ethereal), `apply_status_custom` statuses and `buff_summon` statuses,
+the specialty statuses (poison / frail / focus — neither generic nor exotic), `tags`, `upgrade.cost`,
+`once_per_turn` triggers, `ripen` amounts, and targeted trigger payloads. `format_report` prints EVERY counter.
 """
 from __future__ import annotations
 
@@ -45,6 +51,14 @@ EXOTIC_STATUSES = frozenset({
     "thorns", "regen", "metallicize", "artifact", "buffer", "blur", "intangible",
     "ritual", "barricade", "temp_strength", "temp_dexterity",
 })
+# W2.1: the SPECIALTY statuses — neither the over-used generic debuffs nor "exotic" mitigation/buff exotica.
+# Poison is the DoT debuff, Frail the block-side debuff, Focus the orb-class buff. Their own bucket so a
+# poison class isn't scored as "generic" and an orb class's Focus isn't scored as "exotic".
+SPECIALTY_STATUSES = frozenset({"poison", "frail", "focus"})
+# W2.1: the four card-property keywords (nullary ops). `multi_hit` joins them as a keyword KIND (see
+# CardCensus.keyword_kinds) because "Deal 4 damage 3 times" is a card shape, not an op.
+KEYWORD_OPS = frozenset({"exhaust", "retain", "innate", "ethereal"})
+MULTI_HIT_KIND = "multi_hit"
 
 
 @dataclass
@@ -60,6 +74,16 @@ class CardCensus:
     grow: int = 0                                          # Phase U (gap #23): count of `grow` (Rampage) damage effects
     x_cost: bool = False
     plain: bool = False
+    # --- W2.1 counters -------------------------------------------------------------------------------
+    multi_hit: int = 0                                     # damage/summon_attack effects with hits >= 2
+    keywords: Counter = field(default_factory=Counter)     # exhaust / retain / innate / ethereal (nullary ops)
+    custom_statuses: Counter = field(default_factory=Counter)  # apply_status_custom status_name
+    summon_buffs: Counter = field(default_factory=Counter)     # buff_summon status (default strength)
+    tagged: bool = False                                   # the card declares `tags`
+    upgrade_cost: bool = False                             # the upgrade carries an absolute `cost` (Phase AG)
+    once_per_turn: int = 0                                 # add_trigger effects flagged once_per_turn
+    ripen_amounts: Counter = field(default_factory=Counter)    # ripen trigger countdowns (amount -> count)
+    targeted_payloads: int = 0                             # effects INSIDE a trigger payload carrying a `target`
 
     @property
     def reactive_trigger_kinds(self) -> set[str]:
@@ -78,9 +102,22 @@ class CardCensus:
     def scaled_or_x(self) -> bool:
         return bool(self.scales) or self.x_cost
 
+    @property
+    def keyword_kinds(self) -> set[str]:
+        """The card-shape keywords this card carries: exhaust / retain / innate / ethereal / multi_hit."""
+        kinds = set(self.keywords)
+        if self.multi_hit:
+            kinds.add(MULTI_HIT_KIND)
+        return kinds
 
-def _walk_effects(effects, cc: CardCensus) -> None:
-    """Tally one effects list into `cc`, recursing into add_trigger payloads."""
+    @property
+    def specialty_status_kinds(self) -> set[str]:
+        return set(self.statuses) & SPECIALTY_STATUSES
+
+
+def _walk_effects(effects, cc: CardCensus, *, in_payload: bool = False) -> None:
+    """Tally one effects list into `cc`, recursing into add_trigger payloads (`in_payload` marks the
+    recursion so targeted payload effects can be counted)."""
     if not isinstance(effects, list):
         return
     for eff in effects:
@@ -89,15 +126,35 @@ def _walk_effects(effects, cc: CardCensus) -> None:
         op = eff.get("op")
         if isinstance(op, str) and op:
             cc.ops[op] += 1
+            if op in KEYWORD_OPS:
+                cc.keywords[op] += 1
         if op == "apply_status":
             status = eff.get("status")
             if isinstance(status, str) and status:
                 cc.statuses[status] += 1
+        if op == "apply_status_custom":
+            sname = eff.get("status_name")
+            if isinstance(sname, str) and sname:
+                cc.custom_statuses[sname.strip().lower()] += 1
+        if op == "buff_summon":
+            bstatus = eff.get("status")
+            cc.summon_buffs[bstatus.strip().lower() if isinstance(bstatus, str) and bstatus else "strength"] += 1
+        hits = eff.get("hits")
+        if op in ("damage", "summon_attack") and isinstance(hits, int) and not isinstance(hits, bool) and hits >= 2:
+            cc.multi_hit += 1
+        if in_payload and isinstance(eff.get("target"), str) and eff.get("target"):
+            cc.targeted_payloads += 1
         if op == "add_trigger":
             trig = eff.get("trigger")
             if isinstance(trig, str) and trig:
                 cc.triggers[trig] += 1
-            _walk_effects(eff.get("effects"), cc)  # nested payload
+                if trig == "ripen":
+                    amt = eff.get("amount")
+                    if isinstance(amt, int) and not isinstance(amt, bool):
+                        cc.ripen_amounts[amt] += 1
+            if eff.get("once_per_turn") is True:
+                cc.once_per_turn += 1
+            _walk_effects(eff.get("effects"), cc, in_payload=True)  # nested payload
         when = eff.get("when")
         if isinstance(when, dict):
             kind = when.get("kind")
@@ -116,11 +173,16 @@ def walk_card(card: dict) -> CardCensus:
     if not isinstance(card, dict):
         return cc
     cc.x_cost = str(card.get("cost", "")).strip().lower() == "x"
+    tags = card.get("tags")
+    cc.tagged = isinstance(tags, list) and any(isinstance(t, str) and t for t in tags)
     _walk_effects(card.get("effects"), cc)
     upgrade = card.get("upgrade")
     if isinstance(upgrade, dict):
         _walk_effects(upgrade.get("effects"), cc)
-    # Plain = a stat line only: op set ⊆ base ops, no conditional gate, no scaling, not X-cost, no grow (Rampage).
+        uc = upgrade.get("cost")
+        cc.upgrade_cost = isinstance(uc, int) and not isinstance(uc, bool)
+    # Plain = a stat line only: op set ⊆ base ops, no conditional gate, no scaling, not X-cost, no grow
+    # (Rampage), and (W2.1) no multi-hit — "Deal 4 damage 3 times" is a shape, not a stat line.
     cc.plain = (
         bool(cc.ops)
         and set(cc.ops) <= BASE_OPS
@@ -128,6 +190,7 @@ def walk_card(card: dict) -> CardCensus:
         and not cc.scales
         and not cc.x_cost
         and not cc.grow
+        and not cc.multi_hit
     )
     return cc
 
@@ -145,6 +208,17 @@ class Census:
     whens: Counter = field(default_factory=Counter)
     scales: Counter = field(default_factory=Counter)
     per_card: list = field(default_factory=list)  # list[tuple[dict, CardCensus]]
+    # --- W2.1 counters (summed occurrence counts; the *_cards ints count CARDS carrying the feature) ---
+    multi_hit: int = 0
+    keywords: Counter = field(default_factory=Counter)
+    custom_statuses: Counter = field(default_factory=Counter)
+    summon_buffs: Counter = field(default_factory=Counter)
+    tagged_cards: int = 0
+    upgrade_cost_cards: int = 0
+    once_per_turn: int = 0
+    ripen_amounts: Counter = field(default_factory=Counter)
+    targeted_payloads: int = 0
+    grow: int = 0
 
     @property
     def plain_share(self) -> float:
@@ -162,6 +236,56 @@ class Census:
     def exotic_status_kinds(self) -> set[str]:
         return set(self.statuses) & EXOTIC_STATUSES
 
+    @property
+    def specialty_status_kinds(self) -> set[str]:
+        return set(self.statuses) & SPECIALTY_STATUSES
+
+    @property
+    def keyword_kinds(self) -> set[str]:
+        kinds = set(self.keywords)
+        if self.multi_hit:
+            kinds.add(MULTI_HIT_KIND)
+        return kinds
+
+    def add_card(self, card: dict, cc: CardCensus) -> None:
+        """Fold one card's reading into this aggregate."""
+        self.total += 1
+        if cc.plain:
+            self.plain += 1
+        if cc.x_cost:
+            self.x_cost += 1
+        self.ops.update(cc.ops)
+        self.statuses.update(cc.statuses)
+        self.triggers.update(cc.triggers)
+        self.whens.update(cc.whens)
+        self.scales.update(cc.scales)
+        self.multi_hit += cc.multi_hit
+        self.keywords.update(cc.keywords)
+        self.custom_statuses.update(cc.custom_statuses)
+        self.summon_buffs.update(cc.summon_buffs)
+        if cc.tagged:
+            self.tagged_cards += 1
+        if cc.upgrade_cost:
+            self.upgrade_cost_cards += 1
+        self.once_per_turn += cc.once_per_turn
+        self.ripen_amounts.update(cc.ripen_amounts)
+        self.targeted_payloads += cc.targeted_payloads
+        self.grow += cc.grow
+        self.per_card.append((card, cc))
+
+    def merge(self, other: "Census") -> None:
+        """Fold another aggregate into this one (per_card readings are NOT copied — the aggregate is the
+        report's unit; callers that need victims keep their own per-class Census)."""
+        self.total += other.total
+        self.plain += other.plain
+        self.x_cost += other.x_cost
+        for name in ("ops", "statuses", "triggers", "whens", "scales", "keywords", "custom_statuses",
+                     "summon_buffs", "ripen_amounts"):
+            getattr(self, name).update(getattr(other, name))
+        for name in ("multi_hit", "tagged_cards", "upgrade_cost_cards", "once_per_turn", "targeted_payloads",
+                     "grow"):
+            setattr(self, name, getattr(self, name) + getattr(other, name))
+
 
 def census_cards(cards) -> Census:
     """Census a flat list of card dicts."""
@@ -169,18 +293,7 @@ def census_cards(cards) -> Census:
     for card in cards or []:
         if not isinstance(card, dict):
             continue
-        cc = walk_card(card)
-        cen.total += 1
-        if cc.plain:
-            cen.plain += 1
-        if cc.x_cost:
-            cen.x_cost += 1
-        cen.ops.update(cc.ops)
-        cen.statuses.update(cc.statuses)
-        cen.triggers.update(cc.triggers)
-        cen.whens.update(cc.whens)
-        cen.scales.update(cc.scales)
-        cen.per_card.append((card, cc))
+        cen.add_card(card, walk_card(card))
     return cen
 
 
@@ -235,31 +348,47 @@ def _order(counter: Counter, keys) -> str:
     return " ".join(f"{k}={counter.get(k, 0)}" for k in keys)
 
 
+def _all(counter: Counter) -> str:
+    """Every key of a Counter, most-used first (ties alphabetical) — never a fixed subset (W2.1)."""
+    if not counter:
+        return "-"
+    return " ".join(f"{k}={n}" for k, n in sorted(counter.items(), key=lambda kv: (-kv[1], str(kv[0]))))
+
+
+# The module-docstring table's fixed columns, kept at the head of their lines so the N-0 baseline numbers stay
+# readable at a glance; _all() then prints EVERYTHING else the census counted.
+_STATUS_HEAD = ["vulnerable", "weak", "blur", "metallicize", "artifact", "buffer", "intangible", "ritual"]
+_REACTIVE_HEAD = ["on_exhaust", "on_card_played", "attacked", "on_block_gained", "on_card_drawn", "on_damage_dealt"]
+
+
 def format_report(named: list[tuple[str, Census]]) -> str:
-    """Per-class one-liners + an aggregate block matching the module-docstring table."""
+    """Per-class one-liners + an aggregate block. The aggregate prints EVERY counter the census keeps (W2.1) —
+    the docstring table's fixed columns lead each line, then the full tally."""
     lines: list[str] = []
     agg = Census()
     for name, cen in named:
-        agg.total += cen.total
-        agg.plain += cen.plain
-        agg.x_cost += cen.x_cost
-        agg.ops.update(cen.ops)
-        agg.statuses.update(cen.statuses)
-        agg.triggers.update(cen.triggers)
-        agg.whens.update(cen.whens)
-        agg.scales.update(cen.scales)
+        agg.merge(cen)
         lines.append(
             f"  {name:<22} cards={cen.total:>3}  plain={cen.plain:>3} ({round(cen.plain_share*100):>3}%)"
             f"  reactive_kinds={len(cen.reactive_trigger_kinds)}  when_kinds={len(set(cen.whens))}"
-            f"  exotic={len(cen.exotic_status_kinds)}"
+            f"  exotic={len(cen.exotic_status_kinds)}  keywords={len(cen.keyword_kinds)}"
+            f"  multi_hit={cen.multi_hit}"
         )
-    reactive_keys = ["on_exhaust", "on_card_played", "attacked", "on_block_gained", "on_card_drawn", "on_damage_dealt"]
     out = ["Per-class:"] + lines + ["", "Aggregate:"]
-    out.append(f"  cards={agg.total}  plain={agg.plain} ({round(agg.plain_share*100)}%)  X-cost cards={agg.x_cost}")
-    out.append(f"  statuses: {_order(agg.statuses, ['vulnerable','weak','blur','metallicize','artifact','buffer','intangible','ritual'])}")
+    out.append(f"  cards={agg.total}  plain={agg.plain} ({round(agg.plain_share*100)}%)  X-cost cards={agg.x_cost}"
+               f"  multi_hit={agg.multi_hit}  grow={agg.grow}")
+    out.append(f"  statuses: {_order(agg.statuses, _STATUS_HEAD)}  | all: {_all(agg.statuses)}")
+    out.append(f"  specialty statuses: {_order(agg.statuses, sorted(SPECIALTY_STATUSES))}")
+    out.append(f"  custom statuses (apply_status_custom): {_all(agg.custom_statuses)}")
+    out.append(f"  summon buffs (buff_summon): {_all(agg.summon_buffs)}")
     out.append(f"  triggers: turn_end+turn_start={agg.triggers.get('turn_end',0)+agg.triggers.get('turn_start',0)}  "
-               f"reactive[{'/'.join(reactive_keys)}]={'/'.join(str(agg.triggers.get(k,0)) for k in reactive_keys)}")
-    out.append(f"  when: {_order(agg.whens, ['turn_at_least','enemy_count_ge','hp_below_half'])}")
-    out.append(f"  scales: {_order(agg.scales, ['unspent_energy_last_turn','x'])}")
-    out.append(f"  properties: innate={agg.ops.get('innate',0)}  ethereal={agg.ops.get('ethereal',0)}")
+               f"reactive[{'/'.join(_REACTIVE_HEAD)}]={'/'.join(str(agg.triggers.get(k,0)) for k in _REACTIVE_HEAD)}"
+               f"  | all: {_all(agg.triggers)}")
+    out.append(f"  trigger extras: once_per_turn={agg.once_per_turn}  targeted_payloads={agg.targeted_payloads}"
+               f"  ripen_amounts: {_all(agg.ripen_amounts)}")
+    out.append(f"  when: {_order(agg.whens, ['turn_at_least','enemy_count_ge','hp_below_half'])}  | all: {_all(agg.whens)}")
+    out.append(f"  scales: {_order(agg.scales, ['unspent_energy_last_turn','x'])}  | all: {_all(agg.scales)}")
+    out.append(f"  keywords: {_order(agg.keywords, ['innate','ethereal','retain','exhaust'])}")
+    out.append(f"  card fields: tagged_cards={agg.tagged_cards}  upgrade_cost_cards={agg.upgrade_cost_cards}")
+    out.append(f"  ops (all): {_all(agg.ops)}")
     return "\n".join(out)

@@ -81,7 +81,7 @@ def test_character_warnings(v: CharacterValidator) -> None:
     print("character band warnings:")
     base = _character("ironclad")
     res = v.validate(dict(base, max_hp=200))
-    check(res.ok and any("60..95" in w for w in res.warnings), "hp 200 should warn, not reject")
+    check(res.ok and any("55..100" in w for w in res.warnings), "hp 200 should warn, not reject")
     res = v.validate(dict(base, starting_deck=["strike", "defend", "bash"], signature_cards=["bash"]))
     check(res.ok and any("deck" in w for w in res.warnings), "3-card deck should warn")
 
@@ -135,7 +135,7 @@ def test_blueprint_rejects(bv: BlueprintValidator) -> None:
     check(not bv.validate(d).ok, "two novel archetypes must reject (need one classic)")
 
     res = bv.validate(bp(max_hp=110))
-    check(res.ok and any("60..95" in w for w in res.warnings), "hp 110 should warn, not reject")
+    check(res.ok and any("55..100" in w for w in res.warnings), "hp 110 should warn, not reject")
 
 
 # --------------------------------------------------------------- mechanic identity

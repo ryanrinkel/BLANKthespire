@@ -805,13 +805,13 @@ class BlueprintValidator:
         hp = bp.get("max_hp")
         if not isinstance(hp, int) or isinstance(hp, bool) or not (40 <= hp <= 120):
             errors.append("'max_hp' must be an integer in 40..120")
-        elif not (60 <= hp <= 95):
-            warnings.append(f"max_hp {hp} is outside the usual 60..95 band")
+        elif not (55 <= hp <= 100):
+            warnings.append(f"max_hp {hp} is outside the usual 55..100 band")
         en = bp.get("max_energy", 3)
         if not isinstance(en, int) or isinstance(en, bool) or not (1 <= en <= 6):
             errors.append("'max_energy' must be an integer in 1..6")
-        elif en != 3:
-            warnings.append(f"max_energy {en} != 3 (every existing class starts at 3)")
+        elif not (2 <= en <= 4):
+            warnings.append(f"max_energy {en} is outside the 2..4 band the class forge allows (W2.4)")
 
         # -- archetypes ------------------------------------------------------
         # NOTE: the prototype/character path is DELIBERATELY FROZEN at exactly 2 archetypes (decided 2026-08-15).
@@ -977,10 +977,10 @@ class CharacterValidator:
 
         warnings: list[str] = []
         hp = ch.get("max_hp", 0)
-        if not (60 <= hp <= 95):
-            warnings.append(f"max_hp {hp} is outside the usual 60..95 band")
-        if ch.get("max_energy", 3) != 3:
-            warnings.append(f"max_energy {ch.get('max_energy')} != 3")
+        if not (55 <= hp <= 100):
+            warnings.append(f"max_hp {hp} is outside the usual 55..100 band")
+        if not (2 <= int(ch.get("max_energy", 3) or 3) <= 4):
+            warnings.append(f"max_energy {ch.get('max_energy')} is outside the 2..4 band (W2.4)")
         if len(deck) != 10:
             warnings.append(f"starting deck has {len(deck)} cards (every class starts with exactly 10)")
         return ValidationResult(ok=True, warnings=warnings)
