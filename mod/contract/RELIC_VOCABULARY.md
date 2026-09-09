@@ -48,7 +48,8 @@ Each hook: `{ trigger, effects, target?, when?, once_per_combat? }`.
 | `on_hp_lost` | each time YOU lose HP on your OWN turn from a self/card-caused source (a `lose_hp` card, a self-damage cost — NOT enemy attacks, which fire `attacked`) | the player + (for damage/debuffs) the enemy target — the bleed/sacrifice payoff (Rupture-style) |
 
 > There is **no `combat_start` trigger**. To do something **once at the start of combat**, use a `turn_start`
-> hook with `"once_per_combat": true` — it fires on your first turn only (resets each combat). There is no
+> hook with `"once_per_combat": true` — it fires on your first turn only (resets each combat).
+> There is no loss hook either: `combat_end` fires only when you WIN.
 > The reactive triggers (`attacked`, `on_exhaust`, `on_card_played`, `on_card_drawn`, `on_damage_dealt`,
 > `on_block_gained`, `on_hp_lost`) can fire many times a turn — keep their numbers **small**, or gate with
 > `"once_per_combat": true` for a "first time each combat" effect.
@@ -65,7 +66,7 @@ Each hook: `{ trigger, effects, target?, when?, once_per_combat? }`.
 | `apply_status`| `status`, `amount`  | Apply a status: a **buff** lands on YOU; a **debuff** lands on the enemy target (**requires an enemy `target`**). |
 | `forge`       | `amount` (≥1)       | **FORGE CLASSES ONLY** (a class whose cards use the `forge` keyword / `scale:"forged"` payoffs). Stoke the player's per-combat **Forge** counter by `amount` — a "smoldering heirloom" keystone (e.g. `turn_start` + Forge 1). No-op value if the class has no `scale:"forged"` payoff cards. |
 | `channel_orb` | `orb`, `amount`     | **ORB CLASSES ONLY.** Channel `amount` orbs (`orb`: `"random"` or one of your class's orb names). A **Cracked-Core**-style relic: pair with `turn_start` + `once_per_combat` to channel at the start of combat. No-op if your class has no orbs. |
-| `summon`      | `summon_name`, `amount` | **SUMMON CLASSES ONLY.** Summon `amount` of your class's minion named `summon_name` onto your side. A **companion** relic: pair with `turn_start` + `once_per_combat` for a minion each combat. No-op unless `summon_name` is in your class's minions. |
+| `summon`      | `summon_name`, `amount` (HP) | **SUMMON CLASSES ONLY.** Summon your class's ONE minion named `summon_name` onto your side at `amount` HP — or, if it is already out, raise its Max HP by `amount` (the base-game Osty Summon keyword: one passive bodyguard on board at a time, never a swarm). A **companion** relic: pair with `turn_start` + `once_per_combat` for the minion each combat. No-op unless `summon_name` is in your class's minions. |
 
 No multi-hit, no X-scaling, no custom-statuses, no `add_trigger` in a relic. Orbs/summons are allowed ONLY via the
 class-conditional `channel_orb` / `summon` ops above (and only if your class has them).

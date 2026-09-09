@@ -146,7 +146,9 @@ _EXEMPLAR_POOL = Path(__file__).resolve().parent / "data" / "exemplar_pool.json"
 
 @lru_cache(maxsize=1)
 def load_exemplar_pool() -> tuple:
-    """The hand-written, schema-valid forged exemplars: a tuple of {archetypes, needs?, card} entries."""
+    """The hand-written, schema-valid forged exemplars: a tuple of {archetypes, needs, card} entries. `needs` is
+    "" (dealt to any class) or a class/mechanic kind — orb / status / summon / forge / balance — the class must
+    satisfy (see _pool_kind)."""
     try:
         raw = json.loads(_EXEMPLAR_POOL.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
@@ -159,13 +161,48 @@ def load_exemplar_pool() -> tuple:
     return tuple(out)
 
 
+# The placeholder class context the pool's CLASS-ONLY exemplars are written against: one custom status
+# (`apply_status_custom`), one minion (`summon` & co). Custom orbs are deliberately absent — the orb exemplars
+# channel base orbs only, so a dealt exemplar never names an orb the receiving class's pool lacks.
+EXEMPLAR_CONTEXT = {"extra_statuses": frozenset({"Razor Focus"}), "extra_summons": frozenset({"Bone Thrall"})}
+
+
+def exemplar_validator():
+    """A CardValidator with the pool's placeholder class context (EXEMPLAR_CONTEXT) plus every exemplar id
+    registered as a resolvable same-class card — the `add_card` / `transform_card` / `graft_card` exemplars
+    name OTHER exemplars as their targets (the same-class rule), which a bare validator can't resolve."""
+    from .validator import CardValidator
+    v = CardValidator(extra_statuses=set(EXEMPLAR_CONTEXT["extra_statuses"]),
+                      extra_summons=set(EXEMPLAR_CONTEXT["extra_summons"]))
+    v.known_cards = set(v.known_cards) | {str(e["card"].get("id", "")) for e in load_exemplar_pool()}
+    return v
+
+
+@lru_cache(maxsize=1)
+def _mechanic_kinds() -> dict[str, str]:
+    """archetype id -> its `mechanic_kind` (W0.9: the base-vocab subsystem its ops need), from the catalog."""
+    try:
+        from .frontend.catalog import load_catalog
+        return {e.id: e.mechanic_kind for e in load_catalog().entries if e.mechanic_kind}
+    except Exception:  # a broken catalog must never take the card stage down — fall back to class_kind only
+        return {}
+
+
 def _pool_kind(bp_kind: str, archetype_ids) -> set[str]:
-    """Which `needs` tags this class satisfies: its class_kind (orb/status/summon) + 'forge' on a forge class."""
+    """Which `needs` tags this class satisfies: the blueprint's class_kind (orb/status/summon) UNIONED with every
+    selected archetype's `mechanic_kind` (forge / balance / ...), resolved through the catalog by id — so
+    `needs:"forge"` deals to a forge_ramp class and `needs:"balance"` to a balance_gauge class (W0.9)."""
     ok = {""}
     if bp_kind in ("orb", "status", "summon"):
         ok.add(bp_kind)
-    if any("forge" in str(a) for a in (archetype_ids or [])):
-        ok.add("forge")
+    kinds = _mechanic_kinds()
+    for a in (archetype_ids or []):
+        aid = str(a)
+        k = kinds.get(aid)
+        if k:
+            ok.add(k)
+        elif "forge" in aid:  # legacy: an id the catalog doesn't know (custom/ad-hoc) keeps the old substring rule
+            ok.add("forge")
     return ok
 
 

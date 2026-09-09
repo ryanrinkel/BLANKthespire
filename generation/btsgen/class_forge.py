@@ -11,7 +11,8 @@ EffectRunner only runs the v2 vocabulary, and a forged class is imported as a `B
                  verbatim (the StS rule), spending no model calls.
   3. assemble    cards in slot order (basics first), character.starting_deck = [{slot,count}], -> BTSC code.
 
-Starter relics are NOT generated (the mod uses a placeholder; custom forged relics are a later phase).
+The keystone starter relic is generated too (Phase L: `_RelicContract` + `_validate_relic`, constrained to the
+mod's ForgedRelic runtime — see mod/contract/RELIC_VOCABULARY.md).
 
     uv run btsgen-forge-class --concept "a frost mage who freezes then shatters"            # needs a key
     uv run btsgen-forge-class --concept "anything" --fake                                    # offline, no key
@@ -216,21 +217,23 @@ class _BlueprintContract:
     9/16/7 pool ask) — the legacy f-string is untouched, so the flag-off path never changes."""
 
     def __init__(self, mode: str = "concept", triad: bool | None = None, *, seed: int | None = None,
-                 selected_ops=None, class_kind: str | None = None) -> None:
+                 selected_ops=None, class_kind: str | None = None, nominated_sections=None) -> None:
         self.mode = mode
         self.triad = triad_enabled(triad)
         # Creative harness v2 (Fix D), all optional and only read under BTS_HARNESS_V2: `seed` rotates the
         # homage examples per forge; `selected_ops` (the chosen archetypes' catalog ops) + `class_kind` prune
-        # the long archetype pitch sections down to the ones actually selected.
+        # the long archetype pitch sections down to the ones actually selected; `nominated_sections` (W0.5,
+        # section keys from coverage_nominations.sections) force named sections back in.
         self.seed = seed
         self.selected_ops = set(selected_ops) if selected_ops is not None else None
         self.class_kind = class_kind
+        self.nominated_sections = set(nominated_sections) if nominated_sections else set()
 
     def system_prompt(self) -> str:
         from . import harness_v2
         base = self._system_prompt_legacy()
         if harness_v2.enabled() and self.selected_ops is not None:
-            base = _prune_archetype_sections(base, self.selected_ops, self.class_kind)
+            base = _prune_archetype_sections(base, self.selected_ops, self.class_kind, self.nominated_sections)
         return base + self._triad_addendum() if self.triad else base
 
     def _homage_examples(self) -> str:
@@ -255,19 +258,24 @@ THE HARD CONSTRAINT — the engine runs a CLOSED, SMALL vocabulary. Every mechan
 expressible with ONLY these:
 {vocab}
 
-There are NO other ops, statuses, or primitives — no conditionals, no state-scaling, no card generation, no \
-custom keywords. If the concept implies a mechanic that doesn't exist (freeze, burn, scaling…), \
-translate its FANTASY onto these primitives (e.g. "freeze" -> Weak/Frail/Vulnerable + Block; "burn"/"venom" \
--> Poison; "berserk" -> Strength + lose_hp; "tempo" -> draw + gain_energy). Stay strictly INSIDE the \
-vocabulary (a brief that can't be built from it will be dropped) — but WITHIN it, range widely rather than \
-conservatively.
+There are NO ops, statuses, or keywords outside that list — but the list is RICHER than a flat stat line: it \
+includes `when` gates (conditional payoffs), `scale`d amounts (state-scaling), `add_trigger` engines (ongoing \
+powers), `add_card` tokens (card generation), multi-hit, and the class-kind pools (custom orbs / statuses / a \
+summon). If the concept implies a mechanic that doesn't exist BY NAME (freeze, burn, bleed, rage…), translate \
+its FANTASY onto a DISTINCT shape first, generic debuffs last: "freeze" -> a custom `status_pool` debuff \
+(hook damage_taken: Brittle) or Frail + a Block engine; "burn" -> a `turn_start` power whose payload deals \
+damage to all enemies, or Poison; "bleed" -> `lose_hp` fuel + `on_hp_lost` / `hp_lost_ge` payoffs; "berserk" \
+-> `forge` income + `scale:"forged"` payoffs, or temp_strength; "venom" -> Poison + a `target_debuff_count` \
+payoff; "tempo" -> draw + gain_energy. Stay strictly INSIDE the vocabulary (a brief that can't be built from \
+it will be dropped) — but WITHIN it, range widely rather than conservatively.
 
 Both archetypes must be built from this vocabulary and CROSS-SYNERGIZE (cards of one get better with the \
 other). ANY engine the vocabulary supports is fair game — the full status list (Thorns, Regen, Metallicize, \
 Artifact, Buffer, Blur, temp buffs...), triggers, `when` conditions, scaled amounts, retain / exhaust / \
 innate / ethereal, multi-hit, and the class-kind pools (orbs, custom statuses, a summon) where the identity \
 fits. Do NOT default to a Strength or Poison engine out of habit; let the concept pick its engines from the \
-whole list. Use Vulnerable/Weak sparingly — they are generic filler.
+whole list. Vulnerable/Weak are generic filler: at most about a quarter of the pool may lean on them (the \
+coverage gate enforces that share), and never as a card's whole identity.
 
 ORB CLASSES (optional — only when the concept fits): the vocabulary includes a Defect-style ORB subsystem \
 (see the "Orbs" section above). If — and ONLY if — the concept is an elemental/channeling/"slot-machine"/ \
@@ -312,8 +320,10 @@ ONLY; the other three are generic.
 TRIGGERS / POWER ENGINES (`add_trigger`): a `power`-type card can grant an ONGOING effect that fires every turn \
 — "At the end of your turn, gain Block" (Metallicize), "…gain Strength" (a Demon-Form ramp), "At the start of \
 your turn, draw 1 and gain 1 energy" (a tempo engine), an orb auto-channeler, etc. Use a brief like "power: at \
-end of turn, gain N Block" or "power: each turn start, draw a card". The per-turn payload is SELF/orb-only \
-(block/draw/energy/heal/lose_hp/self-buffs/orb ops — NO targeted damage or enemy debuffs), and may be gated by a \
+end of turn, gain N Block" or "power: each turn start, draw a card". The per-turn payload is SELF/orb-only by \
+default (block/draw/energy/heal/lose_hp/self-buffs/orb ops), OR it may TARGET enemies with `damage` or an enemy \
+debuff (vulnerable/weak/frail/poison) — the per-turn threat family: "power: at the start of your turn, apply 3 \
+Poison to ALL enemies" (Noxious Fumes), "…deal 5 damage to an enemy" (Combust). It may be gated by a \
 fire-time condition (e.g. "…if your orbs match, gain Focus"). These are the build-around RARES/uncommons that \
 make a class snowball; give most classes one or two. Keep per-turn numbers small (they compound). A trigger \
 payload's numeric effect may also `scale` to "cards_retained" (e.g. "power: at end of turn, gain Block equal \
@@ -910,25 +920,35 @@ for a second signature under the card cap)."""
 # are gone). Everything not listed here (triggers, scaled amounts, precision reads, strategic lines, the
 # format + rules) always stays.
 _ORB_TOKENS = frozenset({"channel_orb", "evoke", "gain_orb_slot", "focus", "orbs_match", "orb_count_ge"})
-_PRUNABLE_SECTIONS: list[tuple[str, frozenset, str | None]] = [
-    ("ORB CLASSES", _ORB_TOKENS, "orb"),
-    ("THE ORB POOL", _ORB_TOKENS, "orb"),
-    ("THE SLOT-MACHINE ARCHETYPE", _ORB_TOKENS, "orb"),
-    ("TAGGED SYNERGY", frozenset({"tag_cards_owned"}), None),
-    ("TOKEN GENERATION", frozenset({"add_card"}), None),
-    ("RAMPAGE", frozenset({"grow"}), None),
-    ("IN-RUN UPGRADE", frozenset({"upgrade_card"}), None),
-    ("DECK-THINNING", frozenset({"purge", "purge_card"}), None),
-    ("DISCARD / HAND-CHURN", frozenset({"discard", "scry", "on_discard"}), None),
-    ("CORRUPTION", frozenset({"corruption"}), None),
-    ("METAMORPH", frozenset({"transform_card", "graft_card"}), None),
+# (heading prefix, keep-if-any-of-these-ops-selected, keep-if-class_kind, section KEY, one-phrase pitch).
+# The KEY is what a caller may pre-nominate under coverage_nominations.sections (coverage.SECTION_KEYS mirrors
+# the set) to force the section back in; the PITCH is what the ALSO-AVAILABLE line says when it is pruned.
+_PRUNABLE_SECTIONS: list[tuple[str, frozenset, str | None, str, str]] = [
+    ("ORB CLASSES", _ORB_TOKENS, "orb", "orb", "orbs (channel_orb / evoke / focus, an orb_pool of custom elements)"),
+    ("THE ORB POOL", _ORB_TOKENS, "orb", "orb", ""),
+    ("THE SLOT-MACHINE ARCHETYPE", _ORB_TOKENS, "orb", "orb", ""),
+    ("TAGGED SYNERGY", frozenset({"tag_cards_owned"}), None, "tags", "tags + scale tag_cards_owned (strikes-matter)"),
+    ("TOKEN GENERATION", frozenset({"add_card"}), None, "tokens", "tokens (add_card copies of your own cards)"),
+    ("RAMPAGE", frozenset({"grow"}), None, "rampage", "rampage (a damage `grow` per replay)"),
+    ("IN-RUN UPGRADE", frozenset({"upgrade_card"}), None, "upgrade", "in-run upgrade (upgrade_card, Armaments)"),
+    ("DECK-THINNING", frozenset({"purge", "purge_card"}), None, "purge", "deck-thinning (purge / purge_card)"),
+    ("DISCARD / HAND-CHURN", frozenset({"discard", "scry", "on_discard"}), None, "discard",
+     "discard / scry income + on_discard fuel cards"),
+    ("CORRUPTION", frozenset({"corruption"}), None, "corruption", "corruption (Skills cost 0 but Exhaust)"),
+    ("METAMORPH", frozenset({"transform_card", "graft_card"}), None, "transform",
+     "metamorph (transform_card / graft_card: a card that permanently becomes another)"),
     ("THE FORGE / SIGNATURE-BLADE ARCHETYPE",
-     frozenset({"forge", "forged_ge", "blade_empower", "summon_blade", "on_blade_played"}), None),
-    ("THE BALANCE ARCHETYPE", frozenset({"balance_step"}), None),
-    ("THE STATUS POOL", frozenset({"apply_status_custom"}), "status"),
+     frozenset({"forge", "forged_ge", "blade_empower", "summon_blade", "on_blade_played"}), None, "forge",
+     "forge + a signature blade (forge income, scale forged payoffs, blade_empower, summon_blade)"),
+    ("THE BALANCE ARCHETYPE", frozenset({"balance_step"}), None, "balance",
+     "the balance gauge (balance_step light/dark, light_ge / dark_ge / centered payoffs)"),
+    ("THE STATUS POOL", frozenset({"apply_status_custom"}), "status", "status",
+     "a status_pool of custom signature statuses (apply_status_custom)"),
     ("THE SUMMON POOL", frozenset({"summon", "summon_attack", "buff_summon", "heal_summon", "shield_summon"}),
-     "summon"),
+     "summon", "summon", "a summon_pool minion (summon / summon_attack / buff_summon / heal_summon / shield_summon)"),
 ]
+SECTION_KEYS: frozenset = frozenset(r[3] for r in _PRUNABLE_SECTIONS)
+_ALSO_AVAILABLE_HEAD = "ALSO AVAILABLE (not pitched above, but fully legal in briefs — every op is in the vocabulary): "
 # The generic half of the slot-machine section (conditions work on ANY class) survives pruning as this line.
 _CONDITIONS_PARAGRAPH = (
     "CONDITIONAL PAYOFFS (`when` — on ANY class): give a card a real \"if X then bonus\" twist instead of a flat "
@@ -939,21 +959,37 @@ _CONDITIONS_PARAGRAPH = (
     "the card's only damage line or put the conditional bonus on a DIFFERENT op.")
 
 
-def _prune_archetype_sections(prompt: str, selected_ops, class_kind: str | None) -> str:
-    """Drop the pitch paragraphs for subsystems none of the selected archetypes use (see _PRUNABLE_SECTIONS)."""
+def _prune_archetype_sections(prompt: str, selected_ops, class_kind: str | None,
+                              nominated_sections=None) -> str:
+    """Drop the pitch paragraphs for subsystems none of the selected archetypes use (see _PRUNABLE_SECTIONS).
+
+    W0.5 (VOCAB_GAP_REMEDIATION_PLAN): pruning used to make the dropped subsystems INVISIBLE to the blueprint
+    model, so it could never reach for tags/tokens/rampage/purge/discard/corruption/transform/forge/balance
+    unless an archetype had already selected them. Now (1) a caller may pre-nominate section KEYS
+    (`nominated_sections`, from coverage_nominations.sections) to keep those sections in, and (2) whatever is
+    still pruned is named in ONE compact ALSO-AVAILABLE line (a few dozen tokens) so the model knows the
+    subsystem exists and may use its ops in a brief."""
     ops = {str(o) for o in (selected_ops or [])}
+    keep_keys = {str(k) for k in (nominated_sections or [])}
     out: list[str] = []
+    pruned_pitches: list[str] = []
     for para in prompt.split("\n\n"):
         head = para.lstrip()
         rule = next((r for r in _PRUNABLE_SECTIONS if head.startswith(r[0])), None)
         if rule is None:
             out.append(para)
             continue
-        _, tokens, kind = rule
-        if (ops & tokens) or (kind is not None and class_kind == kind):
+        _, tokens, kind, key, pitch = rule
+        if (ops & tokens) or (kind is not None and class_kind == kind) or key in keep_keys:
             out.append(para)
-        elif rule[0] == "THE SLOT-MACHINE ARCHETYPE":
-            out.append(_CONDITIONS_PARAGRAPH)
+        else:
+            if pitch and pitch not in pruned_pitches:
+                pruned_pitches.append(pitch)
+            if rule[0] == "THE SLOT-MACHINE ARCHETYPE":
+                out.append(_CONDITIONS_PARAGRAPH)
+    if pruned_pitches:
+        # Place the menu right after the conditions paragraph / last pitch so it reads as part of the vocab tour.
+        out.append(_ALSO_AVAILABLE_HEAD + "; ".join(pruned_pitches) + ".")
     return "\n\n".join(out)
 
 

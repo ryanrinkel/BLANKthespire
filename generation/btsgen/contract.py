@@ -70,12 +70,21 @@ def archetype_balance_note(archetype_id: str) -> str:
     Read by the front-end catalog so an archetype's balance guidance lives in the same single source."""
     return _parse_heuristics().get(("archetype-note", archetype_id), "")
 
-# Exemplars chosen to span the vocabulary: plain damage/block, apply_status (+/- with `to`),
-# from_state, multi, add_card (self-ref), set_flag, lose_hp/gain_energy, a power.
+# v1 few-shot exemplars, by card id in CARDS_DIR. W0.6 (VOCAB_GAP_REMEDIATION_PLAN): these are MOD cards
+# (mod/content/cards) — the old list named prototype-only cards (body_slam/twin_strike/battle_trance/...) that
+# used `from_state`/`multi`/`set_flag`, which the mod rejects, and that do not exist under the mod contract at
+# all (so the v1 prompt silently shipped with most of its exemplars missing). Under harness v2 each brief
+# carries its own rotating exemplars from data/exemplar_pool.json instead (see _v2_brief_extras).
 _FEW_SHOT_IDS = [
-    "strike", "defend", "bash", "body_slam", "twin_strike",
-    "disarm", "battle_trance", "anger", "bloodletting", "inflame",
+    "strike", "defend", "bash", "cleave", "iron_wave",
+    "pommel_strike", "hold_the_line", "expose", "rampart", "reckoning",
 ]
+
+
+def few_shot_missing() -> list[str]:
+    """The v1 few-shot ids that do NOT resolve in the active CARDS_DIR (tests assert this is empty under the
+    mod contract; the prototype corpus legitimately lacks some)."""
+    return [cid for cid in _FEW_SHOT_IDS if not (paths.CARDS_DIR / f"{cid}.json").exists()]
 
 
 @dataclass
@@ -272,11 +281,11 @@ uncommon/rare a reprint (same skeleton, same-or-nudged numbers) is rejected outr
 when the brief itself asks for a 'Reprint of <Name> (base game)', recreate THAT base-game card \
 faithfully in the vocabulary — keep its name and stay close to its original numbers. The no-reprint \
 rule guards against copying the pool above, not against a deliberate base-game homage.
-- Creativity discipline: vulnerable/weak are the game's most generic filler — reach for them LAST, \
-never as a card's whole identity, and only when the brief itself asks for debuffs. If the brief \
-names an archetype engine, the card's PRIMARY effect must serve that engine; prefer compositional \
-designs (multi, from_state, conditional, state-scaled amounts, X-cost, add_card recursion, lose_hp \
-costs) over another flat "damage + debuff" stat line.
+- Creativity discipline: vulnerable/weak are the game's most generic filler — never a card's whole \
+identity; use them when the brief asks for debuffs, or as a rider that sets up a distinct payoff. If the \
+brief names an archetype engine, the card's PRIMARY effect must serve that engine; prefer compositional \
+designs (`when`-gated payoffs, `scale`d amounts, multi-hit `hits`, X-cost, `add_trigger` engines, \
+add_card recursion, lose_hp costs) over another flat "damage + debuff" stat line.
 - BRIDGE cards: when the brief marks this card as a BRIDGE (fusion) card, it MUST visibly combine BOTH \
 named engines in the one design — one effect serving each, or one engine's mechanic gating/scaling the \
 other engine's payoff. A "bridge" that serves only one engine is a failed design; do not turn one in.
@@ -338,9 +347,11 @@ least one op, status, gate, or scale. Two cards with the same skeleton and nudge
 - No functional reprints: check THE EXISTING CARD POOL above before settling on a design. ONE exception: \
 when the brief itself asks for a 'Reprint of <Name> (base game)', recreate THAT base-game card faithfully \
 in the vocabulary — keep its name and stay close to its original numbers.
-- Creativity discipline: vulnerable/weak are the game's most generic filler — reach for them LAST, never as \
-a card's whole identity, and only when the brief itself asks for debuffs. Poison is this harness's most \
-overused status: do not default to it. If the brief names an archetype engine, the card's PRIMARY effect must \
+- Creativity discipline: vulnerable/weak/poison are the most generic statuses — never a card's whole \
+identity, and not the default when the fantasy allows a more distinct shape (a class's own custom status, \
+thorns, frail + blur, a `turn_start` power that hits all enemies, an `hp_lost_ge` bleed payoff). They ARE right \
+when the brief asks for debuffs or when they set up a distinct payoff (`target_has_status`, \
+`target_debuff_count`). If the brief names an archetype engine, the card's PRIMARY effect must \
 serve that engine; {harness_v2.compositional_clause(vocab)}
 - BRIDGE cards: when the brief marks this card as a BRIDGE (fusion) card, it MUST visibly combine BOTH \
 named engines in the one design — one effect serving each, or one engine's mechanic gating/scaling the \

@@ -362,9 +362,12 @@ class BlueprintBuilder:
                 e = self._catalog.by_id.get(aid)
                 if e is not None:
                     selected_ops |= set(e.ops)
+            # W0.5: a caller's pre-nominated section keys (coverage_nominations.sections) survive pruning.
+            from .. import coverage as _coverage
+            _sections = _coverage.sanitize_nominations(getattr(brief, "coverage_nominations", None)).get("sections")
             bp_contract = _BlueprintContract(mode="dossier", triad=self._triad,
                                              seed=harness_v2.seed_for(concept), selected_ops=selected_ops,
-                                             class_kind=chosen.class_kind)
+                                             class_kind=chosen.class_kind, nominated_sections=_sections)
         bp = self._run_stage(self._make_gen(bp_contract, max_tokens=48000),
                              dbrief, validate_blueprint_for(declared), "blueprint")
         if harness_v2.enabled():

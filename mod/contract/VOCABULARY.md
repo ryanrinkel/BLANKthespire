@@ -69,7 +69,7 @@ ride any card (e.g. an attack that also grants you Block-over-time).
 | `temp_dexterity`| buff   | Like `dexterity` but only for this turn. |
 | `thorns`        | buff   | When an enemy attacks you, it takes `amount` damage back. Permanent. |
 | `regen`         | buff   | Heal `amount` HP at the end of your turn (typically decays). |
-| `metallicize`   | buff   | Gain `amount` Block at the end of every turn. Permanent. |
+| `metallicize`   | buff   | Gain `amount` Block at the end of every turn, then lose 1 stack at the start of each of your later turns (STS2 **Plating**: `amount` N yields N + (N-1) + … + 1 Block over N turns, NOT a permanent per-turn engine — it decays by one per turn, not when hit). |
 | `artifact`      | buff   | Negate the next `amount` debuffs applied to you. |
 | `buffer`        | buff   | Prevent the next `amount` instances of HP loss. |
 | `blur`          | buff   | Your Block is NOT removed at the start of your next `amount` turn(s). |
@@ -77,6 +77,7 @@ ride any card (e.g. an attack that also grants you Block-over-time).
 | `ritual`        | buff   | Gain `amount` Strength at the end of every turn. Snowballs hard — rare-tier. |
 | `barricade`     | buff   | Your Block is never removed (it persists between turns). A toggle — use `amount: 1`. |
 | `focus`         | buff   | +`amount` to the value of every orb you channel (Lightning damage, Frost Block, Dark hit). **ORB-CLASS ONLY.** |
+<!-- metallicize is implemented as PlatingPower (EffectRunner.cs:832 / TriggerRunner.cs:192 / DataCard.cs:199). Semantics verified 2026-09-09 against the decompiled PlatingPower.cs: +Amount Block at end of turn (BeforeSideTurnEndEarly); -1 stack at each player turn start after turn 1 (AfterSideTurnStart -> Decrement); no decay on being hit. -->
 
 > `vulnerable`/`weak` are the most generic debuff filler and `strength`/`block`-shaped buffs the most generic
 > buff filler — but prefer a card whose identity is a distinct shape (poison, thorns, metallicize/block-engine,
@@ -232,7 +233,9 @@ draw/energy engine at turn start, an orb auto-channeler, etc.
   `{ "op": "add_trigger", "trigger": "on_discard", "effects": [...] }` grants NO power when played; instead, its
   payload fires when THIS card is **discarded by an effect** (a `discard` op — yours or a `turn_start`→`discard`
   churn power). It does **NOT** fire when the card is played, nor at end-of-turn hand cleanup — only effect-driven
-  discards count (base-StS Reflex behavior). Design these as discard FUEL: cards you keep in hand and throw away for
+  discards count (base-StS Reflex behavior). **Caveat:** it fires ONLY from THIS class's own `discard` / `scry`
+  ops — the mod routes those through its own discard path; base-game relic/enemy-forced discards (and any other
+  base-game discard source) do NOT fire it. Design these as discard FUEL: cards you keep in hand and throw away for
   value — e.g. "Whenever this card is discarded, gain 6 Block." `once_per_turn` caps it to one fire per turn (a card
   can be discarded, redrawn, and discarded again). The payload is the same SELF/orb-only (or targeted) sub-vocabulary.
 - **Targeted payload effects** (the per-turn threat family — Noxious Fumes, Combust, Choke): a payload effect may
@@ -329,4 +332,6 @@ The loop is: **summon** the minion (and grow its HP), **buff_summon** it (Streng
 - **common** — one clear effect; a cheap, simple card.
 - **uncommon** — two effects or a bigger swing (e.g. damage + a debuff, or block + draw).
 - **rare** — a standout: large numbers and/or several effects (e.g. AoE damage + Vulnerable to all).
-  (Deeper "build-around" rares need ops not yet supported; for now make rares hit hard and wide.)
+  Build-around rares are the ones to reach for: an `add_trigger` engine (a power that fires every turn or on an event),
+  a `when`-gated payoff, a `scale` amount that grows with state, a `transform_card` rank-up, or the class-kind engine
+  (`forge` / `channel_orb` / `summon` / `apply_status_custom` / `balance_step`) — not just a bigger Strike.

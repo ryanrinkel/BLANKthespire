@@ -83,17 +83,24 @@ for _k, _d in (REACTIVE_MENU_V2 + WHEN_MENU_V2 + EXOTIC_MENU_V2):
 _KEY_BY_DIRECTIVE = {d: k for k, d in DIRECTIVE_BY_KEY.items()}
 
 # The per-class nomination categories the blueprint may declare (Fix B): category -> the v2 menu it filters.
-NOMINATION_CATEGORIES = ("reactive", "when", "exotic")
-NOMINATION_MAX = {"reactive": 3, "when": 4, "exotic": 3}
+# W0.5 adds "sections": blueprint-prompt section KEYS a CALLER (CLI / web / bench via ClassBrief.coverage_nominations)
+# may pre-nominate so the pruned pitch for that subsystem is kept in the blueprint prompt. Mirrors
+# class_forge.SECTION_KEYS (kept as a literal here to avoid a circular import; tests assert they match).
+SECTION_KEYS = frozenset({"orb", "tags", "tokens", "rampage", "upgrade", "purge", "discard", "corruption",
+                          "transform", "forge", "balance", "status", "summon"})
+NOMINATION_CATEGORIES = ("reactive", "when", "exotic", "sections")
+NOMINATION_MAX = {"reactive": 3, "when": 4, "exotic": 3, "sections": 4}
 
 
 def sanitize_nominations(raw) -> dict:
-    """Normalize a blueprint's optional `coverage_nominations` ({reactive:[..], when:[..], exotic:[..]}) to known
-    directive keys only, per-category capped. Unknown/malformed input -> {} (the seeded-shuffle default)."""
+    """Normalize a blueprint's optional `coverage_nominations` ({reactive:[..], when:[..], exotic:[..],
+    sections:[..]}) to known directive keys only, per-category capped. Unknown/malformed input -> {} (the
+    seeded-shuffle default)."""
     if not isinstance(raw, dict):
         return {}
     known = {"reactive": {k for k, _ in REACTIVE_MENU_V2}, "when": {k for k, _ in WHEN_MENU_V2},
-             "exotic": {k for k, _ in EXOTIC_MENU_V2} | {"thorns", "metallicize"}}
+             "exotic": {k for k, _ in EXOTIC_MENU_V2} | {"thorns", "metallicize"},
+             "sections": set(SECTION_KEYS)}
     out: dict = {}
     for cat in NOMINATION_CATEGORIES:
         vals = raw.get(cat)

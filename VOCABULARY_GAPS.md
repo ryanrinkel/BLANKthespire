@@ -428,53 +428,60 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Fantasy it serves:** the restless dead that scratch at their lids and refuse silence — corpses clawing back on their own
 - **Mechanic sketch:** cards you exhaust/bury automatically resurface from a graveyard pile after N turns without you replanting them — self-directed recursion no current archetype cleanly models (countdown_ripen only fires your own deliberately-placed timers).
 - **Buildable today?** No — surfaced as off-vocabulary by the map stage.
-- **Priority:** unset (triage).
-- **Status:** captured
+- **Priority:** Low.
+- **Status:** **rejected (2026-09-09, W0.11 triage)**
+- **Triage (2026-09-09, W0.11):** needs a fourth pile — `ForgedCards.cs:289` piles are hand/draw/discard only, and "buried cards resurface on their own" needs a timer per buried card. Nearest expressible shape TODAY: a `ripen` power whose payload `add_card`s a copy of the "buried" token back into hand/discard after N turns (plant now, the dead claw back later). Re-open only if a graveyard pile is built (#43).
 
 ### 43. Grave-plot cycling
 - **Surfaced by:** staged front-end ("a gravekeeper who tends a hungry garden ")
 - **Fantasy it serves:** digging the same grave twice — reburying and exhuming the dead as a recurring resource
 - **Mechanic sketch:** a dedicated graveyard/burial pile you send cards to and later dig back out, distinct from exhaust/discard, so 'the dead who will not stay buried' is a literal reusable zone
 - **Buildable today?** No — surfaced as off-vocabulary by the map stage.
-- **Priority:** unset (triage).
-- **Status:** captured
+- **Priority:** Low.
+- **Status:** **rejected (2026-09-09, W0.11 triage)**
+- **Triage (2026-09-09, W0.11):** a dedicated burial zone is a new card pile; `ForgedCards.cs:289` supports hand/draw/discard only, so "dig it back out" cannot be a literal zone. Nearest expressible shape: exhaust as burial + `ripen` + `add_card` of a "buried" token as the exhumation (a token_conjurer/countdown_ripen pairing) — the recurring-resource feel without a fourth pile.
 
 ### 44. Coin & Ledger economy
 - **Surfaced by:** staged front-end ("a stormchaser who bottles lightning and ")
 - **Fantasy it serves:** the storm-peddler who literally SELLS bottled thunder for a spendable in-combat currency
 - **Mechanic sketch:** an in-combat gold/coin resource earned by 'selling' (exhausting) charged cards, then spent to buy effects or bank on a persistent run-long ledger — no catalog archetype models a currency you accrue and spend.
 - **Buildable today?** No — surfaced as off-vocabulary by the map stage.
-- **Priority:** unset (triage).
-- **Status:** captured
+- **Priority:** Medium (Phase AX).
+- **Status:** **planned (2026-09-09, W0.11 triage → Phase AX)**
+- **Triage (2026-09-09, W0.11):** re-sketched as Forge-with-spend: ONE new op `spend_forge` `{amount:N, effects:[...]}` — consume N of the existing per-combat Forge counter (`ForgedForgePower`) to run a payoff; no-op if the counter is short. Forge income already models the "earn coin by selling" half (`forge` on cards / in `add_trigger` payloads), so a currency you accrue AND spend is one op, not a new resource. The run-long ledger half stays out of scope (no persistent counter across combats).
 
 ### 45. Contagion Transfer
 - **Surfaced by:** staged front-end ("a plague doctor who brews slow contagion")
 - **Fantasy it serves:** Patient zero — one infected enemy passing its sickness to the rest of the room.
 - **Mechanic sketch:** A mechanic that propagates a status (Poison) from an afflicted enemy onto adjacent/other enemies each turn, rather than the player applying it to each directly.
 - **Buildable today?** No — surfaced as off-vocabulary by the map stage.
-- **Priority:** unset (triage).
-- **Status:** captured
+- **Priority:** Medium (Phase AX).
+- **Status:** **planned (2026-09-09, W0.11 triage → Phase AX)**
+- **Triage (2026-09-09, W0.11):** re-sketched with #46/#47 as ONE op `spread_debuffs` — copy the target's debuffs (Poison/Vulnerable/Weak/Frail) onto every OTHER alive enemy. Adjacency stays rejected per #34 (no positional API); "patient zero" becomes a targeted skill or an `add_trigger` turn_start payload with `target: enemy`, not a per-turn propagation rule.
 
 ### 46. Transmission
 - **Surfaced by:** staged front-end ("a plague doctor who brews slow contagion")
 - **Fantasy it serves:** Contagion that jumps from one enemy to another, spreading infection across the battlefield
 - **Mechanic sketch:** A mechanic where poison or debuffs on one enemy spread to adjacent enemies at turn start — chain-infection that rewards hitting multiple targets with a single seed
 - **Buildable today?** No — surfaced as off-vocabulary by the map stage.
-- **Priority:** unset (triage).
-- **Status:** captured
+- **Priority:** Medium (Phase AX).
+- **Status:** **planned (2026-09-09, W0.11 triage → Phase AX)**
+- **Triage (2026-09-09, W0.11):** duplicate demand for #45 — folded into the single `spread_debuffs` op (copy the target's debuffs to all other enemies). The "at turn start" half is just that op inside an `add_trigger` turn_start payload. Adjacency stays rejected per #34.
 
 ### 47. Contagion Spread
 - **Surfaced by:** staged front-end ("a plague doctor who brews slow contagion")
 - **Fantasy it serves:** The disease leaping from one enemy to another — airborne spores, contagious touch
 - **Mechanic sketch:** A mechanic where a status on one enemy spreads to adjacent or all enemies when it reaches a threshold, modeling epidemic transmission
 - **Buildable today?** No — surfaced as off-vocabulary by the map stage.
-- **Priority:** unset (triage).
-- **Status:** captured
+- **Priority:** Medium (Phase AX).
+- **Status:** **planned (2026-09-09, W0.11 triage → Phase AX)**
+- **Triage (2026-09-09, W0.11):** duplicate demand for #45 — folded into the single `spread_debuffs` op. The "threshold" half is a `when` gate on the spreading card (e.g. `target_has_status` poison ≥ N) rather than a new trigger kind. Adjacency stays rejected per #34; spread is to ALL other enemies.
 
 ### 48. Penance Counter
 - **Surfaced by:** staged front-end ("a penitent knight who bleeds for every m")
 - **Fantasy it serves:** The scourge as a wound that hurts you but also retaliates — self-inflicted damage that triggers holy thorns against the enemy
 - **Mechanic sketch:** A mechanic where taking self-damage from scourge cards also deals damage to the enemy, bridging self-sacrifice and counter_riposte without requiring enemy hits first
 - **Buildable today?** No — surfaced as off-vocabulary by the map stage.
-- **Priority:** unset (triage).
-- **Status:** captured
+- **Priority:** Verify-then-close (expressible since v18/v21; not yet AutoSlay-proven).
+- **Status:** **planned (verify-then-close)** — likely expressible today; NOT marked done until the tester runs.
+- **Triage (2026-09-09, W0.11):** the sketch is `add_trigger` `trigger:"on_hp_lost"` with a TARGETED `damage` payload (`target: enemy`, gap #9 + #14): a power reading "Whenever you lose HP on your turn, deal N damage to the enemy" — self-inflicted scourge damage retaliates without waiting for an enemy hit, bridging self_sacrifice and counter_riposte. Gap Tester spec (`generation/scratch/gaptest-48/`): one power card carrying that on_hp_lost → damage(target:enemy, 3-5) trigger, plus 2-3 `lose_hp` scourge attacks (1-3 HP each) and one `once_per_turn`-gated variant; the class must validate under the mod contract. AutoSlay gate: grep godot.log for `reactive trigger 'on_hp_lost' fired` immediately following each `lose_hp` resolution on the PLAYER's turn (never after an enemy attack), the targeted damage landing on the first hittable enemy, and 0 mod exceptions — the #4 verify-then-close pattern. Mark `done` only after that log evidence is in AUTOSLAY_VALIDATION_QUEUE.md.

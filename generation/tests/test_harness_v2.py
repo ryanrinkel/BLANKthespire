@@ -92,8 +92,11 @@ def test_class_identity_rides_the_system_prompt(v2):
 
 def test_exemplar_pool_is_schema_valid_and_spans_families():
     pool = harness_v2.load_exemplar_pool()
-    assert 30 <= len(pool) <= 50, len(pool)
-    v = CardValidator(extra_statuses={"Razor Focus"}, extra_summons={"Bone Thrall"})
+    # W0.8 (VOCAB_GAP_REMEDIATION_PLAN): the pool grew from 46 to ~80 so every archetype has >=2 exemplars and
+    # every vocabulary token is demonstrated (tests/test_exemplars.py holds the per-token/per-archetype floors).
+    assert 60 <= len(pool) <= 120, len(pool)
+    # exemplar_validator() registers every pool id so same-family transform_card/graft_card targets resolve.
+    v = harness_v2.exemplar_validator()
     for e in pool:
         r = v.validate(dict(e["card"]))
         assert r.ok, (e["card"]["id"], r.errors)

@@ -196,6 +196,10 @@ class ArchetypeEntry:
     # Strategy LEANS (aggro/control/combo): the game plans this engine naturally serves. Hints for the
     # compose stage's strategic_lines — an archetype leans toward strategies but never owns one.
     leans: list[str] = field(default_factory=list)
+    # W0.9: the base-vocab SUBSYSTEM this archetype's ops need (forge / balance / discard / token / transform /
+    # exhaust / retain / rampage / tags / purge), or "" for none. Distinct from class_kind (which drives pool
+    # declarations): harness_v2._pool_kind unions it with the class_kind to deal `needs`-tagged exemplars.
+    mechanic_kind: str = ""
 
 
 # class_kind precedence when a candidate fuses two archetypes: a special pool dominates a normal one.
@@ -396,6 +400,7 @@ def load_catalog(path: Path | None = None) -> ArchetypeCatalog:
             # NOT in archetypes.json (which keeps only the mechanical fields).
             balance_note=archetype_balance_note(str(a["id"])),
             leans=[str(s).strip().lower() for s in (a.get("leans") or [])],
+            mechanic_kind=str(a.get("mechanic_kind") or "").strip().lower(),
         ))
     return ArchetypeCatalog(entries)
 

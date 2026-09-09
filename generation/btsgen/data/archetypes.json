@@ -1,5 +1,5 @@
 {
-  "_comment": "Metaphor-tagged archetype catalog for the staged creative front-end (the MAP stage). Each entry pairs a mechanical engine (vocabulary.ops + class_kind) with seeded-but-open metaphors. The `buildable` field here is a documentation guess only - catalog.py RECOMPUTES it at load against the live mod/contract/VOCABULARY.md and VOCABULARY_GAPS.md, so it auto-flips as the vocab roadmap ships. Ops use the exact tokens from VOCABULARY.md.",
+  "_comment": "Metaphor-tagged archetype catalog for the staged creative front-end (the MAP stage). Each entry pairs a mechanical engine (vocabulary.ops + class_kind) with seeded-but-open metaphors. The `buildable` field here is a documentation guess only - catalog.py RECOMPUTES it at load against the live mod/contract/VOCABULARY.md and VOCABULARY_GAPS.md, so it auto-flips as the vocab roadmap ships. Ops use the exact tokens from VOCABULARY.md. `mechanic_kind` (optional) names the base-vocab SUBSYSTEM an archetype's ops need (forge / balance / discard / token / transform / exhaust / retain / rampage / tags / purge); harness_v2._pool_kind unions it with the class_kind to decide which `needs`-tagged exemplars a class is dealt. The `vocabulary.ops` list is really a VOCAB-TOKEN list (ops + statuses + conditions + scales + triggers) - catalog.live_vocab_tokens() checks each against VOCABULARY.md's backtick tokens.",
   "archetypes": [
     {
       "id": "retain_hold",
@@ -31,6 +31,7 @@
         ],
         "class_kind": "normal"
       },
+      "mechanic_kind": "retain",
       "buildable": true,
       "gap_refs": [
         "VOCABULARY_GAPS#5"
@@ -67,6 +68,7 @@
         ],
         "class_kind": "normal"
       },
+      "mechanic_kind": "forge",
       "buildable": true,
       "gap_refs": [
         "VOCABULARY_GAPS#36"
@@ -101,6 +103,7 @@
         ],
         "class_kind": "normal"
       },
+      "mechanic_kind": "rampage",
       "buildable": true,
       "gap_refs": [
         "VOCABULARY_GAPS#23"
@@ -163,10 +166,12 @@
           "purge",
           "purge_card",
           "draw",
-          "damage"
+          "damage",
+          "draw_pile_empty"
         ],
         "class_kind": "normal"
       },
+      "mechanic_kind": "purge",
       "buildable": true,
       "gap_refs": [
         "VOCABULARY_GAPS#19"
@@ -241,13 +246,13 @@
         "fury",
         "the red haze",
         "sacrifice",
-        "momentum",
+        "the berserk charge",
         "the breaking point",
         "abandon",
         "the blood rage",
         "the war cry",
         "nothing held back",
-        "the rising storm"
+        "the boiling blood"
       ],
       "leans": [
         "aggro"
@@ -403,7 +408,7 @@
         "the tell",
         "mastery",
         "the signature",
-        "the curse",
+        "the hex of your own making",
         "the sigil",
         "the fingerprint",
         "the calling card",
@@ -530,7 +535,7 @@
         "blood for blood",
         "the vampire's feast",
         "life drawn from death",
-        "the crimson tithe",
+        "the tithe of the slain",
         "the leeching blade",
         "sustain through slaughter",
         "the drinking wound"
@@ -547,7 +552,7 @@
         ],
         "class_kind": "normal"
       },
-      "buildable": false,
+      "buildable": true,
       "gap_refs": [
         "VOCABULARY_GAPS#21"
       ]
@@ -610,7 +615,7 @@
         ],
         "class_kind": "normal"
       },
-      "buildable": false,
+      "buildable": true,
       "gap_refs": [
         "VOCABULARY_GAPS#6"
       ]
@@ -636,11 +641,15 @@
       ],
       "vocabulary": {
         "ops": [
-          "balance_step"
+          "balance_step",
+          "light_ge",
+          "dark_ge",
+          "centered"
         ],
         "class_kind": "normal"
       },
-      "buildable": false,
+      "mechanic_kind": "balance",
+      "buildable": true,
       "gap_refs": [
         "VOCABULARY_GAPS#1"
       ]
@@ -673,6 +682,7 @@
         ],
         "class_kind": "normal"
       },
+      "mechanic_kind": "discard",
       "buildable": true,
       "gap_refs": [
         "VOCABULARY_GAPS#17"
@@ -705,7 +715,8 @@
         ],
         "class_kind": "normal"
       },
-      "buildable": false,
+      "mechanic_kind": "token",
+      "buildable": true,
       "gap_refs": [
         "VOCABULARY_GAPS#16"
       ]
@@ -738,6 +749,7 @@
         ],
         "class_kind": "normal"
       },
+      "mechanic_kind": "exhaust",
       "buildable": true,
       "gap_refs": [
         "VOCABULARY_GAPS#20"
@@ -769,6 +781,7 @@
         ],
         "class_kind": "normal"
       },
+      "mechanic_kind": "tags",
       "buildable": true,
       "gap_refs": [
         "VOCABULARY_GAPS#25"
@@ -785,7 +798,7 @@
         "reconfiguring the weapon mid-duel",
         "the shape that learns",
         "molting into a new form",
-        "the blade reforged",
+        "the weapon remade",
         "flipping between two stances",
         "the machine that upgrades itself",
         "one card, two lives",
@@ -803,6 +816,7 @@
         ],
         "class_kind": "normal"
       },
+      "mechanic_kind": "transform",
       "buildable": true,
       "gap_refs": [
         "VOCABULARY_GAPS#35",
