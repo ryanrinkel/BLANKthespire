@@ -23,8 +23,10 @@ namespace BlankTheSpire.BlankTheSpireCode.Engine;
 public static class TriggerRunner
 {
     /// <summary>Run <paramref name="trigger"/> (an <c>add_trigger</c> EffectSpec) on the player, if its
-    /// fire-time condition holds.</summary>
-    public static async Task Run(EffectSpec trigger, Player player, PlayerChoiceContext ctx)
+    /// fire-time condition holds. <paramref name="attacker"/> (Phase AK, v41) is the creature that just dealt us
+    /// damage — supplied only by the <c>attacked</c> hook, so a payload effect with target:"attacker" resolves to
+    /// it (the RelicRunner L-3 pattern); null on every other trigger.</summary>
+    public static async Task Run(EffectSpec trigger, Player player, PlayerChoiceContext ctx, Creature? attacker = null)
     {
         if (trigger.When != null && !Conditions.Evaluate(trigger.When, player, null)) return;
 
@@ -63,8 +65,10 @@ public static class TriggerRunner
                 {
                     // H4 (gap #14): a targeted payload deals intrinsic (ValueProp.Move) damage with the player as
                     // dealer — the same path RelicRunner/SummonRunner use. Validator guarantees a target here.
-                    var targets = ResolveEnemies(e.Target, player);
+                    var targets = ResolveEnemies(e.Target, player, attacker);
                     MainFile.Logger.Info($"[H4] targeted payload: deal {amt} damage to {e.Target} ({targets.Count} enemy/ies).");
+                    if (e.Target == "attacker") // Phase AK (v41) smoke tag: the riposte lands on the one that struck (or nobody, if it died)
+                        MainFile.Logger.Info($"[AK] riposte: deal {amt} damage to the attacker ({(targets.Count > 0 ? "resolved" : "no living attacker — skipped")}).");
                     if (targets.Count > 0)
                         await CreatureCmd.Damage(ctx, targets, amt, ValueProp.Move, player.Creature);
                     break;
@@ -73,8 +77,10 @@ public static class TriggerRunner
                     // H4: with a target it's an enemy debuff; otherwise the H3 self-buff.
                     if (e.Target != null)
                     {
-                        var dtargets = ResolveEnemies(e.Target, player);
+                        var dtargets = ResolveEnemies(e.Target, player, attacker);
                         MainFile.Logger.Info($"[H4] targeted payload: apply {amt} {e.Status} to {e.Target} ({dtargets.Count} enemy/ies).");
+                        if (e.Target == "attacker") // Phase AK (v41)
+                            MainFile.Logger.Info($"[AK] riposte: apply {amt} {e.Status} to the attacker ({(dtargets.Count > 0 ? "resolved" : "no living attacker — skipped")}).");
                         foreach (var tgt in dtargets)
                             await ApplyDebuff(e.Status, ctx, player.Creature, tgt, amt);
                     }
@@ -159,11 +165,13 @@ public static class TriggerRunner
     }
 
     /// <summary>H4 (gap #14): the enemy target(s) of a targeted payload effect. all_enemies = every hittable alive
-    /// enemy; enemy = the first hittable alive enemy. Mirrors RelicRunner/SummonRunner target resolution.</summary>
-    private static List<Creature> ResolveEnemies(string? target, Player player)
+    /// enemy; enemy = the first hittable alive enemy; attacker (Phase AK, v41) = the creature that just hit you
+    /// (the <c>attacked</c> trigger only — empty if it is gone or unknown). Mirrors RelicRunner/SummonRunner.</summary>
+    private static List<Creature> ResolveEnemies(string? target, Player player, Creature? attacker = null)
     {
         var cs = player.Creature.CombatState;
         if (target == "all_enemies") return cs.HittableEnemies.Where(c => c.IsAlive).ToList();
+        if (target == "attacker") return attacker != null && attacker.IsAlive ? [attacker] : [];
         var first = cs.HittableEnemies.FirstOrDefault(c => c.IsAlive);
         return first != null ? [first] : [];
     }

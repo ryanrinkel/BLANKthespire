@@ -37,7 +37,8 @@ namespace BlankTheSpire.BlankTheSpireCode.Engine;
 /// gate the payload to fire AT MOST ONCE per turn. Ignored (and validator-rejected) on turn_start/turn_end/ripen,
 /// which already fire at most once per turn. Default false.</param>
 /// <param name="Target">Phase H4 (gap #14): on a <c>add_trigger</c> PAYLOAD effect, aim it at enemies —
-/// <c>"enemy"</c> (first hittable) or <c>"all_enemies"</c>. Only <c>damage</c> and an enemy-debuff
+/// <c>"enemy"</c> (first hittable), <c>"all_enemies"</c>, or (Phase AK, v41, <c>attacked</c> trigger only)
+/// <c>"attacker"</c> — the creature that just hit you. Only <c>damage</c> and an enemy-debuff
 /// <c>apply_status</c> (vulnerable/weak/frail/poison) may be targeted; every other payload op stays self/orb-only
 /// (Target null). Never set on a card-level effect (a card uses <see cref="CardSpec.Target"/>). Default null.</param>
 /// <param name="CardId">Phase Q (gap #16): the SAME-CLASS card id the <c>add_card</c> op generates copies of,
@@ -52,11 +53,18 @@ namespace BlankTheSpire.BlankTheSpireCode.Engine;
 /// (one random upgradable card in hand), <c>"all"</c> (every upgradable card in hand), or <c>"choose"</c>
 /// (Phase X — the player picks one upgradable hand card via the base-game hand-upgrade picker). The upgrade is
 /// COMBAT-SCOPED (hand cards are deck clones; the run deck is untouched). Null for every other op.</param>
+/// <param name="Tag">Phase AE (gap #25): the tag a <c>scale:tag_cards_owned</c> effect counts. Null otherwise.</param>
+/// <param name="OncePerCombat">Phase AK (v41): on an <c>add_trigger</c> op whose trigger is a POWER-HOSTED reactive
+/// kind (on_hp_lost / on_exhaust / on_card_played / on_card_drawn / on_damage_dealt / on_block_gained / attacked /
+/// on_blade_played), gate the payload to fire AT MOST ONCE per combat — the granted power is a fresh per-combat
+/// instance, so it is a fired flag on the power (the relic-hook <c>once_per_combat</c> pattern). Rejected on
+/// turn_start/turn_end/ripen and on the card-latent on_discard; never combined with <see cref="OncePerTurn"/>
+/// (it already implies it). Default false.</param>
 public sealed record EffectSpec(string Op, int Amount = 0, string? Status = null, int Hits = 1, string? Scale = null,
     string? Orb = null, Condition? When = null, string? Trigger = null, EffectSpec[]? Triggered = null,
     string? StatusName = null, string? SummonName = null, bool OncePerTurn = false, string? Target = null,
     string? CardId = null, string? Pile = null, string? Pole = null, int Grow = 0, string? Cards = null,
-    string? Tag = null)
+    string? Tag = null, bool OncePerCombat = false)
 {
     /// <summary>This op's amount comes from a live scalar (any <see cref="Scale"/>), not <see cref="Amount"/>.</summary>
     public bool IsScaled => Scale != null;

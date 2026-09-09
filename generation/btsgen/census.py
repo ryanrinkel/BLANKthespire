@@ -82,6 +82,7 @@ class CardCensus:
     tagged: bool = False                                   # the card declares `tags`
     upgrade_cost: bool = False                             # the upgrade carries an absolute `cost` (Phase AG)
     once_per_turn: int = 0                                 # add_trigger effects flagged once_per_turn
+    once_per_combat: int = 0                               # Phase AK (v41): add_trigger effects flagged once_per_combat
     ripen_amounts: Counter = field(default_factory=Counter)    # ripen trigger countdowns (amount -> count)
     targeted_payloads: int = 0                             # effects INSIDE a trigger payload carrying a `target`
 
@@ -154,6 +155,8 @@ def _walk_effects(effects, cc: CardCensus, *, in_payload: bool = False) -> None:
                         cc.ripen_amounts[amt] += 1
             if eff.get("once_per_turn") is True:
                 cc.once_per_turn += 1
+            if eff.get("once_per_combat") is True:  # Phase AK (v41)
+                cc.once_per_combat += 1
             _walk_effects(eff.get("effects"), cc, in_payload=True)  # nested payload
         when = eff.get("when")
         if isinstance(when, dict):
@@ -216,6 +219,7 @@ class Census:
     tagged_cards: int = 0
     upgrade_cost_cards: int = 0
     once_per_turn: int = 0
+    once_per_combat: int = 0
     ripen_amounts: Counter = field(default_factory=Counter)
     targeted_payloads: int = 0
     grow: int = 0
@@ -268,6 +272,7 @@ class Census:
         if cc.upgrade_cost:
             self.upgrade_cost_cards += 1
         self.once_per_turn += cc.once_per_turn
+        self.once_per_combat += cc.once_per_combat
         self.ripen_amounts.update(cc.ripen_amounts)
         self.targeted_payloads += cc.targeted_payloads
         self.grow += cc.grow
@@ -282,8 +287,8 @@ class Census:
         for name in ("ops", "statuses", "triggers", "whens", "scales", "keywords", "custom_statuses",
                      "summon_buffs", "ripen_amounts"):
             getattr(self, name).update(getattr(other, name))
-        for name in ("multi_hit", "tagged_cards", "upgrade_cost_cards", "once_per_turn", "targeted_payloads",
-                     "grow"):
+        for name in ("multi_hit", "tagged_cards", "upgrade_cost_cards", "once_per_turn", "once_per_combat",
+                     "targeted_payloads", "grow"):
             setattr(self, name, getattr(self, name) + getattr(other, name))
 
 
@@ -384,8 +389,8 @@ def format_report(named: list[tuple[str, Census]]) -> str:
     out.append(f"  triggers: turn_end+turn_start={agg.triggers.get('turn_end',0)+agg.triggers.get('turn_start',0)}  "
                f"reactive[{'/'.join(_REACTIVE_HEAD)}]={'/'.join(str(agg.triggers.get(k,0)) for k in _REACTIVE_HEAD)}"
                f"  | all: {_all(agg.triggers)}")
-    out.append(f"  trigger extras: once_per_turn={agg.once_per_turn}  targeted_payloads={agg.targeted_payloads}"
-               f"  ripen_amounts: {_all(agg.ripen_amounts)}")
+    out.append(f"  trigger extras: once_per_turn={agg.once_per_turn}  once_per_combat={agg.once_per_combat}"
+               f"  targeted_payloads={agg.targeted_payloads}  ripen_amounts: {_all(agg.ripen_amounts)}")
     out.append(f"  when: {_order(agg.whens, ['turn_at_least','enemy_count_ge','hp_below_half'])}  | all: {_all(agg.whens)}")
     out.append(f"  scales: {_order(agg.scales, ['unspent_energy_last_turn','x'])}  | all: {_all(agg.scales)}")
     out.append(f"  keywords: {_order(agg.keywords, ['innate','ethereal','retain','exhaust'])}")

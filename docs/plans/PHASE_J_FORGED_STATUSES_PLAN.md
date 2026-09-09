@@ -128,7 +128,7 @@ pool of generic `CustomPowerModel` subclasses, each reading a status-spec from J
 
 **The MVP targets the MODIFIER family only** — it's the missing capability and does NOT overlap `add_trigger`. Reactive
 forged statuses (J-3) are a later generalization of triggers to more hooks, and are where the iconic *retaliate/Thorns*
-case lives (needs the hook's context creature as target — the real reason to do it).
+case lives (needs the hook's context creature as target — the real reason to do it). **LANDED for cards (2026-09-09, Phase AK, v41):** the `attacked` card trigger's payload may target `attacker` — the hook's dealer is threaded through `TriggerRunner`, so the retaliate/Thorns case no longer needs a forged-status generalization.
 
 ## The class status pool — modality system (mirror Phase I orbs)
 A custom status is a class-level identity applied by multiple cards (an **orb**, not a per-card trigger). So statuses

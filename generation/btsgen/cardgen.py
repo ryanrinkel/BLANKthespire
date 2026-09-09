@@ -193,6 +193,8 @@ def effect_literal(e: dict) -> str:
     # (order-independent in C#). Kept in lockstep with ForgedCards.ParseEffects.
     if e.get("once_per_turn"):
         lit = f"{lit[:-1]}, OncePerTurn: true)"
+    if e.get("once_per_combat"):  # Phase AK (v41): named arg, lockstep with ForgedCards.ParseEffects
+        lit = f"{lit[:-1]}, OncePerCombat: true)"
     tgt = e.get("target")
     if tgt:
         lit = f'{lit[:-1]}, Target: "{tgt}")'
@@ -258,7 +260,9 @@ def _trigger_fragment(e: dict) -> str:
     op = e["op"]
     amt = e.get("amount", 0)
     cr = str(e.get("scale", "")).lower() == "cards_retained"  # F5: trigger payload may scale to cards_retained
-    to = " to ALL enemies" if e.get("target") == "all_enemies" else ""  # H4: targeted AoE suffix (single enemy → none)
+    tgt = e.get("target")
+    # H4: targeted AoE suffix (single enemy → none); Phase AK (v41): the riposte target reads "to the attacker".
+    to = " to ALL enemies" if tgt == "all_enemies" else " to the attacker" if tgt == "attacker" else ""
     if op == "damage":  # H4 (gap #14): only meaningful with a target
         return f"deal {amt} damage{to}" if e.get("target") else ""
     if op == "block":
@@ -333,7 +337,8 @@ def trigger_sentence(t: dict) -> str:
     else:
         when = "At the end of your turn"
     frags = [f for f in (_trigger_fragment(x) for x in t.get("effects", [])) if f]
-    once = " (once per turn)" if t.get("once_per_turn") else ""  # H4
+    # H4 once_per_turn; Phase AK (v41) once_per_combat (never both — the validator rejects the pair)
+    once = " (once per combat)" if t.get("once_per_combat") else " (once per turn)" if t.get("once_per_turn") else ""
     return f"{when}, {', '.join(frags) if frags else 'do nothing'}{once}."
 
 

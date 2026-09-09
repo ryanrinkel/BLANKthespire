@@ -46,6 +46,9 @@ public abstract class ForgedTriggerPower : BlankTheSpirePower
     private readonly HashSet<string> _firing = [];
     private readonly HashSet<string> _firedThisTurn = [];
     private PlayerChoiceContext? _combatCtx;
+    // Phase AK (v41): kinds that already fired THIS COMBAT, for the `once_per_combat` gate. Never cleared — this
+    // power is a fresh instance per combat application (the relic-hook firedOnce pattern, RelicRunner.Fire).
+    private readonly HashSet<string> _firedThisCombat = [];
 
     public override PowerType Type => PowerType.Buff;
     // One trigger per card; replaying the same card doesn't stack the effect (literal-amount payload).
@@ -109,6 +112,7 @@ public abstract class ForgedTriggerPower : BlankTheSpirePower
             if (target != Owner || result.UnblockedDamage <= 0 || CombatState.CurrentSide != Owner.Side) return;
             if (_firingHpLost) return;
             if (t.OncePerTurn && _firedThisTurn.Contains("on_hp_lost")) return;
+            if (t.OncePerCombat && _firedThisCombat.Contains("on_hp_lost")) return; // Phase AK (v41)
             _firingHpLost = true;
             try
             {
@@ -116,16 +120,18 @@ public abstract class ForgedTriggerPower : BlankTheSpirePower
                 MainFile.Logger.Info($"[H4] reactive trigger 'on_hp_lost' fired (unblocked {result.UnblockedDamage}).");
                 await TriggerRunner.Run(t, Owner.Player, ctx);
                 if (t.OncePerTurn) _firedThisTurn.Add("on_hp_lost");
+                if (t.OncePerCombat) { _firedThisCombat.Add("on_hp_lost"); MainFile.Logger.Info("[AK] once_per_combat 'on_hp_lost' consumed."); }
             }
             finally { _firingHpLost = false; }
             return;
         }
         // attacked: the REACTIVE retaliate hook — fires when an ENEMY deals us damage (their turn). dealer.Player
         // == null identifies an enemy; our own payload damage lands on the enemy (guarded by _firing), so no loop.
+        // Phase AK (v41): the dealer rides along as the `attacker` target so a riposte payload hits the one that struck.
         if (t.Trigger == "attacked")
         {
             if (target != Owner || dealer == null || dealer.Player != null) return;
-            await FireReactive("attacked", ctx);
+            await FireReactive("attacked", ctx, dealer);
         }
     }
 
@@ -177,14 +183,17 @@ public abstract class ForgedTriggerPower : BlankTheSpirePower
     }
 
     /// <summary>Fire a reactive trigger's payload, guarded against re-entrancy (a payload that re-raises its own
-    /// event) and gated by once_per_turn + the fire-time When (checked here so a failed condition doesn't burn the
-    /// once_per_turn slot). Mirrors ForgedRelic.FireGuarded.</summary>
-    private async Task FireReactive(string kind, PlayerChoiceContext ctx)
+    /// event) and gated by once_per_turn / once_per_combat (Phase AK) + the fire-time When (checked here so a failed
+    /// condition doesn't burn a once-slot). <paramref name="attacker"/> is the creature that just hit us — supplied
+    /// only by the <c>attacked</c> hook (Phase AK, v41) so a payload with target:"attacker" hits it back. Mirrors
+    /// ForgedRelic.FireGuarded.</summary>
+    private async Task FireReactive(string kind, PlayerChoiceContext ctx, Creature? attacker = null)
     {
         var t = Trigger;
         if (t == null || t.Trigger != kind) return;
         if (_firing.Contains(kind)) return;
         if (t.OncePerTurn && _firedThisTurn.Contains(kind)) return;
+        if (t.OncePerCombat && _firedThisCombat.Contains(kind)) return;
         if (t.When != null && !Conditions.Evaluate(t.When, Owner.Player, null)) return;
         _firing.Add(kind);
         try
@@ -193,8 +202,13 @@ public abstract class ForgedTriggerPower : BlankTheSpirePower
             // H4 verbose smoke logging: one line per reactive fire so a deep AutoSlay run shows the count
             // (proves the hook fires + no crash). [H4] tag greppable in %APPDATA%/SlayTheSpire2/logs/godot.log.
             MainFile.Logger.Info($"[H4] reactive trigger '{kind}' fired (payload {(t.Triggered?.Length ?? 0)} effect(s)).");
-            await TriggerRunner.Run(t, Owner.Player, ctx);
+            await TriggerRunner.Run(t, Owner.Player, ctx, attacker);
             if (t.OncePerTurn) _firedThisTurn.Add(kind);
+            if (t.OncePerCombat)
+            {
+                _firedThisCombat.Add(kind);
+                MainFile.Logger.Info($"[AK] once_per_combat '{kind}' consumed (no further fires this combat).");
+            }
         }
         finally { _firing.Remove(kind); }
     }

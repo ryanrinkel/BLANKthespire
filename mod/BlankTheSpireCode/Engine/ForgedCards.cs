@@ -42,7 +42,18 @@ public static class ForgedCards
     /// v10 (forged statuses, Phase J): + CharacterSpec.StatusPool (a class's ≤4 custom modifier-family statuses
     /// read from `status_pool`; see ForgedCharacters / ForgedStatusPower). Class cards may apply a custom status
     /// by pool name via the `apply_status_custom` op (class-only, like custom-orb channels).</summary>
-    public const int VocabVersion = 40; // 40: Phase AJ (VOCAB_GAP_REMEDIATION Wave 1) — HIDDEN CAPACITY. No new runtime
+    public const int VocabVersion = 41; // 41: Phase AK (VOCAB_GAP_REMEDIATION Wave 3) — ATTACKER TARGET + ONCE PER COMBAT.
+                                        //     (1) A trigger-payload effect on the `attacked` trigger may carry
+                                        //     target:"attacker": ForgedTriggerPower hands the AfterDamageReceived dealer
+                                        //     into TriggerRunner.Run(attacker:), and ResolveEnemies resolves it (the
+                                        //     RelicRunner L-3 pattern) — a riposte now hits the enemy that STRUCK you, not
+                                        //     the first hittable one (closes the gap #4 nuance + the J-3 "true Thorns" item).
+                                        //     Wording: "… to the attacker". (2) `once_per_combat` on add_trigger for the
+                                        //     POWER-HOSTED reactive kinds (every MultiFireTrigger except the card-latent
+                                        //     on_discard): a fired flag on the per-combat power instance (the relic-hook
+                                        //     pattern, RelicRunner.Fire). Never combined with once_per_turn. Wording:
+                                        //     "… (once per combat)."
+                                        // 40: Phase AJ (VOCAB_GAP_REMEDIATION Wave 1) — HIDDEN CAPACITY. No new runtime
                                         //     mechanic; the contract catches up with what the engine already runs. (1) Card
                                         //     target `random_enemy` exposed (TargetMap/Describe had it; BaseLib CardAttack
                                         //     rolls a random hittable enemy PER HIT, CommonActions.Apply/GetTargets one random
@@ -275,6 +286,12 @@ public static class ForgedCards
         ["on_hp_lost", "on_exhaust", "on_card_played", "on_card_drawn", "on_damage_dealt", "on_block_gained", "attacked",
          "on_discard", // Phase R: a card can be discarded → redrawn → discarded again within a turn
          "on_blade_played"]; // Phase T: you can play the blade more than once a turn (retrieve + replay)
+    // Phase AK (v41): the POWER-HOSTED reactive kinds eligible for `once_per_combat` — the fired flag lives on the
+    // granted ForgedTriggerPower, a fresh instance per combat. on_discard is card-latent (no power; DataCard tracks
+    // it by round), so it is excluded.
+    private static readonly HashSet<string> OncePerCombatTriggers =
+        ["on_hp_lost", "on_exhaust", "on_card_played", "on_card_drawn", "on_damage_dealt", "on_block_gained", "attacked",
+         "on_blade_played"];
     // Phase H3: the self/orb-only sub-vocabulary a trigger's payload may use when it has NO target. (H4 lifts this
     // for effects that carry a `target`: damage + enemy-debuff apply_status may then hit enemies — see TriggerRunner.)
     private static readonly HashSet<string> TriggerOps =
@@ -664,6 +681,8 @@ public static class ForgedCards
             // Phase H4: `once_per_turn` gates a multi-fire reactive trigger (on the add_trigger op); `target`
             // aims a trigger PAYLOAD effect at enemies (enemy/all_enemies). Both default off/null; validated below.
             bool oncePerTurn = e.ContainsKey("once_per_turn") && e["once_per_turn"].AsBool();
+            // Phase AK (v41): `once_per_combat` gates a power-hosted reactive trigger to ONE fire per combat.
+            bool oncePerCombat = e.ContainsKey("once_per_combat") && e["once_per_combat"].AsBool();
             string? target = e.ContainsKey("target") ? Str(e, "target").Trim().ToLowerInvariant() : null;
             // Phase Q (gap #16): add_card names the SAME-CLASS card id to copy (case-sensitive, like summon_name)
             // and the destination pile (lowercased: hand/discard/draw). Distinct fields so base checks don't fire.
@@ -680,7 +699,8 @@ public static class ForgedCards
             // Phase AE (gap #25): the `tag` the tag_cards_owned scalar counts (lowercased; membership/legality in Validate).
             string? tag = e.ContainsKey("tag") ? Str(e, "tag").Trim().ToLowerInvariant() : null;
             list.Add(new EffectSpec(op, amount, status, hits, scale, orb, when, trigger, triggered, statusName,
-                                    summonName, oncePerTurn, target, cardId, pile, pole, grow, cards, tag));
+                                    summonName, oncePerTurn, target, cardId, pile, pole, grow, cards, tag,
+                                    OncePerCombat: oncePerCombat));
         }
         return list.ToArray();
     }
@@ -701,6 +721,8 @@ public static class ForgedCards
                 return $"'target' only applies inside an add_trigger payload (op '{e.Op}' used it at card level).";
             if (e.OncePerTurn && e.Op != "add_trigger")
                 return $"'once_per_turn' only applies to add_trigger (op '{e.Op}').";
+            if (e.OncePerCombat && e.Op != "add_trigger") // Phase AK (v41)
+                return $"'once_per_combat' only applies to add_trigger (op '{e.Op}').";
             if (e.Op == "apply_status" && (e.Status == null || !SupportedStatuses.Contains(e.Status)))
                 return $"unsupported status '{e.Status}'.";
             if (AmountOps.Contains(e.Op) && !e.IsScaled && e.Amount < 1)
@@ -1021,6 +1043,12 @@ public static class ForgedCards
         if (e.OncePerTurn && !MultiFireTriggers.Contains(e.Trigger))
             return $"'once_per_turn' only applies to a multi-fire trigger ({string.Join("/", MultiFireTriggers)}); " +
                    $"'{e.Trigger}' already fires at most once per turn.";
+        // Phase AK (v41): `once_per_combat` only on a POWER-HOSTED reactive trigger (the fired flag lives on the
+        // per-combat power instance); on_discard is card-latent, turn_start/turn_end/ripen aren't reactive.
+        if (e.OncePerCombat && !OncePerCombatTriggers.Contains(e.Trigger))
+            return $"'once_per_combat' only applies to a power-hosted reactive trigger ({string.Join("/", OncePerCombatTriggers)}); got '{e.Trigger}'.";
+        if (e.OncePerCombat && e.OncePerTurn)
+            return "'once_per_combat' already implies once per turn — set one, not both.";
         foreach (var t in e.Triggered)
         {
             // Phase U (gap #23): `grow` is a per-card-play attack mechanic (a card growing as YOU replay IT) — it
@@ -1031,8 +1059,11 @@ public static class ForgedCards
             // without a target it stays self/orb-only (the H3 rule).
             if (t.Target != null)
             {
-                if (t.Target != "enemy" && t.Target != "all_enemies")
-                    return $"a trigger effect 'target' must be 'enemy' or 'all_enemies' (got '{t.Target}').";
+                if (t.Target != "enemy" && t.Target != "all_enemies" && t.Target != "attacker")
+                    return $"a trigger effect 'target' must be 'enemy', 'all_enemies' or 'attacker' (got '{t.Target}').";
+                // Phase AK (v41): 'attacker' (the creature that just hit you) only exists on the `attacked` trigger.
+                if (t.Target == "attacker" && e.Trigger != "attacked")
+                    return $"a trigger effect target 'attacker' is only valid on the 'attacked' trigger (got '{e.Trigger}').";
                 if (!TriggerTargetedOps.Contains(t.Op))
                     return $"a targeted trigger effect must be 'damage' or an enemy-debuff 'apply_status' (got '{t.Op}').";
                 if (t.Op == "apply_status" && (t.Status == null || !EnemyDebuffStatuses.Contains(t.Status)))
@@ -1135,6 +1166,8 @@ public static class ForgedCards
                 return "triggers can't nest (no add_trigger inside a trigger).";
             if (t.OncePerTurn)
                 return "'once_per_turn' goes on the add_trigger op, not on a payload effect.";
+            if (t.OncePerCombat) // Phase AK (v41)
+                return "'once_per_combat' goes on the add_trigger op, not on a payload effect.";
             if (t.Hits > 1) return "multi-hit is not allowed inside a trigger.";
         }
         if (e.When != null && (e.When.Kind == "target_has_status" || e.When.Kind == "retained_last_turn"))
@@ -1352,7 +1385,8 @@ public static class ForgedCards
             _                 => "At the end of your turn",
         };
         var frags = (t.Triggered ?? []).Select(TriggerFragment).Where(s => s.Length > 0).ToList();
-        string once = t.OncePerTurn ? " (once per turn)" : "";
+        // Phase AK (v41): once_per_combat reads "(once per combat)"; it is never combined with once_per_turn.
+        string once = t.OncePerCombat ? " (once per combat)" : t.OncePerTurn ? " (once per turn)" : "";
         return $"{when}, {(frags.Count > 0 ? string.Join(", ", frags) : "do nothing")}{once}.";
     }
 
@@ -1361,8 +1395,8 @@ public static class ForgedCards
         // F5: a numeric trigger effect may scale to cards_retained → phrase it instead of a fixed number.
         bool cr = e.Scale == "cards_retained";
         // H4 (gap #14): a targeted payload effect is worded "… to ALL enemies" for AoE (single-enemy → no suffix,
-        // matching the base-card Describe convention).
-        string to = e.Target == "all_enemies" ? " to ALL enemies" : "";
+        // matching the base-card Describe convention). Phase AK (v41): "… to the attacker" for the riposte target.
+        string to = e.Target == "all_enemies" ? " to ALL enemies" : e.Target == "attacker" ? " to the attacker" : "";
         return e.Op switch
         {
             "damage"        => e.Target != null ? $"deal {e.Amount} damage{to}" : "",

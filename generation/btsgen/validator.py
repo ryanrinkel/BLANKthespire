@@ -88,6 +88,9 @@ _MULTI_FIRE_TRIGGERS = {"on_hp_lost", "on_exhaust", "on_card_played", "on_card_d
                         "on_discard",  # Phase R (gap #17): a card can be discarded, redrawn, discarded again
                         "on_blade_played"}  # Phase AJ (v40): the blade can be played several times a turn (C# parity)
 _ENEMY_DEBUFF_STATUSES = {"vulnerable", "weak", "frail", "poison"}
+# Phase AK (v41): the POWER-HOSTED reactive kinds eligible for 'once_per_combat' (mirror ForgedCards.OncePerCombatTriggers)
+# — every multi-fire kind except the card-latent on_discard (no power instance to carry the fired flag).
+_ONCE_PER_COMBAT_TRIGGERS = _MULTI_FIRE_TRIGGERS - {"on_discard"}
 # Phase Q (gap #16): the combat piles add_card may target + the copies-per-play cap. Mirrors ForgedCards.AddCardPiles
 # / AddCardMaxAmount. card_id existence is the ref-integrity check (_ref_errors); these are the shape rules.
 _ADD_CARD_PILES = {"hand", "discard", "draw"}
@@ -588,6 +591,8 @@ class CardValidator:
         for e in effects + up_effects:
             if e.get("once_per_turn") and e.get("op") != "add_trigger":
                 out.append(f"'once_per_turn' only applies to add_trigger (op '{e.get('op')}').")
+            if e.get("once_per_combat") and e.get("op") != "add_trigger":  # Phase AK (v41)
+                out.append(f"'once_per_combat' only applies to add_trigger (op '{e.get('op')}').")
         for e in effects + up_effects:  # an add_trigger in the UPGRADE is validated too (the mod imports both)
             if e.get("op") != "add_trigger":
                 continue
@@ -601,15 +606,27 @@ class CardValidator:
             if e.get("once_per_turn") and e.get("trigger") not in _MULTI_FIRE_TRIGGERS:
                 out.append(f"'once_per_turn' only applies to a multi-fire trigger "
                            f"({'/'.join(sorted(_MULTI_FIRE_TRIGGERS))}); '{e.get('trigger')}' already fires at most once per turn.")
+            # Phase AK (v41): 'once_per_combat' only on a POWER-HOSTED reactive trigger; never together with once_per_turn.
+            if e.get("once_per_combat") and e.get("trigger") not in _ONCE_PER_COMBAT_TRIGGERS:
+                out.append(f"'once_per_combat' only applies to a power-hosted reactive trigger "
+                           f"({'/'.join(sorted(_ONCE_PER_COMBAT_TRIGGERS))}); got '{e.get('trigger')}'.")
+            if e.get("once_per_combat") and e.get("once_per_turn"):
+                out.append("'once_per_combat' already implies once per turn — set one, not both.")
             for t in (e.get("effects") or []):
                 if not isinstance(t, dict):
                     continue
                 op = t.get("op")
                 tgt = t.get("target")
                 ts = str(t.get("scale", "")).strip().lower()
+                if t.get("once_per_turn") or t.get("once_per_combat"):
+                    out.append("'once_per_turn' / 'once_per_combat' go on the add_trigger op, not on a payload effect.")
                 if tgt is not None:
                     # H4 (gap #14): a TARGETED payload effect hits enemies — damage / enemy-debuff apply_status only,
                     # and never scaled. (target enum + op-vs-target coupling are also enforced by the schema.)
+                    # Phase AK (v41): 'attacker' (the creature that just hit you) exists only on the `attacked` trigger.
+                    if tgt == "attacker" and e.get("trigger") != "attacked":
+                        out.append(f"a trigger effect target 'attacker' is only valid on the 'attacked' trigger "
+                                   f"(got '{e.get('trigger')}').")
                     if op == "apply_status" and str(t.get("status", "")).strip().lower() not in _ENEMY_DEBUFF_STATUSES:
                         out.append(f"a targeted trigger apply_status must be an enemy debuff "
                                    f"({'/'.join(sorted(_ENEMY_DEBUFF_STATUSES))}); got '{t.get('status')}'.")

@@ -879,6 +879,8 @@
         "ops": [
           "add_trigger",
           "attacked",
+          "attacker",
+          "once_per_combat",
           "on_hp_lost",
           "thorns"
         ],

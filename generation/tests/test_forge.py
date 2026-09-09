@@ -235,9 +235,9 @@ def test_blade_manipulation(v: CardValidator) -> None:
 
 
 def test_vocab_version() -> None:
-    print("Phase AJ — the vocab stamp is v40:")
+    print("Phase AK — the vocab stamp is v41:")
     from btsgen import bts1
-    check(bts1.VOCAB_VERSION == 40, f"bts1.VOCAB_VERSION == 40: {bts1.VOCAB_VERSION}")
+    check(bts1.VOCAB_VERSION == 41, f"bts1.VOCAB_VERSION == 41: {bts1.VOCAB_VERSION}")
 
 
 def test_relic() -> None:

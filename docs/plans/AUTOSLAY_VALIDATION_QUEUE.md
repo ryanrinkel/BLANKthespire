@@ -26,6 +26,25 @@ Sibling docs: `AUTOSLAY_TESTING_PLAN.md` (what AutoSlay is / how it's wired) · 
 
 ---
 
+## ✅ RESULTS — 2026-09-09 Phase AK (vocab v41): attacker target + once_per_combat
+
+Tester `generation/scratch/gaptest-ak/build_tester.py` (slot 04: Riposte Guard `attacked → damage 4 target:attacker`, Barbed
+Weak `attacked → Weak to the attacker, once_per_turn`, Second Wind `attacked, once_per_combat → Block 12 + draw`, Opening
+Stance `on_card_played, once_per_combat → energy + Block`, Last Word `attacked, once_per_combat, when hp_below_half → 15 to the
+attacker`). Pass bar (rule 0.3): ≥1 `[AK]` tag · 0 mod exceptions · no mod-attributable hang.
+
+| seed | `[AK]` tags | evidence | mod exceptions | verdict |
+|---|---|---|---|---|
+| GAPTESTAK1 | 6 | riposte damage ×2 + Weak ×2 "to the attacker (resolved)"; once_per_combat `attacked` ×1 and `on_card_played` ×1 consumed | 0 (BaseLib startup Harmony ×2 + merchant watchdog only) | PASS (tool FAIL = map-nav watchdog at a shop) |
+| GAPTESTAK2 | 237 | 176 damage + 57 Weak resolved on the attacker; **2 "no living attacker — skipped"** (attacker died to the damage riposte before the Weak rider); two-slime fight fired per attacking slime, not on the non-damaging Sticky Shot | 0 | PASS (same tool verdict) |
+| GAPTESTAK3 | — | harness launch miss: main menu reached with the mod loaded, AutoSlay hook never fired | 0 | not mod-attributable |
+
+Tag extracts: `generation/scratch/gaptest-ak/godot_AK_tags_GAPTESTAK{1,2}.txt`. Note: the game log does not print the struck
+creature's name — attribution is evidenced by the dealer plumbing (`FireReactive(…, dealer)` → `ResolveEnemies("attacker")`)
+plus the dead-attacker no-ops, where a `target:enemy` payload would have resolved to another living enemy.
+
+---
+
 ## ✅ RESULTS — 2026-07-09 post-reboot run
 
 The box had a fresh reboot (11-min uptime); Gate 0 baseline (`class3`/SANITY1) reached combat and logged

@@ -68,7 +68,7 @@ FEATURED_MENU: list[Featured] = [
              lambda cc: "on_damage_dealt" in cc.triggers),
     Featured("reactive_block", 'a card that triggers when you GAIN Block (add_trigger "on_block_gained")',
              _d("on_block_gained"), lambda cc: "on_block_gained" in cc.triggers),
-    Featured("counterattack", 'a counterattack that triggers when you are ATTACKED (add_trigger "attacked"; payload may hit the enemy)',
+    Featured("counterattack", 'a counterattack that triggers when you are ATTACKED (add_trigger "attacked"; payload target "attacker" hits back the one that struck)',
              _d("attacked"), lambda cc: "attacked" in cc.triggers),
     Featured("blood_engine", 'a card that triggers when you LOSE HP (add_trigger "on_hp_lost")',
              _d("on_hp_lost"), lambda cc: "on_hp_lost" in cc.triggers),

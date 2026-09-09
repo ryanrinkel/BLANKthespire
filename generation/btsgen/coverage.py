@@ -38,7 +38,7 @@ REPAIR_BUDGET = 6               # max card regenerations, ONE round
 # --- the shared directive phrasebook (compact REQUIRED lines; 7B-safe, base-mechanics only so they are
 #     valid on any class kind). Each menu is ordered — repair walks it, skipping kinds already present. ---
 REACTIVE_MENU = [
-    ("attacked", 'REQUIRED: add an ongoing power (op "add_trigger", trigger "attacked") whose payload deals damage back to the attacker.'),
+    ("attacked", 'REQUIRED: add an ongoing power (op "add_trigger", trigger "attacked") whose payload deals damage back to the attacker (payload target "attacker").'),
     ("on_hp_lost", 'REQUIRED: add an ongoing power (op "add_trigger", trigger "on_hp_lost") that pays off whenever you lose HP.'),
     ("on_card_played", 'REQUIRED: add an ongoing power (op "add_trigger", trigger "on_card_played", once_per_turn) that rewards playing a card.'),
     ("on_block_gained", 'REQUIRED: add an ongoing power (op "add_trigger", trigger "on_block_gained") that rewards gaining Block.'),

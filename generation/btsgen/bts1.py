@@ -25,7 +25,10 @@ import sys
 import zlib
 from pathlib import Path
 
-VOCAB_VERSION = 40  # must be <= ForgedCards.VocabVersion (40: Phase AJ — HIDDEN CAPACITY. No new runtime mechanic:
+VOCAB_VERSION = 41  # must be <= ForgedCards.VocabVersion (41: Phase AK — ATTACKER TARGET + ONCE PER COMBAT: a
+                    # trigger-payload effect on `attacked` may target "attacker" (the creature that just hit you);
+                    # `once_per_combat` on the power-hosted reactive triggers.
+                    # 40: Phase AJ — HIDDEN CAPACITY. No new runtime mechanic:
 #                     card target `random_enemy` exposed (each hit / status effect rolls its own random enemy; no
 #                     target_has_status / target_debuff_count on it); trigger-payload channel_orb accepts any pool orb;
 #                     import rejects channel_orb names outside base ∪ the class's custom pool (runtime warns + skips

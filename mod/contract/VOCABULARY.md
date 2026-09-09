@@ -24,7 +24,7 @@ validator. (The vocabulary grows as the interpreter grows — more ops/statuses 
 | `channel_orb`  | `orb` (lightning/frost/dark/**random**), optional `amount` (count) | Channel an orb into your next open slot. `orb:"random"` rolls one of lightning/frost/dark — **independently per orb** when `amount > 1`, so a multi-channel "pull" can come up all-matching (the slot-machine jackpot). **ORB-CLASS ONLY** — see Orbs below. |
 | `evoke`        | optional `amount` (count) | Evoke (trigger + consume) your oldest orb(s) now. **ORB-CLASS ONLY.** |
 | `gain_orb_slot`| `amount` (int ≥1) | Gain `amount` orb slots this combat. **ORB-CLASS ONLY.** |
-| `add_trigger`  | `trigger` (turn_end/turn_start/ripen/on_hp_lost/on_exhaust/on_card_played/on_card_drawn/on_damage_dealt/on_block_gained/attacked/on_discard/on_blade_played), `effects` (1+), optional `when`, optional `once_per_turn`, `amount` (ripen only) | Grant an ongoing power that runs its `effects` payload: every turn (turn_end/turn_start), ONCE after `amount` turns (ripen), or REACTIVELY on an event (on_hp_lost / on_exhaust / on_card_played / on_card_drawn / on_damage_dealt / on_block_gained / attacked). Payload is SELF/orb-only unless an effect carries a `target` (see Triggers below). Best on `power`-type cards. **Exception — `on_discard`** is CARD-LATENT (Reflex, see Triggers): it grants NO power on play; its payload fires when THIS card is DISCARDED BY AN EFFECT. |
+| `add_trigger`  | `trigger` (turn_end/turn_start/ripen/on_hp_lost/on_exhaust/on_card_played/on_card_drawn/on_damage_dealt/on_block_gained/attacked/on_discard/on_blade_played), `effects` (1+), optional `when`, optional `once_per_turn` or `once_per_combat`, `amount` (ripen only) | Grant an ongoing power that runs its `effects` payload: every turn (turn_end/turn_start), ONCE after `amount` turns (ripen), or REACTIVELY on an event (on_hp_lost / on_exhaust / on_card_played / on_card_drawn / on_damage_dealt / on_block_gained / attacked). Payload is SELF/orb-only unless an effect carries a `target` (see Triggers below). Best on `power`-type cards. **Exception — `on_discard`** is CARD-LATENT (Reflex, see Triggers): it grants NO power on play; its payload fires when THIS card is DISCARDED BY AN EFFECT. |
 | `apply_status_custom` | `status_name`, `amount` | Apply `amount` stacks of one of the class's OWN custom statuses (by name). **STATUS-CLASS ONLY** — see Forged Statuses below. |
 | `summon`       | `summon_name`, optional `amount` (HP) | Summon the class's OWN minion (by name) at `amount` HP, OR — if it's already out — raise its Max HP by `amount` (base-game Osty Summon keyword). One per class; passive bodyguard. **SUMMON-CLASS ONLY** — see Forged Summons below. |
 | `summon_attack`| `amount` (per-hit), optional `hits` (≥2) | Deal `amount` damage **through your summon** (it's the attacker, scaling with its Strength); no-op if the summon isn't out. **SUMMON-CLASS ONLY** — see Forged Summons below. |
@@ -221,6 +221,12 @@ draw/energy engine at turn start, an orb auto-channeler, etc.
 - `once_per_turn` (optional, **reactive triggers only**): gate the payload to fire **at most once per turn**. Use it
   to keep a reactive engine in check (e.g. an on_card_played buff that shouldn't fire 5× on a big turn). Rejected on
   turn_start/turn_end/ripen (they already fire at most once per turn).
+- `once_per_combat` (optional, **power-hosted reactive triggers only** — every reactive kind except the card-latent
+  `on_discard`): gate the payload to fire **at most once per combat** — the granted power is a fresh instance each
+  combat, so it fires on the FIRST event and then sleeps (the relic-hook `once_per_combat`). The "first-strike" /
+  "second-wind" shape: `{ "op": "add_trigger", "trigger": "attacked", "once_per_combat": true, "effects": [ { "op": "block", "amount": 12 } ] }`
+  = "Whenever you are attacked, gain 12 Block (once per combat)." Lets a reactive payload be BIG (it can't compound).
+  Never combine with `once_per_turn` (once per combat already implies it); rejected on turn_start/turn_end/ripen.
 - `effects`: the payload, run each time it fires. By default **a trigger fires with no target**, so a payload effect
   is a **SELF/orb-only sub-vocabulary**: `block`, `draw`, `gain_energy`, `heal`, `lose_hp`, `apply_status` (**self-buffs
   ONLY** — strength/dexterity/thorns/regen/metallicize/artifact/buffer/intangible/ritual/blur/temp_strength/
@@ -241,10 +247,15 @@ draw/energy engine at turn start, an orb auto-channeler, etc.
   value — e.g. "Whenever this card is discarded, gain 6 Block." `once_per_turn` caps it to one fire per turn (a card
   can be discarded, redrawn, and discarded again). The payload is the same SELF/orb-only (or targeted) sub-vocabulary.
 - **Targeted payload effects** (the per-turn threat family — Noxious Fumes, Combust, Choke): a payload effect may
-  carry a **`target`** (`"enemy"` or `"all_enemies"`) to hit enemies. Only `damage` and an **enemy-debuff**
-  `apply_status` (vulnerable/weak/frail/poison) may be targeted; a targeted effect can't be scaled. E.g.
+  carry a **`target`** (`"enemy"`, `"all_enemies"`, or — on the `attacked` trigger ONLY — `"attacker"`) to hit
+  enemies. Only `damage` and an **enemy-debuff** `apply_status` (vulnerable/weak/frail/poison) may be targeted; a
+  targeted effect can't be scaled. E.g.
   `{ "op": "add_trigger", "trigger": "turn_start", "effects": [ { "op": "apply_status", "status": "poison", "amount": 3, "target": "all_enemies" } ] }`
   = "At the start of your turn, apply 3 Poison to ALL enemies."
+  **`attacker`** (v41) is the creature that just hit you — the TRUE riposte: `{ "op": "add_trigger", "trigger": "attacked", "effects": [ { "op": "damage", "amount": 5, "target": "attacker" } ] }`
+  = "Whenever you are attacked, deal 5 damage to the attacker." In a crowd it strikes the one that struck (where
+  `enemy` would hit the first living enemy); if that enemy is already dead the riposte simply does nothing. Reach for
+  `attacker` on every retaliation power; keep `enemy` for the passive per-turn threats.
 - A **self** (untargeted) numeric payload effect may use **`"scale": "cards_retained"`** (and ONLY that scalar — not
   on channel_orb/evoke, not on a targeted effect) to make its amount the cards you held into this turn, re-read each
   turn it fires — e.g. "At the end of your turn, gain Block equal to cards retained."

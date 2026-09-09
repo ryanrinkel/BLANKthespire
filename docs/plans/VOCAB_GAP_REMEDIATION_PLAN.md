@@ -81,6 +81,35 @@ Tests: W2 checks appended to `tests/test_census.py` (68), `test_coverage.py` (21
 summon_drill, orb → orb_focus_power, normal → none; colors + energy in the bundle). NOT in this wave: the cross-cutting
 "vocab drift" / "prompt-vs-vocab" tests.
 
+**STATUS (2026-09-09): Phase AK EXECUTED (vocab v41)** — both items landed in lockstep. **(1) `target:"attacker"`** on an
+`attacked` payload: `ForgedTriggerPower.AfterDamageReceived` hands the dealer into `FireReactive(kind, ctx, attacker)` →
+`TriggerRunner.Run(t, player, ctx, attacker)` → `ResolveEnemies` resolves `"attacker"` to it when alive (the RelicRunner L-3
+pattern; a dead attacker = empty target list = no-op). Validate/ValidateTrigger accept it on `attacked` only (any other
+trigger, card level, a self-buff status or a scale are rejected); Describe/`cardgen` read "… to the attacker" byte-identically;
+the C# emit carries the named `Target: "attacker"`. **(2) `once_per_combat`** on `add_trigger`: a new `EffectSpec.OncePerCombat`
+(parsed from `once_per_combat`), a `_firedThisCombat` set on the per-combat power instance (checked + consumed in `FireReactive`
+and the `on_hp_lost` inline path), allowed on `OncePerCombatTriggers` = every multi-fire kind EXCEPT the card-latent `on_discard`
+(no power instance to carry the flag; DataCard tracks it by round) — turn_start/turn_end/ripen, payload-level, card-level and
+the `once_per_turn` + `once_per_combat` pair are all rejected; wording "… (once per combat)."; emit `OncePerCombat: true`.
+Lockstep: `CardSpec.cs`, `ForgedCards.cs` (VocabVersion 41), `ForgedTriggerPower.cs`, `TriggerRunner.cs`, `card.schema.json`
+(payload target enum + `once_per_combat`), `VOCABULARY.md` (add_trigger row, a `once_per_combat` bullet, the attacker paragraph),
+`cardgen.py`, `validator.py` (`_ONCE_PER_COMBAT_TRIGGERS`), `census.py` (`once_per_combat` counter), `coverage.py` /
+`featured.py` (the attacked directive/injection name the attacker target), `bts1.py` VOCAB_VERSION 41, `exemplar_pool.json`
+(Spiked Guard → attacker; + Return Stroke, Second Wind), `archetypes.json` (counter_riposte ops += attacker /
+once_per_combat). Tests: `tests/test_phase_ak.py` (48 checks); suite **382 passed**; C# build 0 errors. AutoSlay (tester
+`generation/scratch/gaptest-ak/build_tester.py`, slot 04, three seeds): **GAPTESTAK1** 6 `[AK]` tags (a single-wurm fight —
+riposte damage ×2, Weak-to-attacker ×2, once_per_combat `attacked` ×1 and `on_card_played` ×1, each consumed exactly once);
+**GAPTESTAK2** a long run, **237 `[AK]` tags** — 176 riposte damage + 57 Weak "to the attacker (resolved)", **2 "no living
+attacker — skipped"** (the attacker died to the damage riposte before the Weak rider — where `target:enemy` would have hit
+another enemy), both once_per_combat kinds consumed; a LEAF_SLIME_S + LEAF_SLIME_M fight fired the riposte on each slime's
+own attack and NOT on the M's non-damaging Sticky Shot; **0 mod-attributable exceptions** in both (the only exception frames
+are BaseLib's own two startup Harmony patches — its networking `AdjustCustomMessageKeys` and the `RelicCollection.LoadRelics`
+patch already noted in the Phase L plan — plus the documented merchant map-nav watchdog, which is the tool's FAIL verdict);
+**GAPTESTAK3** was a harness launch miss (the game reached the main menu with the mod loaded but the AutoSlay hook never
+fired — not mod-attributable). Caveat: the game log does not print the struck creature's name, so attribution is evidenced by
+the dealer plumbing + the dead-attacker no-ops, not by a per-target damage line. Closed: the gap #4 nuance (`VOCABULARY_GAPS.md`)
+and the Phase J "J-3 true Thorns" item (both stamped). Tag evidence: `generation/scratch/gaptest-ak/godot_AK_tags_GAPTESTAK{1,2}.txt`.
+
 ---
 
 ## 0. Ground rules
