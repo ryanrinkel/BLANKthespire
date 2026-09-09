@@ -90,6 +90,7 @@ ride any card (e.g. an attack that also grants you Block-over-time).
 | `enemy`       | A single player-chosen enemy. |
 | `all_enemies` | Every enemy (AoE). |
 | `self`        | The player (use for pure skills like block/draw). |
+| `random_enemy`| A **random** living enemy — the base-game Ricochet / Bouncing Flask feel. **Each damage HIT and each status effect rolls its own random enemy** (a multi-hit `damage` sprays; a following `apply_status` may land on a different enemy). Because there is no chosen target, a random_enemy card may NOT carry `when:target_has_status` or `scale:target_debuff_count`. Text reads "… to a random enemy". Great for chaos/gambler/scatter fantasies and as a cheap AoE-ish rider; keep it off precision ("follow-up") designs. |
 
 ## Structural mechanics (multi-hit & scaled amounts)
 - **Multi-hit:** add `hits` (int ≥2) to a `damage` effect → it deals `amount` damage `hits` times
@@ -223,7 +224,8 @@ draw/energy engine at turn start, an orb auto-channeler, etc.
 - `effects`: the payload, run each time it fires. By default **a trigger fires with no target**, so a payload effect
   is a **SELF/orb-only sub-vocabulary**: `block`, `draw`, `gain_energy`, `heal`, `lose_hp`, `apply_status` (**self-buffs
   ONLY** — strength/dexterity/thorns/regen/metallicize/artifact/buffer/intangible/ritual/blur/temp_strength/
-  temp_dexterity/barricade/focus), `gain_orb_slot`, `channel_orb`, `evoke`, `forge` (fixed amount only — the Forge
+  temp_dexterity/barricade/focus), `gain_orb_slot`, `channel_orb` (any orb in YOUR class's pool — base, `random`, or
+  a custom orb: "At the start of your turn, channel an Ember"), `evoke`, `forge` (fixed amount only — the Forge
   engine: "At the start of your turn, Forge 2"), `balance_step` (fixed amount only — the Balance engine: "At the
   start of your turn, shift 2 toward the Dark"), `add_card` (**CLASS-ONLY** — the compost loop: "Whenever a card is
   Exhausted, add a copy of Cinder to your discard pile"), `discard` (forced churn: "At the start of your turn,

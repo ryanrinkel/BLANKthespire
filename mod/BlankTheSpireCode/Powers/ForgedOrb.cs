@@ -74,10 +74,30 @@ public abstract class ForgedOrb : CustomOrbModel
     public override string? CustomIconPath => Lightning.IconPath;
     public override string? CustomSpritePath => Lightning.SpritePath;
 
+    // Borrow Lightning's sound events too (Phase AJ, 2026-09-09): with these null, BaseLib composed a per-orb
+    // debug-audio path (res://debug_audio/blankthespire-forged_classKK_orbM_channel.mp3) that does not exist, and
+    // every channel/passive/evoke logged a "No loader found for resource" ERROR (64 per smoke run).
+    public override string? CustomPassiveSfx => "event:/sfx/characters/defect/defect_lightning_passive";
+    public override string? CustomEvokeSfx => "event:/sfx/characters/defect/defect_lightning_evoke";
+    public override string? CustomChannelSfx => "event:/sfx/characters/defect/defect_lightning_channel";
+
     public override Node2D? CreateCustomSprite()
     {
+        // Phase AJ (2026-09-09): the game's NOrb.UpdateVisuals now wraps the sprite's "SpineSkeleton" child in a
+        // MegaSprite (idle_loop animation) — the procedural circle Sprite2D has no such child, so EVERY custom-orb
+        // channel threw "Expected a GodotObject but was Nil" (a logged visual exception; the run continued). Use the
+        // real Lightning orb scene (spine skeleton + animations) and TINT it to this orb's hue instead — each custom
+        // orb still reads as its own color, and the animation/evoke visuals work. Real per-orb art stays deferred.
         var hue = Source?.Hue ?? 0f;
-        return MakeCircleSprite(Color.FromHsv(hue, 0.75f, 0.95f));
+        Node2D sprite;
+        try { sprite = Lightning.CreateSprite(); }
+        catch (System.Exception ex)
+        {
+            MainFile.Logger.Warn($"[Forged] custom orb sprite: Lightning scene unavailable ({ex.Message}); using the flat circle.");
+            return MakeCircleSprite(Color.FromHsv(hue, 0.75f, 0.95f));
+        }
+        sprite.Modulate = Color.FromHsv(hue, 0.85f, 1.0f);
+        return sprite;
     }
 
     /// <summary>A simple filled-circle orb graphic (a generated texture, no shipped asset): the body in

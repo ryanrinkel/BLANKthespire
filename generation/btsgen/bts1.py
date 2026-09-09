@@ -25,7 +25,12 @@ import sys
 import zlib
 from pathlib import Path
 
-VOCAB_VERSION = 39  # must be <= ForgedCards.VocabVersion (39: Phase AI (gap #7) — GRAFT. New op `graft_card`
+VOCAB_VERSION = 40  # must be <= ForgedCards.VocabVersion (40: Phase AJ — HIDDEN CAPACITY. No new runtime mechanic:
+#                     card target `random_enemy` exposed (each hit / status effect rolls its own random enemy; no
+#                     target_has_status / target_debuff_count on it); trigger-payload channel_orb accepts any pool orb;
+#                     import rejects channel_orb names outside base ∪ the class's custom pool (runtime warns + skips
+#                     instead of silently channeling Lightning); hits on summon_attack + once_per_turn on
+#                     on_blade_played opened generation-side. 39: Phase AI (gap #7) — GRAFT. New op `graft_card`
 #                     {card_id}: the CHOOSE form of transform_card (as purge_card is the choose form of purge). When
 #                     played, YOU pick a card in HAND (CardSelectCmd.FromHand) and THAT picked card PERMANENTLY becomes
 #                     the named same-class card for the rest of the run (deck original swapped + the picked hand clone

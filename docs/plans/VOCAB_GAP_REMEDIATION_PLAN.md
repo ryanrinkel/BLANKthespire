@@ -18,6 +18,24 @@ vocab); gap #48 is `planned (verify-then-close)`, not done — it still needs th
 Run tests with `uv run python -m pytest` from `generation/` — bare `uv run pytest` can resolve a different
 checkout's `btsgen`.
 
+**STATUS (2026-09-09): Phase AJ EXECUTED (vocab v40)** — all six items landed in lockstep (`ForgedCards.cs`
+Validate/ValidateTrigger/Describe + `OrbNameError`, `ForgedCharacters.cs` import passes the class's custom orb names,
+`EffectRunner`/`OrbRunner` warn + skip an unknown orb, `card.schema.json`, `VOCABULARY.md`, `cardgen.py`,
+`validator.py`, `bts1.py`). Verify-first finding: `random_enemy` needs NO runtime change — BaseLib's `CardAttack`
+already rolls a random enemy per hit (`TargetingRandomOpponents`) and `Apply<T>`/`GetTargets` one random enemy per
+status effect — so the contract rule is "no `when:target_has_status` / `scale:target_debuff_count` on a random_enemy
+card" (each effect rolls independently). Tests: `tests/test_phase_aj.py` (22 checks); suite 367 passed. C# build
+0 errors (`~/.dotnet/dotnet.exe build mod/BlankTheSpire.csproj -c Debug` — the Program Files dotnet is runtime-only).
+AutoSlay GAPTESTAJ2 (tester `generation/scratch/gaptest-aj/build_tester.py`, staged into slot 04, Act 2 floor 27):
+**206 `[AJ]` tags** (random_enemy damage x1/x3/x5, random_enemy weak/vulnerable, trigger channel_orb 'ember' x27,
+unknown-orb warn+skip x22) · **0 mod exceptions** · tool verdict = the documented base-game map-nav watchdog at a
+shop ("There is no item to purchase"), not mod-attributable. **Incidental fix (pre-existing, also in the 2026-08-19
+log):** every custom-orb channel threw `Expected a GodotObject but was Nil` from `NOrb.UpdateVisuals` because the
+game now wraps the sprite's `SpineSkeleton` child in a MegaSprite and the procedural circle had none —
+`ForgedOrb.CreateCustomSprite` now instantiates the Lightning orb's real spine scene tinted to the orb's hue, and
+borrows Lightning's channel/passive/evoke sound events (64 "No loader found" errors per run gone). GAPTESTAJ1 (before
+that fix): 138 tags, 32 of those exceptions; GAPTESTAJ2 (after): 0.
+
 ---
 
 ## 0. Ground rules

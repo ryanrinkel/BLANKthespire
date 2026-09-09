@@ -42,7 +42,20 @@ public static class ForgedCards
     /// v10 (forged statuses, Phase J): + CharacterSpec.StatusPool (a class's ≤4 custom modifier-family statuses
     /// read from `status_pool`; see ForgedCharacters / ForgedStatusPower). Class cards may apply a custom status
     /// by pool name via the `apply_status_custom` op (class-only, like custom-orb channels).</summary>
-    public const int VocabVersion = 39; // 39: Phase AI (gap #7) — GRAFT. New op `graft_card` {card_id}: the CHOOSE form of
+    public const int VocabVersion = 40; // 40: Phase AJ (VOCAB_GAP_REMEDIATION Wave 1) — HIDDEN CAPACITY. No new runtime
+                                        //     mechanic; the contract catches up with what the engine already runs. (1) Card
+                                        //     target `random_enemy` exposed (TargetMap/Describe had it; BaseLib CardAttack
+                                        //     rolls a random hittable enemy PER HIT, CommonActions.Apply/GetTargets one random
+                                        //     enemy per status effect) — each effect rolls independently, so a random_enemy
+                                        //     card may not carry `when:target_has_status` / `scale:target_debuff_count` (no
+                                        //     chosen target to read); status wording gains " to a random enemy". (2) Trigger-
+                                        //     payload `channel_orb` accepts any orb in the class's pool (TriggerRunner already
+                                        //     resolved custom names; validation pinned base orbs). (3) Class import rejects a
+                                        //     channel_orb naming an orb outside base ∪ the class's custom pool (was: silently
+                                        //     channeled Lightning at runtime; EffectRunner/OrbRunner now warn + skip). (4)
+                                        //     `hits` on summon_attack + once_per_turn on on_blade_played: generation-side
+                                        //     gates opened to match this file (no C# change).
+                                        // 39: Phase AI (gap #7) — GRAFT. New op `graft_card` {card_id}: the CHOOSE form of
                                         //     transform_card (as purge_card is the choose form of purge). When played, YOU pick a
                                         //     card in HAND (CardSelectCmd.FromHand) and THAT picked card PERMANENTLY becomes the
                                         //     named same-class card for the rest of the run (deck original swapped + the picked
@@ -432,7 +445,7 @@ public static class ForgedCards
     /// user on import). <paramref name="slot"/> only supplies a fallback id when the JSON omits one.
     /// </summary>
     public static bool TryParseCardJson(string json, int slot, out CardSpec? spec, out string error,
-        bool allowBasic = false, bool allowCustomOrbs = false)
+        bool allowBasic = false, bool allowCustomOrbs = false, IReadOnlySet<string>? orbNames = null)
     {
         spec = null;
         var parser = new Godot.Json();
@@ -447,11 +460,11 @@ public static class ForgedCards
             error = "root is not a JSON object.";
             return false;
         }
-        return TryBuildSpec(parser.Data.AsGodotDictionary(), slot, out spec, out error, allowBasic, allowCustomOrbs);
+        return TryBuildSpec(parser.Data.AsGodotDictionary(), slot, out spec, out error, allowBasic, allowCustomOrbs, orbNames);
     }
 
     private static bool TryBuildSpec(Godot.Collections.Dictionary card, int slot, out CardSpec? spec, out string error,
-        bool allowBasic = false, bool allowCustomOrbs = false)
+        bool allowBasic = false, bool allowCustomOrbs = false, IReadOnlySet<string>? orbNames = null)
     {
         spec = null;
         string id = Str(card, "id", $"forged_card_slot{slot:00}");
@@ -491,7 +504,7 @@ public static class ForgedCards
             if (up.ContainsKey("cost")) upgradedCost = Int(up, "cost");
         }
 
-        var invalid = Validate(effects, upgrade, allowCustomOrbs);
+        var invalid = Validate(effects, upgrade, allowCustomOrbs, target, orbNames);
         if (invalid != null) { error = invalid; return false; }
 
         // Cost is an int (0–3) OR the string "X" (an X-cost card: X = all energy, resolved at play time).
@@ -675,7 +688,8 @@ public static class ForgedCards
     /// <summary>Re-validate every op/status against what EffectRunner + DataCard actually run. When
     /// <paramref name="allowCustomOrbs"/> (class cards), <c>channel_orb</c> accepts any non-empty orb name (it
     /// is resolved against the class's own pool at runtime, with a fallback); shared cards stay strict.</summary>
-    private static string? Validate(EffectSpec[] effects, EffectSpec[]? upgrade, bool allowCustomOrbs = false)
+    private static string? Validate(EffectSpec[] effects, EffectSpec[]? upgrade, bool allowCustomOrbs = false,
+        TargetType? target = null, IReadOnlySet<string>? orbNames = null)
     {
         foreach (var e in effects.Concat(upgrade ?? []))
         {
@@ -752,11 +766,17 @@ public static class ForgedCards
             }
             if (e.Op == "channel_orb")
             {
-                bool orbOk = e.Orb != null && (allowCustomOrbs ? e.Orb.Length > 0 : SupportedOrbs.Contains(e.Orb));
-                if (!orbOk)
-                    return allowCustomOrbs
-                        ? "channel_orb needs a non-empty 'orb' name (a class pool entry or 'random')."
-                        : $"channel_orb needs a valid 'orb' (one of {string.Join("/", SupportedOrbs)}); got '{e.Orb}'.";
+                var oerr = OrbNameError(e.Orb, allowCustomOrbs, orbNames, "channel_orb");
+                if (oerr != null) return oerr;
+            }
+            // Phase AJ (v40): a random_enemy card has NO chosen target — BaseLib rolls a random hittable enemy per
+            // damage hit and per status effect — so the target-reading condition/scale can't be evaluated on it.
+            if (target == TargetType.RandomEnemy)
+            {
+                if (e.When != null && e.When.Kind == "target_has_status")
+                    return "'when:target_has_status' can't be used on a random_enemy card (no chosen target to read — each effect rolls its own random enemy).";
+                if (e.Scale == "target_debuff_count")
+                    return "'scale:target_debuff_count' can't be used on a random_enemy card (no chosen target to read — each effect rolls its own random enemy).";
             }
             if (e.Orb != null && e.Op != "channel_orb")
                 return $"'orb' only applies to channel_orb (op '{e.Op}').";
@@ -900,7 +920,7 @@ public static class ForgedCards
             }
             if (e.Op == "add_trigger")
             {
-                var terr = ValidateTrigger(e, allowCustomOrbs);
+                var terr = ValidateTrigger(e, allowCustomOrbs, orbNames);
                 if (terr != null) return terr;
             }
         }
@@ -968,7 +988,26 @@ public static class ForgedCards
     /// <summary>Validate a Phase H3 <c>add_trigger</c>: a known trigger kind, a non-empty payload drawn only
     /// from the self/orb-only <see cref="TriggerOps"/> (trigger apply_status must be a self-buff), no nested
     /// trigger / inner when / scale:x / multi-hit, and a fire-time When that doesn't need a target.</summary>
-    private static string? ValidateTrigger(EffectSpec e, bool allowCustomOrbs = false)
+    /// <summary>Phase AJ (v40): the ONE orb-name rule for card-level AND trigger-payload channel_orb. Shared cards:
+    /// base orbs / 'random' only. Class cards: any non-empty name — and when the importer hands over the class's
+    /// declared CUSTOM pool names (<paramref name="orbNames"/>, lowercase), a custom name must be in it (mirrors the
+    /// generation validator's base ∪ random ∪ declared-customs rule; an unknown name used to channel Lightning silently).</summary>
+    private static string? OrbNameError(string? orb, bool allowCustomOrbs, IReadOnlySet<string>? orbNames, string where)
+    {
+        if (string.IsNullOrEmpty(orb))
+            return allowCustomOrbs
+                ? $"{where} needs a non-empty 'orb' name (a class pool entry or 'random')."
+                : $"{where} needs a valid 'orb' (one of {string.Join("/", SupportedOrbs)}); got '{orb}'.";
+        if (!allowCustomOrbs)
+            return SupportedOrbs.Contains(orb) ? null
+                : $"{where} needs a valid 'orb' (one of {string.Join("/", SupportedOrbs)}); got '{orb}'.";
+        if (orbNames != null && !SupportedOrbs.Contains(orb) && !orbNames.Contains(orb.ToLowerInvariant()))
+            return $"{where} 'orb':'{orb}' is not a base orb, 'random', or a custom orb in this class's orb_pool " +
+                   $"({(orbNames.Count == 0 ? "none declared" : string.Join("/", orbNames))}).";
+        return null;
+    }
+
+    private static string? ValidateTrigger(EffectSpec e, bool allowCustomOrbs = false, IReadOnlySet<string>? orbNames = null)
     {
         if (e.Trigger == null || !SupportedTriggers.Contains(e.Trigger))
             return $"add_trigger needs a valid 'trigger' (one of {string.Join("/", SupportedTriggers)}); got '{e.Trigger}'.";
@@ -1009,8 +1048,13 @@ public static class ForgedCards
                            "add a 'target' (enemy/all_enemies) for a damage or enemy-debuff effect.";
                 if (t.Op == "apply_status" && (t.Status == null || !EffectRunner.SelfBuffStatuses.Contains(t.Status)))
                     return $"a self trigger apply_status must be a self-buff (got '{t.Status}'); add target:enemy for a debuff.";
-                if (t.Op == "channel_orb" && (t.Orb == null || !SupportedOrbs.Contains(t.Orb)))
-                    return $"trigger channel_orb needs a valid 'orb' (one of {string.Join("/", SupportedOrbs)}); got '{t.Orb}'.";
+                // Phase AJ (v40): a trigger-payload channel_orb may name any orb in the class's pool (TriggerRunner
+                // resolves it against the player's class at fire time) — the same rule as the card-level op.
+                if (t.Op == "channel_orb")
+                {
+                    var oerr = OrbNameError(t.Orb, allowCustomOrbs, orbNames, "trigger channel_orb");
+                    if (oerr != null) return oerr;
+                }
                 // F5: a self trigger payload may scale ONLY to cards_retained (a per-turn snapshot), and only on the
                 // numeric self ops — never channel_orb/evoke (those use a count, not a scaled amount).
                 if (t.IsScaled)
@@ -1226,7 +1270,7 @@ public static class ForgedCards
                     // cards carry explicit text; real per-status emoji in card text is a cosmetic follow-up.)
                     parts.Add(target == TargetType.Self
                         ? $"Gain {Math.Max(1, e.Amount)} {e.StatusName}."
-                        : $"Apply {Math.Max(1, e.Amount)} {e.StatusName}{(aoe ? " to ALL enemies" : "")}.");
+                        : $"Apply {Math.Max(1, e.Amount)} {e.StatusName}{dmgSuffix}."); // AJ: " to a random enemy" too
                     break;
                 case "add_trigger":
                     // The trigger sentence WITHOUT its condition; the generic When-weave below appends it (so
@@ -1258,7 +1302,7 @@ public static class ForgedCards
                     // Self-buffs are worded "Gain"; debuffs are "Apply"-ed to the target. SelfBuffStatuses is the
                     // single source of truth (shared with EffectRunner) so wording matches actual targeting.
                     bool buff = EffectRunner.SelfBuffStatuses.Contains(e.Status ?? "");
-                    parts.Add($"{(buff ? "Gain" : "Apply")} {name}{(aoe && !buff ? " to ALL enemies" : "")}.");
+                    parts.Add($"{(buff ? "Gain" : "Apply")} {name}{(buff ? "" : dmgSuffix)}."); // AJ: random_enemy suffix too
                     break;
             }
             // Phase H: weave the condition into the gated effect's sentence ("… if your orbs match.").

@@ -10,7 +10,7 @@
     "type": { "enum": ["attack", "skill", "power"] },
     "rarity": { "enum": ["basic", "common", "uncommon", "rare", "token"] },
     "cost": { "oneOf": [ { "type": "integer", "minimum": 0, "maximum": 3 }, { "const": "X" } ], "description": "Energy cost 0–3, or \"X\" for an X-cost card (spends all energy; pair with an effect that has scale:\"x\")." },
-    "target": { "enum": ["enemy", "self", "all_enemies"] },
+    "target": { "enum": ["enemy", "self", "all_enemies", "random_enemy"], "description": "Phase AJ (v40) adds random_enemy: each damage HIT and each status effect rolls its own random living enemy (no chosen target), so when:target_has_status and scale:target_debuff_count are not allowed on a random_enemy card." },
     "source": { "type": "string" },
     "flavor": { "type": "string" },
     "tags": { "type": "array", "minItems": 1, "maxItems": 2, "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]{1,15}$" }, "description": "Phase AE (gap #25): 1-2 lowercase synergy slugs declaring this card's kind (e.g. [\"strike\"]). Purely declarative metadata — no behavior on its own; a 'scale:tag_cards_owned' payoff counts cards carrying a given tag across your combat piles (the Perfected-Strike synergy). Tag 3-5 cards of a class with the same slug + add 1-2 payoffs referencing it." },
@@ -144,7 +144,7 @@
         "pile": { "enum": ["hand", "discard", "draw"], "description": "Required on a payload 'add_card': which combat pile the generated copies drop into." },
         "pole": { "enum": ["light", "dark"], "description": "Required on a payload 'balance_step' (Phase S, gap #1): the pole to move the Balance gauge toward ('amount' 1..5, fixed — no scale). Trigger-side balance_step is the 'engine' half (steady per-turn gauge income), e.g. turn_start → shift 2 toward the Dark." },
         "scale": { "const": "cards_retained", "description": "F5: make this payload effect's amount = the cards you held into this turn (resolved each turn it fires). Only on the numeric SELF ops (not channel_orb/evoke, not a targeted effect). Still include a nominal 'amount' (ignored)." },
-        "orb": { "enum": ["lightning", "frost", "dark", "random"] },
+        "orb": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "Phase AJ (v40): a trigger-payload channel_orb may name a base orb (lightning/frost/dark), 'random', or a custom orb declared in this class's orb_pool (resolved against the player's class when the power fires) — the same rule as the card-level op." },
         "target": { "enum": ["enemy", "all_enemies"], "description": "H4 (gap #14): aim this payload effect at enemies — 'enemy' (first hittable) or 'all_enemies'. Only on 'damage' or an enemy-debuff 'apply_status'. Omit for the default self/orb effect." },
         "status": { "enum": ["vulnerable", "weak", "frail", "poison", "strength", "dexterity", "thorns", "regen", "metallicize", "artifact", "buffer", "intangible", "ritual", "blur", "temp_strength", "temp_dexterity", "barricade", "focus"], "description": "For a SELF apply_status (no target) this must be a self-buff; for a TARGETED apply_status it must be a debuff (vulnerable/weak/frail/poison). The self-buff-vs-debuff coupling is enforced by the validators." }
       },

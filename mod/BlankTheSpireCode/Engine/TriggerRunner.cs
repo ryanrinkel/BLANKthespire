@@ -106,7 +106,11 @@ public static class TriggerRunner
                     // has no card host at fire time, so it's read off the player (the heal_summon pattern below).
                     int orbClass = ForgedCharacters.ClassIndexOfPlayer(player);
                     if (ForgedCharacters.IsOrbClass(orbClass))
+                    {
+                        if (e.Orb is not ("lightning" or "frost" or "dark" or "random")) // Phase AJ smoke: a custom pool orb in a payload
+                            MainFile.Logger.Info($"[AJ] trigger channel_orb '{e.Orb}' x{count} resolved against class {orbClass}'s pool.");
                         await EffectRunner.ChannelForgedOrbs(orbClass, e.Orb, count, player, ctx);
+                    }
                     else
                         for (int n = 0; n < count; n++)
                         {

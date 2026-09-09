@@ -109,6 +109,8 @@ public static class EffectRunner
                     }
                     // Hold the command so we can read its per-hit/per-target DamageResults after it resolves — the
                     // unblocked total feeds a later damage_dealt_unblocked heal (Phase P gap #21, lifesteal).
+                    if (card.TargetType == TargetType.RandomEnemy) // Phase AJ smoke: BaseLib rolls a random enemy per hit
+                        MainFile.Logger.Info($"[AJ] random_enemy damage x{hits} from '{card.Id}' (BaseLib TargetingRandomOpponents).");
                     var atk = CommonActions.CardAttack(card, play, hits);
                     await atk.Execute(ctx);
                     // Results is per-hit lists of per-target DamageResults — flatten both to sum every unblocked hit.
@@ -131,6 +133,8 @@ public static class EffectRunner
                     else await CommonActions.Draw(card, ctx);
                     break;
                 case "apply_status":
+                    if (card.TargetType == TargetType.RandomEnemy && !SelfBuffStatuses.Contains(e.Status ?? "")) // Phase AJ smoke
+                        MainFile.Logger.Info($"[AJ] random_enemy debuff '{e.Status}' from '{card.Id}' (BaseLib GetTargets rolls one enemy).");
                     await ApplyStatus(e.Status, card, ctx, play);
                     break;
                 case "gain_energy":
@@ -318,6 +322,7 @@ public static class EffectRunner
                             if (targets.Count > 0)
                             {
                                 int hitCount = Math.Max(1, e.Hits + (card.IsUpgraded ? HitsUpgradeDelta(spec, i) : 0));
+                                if (hitCount > 1) MainFile.Logger.Info($"[AJ] summon_attack x{hitCount} from '{card.Id}'."); // Phase AJ smoke
                                 for (int h = 0; h < hitCount; h++)
                                     await CreatureCmd.Damage(ctx, targets, amt, ValueProp.Move, atkPet);
                             }
@@ -898,14 +903,21 @@ public static class EffectRunner
     }
 
     /// <summary>Channel <paramref name="count"/> orbs from forged class <paramref name="orbClass"/>'s pool
-    /// ("random" rolls within the pool, falling back to lightning). Shared by the card and relic channel_orb ops.</summary>
+    /// ("random" rolls within the pool). Shared by the card and relic channel_orb ops. Phase AJ (v40): an orb name the
+    /// class's pool doesn't resolve is WARNED and skipped — it used to fall back to Lightning silently, which hid typos
+    /// and contradicted the "custom orbs are strictly per-class" contract (the importer now rejects such names too).</summary>
     internal static async Task ChannelForgedOrbs(int orbClass, string? orb, int count, Player owner, PlayerChoiceContext ctx)
     {
         for (int n = 0; n < count; n++)
         {
-            Type orbType = (orb == "random"
+            Type? orbType = orb == "random"
                                ? ForgedCharacters.RandomOrbType(orbClass, owner)
-                               : ForgedCharacters.ResolveOrbType(orbClass, orb)) ?? OrbTypeFor("lightning");
+                               : ForgedCharacters.ResolveOrbType(orbClass, orb);
+            if (orbType == null)
+            {
+                MainFile.Logger.Warn($"[AJ] channel_orb: class {orbClass} has no orb '{orb}' — skipped (no Lightning fallback).");
+                return;
+            }
             await OrbCmd.Channel(ctx, ((OrbModel)ModelDb.Get(orbType)).ToMutable(0), owner);
         }
     }

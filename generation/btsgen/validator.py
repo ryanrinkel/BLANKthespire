@@ -67,7 +67,8 @@ _SELF_BUFF_STATUSES = {"strength", "dexterity", "thorns", "regen", "metallicize"
 # (mirror ForgedCards.MultiFireTriggers); and the debuffs a TARGETED trigger apply_status may apply.
 _MULTI_FIRE_TRIGGERS = {"on_hp_lost", "on_exhaust", "on_card_played", "on_card_drawn", "on_damage_dealt",
                         "on_block_gained", "attacked",
-                        "on_discard"}  # Phase R (gap #17): a card can be discarded, redrawn, discarded again
+                        "on_discard",  # Phase R (gap #17): a card can be discarded, redrawn, discarded again
+                        "on_blade_played"}  # Phase AJ (v40): the blade can be played several times a turn (C# parity)
 _ENEMY_DEBUFF_STATUSES = {"vulnerable", "weak", "frail", "poison"}
 # Phase Q (gap #16): the combat piles add_card may target + the copies-per-play cap. Mirrors ForgedCards.AddCardPiles
 # / AddCardMaxAmount. card_id existence is the ref-integrity check (_ref_errors); these are the shape rules.
@@ -310,7 +311,15 @@ class CardValidator:
                 out.append(f"upgrade 'cost' must be an integer 0..3; got {ucost!r}.")
             elif isinstance(base_cost, int) and ucost > base_cost:
                 out.append(f"upgrade 'cost' ({ucost}) may not exceed the base cost ({base_cost}) — upgrades cheapen, never tax.")
+        # Phase AJ (v40): a random_enemy card has no chosen target (each hit / status effect rolls its own enemy), so
+        # the target-reading condition and scale are rejected on it. Mirrors ForgedCards.Validate.
+        is_random_target = card.get("target") == "random_enemy"
         for e in effects + up_effects:
+            if is_random_target:
+                if isinstance(e.get("when"), dict) and e["when"].get("kind") == "target_has_status":
+                    out.append("'when:target_has_status' can't be used on a random_enemy card (no chosen target to read — each effect rolls its own random enemy).")
+                if str(e.get("scale", "")).strip().lower() == "target_debuff_count":
+                    out.append("'scale:target_debuff_count' can't be used on a random_enemy card (no chosen target to read — each effect rolls its own random enemy).")
             if e.get("op") == "channel_orb":
                 orb = e.get("orb")
                 if orb is not None and orb not in self._allowed_orbs:
@@ -413,8 +422,10 @@ class CardValidator:
             op = e.get("op")            # mod's `effects.Concat(upgrade)` in ForgedCards.Validate)
             hits = e.get("hits", 1)
             scale = str(e.get("scale", "")).strip().lower()
-            if isinstance(hits, int) and hits > 1 and op != "damage":
-                out.append(f"'hits' only applies to 'damage' (op '{op}' had hits {hits}).")
+            # Phase AJ (v40): `hits` is legal on damage AND summon_attack (the engine has run multi-hit summon attacks
+            # since Phase K; the vocabulary/schema advertised it, but this guard rejected it — hidden capacity).
+            if isinstance(hits, int) and hits > 1 and op not in ("damage", "summon_attack"):
+                out.append(f"'hits' only applies to 'damage'/'summon_attack' (op '{op}' had hits {hits}).")
             if scale:
                 if scale not in _SUPPORTED_SCALES:
                     out.append(f"unsupported scale '{scale}' (one of {'/'.join(sorted(_SUPPORTED_SCALES))}).")
@@ -593,6 +604,14 @@ class CardValidator:
                     if op == "apply_status" and str(t.get("status", "")).strip().lower() not in _SELF_BUFF_STATUSES:
                         out.append(f"a self trigger apply_status must be a self-buff (got '{t.get('status')}'); "
                                    "add target:enemy for a debuff.")
+                    # Phase AJ (v40): a trigger-payload channel_orb may name any orb in THIS class's pool (base, 'random',
+                    # or a custom orb) — the runtime has resolved custom names since the Phase-I parity fix; the schema
+                    # enum used to pin base orbs only. Membership is checked here, like the card-level check above.
+                    if op == "channel_orb":
+                        orb = t.get("orb")
+                        if orb is not None and orb not in self._allowed_orbs:
+                            out.append(f"trigger channel_orb 'orb':'{orb}' is not a valid orb here "
+                                       f"(base lightning/frost/dark, 'random', or a custom orb in this class's pool).")
                     # F5: a self trigger payload may scale ONLY to cards_retained, never on channel_orb/evoke (no amount).
                     if ts and ts != _TRIGGER_SCALE:
                         out.append(f"inside a trigger only 'scale:{_TRIGGER_SCALE}' is allowed (got scale '{ts}').")

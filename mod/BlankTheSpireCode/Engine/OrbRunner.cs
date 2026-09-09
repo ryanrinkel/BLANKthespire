@@ -86,7 +86,11 @@ public static class OrbRunner
                     var type = e.Orb == "random"
                         ? ForgedCharacters.RandomOrbType(orb.ClassK, player)
                         : ForgedCharacters.ResolveOrbType(orb.ClassK, e.Orb);
-                    type ??= EffectRunner.OrbTypeFor("lightning"); // defensive: unknown name falls back
+                    if (type == null) // Phase AJ (v40): unknown name -> warn + skip (was: silent Lightning fallback)
+                    {
+                        MainFile.Logger.Warn($"[AJ] orb-effect channel_orb: class {orb.ClassK} has no orb '{e.Orb}' — skipped.");
+                        break;
+                    }
                     await OrbCmd.Channel(ctx, ((OrbModel)ModelDb.Get(type)).ToMutable(0), player);
                 }
                 break;

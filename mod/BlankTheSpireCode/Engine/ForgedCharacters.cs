@@ -1051,14 +1051,17 @@ public static class ForgedCharacters
             if (slot > cardsArr.Count)
             { error = $"starting_deck references slot {slot} but the bundle has only {cardsArr.Count} cards."; return false; }
 
-        // Validate every card against the live vocab (basics allowed for class starters).
+        // Validate every card against the live vocab (basics allowed for class starters). Phase AJ (v40): the class's
+        // declared CUSTOM orb names are handed to the card validator so a channel_orb naming an orb outside base ∪ pool
+        // is rejected at import (it used to import fine and silently channel Lightning at runtime).
+        var poolOrbNames = cspec.OrbPool.Where(o => o.IsCustom).Select(o => o.Name.ToLowerInvariant()).ToHashSet();
         var cardJsons = new List<string>(cardsArr.Count);
         for (int i = 0; i < cardsArr.Count; i++)
         {
             if (cardsArr[i].VariantType != Godot.Variant.Type.Dictionary)
             { error = $"card {i + 1} is not a JSON object."; return false; }
             string cj = Godot.Json.Stringify(cardsArr[i]);
-            if (!ForgedCards.TryParseCardJson(cj, i + 1, out _, out var cerr, allowBasic: true, allowCustomOrbs: true))
+            if (!ForgedCards.TryParseCardJson(cj, i + 1, out _, out var cerr, allowBasic: true, allowCustomOrbs: true, orbNames: poolOrbNames))
             { error = $"card {i + 1}: {cerr}"; return false; }
             cardJsons.Add(cj);
         }

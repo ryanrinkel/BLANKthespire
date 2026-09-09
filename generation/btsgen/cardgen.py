@@ -443,7 +443,7 @@ def describe(effects: list[dict], target: str) -> str:
             if target == "self":
                 parts.append(f"Gain {e.get('amount', 0)} {nm}.")
             else:
-                parts.append(f"Apply {e.get('amount', 0)} {nm}{' to ALL enemies' if aoe else ''}.")
+                parts.append(f"Apply {e.get('amount', 0)} {nm}{dmg_suffix}.")  # AJ: ' to a random enemy' too
         elif op == "summon":
             # Phase K (v15 true-Osty): (re)summon the minion or grow its HP. Lockstep with ForgedCards.Describe.
             mn = _orb_display(e.get("summon_name"))
@@ -478,7 +478,7 @@ def describe(effects: list[dict], target: str) -> str:
             name = STATUS_NAME.get(e["status"], e["status"])
             buff = e["status"] in _BUFFS
             verb = "Gain" if buff else "Apply"
-            parts.append(f'{verb} {name}{" to ALL enemies" if aoe and not buff else ""}.')
+            parts.append(f'{verb} {name}{"" if buff else dmg_suffix}.')  # AJ (v40): random_enemy suffix too
         # Phase H: weave the condition into the gated effect's sentence ("… if your orbs match.").
         when = e.get("when")
         if isinstance(when, dict) and len(parts) > before:
