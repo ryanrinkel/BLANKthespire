@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "bts/mod/relic.schema.json",
+  "title": "BLANK the spire — forged starter relic (mod contract, v1)",
+  "description": "Phase AJ-b (VOCAB_GAP_REMEDIATION_PLAN): the JSON shape of a forged class's starter relic, mirroring mod/BlankTheSpireCode/Engine/RelicSpec.cs + ForgedCharacters.TryParseRelic and the generation-side class_forge._validate_relic. hooks[] = triggered behaviour (trigger + effects from the closed card op subset, optional target/when/once_per_combat); modifiers[] = passive stat bonuses. At least one of the two must be non-empty. Class-conditional ops (channel_orb / summon / forge) are shape-checked here; whether the class can support them is a class-context rule (see _validate_relic with a blueprint).",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["name"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+    "name": { "type": "string", "minLength": 1, "maxLength": 32 },
+    "description": { "type": "string" },
+    "icon_emoji": { "type": "string", "minLength": 1, "maxLength": 8, "description": "One emoji, rendered into the in-game relic icon." },
+    "tier": { "enum": ["starter"], "description": "v1: a forged relic is always the class's STARTER relic (never rolled into rewards)." },
+    "source": { "type": "string" },
+    "flavor": { "type": "string" },
+    "hooks": { "type": "array", "items": { "$ref": "#/$defs/hook" } },
+    "modifiers": { "type": "array", "items": { "$ref": "#/$defs/modifier" } }
+  },
+  "anyOf": [
+    { "properties": { "hooks": { "type": "array", "minItems": 1 } }, "required": ["hooks"] },
+    { "properties": { "modifiers": { "type": "array", "minItems": 1 } }, "required": ["modifiers"] }
+  ],
+  "$defs": {
+    "hook": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["trigger", "effects"],
+      "properties": {
+        "trigger": { "enum": ["turn_start", "turn_end", "attacked", "on_exhaust", "on_card_played", "combat_end", "on_card_drawn", "on_damage_dealt", "on_block_gained", "on_hp_lost"] },
+        "target": { "enum": ["self", "enemy", "all_enemies", "attacker"], "description": "Default self. 'attacker' only on the 'attacked' trigger. damage / an enemy-debuff apply_status need an enemy target." },
+        "once_per_combat": { "type": "boolean" },
+        "when": { "$ref": "#/$defs/condition" },
+        "effects": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/effect" } }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "target": { "const": "attacker" } }, "required": ["target"] },
+          "then": { "properties": { "trigger": { "const": "attacked" } } }
+        },
+        {
+          "if": { "properties": { "trigger": { "const": "combat_end" } } },
+          "then": { "properties": { "effects": { "items": { "properties": { "op": { "const": "heal" } } } } } }
+        }
+      ]
+    },
+    "effect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["op"],
+      "properties": {
+        "op": { "enum": ["damage", "block", "draw", "gain_energy", "heal", "lose_hp", "apply_status", "forge", "channel_orb", "summon"] },
+        "amount": { "type": "integer", "minimum": 1 },
+        "status": { "enum": ["strength", "dexterity", "thorns", "regen", "metallicize", "artifact", "buffer", "intangible", "ritual", "blur", "temp_strength", "temp_dexterity", "barricade", "focus", "vulnerable", "weak", "frail", "poison"] },
+        "orb": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "channel_orb: 'random' or a name in the class's orb_pool." },
+        "summon_name": { "type": "string", "minLength": 1, "description": "summon: the minion declared in the class's summon_pool." }
+      },
+      "allOf": [
+        { "if": { "properties": { "op": { "const": "apply_status" } } }, "then": { "required": ["status", "amount"] } },
+        { "if": { "properties": { "op": { "const": "channel_orb" } } }, "then": { "required": ["orb"] } },
+        { "if": { "properties": { "op": { "const": "summon" } } }, "then": { "required": ["summon_name"] } },
+        { "if": { "properties": { "op": { "enum": ["damage", "block", "draw", "gain_energy", "heal", "lose_hp", "forge"] } } }, "then": { "required": ["amount"] } }
+      ]
+    },
+    "condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": { "enum": ["hp_below_half", "no_block", "has_block", "enemy_count_ge", "turn_at_least", "hand_size_ge"] },
+        "value": { "type": "integer", "minimum": 1 },
+        "negate": { "type": "boolean" }
+      },
+      "allOf": [
+        { "if": { "properties": { "kind": { "enum": ["enemy_count_ge", "turn_at_least", "hand_size_ge"] } } }, "then": { "required": ["value"] } }
+      ]
+    },
+    "modifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stat", "amount"],
+      "properties": {
+        "stat": { "enum": ["max_energy", "first_attack", "cost_reduction", "start_combat_block"] },
+        "amount": { "type": "integer", "not": { "const": 0 } }
+      }
+    }
+  }
+}

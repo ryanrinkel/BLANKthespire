@@ -8,6 +8,12 @@ starter relic -> assembled character -> quarantined bundle -> review reject clea
 """
 from __future__ import annotations
 
+# Phase AJ-b (2026-09-09): this is a PROTOTYPE-contract test. btsgen.paths now defaults to the MOD contract, so pin
+# the archived prototype one here for standalone runs (pytest's conftest `contract` fixture re-pins it per test).
+from btsgen import paths as _paths  # noqa: E402
+
+_paths.use_prototype_contract()
+
 import contextlib
 import io
 import json

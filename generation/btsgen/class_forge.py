@@ -130,7 +130,13 @@ STARTING_DECK_SIZE = 10
 
 
 def point_btsgen_at_mod_contract() -> None:
-    """Repoint the card schema/vocabulary/statuses at the constrained v2 mod contract. Ideally run before the
+    """Pin the card schema/vocabulary/statuses at the constrained v2 mod contract.
+
+    Phase AJ-b (2026-09-09): `btsgen.paths` now DEFAULTS to the mod contract, so with no BTSGEN_* env set this is a
+    no-op safety net (it re-asserts the same paths). It still matters when a caller has pointed the env at the
+    prototype (or anywhere else) and wants the production contract back. History, kept because it explains the
+    reload below: the defaults used to target the archived prototype, and this function had to repoint them
+    before the
     btsgen modules that read paths at import time — but `btsgen.paths` snapshots its BTSGEN_* env vars ONCE, at
     first import, so if a caller has ALREADY imported a paths-bearing module (contract / validator / generator /
     frontend / bts1) this env-set alone is a no-op and the harness silently keeps running on the *prototype*

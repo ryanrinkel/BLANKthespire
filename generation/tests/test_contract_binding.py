@@ -22,18 +22,21 @@ import sys
 # prototype `conditional`-op card is (now correctly) rejected.
 _CHILD = r'''
 import os
-for k in ("BTSGEN_CARD_SCHEMA", "BTSGEN_VOCABULARY", "BTSGEN_GODOT_ROOT",
-          "BTSGEN_STATUSES_DIR", "BTSGEN_CARDS_DIR", "BTSGEN_GENERATED_DIR"):
-    os.environ.pop(k, None)
+for k in [k for k in os.environ if k.startswith("BTSGEN_") and k not in ("BTSGEN_FEEDBACK_FILE", "BTSGEN_FEEDBACK_EXTRA")]:
+    os.environ.pop(k, None)  # env-clean: every contract override gone (the parent may run prototype-era tests)
 
-# BROKEN order: generator (top-level `from . import paths`) binds paths = PROTOTYPE, before the point call.
+# The once-BROKEN order: generator (top-level `from . import paths`) binds paths BEFORE the point call. Phase AJ-b
+# made the env-clean defaults the MOD contract, so this order can no longer bind the prototype; the point call is
+# a no-op safety net and must keep the mod binding.
 from btsgen.generator import AnthropicGenerator  # noqa: F401
 from btsgen.class_forge import point_btsgen_at_mod_contract
 from btsgen import paths
-assert paths.VOCABULARY.parent.parent.name == "prototype", paths.VOCABULARY
+assert paths.VOCABULARY.parent.parent.name == "mod", ("env-clean default must be the MOD contract:", paths.VOCABULARY)
+assert paths.CARD_SCHEMA.parent.name == "contract", paths.CARD_SCHEMA
+assert paths.RELIC_SCHEMA.parent.name == "contract" and paths.RELIC_SCHEMA.exists(), paths.RELIC_SCHEMA
 
-point_btsgen_at_mod_contract()  # must reload paths in place -> mod contract, with no manual reload
-assert paths.VOCABULARY.parent.parent.name == "mod", ("point() did not flip paths:", paths.VOCABULARY)
+point_btsgen_at_mod_contract()  # safety net: still the mod contract afterwards
+assert paths.VOCABULARY.parent.parent.name == "mod", ("point() moved paths off the mod contract:", paths.VOCABULARY)
 assert paths.CARD_SCHEMA.parent.name == "contract", paths.CARD_SCHEMA
 
 from btsgen import census, validator

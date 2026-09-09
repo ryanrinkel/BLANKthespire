@@ -1,5 +1,10 @@
 """Orchestrate a WHOLE CLASS: blueprint -> cards -> starter relic -> assembled character.
 
+LEGACY (Phase AJ-b, 2026-09-09): a PROTOTYPE-contract-only path. Production forging is `class_forge` /
+`btsgen-forge-class` (the STS2-mod BTSC bundle, validated by the C# importer); the mod has no standalone
+relic/character generation. This module reads the archived prototype schema (BTSGEN_* env or
+`paths.prototype_overrides()`) and is kept for the offline prototype-era tests. Do not extend it.
+
 Two-stage design (see character_contract): one blueprint call plans the class; then every
 card/relic is generated through the EXISTING single-artifact pipelines (each with its own
 validate -> repair-once loop) with the blueprint as design context. The assembled character

@@ -44,21 +44,25 @@ _CONTRACT_ATTRS = ("GODOT_ROOT", "CARD_SCHEMA", "VOCABULARY", "DESIGN_HEURISTICS
 _PROTOTYPE_MODULES = ("pipeline_balance_repair", "test_validator", "relic_validator",
                       "character_pipeline")
 
-# --- Snapshot the PROTOTYPE contract (paths' env-clean defaults), THEN pin the mod contract as the
-# process default. conftest is imported before any test module, so this is the first paths binding. ---
+# --- Phase AJ-b: paths' env-clean defaults ARE the mod contract now. Snapshot them as _MOD, and take the
+# archived prototype contract from paths.prototype_overrides() for the prototype-era test modules. conftest is
+# imported before any test module, so this is the first paths binding. ---
 for _k in ("BTSGEN_GODOT_ROOT", "BTSGEN_CARD_SCHEMA", "BTSGEN_VOCABULARY", "BTSGEN_DESIGN_HEURISTICS",
-           "BTSGEN_STATUSES_DIR", "BTSGEN_CARDS_DIR", "BTSGEN_GENERATED_DIR"):
+           "BTSGEN_STATUSES_DIR", "BTSGEN_CARDS_DIR", "BTSGEN_GENERATED_DIR", "BTSGEN_RELIC_SCHEMA",
+           "BTSGEN_RELIC_VOCABULARY", "BTSGEN_RELICS_DIR", "BTSGEN_GENERATED_RELICS_DIR",
+           "BTSGEN_CHARACTER_SCHEMA", "BTSGEN_CHARACTERS_DIR", "BTSGEN_GENERATED_CHARACTERS_DIR"):
     os.environ.pop(_k, None)
 
-from btsgen import paths  # env-clean here -> prototype defaults
+from btsgen import paths  # env-clean here -> MOD contract defaults
 
-_PROTOTYPE = {k: getattr(paths, k) for k in _CONTRACT_ATTRS}
-
-from btsgen.class_forge import point_btsgen_at_mod_contract  # imports paths lazily; safe to import now
-
-point_btsgen_at_mod_contract()      # sets the mod-contract BTSGEN_* env
-importlib.reload(paths)             # re-read them into the (single) paths module -> mod contract default
+importlib.reload(paths)             # in case a paths-bearing module was imported before the env was cleaned
 _MOD = {k: getattr(paths, k) for k in _CONTRACT_ATTRS}
+_PROTOTYPE = {k: paths.prototype_overrides()[k] for k in _CONTRACT_ATTRS}
+
+from btsgen.class_forge import point_btsgen_at_mod_contract  # noqa: E402  (now a no-op safety net; kept for parity)
+
+point_btsgen_at_mod_contract()
+importlib.reload(paths)
 
 
 @pytest.fixture(autouse=True)

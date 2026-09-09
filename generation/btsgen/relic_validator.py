@@ -1,5 +1,10 @@
 """Validator-in-the-loop for relics (parallel to validator.py for cards).
 
+LEGACY (Phase AJ-b, 2026-09-09): a PROTOTYPE-contract-only path. Production forging is `class_forge` /
+`btsgen-forge-class` (the STS2-mod BTSC bundle, validated by the C# importer); the mod has no standalone
+relic/character generation. This module reads the archived prototype schema (BTSGEN_* env or
+`paths.prototype_overrides()`) and is kept for the offline prototype-era tests. Do not extend it.
+
 Three checks, mirroring the engine gate:
 1. Schema shape + closed vocabulary (triggers/conditions/targets/ops/stats + recursion)
    -> jsonschema against relic.schema.json.

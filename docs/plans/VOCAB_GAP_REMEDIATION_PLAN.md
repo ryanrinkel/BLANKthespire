@@ -36,6 +36,21 @@ game now wraps the sprite's `SpineSkeleton` child in a MegaSprite and the proced
 borrows Lightning's channel/passive/evoke sound events (64 "No loader found" errors per run gone). GAPTESTAJ1 (before
 that fix): 138 tags, 32 of those exceptions; GAPTESTAJ2 (after): 0.
 
+**STATUS (2026-09-09): Phase AJ-b EXECUTED (no vocab bump)** — `btsgen.paths` now DEFAULTS to the mod contract
+(card + new `mod/contract/relic.schema.json` + both vocabularies + statuses + `mod/content/cards`); every contract
+attr has a `BTSGEN_*` override, `paths.prototype_overrides()` / `use_prototype_contract()` reach the archived
+prototype, and `point_btsgen_at_mod_contract()` is a no-op safety net. `_STATUS_WEIGHT` is keyed to all 18 mod
+statuses (Intangible 8, Ritual/Strength/Barricade 4, Dexterity/Metallicize/Buffer/Focus 3, Vulnerable/Thorns/Regen/
+Artifact/Blur/temp_strength 2, Weak/Frail/temp_dexterity 1.5, Poison 1.2). The prototype composites are out of
+`_BUILD_AROUND_OPS` and live only in `_LEGACY_PROTOTYPE_OPS`, consulted when `_mod_contract` is False; the legacy
+relic/character modules + CLIs carry a LEGACY banner and the two generate CLIs warn. **Deviations from the plan
+text, deliberately:** (a) the prototype ops are GATED, not deleted — deleting them retires the prototype-era
+validator suite (test_validator / test_relic_validator / test_character_pipeline / test_pipeline_balance_repair),
+which is a separate decision; those four tests now pin the prototype contract themselves for standalone runs;
+(b) the legacy CLIs are deprecated, not rewired onto `class_forge` (they generate a single relic/character, which
+the mod has no concept of). Tests: `tests/test_phase_ajb.py`; `test_contract_binding` updated (env-clean default =
+mod); suite 372 passed; every test file also runs standalone.
+
 ---
 
 ## 0. Ground rules

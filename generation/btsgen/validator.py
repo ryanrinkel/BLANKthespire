@@ -22,13 +22,26 @@ from jsonschema import Draft202012Validator
 
 from . import paths
 
-# ---- balance constants, copied verbatim from ContentValidator.gd ----
+# ---- balance constants: per-stack value of each status (Phase AJ-b: keyed to the MOD's 18 statuses) ----
+# The base five came from the prototype's ContentValidator.gd; the rest (poison/thorns/regen/metallicize/artifact/
+# buffer/blur/intangible/barricade/focus/temp_*) used to fall through to the 2.0 default, so Intangible 1 priced like
+# Weak 1. Relative scale: a permanent stat (Strength 4, Dexterity 3) > a one-turn burst (temp_* ~half) > a decaying
+# debuff (Vulnerable 2, Weak/Frail 1.5) ; the build-defining rares (Intangible/Ritual/Barricade) sit well above.
 _STATUS_WEIGHT = {
-    "vulnerable": 2.0, "weak": 1.5, "strength": 4.0,
-    "dexterity": 3.0, "frail": 1.5, "ritual": 4.0,
-    "strength_temp": 2.0,  # this-turn only: ~half permanent Strength's value
-    "armor": 4.0,          # Barricade: Block persists/compounds (kept in parity with ContentValidator.gd)
-    "burrowed": 6.0,       # a full turn of invulnerability (situational but a big swing)
+    "vulnerable": 2.0, "weak": 1.5, "frail": 1.5,
+    "poison": 1.2,          # N damage over N turns, decaying — a slow burn, cheaper than a flat hit
+    "strength": 4.0, "dexterity": 3.0,
+    "temp_strength": 2.0, "temp_dexterity": 1.5,   # this-turn only: ~half the permanent stat
+    "thorns": 2.0,          # pays out per enemy hit taken
+    "regen": 2.0,           # heal per turn, decaying
+    "metallicize": 3.0,     # STS2 Plating: N + (N-1) + ... + 1 Block over N turns
+    "artifact": 2.0, "buffer": 3.0, "blur": 2.0,
+    "intangible": 8.0,      # a turn of near-invulnerability — rare-tier, keep amounts tiny
+    "ritual": 4.0,          # Strength per turn: snowballs (rare-tier)
+    "barricade": 4.0,       # Block persists/compounds (Barricade; the prototype called it "armor")
+    "focus": 3.0,           # +N to every orb value (orb classes)
+    # LEGACY (prototype contract only; harmless under the mod contract — its schema never emits these names)
+    "strength_temp": 2.0, "armor": 4.0, "burrowed": 6.0,
 }
 
 _RARITY_RANK = {"basic": 0, "common": 1, "uncommon": 2, "rare": 3}
@@ -36,7 +49,12 @@ _RARITY_RANK = {"basic": 0, "common": 1, "uncommon": 2, "rare": 3}
 _SIMPLE_BENEFIT_OPS = {"damage", "block", "draw", "gain_energy", "heal"}
 # Phase H3: composite/build-around ops (the schema/triggerEffect $def enforces add_trigger's payload shape;
 # these are for the balance heuristics — a trigger is a build-around, not a flat stat line).
-_BUILD_AROUND_OPS = {"multi", "conditional", "from_state", "fuse", "add_trigger", "apply_status_custom",
+# Phase AJ-b: the prototype's composite ops (multi / conditional / from_state / fuse) are NOT in this set any more —
+# the mod contract never sees them (its schema rejects them). They survive only in _LEGACY_PROTOTYPE_OPS, which the
+# walker / scorer / build-around check consult ONLY when the active contract is the prototype one (self._mod_contract
+# is False). Deleting them outright would retire the prototype-era validator tests; that is a separate decision.
+_LEGACY_PROTOTYPE_OPS = {"multi", "conditional", "from_state", "fuse"}
+_BUILD_AROUND_OPS = {"add_trigger", "apply_status_custom",
                      "summon", "summon_attack", "buff_summon",
                      "heal_summon", "shield_summon",  # Phase AC (gap #2): summon support, not a flat stat line
 
@@ -242,11 +260,9 @@ class CardValidator:
                     c = eff.get("card_id")
                     if isinstance(c, str) and c not in cards_ok:
                         out.append(f"{p}: graft_card references unknown card '{c}'")
-                elif op == "multi":
+                elif not self._mod_contract and op in ("multi", "fuse"):   # LEGACY prototype composites
                     walk(eff.get("effects"), f"{p}.effects")
-                elif op == "fuse":
-                    walk(eff.get("effects"), f"{p}.effects")
-                elif op == "conditional":
+                elif not self._mod_contract and op == "conditional":       # LEGACY prototype composite
                     walk(eff.get("then"), f"{p}.then")
                     walk(eff.get("else"), f"{p}.else")
 
@@ -738,6 +754,17 @@ class CardValidator:
             # Phase AA (gap #17 R-2): a draw-quality filter (look at top N, discard any) — real card-selection
             # value that also fuels on_discard, but weaker than raw draw; ~1.5 per card looked at.
             return self._amt(eff.get("amount", 0)) * 1.5
+        if not self._mod_contract and op in _LEGACY_PROTOTYPE_OPS:
+            return self._score_legacy_prototype_effect(op, eff)
+        if op == "add_trigger":
+            # Phase H3: a per-turn engine. Score one round of the payload (a conservative lower bound — the
+            # real value compounds over the fight; _has_composite keeps it off the flat-rare floor).
+            return sum(self._score_effect(t) for t in eff.get("effects", []))
+        return 0.0
+
+    def _score_legacy_prototype_effect(self, op: str, eff: dict) -> float:
+        """LEGACY (prototype contract only): the Godot prototype's composite ops. Never reached under the mod
+        contract (Phase AJ-b) — the mod schema rejects these ops, and _score_effect gates on self._mod_contract."""
         if op == "multi":
             sub = sum(self._score_effect(se) for se in eff.get("effects", []))
             return self._amt(eff.get("times", 1)) * sub
@@ -750,10 +777,6 @@ class CardValidator:
             # also hurts the planter so it's valued a touch lower than enemies-only.
             sub = sum(self._score_effect(se) for se in eff.get("effects", []))
             return sub * (1.1 if eff.get("scope", "all_enemies") == "all" else 1.3)
-        if op == "add_trigger":
-            # Phase H3: a per-turn engine. Score one round of the payload (a conservative lower bound — the
-            # real value compounds over the fight; _has_composite keeps it off the flat-rare floor).
-            return sum(self._score_effect(t) for t in eff.get("effects", []))
         return 0.0
 
     @staticmethod
@@ -795,8 +818,8 @@ class CardValidator:
         expected = 5.0 + self._eff_cost(card) * 7.0
         if score < expected:
             return [f"flat rare: power score {score:.1f} is under the cost baseline ~{expected:.0f} "
-                    "and there is no build-around mechanic (multi/conditional/from_state/fuse/"
-                    "X-cost) -- a rare should be the archetype payoff, not a mislabeled common"]
+                    "and there is no build-around mechanic (an add_trigger engine / a `when` gate / a scaled "
+                    "amount / X-cost) -- a rare should be the archetype payoff, not a mislabeled common"]
         return []
 
     @classmethod
@@ -807,6 +830,10 @@ class CardValidator:
             if not isinstance(e, dict):
                 continue
             if e.get("op") in _BUILD_AROUND_OPS:
+                return True
+            # LEGACY prototype composites. Unconditional here (classmethod, no contract flag) but harmless under the
+            # mod contract: its schema rejects these ops long before the rarity-floor check runs.
+            if e.get("op") in _LEGACY_PROTOTYPE_OPS:
                 return True
             if isinstance(e.get("when"), dict):
                 return True  # a per-effect `when` guard (Phase H) is a conditional build-around

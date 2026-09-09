@@ -1,5 +1,10 @@
 """CLI: generate a WHOLE CLASS (character + card set + starter relic) into quarantine.
 
+LEGACY (Phase AJ-b, 2026-09-09): a PROTOTYPE-contract-only path. Production forging is `class_forge` /
+`btsgen-forge-class` (the STS2-mod BTSC bundle, validated by the C# importer); the mod has no standalone
+relic/character generation. This module reads the archived prototype schema (BTSGEN_* env or
+`paths.prototype_overrides()`) and is kept for the offline prototype-era tests. Do not extend it.
+
     uv run btsgen-character-generate --concept "a frost mage that freezes enemies solid"
 
 This is the most expensive command in the harness: one blueprint call plus one call per
@@ -20,6 +25,9 @@ from .character_pipeline import generate_character
 
 
 def main(argv: list[str] | None = None) -> int:
+    import warnings
+    warnings.warn("LEGACY prototype-contract CLI (Phase AJ-b): production forging is `btsgen-forge-class` / the website; this path targets the archived prototype schema.", DeprecationWarning, stacklevel=2)
+    print("[legacy] prototype-contract CLI — production forging is btsgen-forge-class (see paths.py).")
     ap = argparse.ArgumentParser(description="Generate a whole BLANK the spire class (LLM, validated, quarantined).")
     ap.add_argument("--concept", required=True, help="free-text player concept for the class")
     ap.add_argument("--model", default=None, help="override the model id")

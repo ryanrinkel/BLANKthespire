@@ -1,5 +1,10 @@
 """Build the class-blueprint prompt = the contract for WHOLE-CLASS generation.
 
+LEGACY (Phase AJ-b, 2026-09-09): a PROTOTYPE-contract-only path. Production forging is `class_forge` /
+`btsgen-forge-class` (the STS2-mod BTSC bundle, validated by the C# importer); the mod has no standalone
+relic/character generation. This module reads the archived prototype schema (BTSGEN_* env or
+`paths.prototype_overrides()`) and is kept for the offline prototype-era tests. Do not extend it.
+
 The character harness is two-stage: (1) one "blueprint" call designs the class — identity,
 stats, two synergistic archetypes, and a per-card DESIGN BRIEF list (no effect JSON); then
 (2) the existing card/relic pipelines generate each artifact with the blueprint as context,

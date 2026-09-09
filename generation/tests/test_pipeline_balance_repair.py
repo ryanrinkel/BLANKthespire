@@ -8,6 +8,12 @@ down to the budget, so an overtuned card only ships when it has no shrinkable nu
 """
 from __future__ import annotations
 
+# Phase AJ-b (2026-09-09): this is a PROTOTYPE-contract test. btsgen.paths now defaults to the MOD contract, so pin
+# the archived prototype one here for standalone runs (pytest's conftest `contract` fixture re-pins it per test).
+from btsgen import paths as _paths  # noqa: E402
+
+_paths.use_prototype_contract()
+
 import json
 import shutil
 import sys
