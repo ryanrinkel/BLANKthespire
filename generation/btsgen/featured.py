@@ -180,6 +180,12 @@ FEATURED_CLASS_KIND: dict[str, list[Featured]] = {
                  'REQUIRED: apply one of THIS class\'s own status_pool statuses by name (op "apply_status_custom", '
                  'status_name + amount) - the signature status should ride at least three cards.',
                  lambda cc: "apply_status_custom" in cc.ops, min_cards=3),
+        # Phase AL (v42): the signature status as a per-turn ENGINE (apply_status_custom inside an add_trigger payload).
+        Featured("custom_status_engine", 'a status-class POWER whose ongoing trigger applies the class\'s OWN status each fire (apply_status_custom inside an add_trigger payload)',
+                 'REQUIRED: add a POWER with op "add_trigger" (turn_start or a reactive trigger) whose payload applies '
+                 'one of THIS class\'s own status_pool statuses by name (payload op "apply_status_custom", status_name + '
+                 'amount 1-2) - the signature status as a per-turn engine.',
+                 lambda cc: "apply_status_custom" in cc.payload_ops),
     ],
     "summon": [
         Featured("summon_medic", 'a summon-class MEDIC card that heals or shields the minion (op "heal_summon" / "shield_summon")',
@@ -190,6 +196,12 @@ FEATURED_CLASS_KIND: dict[str, list[Featured]] = {
                  'REQUIRED: add a card with op "buff_summon" (amount 1-3, status strength by default) so the minion\'s '
                  'summon_attack hits harder over the fight.',
                  lambda cc: "buff_summon" in cc.ops),
+        # Phase AL (v42): the minion as a per-turn ENGINE (summon_attack / buff_summon inside an add_trigger payload).
+        Featured("summon_engine", 'a summon-class POWER whose ongoing trigger makes the minion act each fire (summon_attack or buff_summon inside an add_trigger payload)',
+                 'REQUIRED: add a POWER with op "add_trigger" (turn_end or turn_start) whose payload is op '
+                 '"summon_attack" (amount 3-6, optional hits 2) or "buff_summon" (amount 1) - the minion strikes or '
+                 'drills every turn on its own.',
+                 lambda cc: "summon_attack" in cc.payload_ops or "buff_summon" in cc.payload_ops),
     ],
     "forge": [
         Featured("blade_empower_burst", 'a forge-class BURST that multiplies the signature blade this turn (op "blade_empower")',

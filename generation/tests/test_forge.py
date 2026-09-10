@@ -84,10 +84,14 @@ def test_rejects(v: CardValidator) -> None:
     # forge op without an amount (schema requires it)
     bad(_card([{"op": "forge"}], type="skill", target="self"),
         "forge without amount must be rejected")
-    # scale:"forged" inside a trigger payload (only cards_retained is allowed there)
+    # Phase AL (v42): scale:"forged" inside a trigger payload is LEGAL on block/damage (additive, amount >= 1) —
+    # the Forge class's second payoff ("At the end of your turn, gain 3 Block, plus your Forge"); never on draw.
+    r = v.validate(_card([{"op": "add_trigger", "trigger": "turn_end",
+                           "effects": [{"op": "block", "amount": 3, "scale": "forged"}]}], type="power", target="self"))
+    check(r.ok, f"scale:forged on a block payload validates (Phase AL): {r.errors}")
     bad(_card([{"op": "add_trigger", "trigger": "turn_end",
-                "effects": [{"op": "block", "amount": 3, "scale": "forged"}]}], type="power", target="self"),
-        "scale:forged inside a trigger payload must be rejected")
+                "effects": [{"op": "draw", "amount": 1, "scale": "forged"}]}], type="power", target="self"),
+        "scale:forged on a draw payload must be rejected")
     # a scaled trigger forge (income is fixed-amount only)
     bad(_card([{"op": "add_trigger", "trigger": "turn_end",
                 "effects": [{"op": "forge", "amount": 1, "scale": "cards_retained"}]}], type="power", target="self"),
@@ -237,7 +241,7 @@ def test_blade_manipulation(v: CardValidator) -> None:
 def test_vocab_version() -> None:
     print("Phase AK — the vocab stamp is v41:")
     from btsgen import bts1
-    check(bts1.VOCAB_VERSION == 41, f"bts1.VOCAB_VERSION == 41: {bts1.VOCAB_VERSION}")
+    check(bts1.VOCAB_VERSION >= 41, f"bts1.VOCAB_VERSION >= 41: {bts1.VOCAB_VERSION}")
 
 
 def test_relic() -> None:

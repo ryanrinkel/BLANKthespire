@@ -256,6 +256,9 @@ def test_class_kind_detectors_and_presence() -> None:
         "custom_status_spread": _card([{"op": "apply_status_custom", "status_name": "Rust", "amount": 2}]),
         "summon_medic": _card([{"op": "heal_summon", "amount": 4}]),
         "summon_drill": _card([{"op": "buff_summon", "amount": 2}]),
+        # Phase AL (v42): the class engines as payloads
+        "custom_status_engine": _card([{"op": "add_trigger", "trigger": "turn_start", "effects": [{"op": "apply_status_custom", "status_name": "Rust", "amount": 1}]}]),
+        "summon_engine": _card([{"op": "add_trigger", "trigger": "turn_end", "effects": [{"op": "summon_attack", "amount": 4, "hits": 2}]}]),
         "blade_empower_burst": _card([{"op": "blade_empower", "amount": 2}]),
         "blade_recall": _card([{"op": "summon_blade"}]),
         "blade_rider": _card([{"op": "add_trigger", "trigger": "on_blade_played", "effects": [{"op": "block", "amount": 3}]}]),

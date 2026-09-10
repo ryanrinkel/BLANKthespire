@@ -76,7 +76,11 @@ _SUPPORTED_SCALES = {"x", "cards_in_hand", "cards_retained", "unspent_energy_las
                      # Phase AE (gap #25): tag_cards_owned = ADDITIVE (printed amount + count of cards with a tag),
                      # damage/block-only, requires a sibling `tag`.
                      "tag_cards_owned"}
-_TRIGGER_SCALE = "cards_retained"
+# Phase AL (v42): the scalars a trigger payload may use — PLAYER-level reads only (mirror ForgedCards.TriggerScales);
+# and the payload ops whose amount a scale may replace / add to (mirror ForgedCards.TriggerScalableOps). `forged`
+# keeps its ADDITIVE damage/block-only shape; a TARGETED payload may be scaled only when it is `damage`.
+_TRIGGER_SCALES = {"cards_retained", "cards_in_hand", "unspent_energy_last_turn", "forged"}
+_TRIGGER_SCALABLE_OPS = {"damage", "block", "draw", "gain_energy", "heal", "lose_hp", "gain_orb_slot", "apply_status"}
 # Self-buff statuses (mirror C# EffectRunner.SelfBuffStatuses) — a buff_summon's status must be one of these
 # (it lands on the minion, like Strength). Kept in lockstep with the mod's ForgedCards.buff_summon validation.
 _SELF_BUFF_STATUSES = {"strength", "dexterity", "thorns", "regen", "metallicize", "artifact", "buffer",
@@ -630,8 +634,10 @@ class CardValidator:
                     if op == "apply_status" and str(t.get("status", "")).strip().lower() not in _ENEMY_DEBUFF_STATUSES:
                         out.append(f"a targeted trigger apply_status must be an enemy debuff "
                                    f"({'/'.join(sorted(_ENEMY_DEBUFF_STATUSES))}); got '{t.get('status')}'.")
-                    if ts:
-                        out.append("a targeted trigger effect can't be scaled (scale is for the self numeric payload only).")
+                    # Phase AL (v42): a targeted payload DAMAGE may be scaled ("deal damage equal to the cards in your
+                    # hand to ALL enemies"); a targeted debuff / summon strike / custom status stays literal.
+                    if ts and op != "damage":
+                        out.append(f"only a targeted trigger 'damage' may be scaled (trigger effect '{op}' had scale '{ts}').")
                 else:
                     # a SELF payload apply_status must be a self-buff (the schema status enum now also lists debuffs).
                     if op == "apply_status" and str(t.get("status", "")).strip().lower() not in _SELF_BUFF_STATUSES:
@@ -645,14 +651,53 @@ class CardValidator:
                         if orb is not None and orb not in self._allowed_orbs:
                             out.append(f"trigger channel_orb 'orb':'{orb}' is not a valid orb here "
                                        f"(base lightning/frost/dark, 'random', or a custom orb in this class's pool).")
-                    # F5: a self trigger payload may scale ONLY to cards_retained, never on channel_orb/evoke (no amount).
-                    if ts and ts != _TRIGGER_SCALE:
-                        out.append(f"inside a trigger only 'scale:{_TRIGGER_SCALE}' is allowed (got scale '{ts}').")
-                    elif ts == _TRIGGER_SCALE and op in ("channel_orb", "evoke"):
-                        out.append(f"'scale:{_TRIGGER_SCALE}' can't be used on a trigger '{op}' (no scalable amount).")
-                    elif ts == _TRIGGER_SCALE and op in ("forge", "balance_step"):
-                        # Phase M/S: trigger-side forge / balance income is a fixed drumbeat; scaling lives on payoff cards.
+                # F5 / Phase AL (v42): a payload may scale to a PLAYER-level read (_TRIGGER_SCALES), only on the ops
+                # with a scalable amount — never channel_orb/evoke (a count), never forge/balance_step (the fixed
+                # income drumbeat; scaling lives on payoff cards), never the summon/custom-status/pile ops.
+                # Mirrors ForgedCards.ValidateTrigger.
+                thits = t.get("hits", 1)
+                if ts:
+                    if ts not in _TRIGGER_SCALES:
+                        out.append(f"inside a trigger 'scale' must be one of {'/'.join(sorted(_TRIGGER_SCALES))} (got scale '{ts}').")
+                    elif op in ("channel_orb", "evoke"):
+                        out.append(f"'scale:{ts}' can't be used on a trigger '{op}' (no scalable amount).")
+                    elif op in ("forge", "balance_step"):
                         out.append(f"a trigger '{op}' uses a fixed amount (no scale).")
+                    elif op not in _TRIGGER_SCALABLE_OPS:
+                        out.append(f"'scale:{ts}' can't be used on a trigger '{op}' "
+                                   f"(only {'/'.join(sorted(_TRIGGER_SCALABLE_OPS))} carry a scalable amount).")
+                    if ts == "forged" and op not in ("damage", "block"):
+                        out.append("'scale:forged' inside a trigger only applies to damage/block (Forge ADDS to a printed damage/block amount).")
+                    if ts == "forged" and int(t.get("amount", 0) or 0) < 1:
+                        out.append("a 'scale:forged' trigger effect needs amount >= 1 (Forge ADDS to the printed amount).")
+                    if isinstance(thits, int) and not isinstance(thits, bool) and thits > 1:
+                        out.append("a scaled trigger effect can't also be multi-hit (hits + scale on one effect).")
+                    # AutoSlay finding (GAPTESTAL1): the turn_end hook fires AFTER the end-of-turn discard, so a
+                    # turn_end cards_in_hand always reads 0. Mirrors ForgedCards.ValidateTrigger.
+                    if ts == "cards_in_hand" and e.get("trigger") == "turn_end":
+                        out.append("'scale:cards_in_hand' can't be used on a turn_end trigger (the hand is already discarded "
+                                   "when it fires — use turn_start or a reactive trigger, or scale:cards_retained).")
+                # Phase AL (v42): `hits` inside a payload — damage (targeted) / summon_attack only (schema-enforced too).
+                if isinstance(thits, int) and not isinstance(thits, bool) and thits > 1 and op not in ("damage", "summon_attack"):
+                    out.append(f"'hits' only applies to a trigger 'damage'/'summon_attack' (trigger effect '{op}' had hits {thits}).")
+                # Phase AL (v42): the class engines as payloads — class-only, like the card-level ops. A payload
+                # apply_status_custom names a status in THIS class's status_pool; buff_summon's status is a self-buff.
+                if op == "apply_status_custom":
+                    nm = str(t.get("status_name", "")).strip().lower()
+                    if not nm:
+                        out.append("a trigger apply_status_custom needs a 'status_name' (a custom status in this class's status_pool).")
+                    elif nm not in self._allowed_custom_statuses:
+                        out.append(f"a trigger apply_status_custom 'status_name':'{t.get('status_name')}' is not a status in "
+                                   f"this class's status_pool (apply_status_custom is class-only).")
+                elif t.get("status_name") is not None:
+                    out.append(f"'status_name' only applies to apply_status_custom (trigger effect '{op}').")
+                if op in ("summon_attack", "buff_summon"):
+                    if not self._allowed_custom_summons:
+                        out.append(f"a trigger {op} is only valid on a summon class (one with a summon_pool).")
+                    if op == "buff_summon":
+                        bst = t.get("status")
+                        if bst is not None and str(bst).strip().lower() not in _SELF_BUFF_STATUSES:
+                            out.append(f"a trigger buff_summon 'status':'{bst}' must be a self-buff (e.g. strength); it lands on the minion.")
                 # Phase S (gap #1): a trigger-payload balance_step (the Balance engine) needs a valid pole; a stray
                 # 'pole' on any other payload op is an error. Mirrors ForgedCards.ValidateTrigger.
                 if op == "balance_step":

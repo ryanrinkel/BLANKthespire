@@ -105,6 +105,11 @@ in-game verify; then **website redeploy** (scp `generation/btsgen`+`mod/contract
 ---
 
 ## K-3 — CUSTOM GAME MECHANICS (deferred follow-up; the "possibly with custom mechanics" ask)
+> **2026-09-09 (Phase AL, vocab v42):** the dormant per-turn MOVE-CYCLE is re-expressed as a CARD engine — `summon_attack`
+> / `buff_summon` are legal inside `add_trigger` payloads ("At the end of your turn, deal 4 damage 2 times with your
+> summon"; "At the start of your turn, your summon gains 1 Strength"), resolved off the player's class at fire time
+> (`TriggerRunner`). The autonomous minion model itself stays shelved (Phase AV). See `VOCAB_GAP_REMEDIATION_PLAN.md`.
+
 Each a separate smaller phase, gated on prior in-game verify:
 - **`on_summon`/`on_death` payloads** (death via `MinionPower` hooks or `Creature.Died`).
 - **Apply the class's FORGED status** — minion `apply_status` reaches the class `status_pool` (Phase J): cross-axis composition.

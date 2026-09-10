@@ -110,6 +110,49 @@ fired — not mod-attributable). Caveat: the game log does not print the struck 
 the dealer plumbing + the dead-attacker no-ops, not by a per-target damage line. Closed: the gap #4 nuance (`VOCABULARY_GAPS.md`)
 and the Phase J "J-3 true Thorns" item (both stamped). Tag evidence: `generation/scratch/gaptest-ak/godot_AK_tags_GAPTESTAK{1,2}.txt`.
 
+**STATUS (2026-09-09): Phase AL EXECUTED (vocab v42)** — all three items landed in lockstep. **(1) Class engines as payloads:**
+`TriggerOps` += `apply_status_custom` (status class — untargeted = GAIN the buff on the player; with a payload `target` = APPLY
+the debuff to the resolved enemies, buff/debuff split read off the resolved `StatusSpec.IsBuff` exactly like the card path),
+`summon_attack` (summon class — the pet is the dealer, `target` optional → enemy/all_enemies/attacker, default the first
+living enemy; no summon = logged no-op) and `buff_summon` (summon class; `SummonRunner.ApplyBuff`). `TriggerTargetedOps` +=
+`summon_attack` / `apply_status_custom`. The class is read off the player at fire time (`ClassIndexOfPlayer`, the heal_summon
+pattern). **(2) `hits` on a payload `damage`/`summon_attack`** — `TriggerRunner` loops the intrinsic hit; rejected on every
+other payload op and together with a scale. **(3) Payload `scale`** — `TriggerScale` (const) became `TriggerScales` =
+cards_retained / cards_in_hand / unspent_energy_last_turn / forged + `TriggerScalableOps` (block/draw/gain_energy/heal/
+lose_hp/gain_orb_slot/self apply_status + a TARGETED damage — the H4 "a targeted effect can't be scaled" rule is lifted for
+damage ONLY); `forged` keeps its ADDITIVE damage/block-only, amount ≥ 1 shape ("gain 2 Block, plus your Forge");
+`TriggerRunner.ResolveAmount` resolves them at fire time. Wording: `TriggerScalePhrase` ("equal to cards retained" unchanged /
+"the cards in your hand" / "your unspent energy last turn"), "deal N damage H times{to}", "deal N damage [H times] with your
+summon{to}", "your summon gains N Strength", "gain N Razor Focus" / "apply N Brittle to ALL enemies" — byte-lockstep with
+`cardgen._trigger_fragment`. **Deviation, deliberate:** scale on a payload is now RESTRICTED to the ops whose fragment can
+word it (before, `discard`/`add_card`/… silently accepted `scale:cards_retained` and ran the scaled amount while the text
+showed the literal). Lockstep: `ForgedCards.cs` (VocabVersion 42), `TriggerRunner.cs`, `CardSpec.cs` docs, `card.schema.json`
+(triggerEffect: op enum, `hits`, `status_name`, `scale` enum, target/op coupling, allOf rules), `VOCABULARY.md` (three table
+rows, Structural mechanics, Triggers bullets), `cardgen.py`, `validator.py` (`_TRIGGER_SCALES` / `_TRIGGER_SCALABLE_OPS` +
+class-context checks), `census.py` (`payload_ops` / `scaled_payloads` / `multi_hit_payloads` + report line), `bts1.py`
+VOCAB_VERSION 42, `featured.py` (class-kind entries `custom_status_engine` + `summon_engine`, detected via `payload_ops`),
+`class_forge.py` (a one-line pointer in the TRIGGERS paragraph, paid for by trimming its second brief example — rule 0.9),
+`archetypes.json` (summon_swarm + status_signature ops += add_trigger), `exemplar_pool.json` (+7: Honing Ritual, Thrall's
+Hour, Drill Cadence, Flurry Ward, Ember Tithe, Thrift Bulwark, Crowded Mind; pool 84 → 91), `PHASE_K…` K-3 stamped. Tests:
+`tests/test_phase_al.py` (87 checks); `test_phase_ak` / `test_h4_triggers` / `test_forge` re-pinned (a targeted DEBUFF is
+the scaled-targeted rejection now; `scale:forged` on a block payload is LEGAL); suite **384 passed**; every `test_phase_*.py`
+runs standalone; C# build 0 errors. **AutoSlay finding → fix:** `AfterSideTurnEnd` fires AFTER the end-of-turn discard, so
+a `turn_end` payload `scale:cards_in_hand` read **0 on all 59 fires** in GAPTESTAL1 — both validators now REJECT
+`cards_in_hand` on a `turn_end` trigger (use turn_start / a reactive trigger, or `cards_retained`); the exemplar and tester
+moved to turn_start; VOCABULARY.md + schema say so. AutoSlay (tester `generation/scratch/gaptest-al/build_tester.py` — a
+status+summon class, staged into slot 04): **GAPTESTAL1** PASS RunCompleted, **506 `[AL]` tags** — summon_attack x2 through
+'Bone Thrall' ×91 (90 with a living target, 1 empty), buff_summon ×75, custom BUFF (Razor Focus) ×69, custom DEBUFF (Brittle
+to all_enemies) ×45, x3 riposte to the attacker ×39 (all resolved), `unspent_energy_last_turn` ×56 (read 3–8),
+`forged` ×65 (2 + Forge 0..20 → 2–22), plus 7 no-summon no-ops · **0 mod exceptions** (the only exception frames are BaseLib's
+two startup Harmony patches and AutoSlay's own end-of-run Options-button timeout). **GAPTESTAL2** (after the fix, the
+tester's Crowded Mind moved to turn_start) — a short run (the documented merchant map-nav watchdog ended it, tool verdict
+FAIL, not mod-attributable): 8 `[AL]` tags, `cards_in_hand` at turn START read **5** on both fires (vs 0 on turn_end in
+run 1) · 0 mod exceptions. **GAPTESTAL3** — likewise short (map-nav watchdog): 10 `[AL]` tags, `cards_in_hand` at turn
+start read 5 ×2, buff_summon / summon_attack / Brittle / unspent / forged all fired again · 0 mod exceptions (the only
+non-Harmony errors are the base game's own "Dev console used before being created"). The AL tester stays staged in
+slot 04 (the smoke tool restores only its relic injection). Tag evidence:
+`generation/scratch/gaptest-al/godot_AL_tags_GAPTESTAL{1,2,3}.txt`.
+
 ---
 
 ## 0. Ground rules

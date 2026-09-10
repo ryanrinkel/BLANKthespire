@@ -16,9 +16,13 @@ namespace BlankTheSpire.BlankTheSpireCode.Engine;
 /// Phase H3: runs an <c>add_trigger</c> power's payload when it FIRES (turn end/start). Unlike
 /// <see cref="EffectRunner"/>, there is NO card and NO chosen target at fire time — only the player. So this
 /// is a deliberately RESTRICTED, self/orb-only sub-vocabulary executed with LITERAL amounts (the validator,
-/// <c>ForgedCards.IsTriggerOp</c> / <c>TriggerStatuses</c>, forbids anything that needs a card var or an enemy
-/// target: single-target damage, enemy debuffs, scale:x, multi-hit). The fire-time <c>When</c> gate is checked
-/// once up front via <see cref="Conditions"/> with no target (so <c>target_has_status</c> is forbidden there).
+/// <c>ForgedCards.ValidateTrigger</c>, forbids anything that needs a card var: scale:x, grow, nested triggers).
+/// H4 lets a payload effect carry a <c>target</c>; Phase AL (v42) adds the class engines as payloads
+/// (apply_status_custom / summon_attack / buff_summon — the class is read off the player, like heal_summon),
+/// multi-hit on a payload damage/summon_attack, and the player-level scalars cards_in_hand /
+/// unspent_energy_last_turn / forged next to cards_retained (<see cref="ResolveAmount"/>). The fire-time
+/// <c>When</c> gate is checked once up front via <see cref="Conditions"/> with no target (so
+/// <c>target_has_status</c> is forbidden there).
 /// </summary>
 public static class TriggerRunner
 {
@@ -40,8 +44,9 @@ public static class TriggerRunner
 
         foreach (var e in trigger.Triggered ?? [])
         {
-            // channel_orb/evoke ignore scale (validator-forbidden); otherwise literal amount.
-            int amt = e.Scale == "cards_retained" ? retained : e.Amount;
+            // channel_orb/evoke ignore scale (validator-forbidden); otherwise the literal amount, or a
+            // player-level scalar resolved at fire time (Phase AL, v42).
+            int amt = ResolveAmount(e, player, retained);
             switch (e.Op)
             {
                 case "block":
@@ -66,11 +71,15 @@ public static class TriggerRunner
                     // H4 (gap #14): a targeted payload deals intrinsic (ValueProp.Move) damage with the player as
                     // dealer — the same path RelicRunner/SummonRunner use. Validator guarantees a target here.
                     var targets = ResolveEnemies(e.Target, player, attacker);
+                    int hits = Math.Max(1, e.Hits); // Phase AL (v42): a multi-hit payload loops the intrinsic hit
                     MainFile.Logger.Info($"[H4] targeted payload: deal {amt} damage to {e.Target} ({targets.Count} enemy/ies).");
                     if (e.Target == "attacker") // Phase AK (v41) smoke tag: the riposte lands on the one that struck (or nobody, if it died)
                         MainFile.Logger.Info($"[AK] riposte: deal {amt} damage to the attacker ({(targets.Count > 0 ? "resolved" : "no living attacker — skipped")}).");
+                    if (hits > 1)
+                        MainFile.Logger.Info($"[AL] payload damage x{hits}: deal {amt} damage {hits} times to {e.Target} ({targets.Count} enemy/ies).");
                     if (targets.Count > 0)
-                        await CreatureCmd.Damage(ctx, targets, amt, ValueProp.Move, player.Creature);
+                        for (int h = 0; h < hits; h++)
+                            await CreatureCmd.Damage(ctx, targets, amt, ValueProp.Move, player.Creature);
                     break;
                 }
                 case "apply_status":
@@ -159,8 +168,96 @@ public static class TriggerRunner
                     // summon out → logged no-op (HealOrShieldSummonFor).
                     await EffectRunner.HealOrShieldSummonFor(player, ForgedCharacters.ClassIndexOfPlayer(player), e.Op, amt);
                     break;
+                case "summon_attack":
+                {
+                    // Phase AL (v42): the summon strikes on the trigger — the dormant per-turn move-cycle re-expressed
+                    // as a card engine ("At the end of your turn, deal 4 damage 2 times with your summon"). The PET
+                    // is the dealer (scales with its Strength, the card-level summon_attack path); targets resolve
+                    // like any targeted payload (no target = the first living enemy). No summon out → logged no-op.
+                    int k = ForgedCharacters.ClassIndexOfPlayer(player);
+                    var pet = ForgedCharacters.IsSummonClass(k) ? EffectRunner.FindLivingSummon(player, k) : null;
+                    if (pet == null) { MainFile.Logger.Info("[AL] trigger summon_attack: no summon (no-op)."); break; }
+                    var stargets = ResolveEnemies(e.Target, player, attacker).Where(c => c.IsAlive).ToList();
+                    int shits = Math.Max(1, e.Hits);
+                    MainFile.Logger.Info($"[AL] trigger summon_attack: deal {amt} damage x{shits} with '{(pet.Monster as ForgedSummon)?.Source?.Name ?? "summon"}' to {e.Target ?? "enemy"} ({stargets.Count} enemy/ies).");
+                    if (stargets.Count > 0)
+                        for (int h = 0; h < shits; h++)
+                            await CreatureCmd.Damage(ctx, stargets, amt, ValueProp.Move, pet);
+                    break;
+                }
+                case "buff_summon":
+                {
+                    // Phase AL (v42): buff the living summon on the trigger ("At the start of your turn, your summon
+                    // gains 1 Strength") — the card-level buff_summon path (SummonRunner.ApplyBuff). No summon → no-op.
+                    int k = ForgedCharacters.ClassIndexOfPlayer(player);
+                    var pet = ForgedCharacters.IsSummonClass(k) ? EffectRunner.FindLivingSummon(player, k) : null;
+                    if (pet == null) { MainFile.Logger.Info("[AL] trigger buff_summon: no summon (no-op)."); break; }
+                    string bst = e.Status ?? "strength";
+                    MainFile.Logger.Info($"[AL] trigger buff_summon: +{amt} {bst} -> '{(pet.Monster as ForgedSummon)?.Source?.Name ?? "summon"}'.");
+                    await SummonRunner.ApplyBuff(ctx, pet, bst, amt);
+                    break;
+                }
+                case "apply_status_custom":
+                {
+                    // Phase AL (v42): apply one of the class's OWN statuses on the trigger ("At the start of your turn,
+                    // gain 1 Razor Focus"). Mirrors the card-level split: a BUFF lands on the player (any target is
+                    // ignored, as at card level); a DEBUFF lands on the resolved enemy target(s) — no target = the
+                    // first living enemy. Unknown name (not in this class's status_pool) → warn + skip, like the card op.
+                    int k = ForgedCharacters.ClassIndexOfPlayer(player);
+                    var inst = ForgedCharacters.IsStatusClass(k) ? ForgedCharacters.ResolveStatusInstance(k, e.StatusName) : null;
+                    if (inst?.Spec is not { } st)
+                    {
+                        MainFile.Logger.Warn($"[Forged] trigger apply_status_custom: class {k} has no status '{e.StatusName}' (skipped).");
+                        break;
+                    }
+                    int n = Math.Max(1, amt);
+                    if (st.IsBuff)
+                    {
+                        MainFile.Logger.Info($"[AL] trigger apply_status_custom: gain {n} {st.Name} (self buff).");
+                        await inst.ApplyStacks(ctx, player.Creature, player.Creature, n);
+                    }
+                    else
+                    {
+                        var ctargets = ResolveEnemies(e.Target, player, attacker);
+                        MainFile.Logger.Info($"[AL] trigger apply_status_custom: apply {n} {st.Name} to {e.Target ?? "enemy"} ({ctargets.Count} enemy/ies).");
+                        foreach (var tgt in ctargets)
+                            await inst.ApplyStacks(ctx, tgt, player.Creature, n);
+                    }
+                    break;
+                }
                 // Any other op is validator-forbidden in a trigger; ignore defensively.
             }
+        }
+    }
+
+    /// <summary>Phase AL (v42): a payload effect's live amount. cards_retained keeps its F5 turn_end twist (the
+    /// caller resolves <paramref name="retained"/>); cards_in_hand = the hand RIGHT NOW (all of it — no card to
+    /// exclude at fire time); unspent_energy_last_turn = the turn-end snapshot (<see cref="HandStateTracker"/>);
+    /// forged = the printed amount PLUS the Forge counter (ADDITIVE, the card-level rule). Anything else = literal.</summary>
+    private static int ResolveAmount(EffectSpec e, Player player, int retained)
+    {
+        switch (e.Scale)
+        {
+            case "cards_retained": return retained;
+            case "cards_in_hand":
+            {
+                int n = player.PlayerCombatState?.Hand?.Cards?.Count ?? 0;
+                MainFile.Logger.Info($"[AL] payload scale cards_in_hand -> {n} ({e.Op}).");
+                return n;
+            }
+            case "unspent_energy_last_turn":
+            {
+                int n = HandStateTracker.UnspentEnergyLastTurn;
+                MainFile.Logger.Info($"[AL] payload scale unspent_energy_last_turn -> {n} ({e.Op}).");
+                return n;
+            }
+            case "forged":
+            {
+                int n = e.Amount + EffectRunner.ForgeStacks(player);
+                MainFile.Logger.Info($"[AL] payload scale forged -> {e.Amount} + Forge {EffectRunner.ForgeStacks(player)} = {n} ({e.Op}).");
+                return n;
+            }
+            default: return e.Amount;
         }
     }
 

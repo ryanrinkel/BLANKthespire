@@ -11,8 +11,9 @@ namespace BlankTheSpire.BlankTheSpireCode.Engine;
 /// <param name="Amount">Scalar amount for the op (damage/block/draw count, status stacks). For a multi-hit
 /// <c>damage</c> op this is the PER-HIT damage.</param>
 /// <param name="Status">Status/power id for apply_status (e.g. "vulnerable", "weak").</param>
-/// <param name="Hits">Number of hits for a <c>damage</c> op (default 1 = a single hit). >1 makes it a
-/// multi-hit attack dealing <c>Amount</c> damage <c>Hits</c> times. Ignored by non-damage ops.</param>
+/// <param name="Hits">Number of hits for a <c>damage</c> / <c>summon_attack</c> op (default 1 = a single hit). >1
+/// makes it a multi-hit attack dealing <c>Amount</c> damage <c>Hits</c> times. Ignored by other ops. Phase AL
+/// (v42): also legal on a trigger-payload damage/summon_attack (TriggerRunner loops the hits).</param>
 /// <param name="Scale">If set, this op's amount comes from a live combat-state SCALAR, not <c>Amount</c>
 /// (Phase F5; only on damage/block/draw). Values: <c>"x"</c> = the resolved X (= energy spent) of an X-cost
 /// card (X-cost coupling: requires/required-by a <c>"X"</c> cost); <c>"cards_in_hand"</c> = the count of OTHER
@@ -27,7 +28,9 @@ namespace BlankTheSpire.BlankTheSpireCode.Engine;
 /// The op grants an ongoing power that runs <see cref="Triggered"/> at that moment. Null for every other op.</param>
 /// <param name="Triggered">The effects the <c>add_trigger</c> power runs when it fires (Phase H3). These execute
 /// with LITERAL amounts on the player (no card/target context), so they are a SELF/orb-only sub-vocabulary —
-/// see <c>TriggerRunner</c>. Null for every other op.</param>
+/// see <c>TriggerRunner</c> — plus the H4 targeted ops and, from Phase AL (v42), the class engines
+/// (apply_status_custom / summon_attack / buff_summon), multi-hit damage and the player-level scalars
+/// (cards_retained / cards_in_hand / unspent_energy_last_turn / forged). Null for every other op.</param>
 /// <param name="StatusName">The custom (forged) status name for the <c>apply_status_custom</c> op (Phase J),
 /// resolved against the card's class <c>status_pool</c> at play time. Null for every other op.</param>
 /// <param name="SummonName">The forged-minion name for the <c>summon</c> op (Phase K), resolved against the card's
@@ -38,9 +41,10 @@ namespace BlankTheSpire.BlankTheSpireCode.Engine;
 /// which already fire at most once per turn. Default false.</param>
 /// <param name="Target">Phase H4 (gap #14): on a <c>add_trigger</c> PAYLOAD effect, aim it at enemies —
 /// <c>"enemy"</c> (first hittable), <c>"all_enemies"</c>, or (Phase AK, v41, <c>attacked</c> trigger only)
-/// <c>"attacker"</c> — the creature that just hit you. Only <c>damage</c> and an enemy-debuff
-/// <c>apply_status</c> (vulnerable/weak/frail/poison) may be targeted; every other payload op stays self/orb-only
-/// (Target null). Never set on a card-level effect (a card uses <see cref="CardSpec.Target"/>). Default null.</param>
+/// <c>"attacker"</c> — the creature that just hit you. Only <c>damage</c>, an enemy-debuff
+/// <c>apply_status</c> (vulnerable/weak/frail/poison) and (Phase AL, v42) <c>summon_attack</c> / a custom-debuff
+/// <c>apply_status_custom</c> may be targeted; every other payload op stays self/orb-only (Target null). Never set
+/// on a card-level effect (a card uses <see cref="CardSpec.Target"/>). Default null.</param>
 /// <param name="CardId">Phase Q (gap #16): the SAME-CLASS card id the <c>add_card</c> op generates copies of,
 /// resolved against the player's forged class at play time (see <c>ForgedCharacters.ResolveClassCardModel</c>).
 /// Class-only, like <see cref="SummonName"/>. Null for every other op.</param>

@@ -25,10 +25,10 @@ validator. (The vocabulary grows as the interpreter grows — more ops/statuses 
 | `evoke`        | optional `amount` (count) | Evoke (trigger + consume) your oldest orb(s) now. **ORB-CLASS ONLY.** |
 | `gain_orb_slot`| `amount` (int ≥1) | Gain `amount` orb slots this combat. **ORB-CLASS ONLY.** |
 | `add_trigger`  | `trigger` (turn_end/turn_start/ripen/on_hp_lost/on_exhaust/on_card_played/on_card_drawn/on_damage_dealt/on_block_gained/attacked/on_discard/on_blade_played), `effects` (1+), optional `when`, optional `once_per_turn` or `once_per_combat`, `amount` (ripen only) | Grant an ongoing power that runs its `effects` payload: every turn (turn_end/turn_start), ONCE after `amount` turns (ripen), or REACTIVELY on an event (on_hp_lost / on_exhaust / on_card_played / on_card_drawn / on_damage_dealt / on_block_gained / attacked). Payload is SELF/orb-only unless an effect carries a `target` (see Triggers below). Best on `power`-type cards. **Exception — `on_discard`** is CARD-LATENT (Reflex, see Triggers): it grants NO power on play; its payload fires when THIS card is DISCARDED BY AN EFFECT. |
-| `apply_status_custom` | `status_name`, `amount` | Apply `amount` stacks of one of the class's OWN custom statuses (by name). **STATUS-CLASS ONLY** — see Forged Statuses below. |
+| `apply_status_custom` | `status_name`, `amount` | Apply `amount` stacks of one of the class's OWN custom statuses (by name). Also legal inside `add_trigger` payloads (v42 — the signature status as a per-turn engine: "At the start of your turn, gain 1 Razor Focus"; a custom DEBUFF in a payload takes a `target`). **STATUS-CLASS ONLY** — see Forged Statuses below. |
 | `summon`       | `summon_name`, optional `amount` (HP) | Summon the class's OWN minion (by name) at `amount` HP, OR — if it's already out — raise its Max HP by `amount` (base-game Osty Summon keyword). One per class; passive bodyguard. **SUMMON-CLASS ONLY** — see Forged Summons below. |
-| `summon_attack`| `amount` (per-hit), optional `hits` (≥2) | Deal `amount` damage **through your summon** (it's the attacker, scaling with its Strength); no-op if the summon isn't out. **SUMMON-CLASS ONLY** — see Forged Summons below. |
-| `buff_summon`  | `amount`, optional `status` (self-buff, default `strength`) | Buff your living summon (e.g. Strength so its `summon_attack`s hit harder); no-op if the summon isn't out. **SUMMON-CLASS ONLY** — see Forged Summons below. |
+| `summon_attack`| `amount` (per-hit), optional `hits` (≥2) | Deal `amount` damage **through your summon** (it's the attacker, scaling with its Strength); no-op if the summon isn't out. Also legal inside `add_trigger` payloads (v42 — the minion acting on its own each turn: "At the end of your turn, deal 4 damage 2 times with your summon"; a payload `target` picks enemy/all_enemies/attacker, default the first enemy). **SUMMON-CLASS ONLY** — see Forged Summons below. |
+| `buff_summon`  | `amount`, optional `status` (self-buff, default `strength`) | Buff your living summon (e.g. Strength so its `summon_attack`s hit harder); no-op if the summon isn't out. Also legal inside `add_trigger` payloads (v42 — "At the start of your turn, your summon gains 1 Strength"). **SUMMON-CLASS ONLY** — see Forged Summons below. |
 | `heal_summon`  | `amount` (int 1–9) | Heal your living summon `amount` HP (the selfless "medic" op — spend a card to keep your bodyguard alive); no-op if the summon isn't out. Also legal inside `add_trigger` payloads (a per-turn medic engine: "At the start of your turn, heal your summon 3"). **SUMMON-CLASS ONLY** — see Forged Summons below. |
 | `shield_summon`| `amount` (int 1–12) | Grant your living summon `amount` Block; no-op if the summon isn't out. Also legal inside `add_trigger` payloads. **SUMMON-CLASS ONLY** — see Forged Summons below. |
 | `add_card`     | `card_id` (a card in THIS class's own set), `pile` (hand/discard/draw), optional `amount` (copies, 1–3, default 1) | Generate `amount` **combat-transient copies** of one of your class's OWN cards into a pile (the base-game "add a card to combat" — the copies vanish at combat end, never enter your deck). May reference itself (Anger). The referenced card must NOT itself `add_card` (depth-1 loop discipline). Also legal inside `add_trigger` payloads — the compost loop ("Whenever a card is Exhausted, add a copy of X to your discard pile"). **CLASS-ONLY.** |
@@ -95,7 +95,8 @@ ride any card (e.g. an attack that also grants you Block-over-time).
 ## Structural mechanics (multi-hit & scaled amounts)
 - **Multi-hit:** add `hits` (int ≥2) to a `damage` effect → it deals `amount` damage `hits` times
   (e.g. `{ "op":"damage", "amount":4, "hits":3 }` = "Deal 4 damage 3 times"). At most one per card. The
-  per-hit damage is `amount`; an upgrade can raise either the per-hit damage or the hit count.
+  per-hit damage is `amount`; an upgrade can raise either the per-hit damage or the hit count. Also legal (v42)
+  on a trigger-payload `damage` / `summon_attack` ("Whenever you are attacked, deal 2 damage 3 times to the attacker").
 - **Rampage (`grow`):** add `grow` (int 1..9) to a `damage` effect → the attack **grows every time you play
   it this combat**: damage dealt = `amount` + `grow` × (times THIS card was played earlier this combat).
   First play = the printed `amount`; the card shows its CURRENT (grown) damage in your hand.
@@ -138,7 +139,8 @@ ride any card (e.g. an attack that also grants you Block-over-time).
   - The non-`x` scalars — `cards_in_hand`, `cards_retained`, `unspent_energy_last_turn`, `forged`,
     `damage_dealt_unblocked`, `target_debuff_count`, `tag_cards_owned` — have **no cost coupling** (use any cost).
     At most **one scaled damage/block per card** (a scaled `draw` or lifesteal `heal` is exempt). A scaled effect
-    can't also be multi-hit.
+    can't also be multi-hit. The four PLAYER-level reads (`cards_retained`, `cards_in_hand`,
+    `unspent_energy_last_turn`, `forged`) also work inside `add_trigger` payloads (v42) — see Triggers.
 - **Card `tags` (Phase AE, gap #25):** a card may carry an optional top-level **`tags`** array (1–2 lowercase
   slugs, e.g. `["strike"]`) — purely declarative metadata naming the card's kind. It has **no behavior on its
   own**; it exists so a `scale:"tag_cards_owned"` payoff can count cards by tag (above). Tag a family of 3–5
@@ -236,7 +238,12 @@ draw/energy engine at turn start, an orb auto-channeler, etc.
   start of your turn, shift 2 toward the Dark"), `add_card` (**CLASS-ONLY** — the compost loop: "Whenever a card is
   Exhausted, add a copy of Cinder to your discard pile"), `discard` (forced churn: "At the start of your turn,
   discard 1"), `upgrade_card` (**`random` only** — "At the start of your turn, upgrade a random card in your hand";
-  `all` is card-only) — and no `hits`.
+  `all` is card-only), `heal_summon` / `shield_summon` (the medic engine) — and, from **v42**, the **class
+  engines**: `apply_status_custom` (**STATUS-CLASS** — "At the start of your turn, gain 1 Razor Focus"; give a
+  custom DEBUFF a `target`), `summon_attack` (**SUMMON-CLASS** — the minion strikes on its own each turn: "At the
+  end of your turn, deal 4 damage 2 times with your summon"; optional `target`, default the first enemy) and
+  `buff_summon` (**SUMMON-CLASS** — "At the start of your turn, your summon gains 1 Strength"). A payload
+  `damage` / `summon_attack` may carry `hits` (multi-hit each fire, v42); no other payload op may.
 - **`on_discard` is CARD-LATENT (Reflex) — the exception to the whole model.** A card with
   `{ "op": "add_trigger", "trigger": "on_discard", "effects": [...] }` grants NO power when played; instead, its
   payload fires when THIS card is **discarded by an effect** (a `discard` op — yours or a `turn_start`→`discard`
@@ -248,17 +255,23 @@ draw/energy engine at turn start, an orb auto-channeler, etc.
   can be discarded, redrawn, and discarded again). The payload is the same SELF/orb-only (or targeted) sub-vocabulary.
 - **Targeted payload effects** (the per-turn threat family — Noxious Fumes, Combust, Choke): a payload effect may
   carry a **`target`** (`"enemy"`, `"all_enemies"`, or — on the `attacked` trigger ONLY — `"attacker"`) to hit
-  enemies. Only `damage` and an **enemy-debuff** `apply_status` (vulnerable/weak/frail/poison) may be targeted; a
-  targeted effect can't be scaled. E.g.
+  enemies. Only `damage`, an **enemy-debuff** `apply_status` (vulnerable/weak/frail/poison), `summon_attack` and
+  a custom-debuff `apply_status_custom` may be targeted; of these only a targeted `damage` may be scaled (v42). E.g.
   `{ "op": "add_trigger", "trigger": "turn_start", "effects": [ { "op": "apply_status", "status": "poison", "amount": 3, "target": "all_enemies" } ] }`
   = "At the start of your turn, apply 3 Poison to ALL enemies."
   **`attacker`** (v41) is the creature that just hit you — the TRUE riposte: `{ "op": "add_trigger", "trigger": "attacked", "effects": [ { "op": "damage", "amount": 5, "target": "attacker" } ] }`
   = "Whenever you are attacked, deal 5 damage to the attacker." In a crowd it strikes the one that struck (where
   `enemy` would hit the first living enemy); if that enemy is already dead the riposte simply does nothing. Reach for
   `attacker` on every retaliation power; keep `enemy` for the passive per-turn threats.
-- A **self** (untargeted) numeric payload effect may use **`"scale": "cards_retained"`** (and ONLY that scalar — not
-  on channel_orb/evoke, not on a targeted effect) to make its amount the cards you held into this turn, re-read each
-  turn it fires — e.g. "At the end of your turn, gain Block equal to cards retained."
+- A numeric payload effect (`block` / `draw` / `gain_energy` / `heal` / `lose_hp` / `gain_orb_slot` / a self
+  `apply_status`, or a TARGETED `damage`) may **`scale`** to one of the four **PLAYER-level reads** — re-read each
+  time it fires: `cards_retained` (the cards you held into this turn — "At the end of your turn, gain Block equal
+  to cards retained"), `cards_in_hand` (v42 — the cards in your hand when it fires: "At the start of your turn, deal
+  damage equal to the cards in your hand to ALL enemies"; **not on `turn_end`** — the hand is already discarded when
+  that fires, so it would read 0; use `turn_start` / a reactive trigger, or `cards_retained`), `unspent_energy_last_turn` (v42 — "At the start of your
+  turn, gain Block equal to your unspent energy last turn"), or `forged` (v42 — ADDITIVE, damage/block only,
+  amount ≥1: "At the end of your turn, gain 2 Block, plus your Forge" — a Forge class's second payoff). Never on
+  channel_orb/evoke/forge/balance_step or the summon/custom-status/pile ops; never together with `hits`.
 - Optional `when` on the add_trigger is the **fire-time** gate, re-checked each fire (e.g. "at end of turn, **if your
   orbs match**, gain Focus"). It may use any condition EXCEPT `target_has_status` (no target at trigger time).
 - **One `add_trigger` per card.** Put it on a `power`-type card. The numbers are per-turn, so keep them modest —

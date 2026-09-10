@@ -136,17 +136,19 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["op"],
-      "description": "An effect inside an add_trigger payload (Phase H3/H4). SELF/orb-only by default (the trigger runner has no card/target): no multi-hit, no nested when/trigger; apply_status must be a SELF-BUFF; the only allowed 'scale' is 'cards_retained' (F5), not on channel_orb/evoke. H4 (gap #14): a payload effect may instead carry a 'target' (enemy/all_enemies) to hit enemies — then op must be 'damage' or an enemy-debuff 'apply_status' (vulnerable/weak/frail/poison), and it can't be scaled. Phase Q (gap #16): 'add_card' is a legal payload op (the on_exhaust 'compost' loop) — CLASS-ONLY, with card_id + pile.",
+      "description": "An effect inside an add_trigger payload (Phase H3/H4). SELF/orb-only by default (the trigger runner has no card/target): no nested when/trigger; apply_status must be a SELF-BUFF. H4 (gap #14): a payload effect may instead carry a 'target' (enemy/all_enemies) to hit enemies — then op must be 'damage', an enemy-debuff 'apply_status' (vulnerable/weak/frail/poison), or (Phase AL, v42) 'summon_attack' / a custom-debuff 'apply_status_custom'. Phase Q (gap #16): 'add_card' is a legal payload op (the on_exhaust 'compost' loop) — CLASS-ONLY, with card_id + pile. Phase AL (v42): the class engines are legal payloads — 'apply_status_custom' (STATUS-CLASS; untargeted = gain the buff, targeted = apply the debuff), 'summon_attack' / 'buff_summon' (SUMMON-CLASS; the per-turn minion strike / drill); a payload 'damage' or 'summon_attack' may carry 'hits' (multi-hit); a numeric self payload (or a targeted 'damage') may 'scale' to a PLAYER-level read — cards_retained / cards_in_hand / unspent_energy_last_turn / forged (forged is ADDITIVE, damage/block only, amount >= 1).",
       "properties": {
-        "op": { "enum": ["damage", "block", "draw", "gain_energy", "heal", "lose_hp", "apply_status", "gain_orb_slot", "channel_orb", "evoke", "forge", "add_card", "discard", "balance_step", "summon_blade", "upgrade_card", "heal_summon", "shield_summon"] },
+        "op": { "enum": ["damage", "block", "draw", "gain_energy", "heal", "lose_hp", "apply_status", "gain_orb_slot", "channel_orb", "evoke", "forge", "add_card", "discard", "balance_step", "summon_blade", "upgrade_card", "heal_summon", "shield_summon", "apply_status_custom", "summon_attack", "buff_summon"] },
         "amount": { "type": "integer", "minimum": 1 },
+        "hits": { "type": "integer", "minimum": 2, "description": "Phase AL (v42): only on a payload 'damage' (targeted) or 'summon_attack': deal 'amount' damage this many times each fire (e.g. attacked -> deal 2 damage 3 times to the attacker; turn_end -> deal 4 damage 2 times with your summon). Not with 'scale'." },
+        "status_name": { "type": "string", "minLength": 1, "description": "Required on a payload 'apply_status_custom' (Phase AL, v42): a custom status declared in this class's status_pool (matched case-insensitively). Untargeted = GAIN the (buff) status each fire ('At the start of your turn, gain 1 Razor Focus'); with a 'target' = APPLY the (debuff) status to the resolved enemies. STATUS-CLASS ONLY." },
         "cards": { "const": "random", "description": "Required on a payload 'upgrade_card' (Phase V, gap #18): trigger-side upgrade is 'random' ONLY — one random UPGRADABLE card in your hand (combat-scoped). The 'all' form is card-only ('all' every turn is degenerate). E.g. turn_start → upgrade_card cards:random." },
         "card_id": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "Required on a payload 'add_card': the id of a card in THIS class's own set to copy (see the top-level add_card). CLASS-ONLY." },
         "pile": { "enum": ["hand", "discard", "draw"], "description": "Required on a payload 'add_card': which combat pile the generated copies drop into." },
         "pole": { "enum": ["light", "dark"], "description": "Required on a payload 'balance_step' (Phase S, gap #1): the pole to move the Balance gauge toward ('amount' 1..5, fixed — no scale). Trigger-side balance_step is the 'engine' half (steady per-turn gauge income), e.g. turn_start → shift 2 toward the Dark." },
-        "scale": { "const": "cards_retained", "description": "F5: make this payload effect's amount = the cards you held into this turn (resolved each turn it fires). Only on the numeric SELF ops (not channel_orb/evoke, not a targeted effect). Still include a nominal 'amount' (ignored)." },
+        "scale": { "enum": ["cards_retained", "cards_in_hand", "unspent_energy_last_turn", "forged"], "description": "F5 / Phase AL (v42): make this payload effect's amount a PLAYER-level read resolved each time it fires — 'cards_retained' (the cards you held into this turn), 'cards_in_hand' (the cards in your hand when it fires — NOT on turn_end, where the hand is already discarded; use turn_start or a reactive trigger), 'unspent_energy_last_turn' (energy left at the end of your last turn), or 'forged' (ADDITIVE: the printed 'amount' PLUS your Forge counter; damage/block only, amount >= 1). Only on the numeric SELF ops (block/draw/gain_energy/heal/lose_hp/gain_orb_slot/self apply_status) and on a TARGETED 'damage' (e.g. 'deal damage equal to the cards in your hand to ALL enemies') — never on channel_orb/evoke/forge/balance_step or the summon/custom-status ops, never with 'hits'. Still include a nominal 'amount' (ignored unless forged)." },
         "orb": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "Phase AJ (v40): a trigger-payload channel_orb may name a base orb (lightning/frost/dark), 'random', or a custom orb declared in this class's orb_pool (resolved against the player's class when the power fires) — the same rule as the card-level op." },
-        "target": { "enum": ["enemy", "all_enemies", "attacker"], "description": "H4 (gap #14): aim this payload effect at enemies — 'enemy' (first hittable), 'all_enemies', or (Phase AK, v41) 'attacker' = the creature that just hit you, valid ONLY inside an 'attacked' trigger (the true riposte: it hits the one that struck, not the first enemy; reads '... to the attacker'). Only on 'damage' or an enemy-debuff 'apply_status'. Omit for the default self/orb effect." },
+        "target": { "enum": ["enemy", "all_enemies", "attacker"], "description": "H4 (gap #14): aim this payload effect at enemies — 'enemy' (first hittable), 'all_enemies', or (Phase AK, v41) 'attacker' = the creature that just hit you, valid ONLY inside an 'attacked' trigger (the true riposte: it hits the one that struck, not the first enemy; reads '... to the attacker'). Only on 'damage', an enemy-debuff 'apply_status', or (Phase AL, v42) 'summon_attack' / a custom-debuff 'apply_status_custom' (a summon_attack / custom debuff with NO target hits the first living enemy). Omit for the default self/orb effect." },
         "status": { "enum": ["vulnerable", "weak", "frail", "poison", "strength", "dexterity", "thorns", "regen", "metallicize", "artifact", "buffer", "intangible", "ritual", "blur", "temp_strength", "temp_dexterity", "barricade", "focus"], "description": "For a SELF apply_status (no target) this must be a self-buff; for a TARGETED apply_status it must be a debuff (vulnerable/weak/frail/poison). The self-buff-vs-debuff coupling is enforced by the validators." }
       },
       "allOf": [
@@ -187,11 +189,26 @@
         },
         {
           "if": { "required": ["target"] },
-          "then": { "properties": { "op": { "enum": ["damage", "apply_status"] } } }
+          "then": { "properties": { "op": { "enum": ["damage", "apply_status", "summon_attack", "apply_status_custom"] } } }
         },
         {
-          "if": { "properties": { "op": { "enum": ["block", "draw", "gain_energy", "lose_hp", "heal", "gain_orb_slot", "forge", "discard", "balance_step"] } } },
+          "if": { "properties": { "op": { "enum": ["block", "draw", "gain_energy", "lose_hp", "heal", "gain_orb_slot", "forge", "discard", "balance_step", "summon_attack", "buff_summon"] } } },
           "then": { "required": ["amount"] }
+        },
+        {
+          "comment": "Phase AL (v42): a payload 'apply_status_custom' requires 'status_name' + 'amount' (the class status by name; stacks).",
+          "if": { "properties": { "op": { "const": "apply_status_custom" } } },
+          "then": { "required": ["status_name", "amount"] }
+        },
+        {
+          "comment": "Phase AL (v42): payload 'hits' is legal ONLY on damage / summon_attack (hits + scale exclusive, validator-enforced).",
+          "if": { "required": ["hits"] },
+          "then": { "properties": { "op": { "enum": ["damage", "summon_attack"] } } }
+        },
+        {
+          "comment": "Phase AL (v42): a payload 'scale' is legal ONLY on the numeric self ops and a targeted damage (the validators add the forged / targeted-non-damage rules).",
+          "if": { "required": ["scale"] },
+          "then": { "properties": { "op": { "enum": ["damage", "block", "draw", "gain_energy", "heal", "lose_hp", "gain_orb_slot", "apply_status"] } } }
         },
         {
           "if": { "properties": { "op": { "enum": ["forge", "balance_step"] } } },

@@ -325,15 +325,17 @@ ONLY; the other three are generic.
 
 TRIGGERS / POWER ENGINES (`add_trigger`): a `power`-type card can grant an ONGOING effect that fires every turn \
 — "At the end of your turn, gain Block" (Metallicize), "…gain Strength" (a Demon-Form ramp), "At the start of \
-your turn, draw 1 and gain 1 energy" (a tempo engine), an orb auto-channeler, etc. Use a brief like "power: at \
-end of turn, gain N Block" or "power: each turn start, draw a card". The per-turn payload is SELF/orb-only by \
+your turn, draw 1 and gain 1 energy" (a tempo engine), etc. Use a brief like "power: at end of turn, gain N \
+Block". The per-turn payload is SELF/orb-only by \
 default (block/draw/energy/heal/lose_hp/self-buffs/orb ops), OR it may TARGET enemies with `damage` or an enemy \
 debuff (vulnerable/weak/frail/poison) — the per-turn threat family: "power: at the start of your turn, apply 3 \
 Poison to ALL enemies" (Noxious Fumes), "…deal 5 damage to an enemy" (Combust). It may be gated by a \
 fire-time condition (e.g. "…if your orbs match, gain Focus"). These are the build-around RARES/uncommons that \
 make a class snowball; give most classes one or two. Keep per-turn numbers small (they compound). A trigger \
-payload's numeric effect may also `scale` to "cards_retained" (e.g. "power: at end of turn, gain Block equal \
-to cards retained") — see SCALED AMOUNTS below.
+payload's numeric effect may also `scale` to "cards_retained" / "cards_in_hand" / "unspent_energy_last_turn" / \
+"forged" (e.g. "power: at end of turn, gain Block equal to cards retained"); a payload damage may carry "hits"; \
+a SUMMON class may fire summon_attack / buff_summon and a STATUS class apply_status_custom inside a payload (the \
+minion strikes / the signature status ticks every turn on its own).
 
 SCALED AMOUNTS / RETAIN PAYOFF (`scale`): a damage/block/draw card effect can make its amount a LIVE value \
 instead of a fixed number by adding `"scale": "<source>"` (keep a nominal "amount"; it is ignored). Sources: \

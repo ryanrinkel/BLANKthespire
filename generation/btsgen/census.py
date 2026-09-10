@@ -85,6 +85,11 @@ class CardCensus:
     once_per_combat: int = 0                               # Phase AK (v41): add_trigger effects flagged once_per_combat
     ripen_amounts: Counter = field(default_factory=Counter)    # ripen trigger countdowns (amount -> count)
     targeted_payloads: int = 0                             # effects INSIDE a trigger payload carrying a `target`
+    # Phase AL (v42): what the trigger PAYLOADS reach for — the op tally inside payloads (so a class-kind engine
+    # like summon_attack-in-a-trigger is detectable), payload effects carrying a `scale`, and multi-hit payloads.
+    payload_ops: Counter = field(default_factory=Counter)
+    scaled_payloads: int = 0
+    multi_hit_payloads: int = 0
 
     @property
     def reactive_trigger_kinds(self) -> set[str]:
@@ -145,6 +150,13 @@ def _walk_effects(effects, cc: CardCensus, *, in_payload: bool = False) -> None:
             cc.multi_hit += 1
         if in_payload and isinstance(eff.get("target"), str) and eff.get("target"):
             cc.targeted_payloads += 1
+        if in_payload:  # Phase AL (v42)
+            if isinstance(op, str) and op:
+                cc.payload_ops[op] += 1
+            if isinstance(eff.get("scale"), str) and eff.get("scale"):
+                cc.scaled_payloads += 1
+            if op in ("damage", "summon_attack") and isinstance(hits, int) and not isinstance(hits, bool) and hits >= 2:
+                cc.multi_hit_payloads += 1
         if op == "add_trigger":
             trig = eff.get("trigger")
             if isinstance(trig, str) and trig:
@@ -223,6 +235,9 @@ class Census:
     ripen_amounts: Counter = field(default_factory=Counter)
     targeted_payloads: int = 0
     grow: int = 0
+    payload_ops: Counter = field(default_factory=Counter)  # Phase AL (v42)
+    scaled_payloads: int = 0
+    multi_hit_payloads: int = 0
 
     @property
     def plain_share(self) -> float:
@@ -276,6 +291,9 @@ class Census:
         self.ripen_amounts.update(cc.ripen_amounts)
         self.targeted_payloads += cc.targeted_payloads
         self.grow += cc.grow
+        self.payload_ops.update(cc.payload_ops)  # Phase AL (v42)
+        self.scaled_payloads += cc.scaled_payloads
+        self.multi_hit_payloads += cc.multi_hit_payloads
         self.per_card.append((card, cc))
 
     def merge(self, other: "Census") -> None:
@@ -285,10 +303,10 @@ class Census:
         self.plain += other.plain
         self.x_cost += other.x_cost
         for name in ("ops", "statuses", "triggers", "whens", "scales", "keywords", "custom_statuses",
-                     "summon_buffs", "ripen_amounts"):
+                     "summon_buffs", "ripen_amounts", "payload_ops"):
             getattr(self, name).update(getattr(other, name))
         for name in ("multi_hit", "tagged_cards", "upgrade_cost_cards", "once_per_turn", "once_per_combat",
-                     "targeted_payloads", "grow"):
+                     "targeted_payloads", "grow", "scaled_payloads", "multi_hit_payloads"):
             setattr(self, name, getattr(self, name) + getattr(other, name))
 
 
@@ -391,6 +409,8 @@ def format_report(named: list[tuple[str, Census]]) -> str:
                f"  | all: {_all(agg.triggers)}")
     out.append(f"  trigger extras: once_per_turn={agg.once_per_turn}  once_per_combat={agg.once_per_combat}"
                f"  targeted_payloads={agg.targeted_payloads}  ripen_amounts: {_all(agg.ripen_amounts)}")
+    out.append(f"  trigger payloads (AL): scaled_payloads={agg.scaled_payloads}  multi_hit_payloads={agg.multi_hit_payloads}"
+               f"  payload_ops: {_all(agg.payload_ops)}")
     out.append(f"  when: {_order(agg.whens, ['turn_at_least','enemy_count_ge','hp_below_half'])}  | all: {_all(agg.whens)}")
     out.append(f"  scales: {_order(agg.scales, ['unspent_energy_last_turn','x'])}  | all: {_all(agg.scales)}")
     out.append(f"  keywords: {_order(agg.keywords, ['innate','ethereal','retain','exhaust'])}")

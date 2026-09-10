@@ -389,7 +389,8 @@
           "summon_attack",
           "buff_summon",
           "heal_summon",
-          "shield_summon"
+          "shield_summon",
+          "add_trigger"
         ],
         "class_kind": "summon"
       },
@@ -420,7 +421,8 @@
       ],
       "vocabulary": {
         "ops": [
-          "apply_status_custom"
+          "apply_status_custom",
+          "add_trigger"
         ],
         "class_kind": "status"
       },

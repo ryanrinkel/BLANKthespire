@@ -44,7 +44,7 @@ def _power(cid, trigger, payload, **flags):
 
 def test_version() -> None:
     print("Phase AK vocab stamp is v41:")
-    check(bts1.VOCAB_VERSION == 41, f"bts1.VOCAB_VERSION must be 41 (Phase AK), got {bts1.VOCAB_VERSION}")
+    check(bts1.VOCAB_VERSION >= 41, f"bts1.VOCAB_VERSION must be >= 41 (Phase AK), got {bts1.VOCAB_VERSION}")
 
 
 def _t_attacker(v: CardValidator) -> None:
@@ -82,8 +82,9 @@ def _t_attacker(v: CardValidator) -> None:
     check(not v.validate(card_level).ok, "a card-level effect can't carry target:attacker")
     buff = _power("ak_buff_att", "attacked", [{"op": "apply_status", "status": "strength", "amount": 1, "target": "attacker"}])
     check(not v.validate(buff).ok, "a targeted apply_status must be an enemy debuff (strength rejected)")
-    scaled = _power("ak_scaled_att", "attacked", [{"op": "damage", "amount": 1, "scale": "cards_retained", "target": "attacker"}])
-    check(not v.validate(scaled).ok, "a targeted payload can't be scaled")
+    # Phase AL (v42) lifted the "targeted can't be scaled" rule for DAMAGE only — a targeted debuff still can't scale
+    scaled = _power("ak_scaled_att", "attacked", [{"op": "apply_status", "status": "weak", "amount": 1, "scale": "cards_retained", "target": "attacker"}])
+    check(not v.validate(scaled).ok, "a targeted (non-damage) payload can't be scaled")
 
 
 def _t_once_per_combat(v: CardValidator) -> None:

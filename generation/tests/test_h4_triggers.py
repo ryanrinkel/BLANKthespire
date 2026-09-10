@@ -92,10 +92,10 @@ def test_rejects(v: CardValidator) -> None:
     bad(_card([_trig("turn_end", [{"op": "apply_status", "status": "strength", "amount": 2,
                                    "target": "enemy"}])]),
         "targeted self-buff apply_status must be rejected")
-    # targeted effect that is also scaled
-    bad(_card([_trig("turn_end", [{"op": "damage", "amount": 5, "target": "all_enemies",
+    # targeted NON-damage effect that is also scaled (Phase AL, v42: a targeted damage MAY be scaled now)
+    bad(_card([_trig("turn_end", [{"op": "apply_status", "status": "poison", "amount": 2, "target": "all_enemies",
                                    "scale": "cards_retained"}])]),
-        "scaled targeted effect must be rejected")
+        "scaled targeted debuff must be rejected")
     # unknown trigger kind (schema enum)
     bad(_card([_trig("on_potion_used", [{"op": "block", "amount": 3}])]),
         "unknown trigger kind must be rejected")

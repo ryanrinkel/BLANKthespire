@@ -42,7 +42,10 @@ public static class ForgedCards
     /// v10 (forged statuses, Phase J): + CharacterSpec.StatusPool (a class's ≤4 custom modifier-family statuses
     /// read from `status_pool`; see ForgedCharacters / ForgedStatusPower). Class cards may apply a custom status
     /// by pool name via the `apply_status_custom` op (class-only, like custom-orb channels).</summary>
-    public const int VocabVersion = 41; // 41: Phase AK (VOCAB_GAP_REMEDIATION Wave 3) — ATTACKER TARGET + ONCE PER COMBAT.
+    public const int VocabVersion = 42; // 42: Phase AL (VOCAB_GAP_REMEDIATION Wave 3) — RICHER TRIGGER PAYLOADS: apply_status_custom /
+                                        //     summon_attack / buff_summon inside add_trigger payloads (class-only), `hits` on a payload
+                                        //     damage/summon_attack, payload scale += cards_in_hand / unspent_energy_last_turn / forged
+                                        //     (a targeted payload damage may be scaled). 41: Phase AK — ATTACKER TARGET + ONCE PER COMBAT.
                                         //     (1) A trigger-payload effect on the `attacked` trigger may carry
                                         //     target:"attacker": ForgedTriggerPower hands the AfterDamageReceived dealer
                                         //     into TriggerRunner.Run(attacker:), and ResolveEnemies resolves it (the
@@ -304,10 +307,17 @@ public static class ForgedCards
          "summon_blade", // Phase T: trigger-side blade retrieval ("Whenever you play a card, put your blade into your hand")
          "upgrade_card", // Phase V (gap #18): trigger-side upgrade ("At the start of your turn, upgrade a random card in your hand") — `random` only
          "heal_summon", // Phase AC (gap #2): trigger-side summon heal (the medic engine — "at turn start, heal your summon 3")
-         "shield_summon"]; // Phase AC (gap #2): trigger-side summon shield ("at turn start, your summon gains 4 Block")
+         "shield_summon", // Phase AC (gap #2): trigger-side summon shield ("at turn start, your summon gains 4 Block")
+         // Phase AL (v42): the class engines re-expressed as payloads. Class-only (ValidateTrigger); resolved off the
+         // player's class at fire time (TriggerRunner) exactly like heal_summon / trigger channel_orb.
+         "apply_status_custom", // status class: "At the start of your turn, gain 1 Razor Focus" (a debuff needs a target)
+         "summon_attack", // summon class: "At the end of your turn, deal 4 damage 2 times with your summon" (the dormant move-cycle as a card engine)
+         "buff_summon"]; // summon class: "At the start of your turn, your summon gains 1 Strength"
     // H4 (gap #14): payload ops that may aim at enemies (with a `target`), and the debuffs a targeted apply_status
-    // may apply. Everything else stays self/orb-only.
-    private static readonly HashSet<string> TriggerTargetedOps = ["damage", "apply_status"];
+    // may apply. Everything else stays self/orb-only. Phase AL (v42): + summon_attack (the summon strikes the
+    // resolved enemies; no target = the first living enemy) and apply_status_custom (a custom DEBUFF lands on the
+    // resolved enemies; an untargeted apply_status_custom is the self-buff form).
+    private static readonly HashSet<string> TriggerTargetedOps = ["damage", "apply_status", "summon_attack", "apply_status_custom"];
     private static readonly HashSet<string> EnemyDebuffStatuses = ["vulnerable", "weak", "frail", "poison"];
     private static readonly HashSet<string> SupportedStatuses =
         ["vulnerable", "weak", "frail", "poison",
@@ -340,9 +350,16 @@ public static class ForgedCards
         ["x", "cards_in_hand", "cards_retained", "unspent_energy_last_turn", "forged",
          "damage_dealt_unblocked", "target_debuff_count",
          "tag_cards_owned"]; // Phase AE (gap #25): ADDITIVE (printed amount + count of cards with the sibling `tag`); damage/block-only
-    // The only scalar a trigger payload may use (a trigger fires with no card, so x/cards_in_hand make no sense;
-    // cards_retained is a per-turn snapshot that DOES — "at end of turn, gain Block equal to cards retained").
-    private const string TriggerScale = "cards_retained";
+    // The scalars a trigger payload may use — PLAYER-level reads only (a trigger fires with no card, so `x` and the
+    // target/lifesteal/tag reads make no sense). cards_retained (F5) is the per-turn snapshot; Phase AL (v42) adds
+    // cards_in_hand (the hand when it fires), unspent_energy_last_turn (the turn-end snapshot) and the ADDITIVE
+    // forged (printed amount + Forge — damage/block only, amount >= 1, like the card-level rule).
+    private static readonly HashSet<string> TriggerScales =
+        ["cards_retained", "cards_in_hand", "unspent_energy_last_turn", "forged"];
+    // The payload ops whose amount a scale may replace/add to (each has a scaled TriggerFragment wording). damage
+    // needs a target (H4) — Phase AL lifts the "a targeted effect can't be scaled" rule for damage ONLY.
+    private static readonly HashSet<string> TriggerScalableOps =
+        ["damage", "block", "draw", "gain_energy", "heal", "lose_hp", "gain_orb_slot", "apply_status"];
     // Ops that carry a numeric amount (>= 1 required). exhaust/innate/retain/ethereal are flag ops (no amount).
     private static readonly HashSet<string> AmountOps =
         ["damage", "block", "draw", "apply_status", "gain_energy", "lose_hp", "heal", "gain_orb_slot",
@@ -1008,8 +1025,10 @@ public static class ForgedCards
     }
 
     /// <summary>Validate a Phase H3 <c>add_trigger</c>: a known trigger kind, a non-empty payload drawn only
-    /// from the self/orb-only <see cref="TriggerOps"/> (trigger apply_status must be a self-buff), no nested
-    /// trigger / inner when / scale:x / multi-hit, and a fire-time When that doesn't need a target.</summary>
+    /// from the self/orb-only <see cref="TriggerOps"/> (trigger apply_status must be a self-buff) or the targeted
+    /// <see cref="TriggerTargetedOps"/>, no nested trigger / inner when, only the player-level
+    /// <see cref="TriggerScales"/> (Phase AL, v42), multi-hit on damage/summon_attack only (Phase AL), and a
+    /// fire-time When that doesn't need a target.</summary>
     /// <summary>Phase AJ (v40): the ONE orb-name rule for card-level AND trigger-payload channel_orb. Shared cards:
     /// base orbs / 'random' only. Class cards: any non-empty name — and when the importer hands over the class's
     /// declared CUSTOM pool names (<paramref name="orbNames"/>, lowercase), a custom name must be in it (mirrors the
@@ -1055,8 +1074,15 @@ public static class ForgedCards
             // has no meaning in a trigger payload (which re-runs from a granted power, not a card the player replays).
             if (t.HasGrow)
                 return "'grow' is not allowed in a trigger payload (it's a per-card-play attack mechanic).";
-            // H4 (gap #14): a payload effect with a `target` may hit enemies (damage / enemy-debuff apply_status);
-            // without a target it stays self/orb-only (the H3 rule).
+            // Phase AL (v42): `hits` inside a payload — on damage (targeted) and summon_attack only, like the card
+            // level ("Whenever you are attacked, deal 2 damage 3 times to the attacker"). TriggerRunner loops the
+            // hits; no DynamicVar is involved (payload amounts are literal).
+            if (t.Hits < 1)
+                return $"trigger effect '{t.Op}' has hits < 1.";
+            if (t.Hits > 1 && t.Op is not ("damage" or "summon_attack"))
+                return $"'hits' only applies to a trigger 'damage'/'summon_attack' (trigger effect '{t.Op}' had hits {t.Hits}).";
+            // H4 (gap #14): a payload effect with a `target` may hit enemies (damage / enemy-debuff apply_status;
+            // Phase AL: + summon_attack / a custom-debuff apply_status_custom); without a target it stays self/orb-only.
             if (t.Target != null)
             {
                 if (t.Target != "enemy" && t.Target != "all_enemies" && t.Target != "attacker")
@@ -1065,18 +1091,20 @@ public static class ForgedCards
                 if (t.Target == "attacker" && e.Trigger != "attacked")
                     return $"a trigger effect target 'attacker' is only valid on the 'attacked' trigger (got '{e.Trigger}').";
                 if (!TriggerTargetedOps.Contains(t.Op))
-                    return $"a targeted trigger effect must be 'damage' or an enemy-debuff 'apply_status' (got '{t.Op}').";
+                    return $"a targeted trigger effect must be 'damage', an enemy-debuff 'apply_status', 'summon_attack' or 'apply_status_custom' (got '{t.Op}').";
                 if (t.Op == "apply_status" && (t.Status == null || !EnemyDebuffStatuses.Contains(t.Status)))
                     return $"a targeted trigger apply_status must be an enemy debuff " +
                            $"({string.Join("/", EnemyDebuffStatuses)}); got '{t.Status}'.";
-                if (t.IsScaled)
-                    return "a targeted trigger effect can't be scaled (scale is for the self numeric payload only).";
+                // Phase AL (v42): a targeted payload DAMAGE may be scaled ("deal damage equal to the cards in your hand
+                // to ALL enemies"); a targeted debuff / summon strike / custom status stays literal.
+                if (t.IsScaled && t.Op != "damage")
+                    return $"only a targeted trigger 'damage' may be scaled (trigger effect '{t.Op}' had scale '{t.Scale}').";
             }
             else
             {
                 if (!TriggerOps.Contains(t.Op))
                     return $"trigger effect '{t.Op}' is not allowed in a self trigger (self/orb-only: {string.Join("/", TriggerOps)}); " +
-                           "add a 'target' (enemy/all_enemies) for a damage or enemy-debuff effect.";
+                           "add a 'target' (enemy/all_enemies) for a damage, enemy-debuff or summon_attack effect.";
                 if (t.Op == "apply_status" && (t.Status == null || !EffectRunner.SelfBuffStatuses.Contains(t.Status)))
                     return $"a self trigger apply_status must be a self-buff (got '{t.Status}'); add target:enemy for a debuff.";
                 // Phase AJ (v40): a trigger-payload channel_orb may name any orb in the class's pool (TriggerRunner
@@ -1086,22 +1114,55 @@ public static class ForgedCards
                     var oerr = OrbNameError(t.Orb, allowCustomOrbs, orbNames, "trigger channel_orb");
                     if (oerr != null) return oerr;
                 }
-                // F5: a self trigger payload may scale ONLY to cards_retained (a per-turn snapshot), and only on the
-                // numeric self ops — never channel_orb/evoke (those use a count, not a scaled amount).
-                if (t.IsScaled)
-                {
-                    if (t.Scale != TriggerScale)
-                        return $"inside a trigger only 'scale:{TriggerScale}' is allowed (got scale '{t.Scale}').";
-                    if (t.Op is "channel_orb" or "evoke")
-                        return $"'scale:{TriggerScale}' can't be used on a trigger '{t.Op}' (it has no scalable amount).";
-                    // Phase M: forge income inside a trigger is fixed-amount only (the plan's "engine" half
-                    // stays a steady drumbeat; the payoff card is where scaling lives). Phase S: same for balance_step.
-                    if (t.Op == "forge" || t.Op == "balance_step")
-                        return $"a trigger '{t.Op}' uses a fixed amount (no scale).";
-                }
+            }
+            // F5 / Phase AL (v42): a payload effect may scale to a PLAYER-level read (TriggerScales), and only on the
+            // ops that carry a scalable amount — never channel_orb/evoke (a count), never forge/balance_step (fixed
+            // income drumbeat — the payoff card is where scaling lives), never the summon/custom-status/pile ops.
+            if (t.IsScaled)
+            {
+                if (!TriggerScales.Contains(t.Scale!))
+                    return $"inside a trigger 'scale' must be one of {string.Join("/", TriggerScales)} (got scale '{t.Scale}').";
+                if (t.Op is "channel_orb" or "evoke")
+                    return $"'scale:{t.Scale}' can't be used on a trigger '{t.Op}' (it has no scalable amount).";
+                if (t.Op == "forge" || t.Op == "balance_step")
+                    return $"a trigger '{t.Op}' uses a fixed amount (no scale).";
+                if (!TriggerScalableOps.Contains(t.Op))
+                    return $"'scale:{t.Scale}' can't be used on a trigger '{t.Op}' (only {string.Join("/", TriggerScalableOps)} carry a scalable amount).";
+                // Phase AL: the ADDITIVE forged scalar keeps its card-level shape — damage/block only, printed amount real.
+                if (t.Scale == "forged" && t.Op is not ("damage" or "block"))
+                    return "'scale:forged' inside a trigger only applies to damage/block (Forge ADDS to a printed damage/block amount).";
+                if (t.Scale == "forged" && t.Amount < 1)
+                    return "a 'scale:forged' trigger effect needs amount >= 1 (Forge ADDS to the printed amount).";
+                if (t.Hits > 1)
+                    return "a scaled trigger effect can't also be multi-hit (hits + scale on one effect).";
+                // AutoSlay finding (GAPTESTAL1): AfterSideTurnEnd fires AFTER the end-of-turn discard, so a turn_end
+                // cards_in_hand always reads 0 (only Retained cards remain — that is what cards_retained is for).
+                if (t.Scale == "cards_in_hand" && e.Trigger == "turn_end")
+                    return "'scale:cards_in_hand' can't be used on a turn_end trigger (the hand is already discarded when it fires — use turn_start or a reactive trigger, or scale:cards_retained).";
             }
             if (t.Orb != null && t.Op != "channel_orb")
                 return $"'orb' only applies to channel_orb (trigger effect '{t.Op}').";
+            // Phase AL (v42): the class engines as payloads — class-only (the class is read off the player at fire
+            // time), a non-empty status_name for apply_status_custom (pool membership is a runtime warn+skip, like the
+            // card-level op), a self-buff status for buff_summon. amount >= 1 is enforced by the AmountOps check below.
+            if (t.Op == "apply_status_custom")
+            {
+                if (!allowCustomOrbs)
+                    return "a trigger apply_status_custom is only valid on a class card (a forged status belongs to a class status_pool).";
+                if (string.IsNullOrWhiteSpace(t.StatusName))
+                    return "a trigger apply_status_custom needs a non-empty 'status_name' (a class status_pool entry).";
+            }
+            else if (t.StatusName != null)
+                return $"'status_name' only applies to apply_status_custom (trigger effect '{t.Op}').";
+            if (t.Op == "summon_attack" && !allowCustomOrbs)
+                return "a trigger summon_attack is only valid on a class card (it strikes through this class's summon).";
+            if (t.Op == "buff_summon")
+            {
+                if (!allowCustomOrbs)
+                    return "a trigger buff_summon is only valid on a class card (it buffs this class's summon).";
+                if (t.Status != null && !EffectRunner.SelfBuffStatuses.Contains(t.Status))
+                    return $"a trigger buff_summon 'status' must be a self-buff (e.g. strength); got '{t.Status}'.";
+            }
             // Phase Q (gap #16): a trigger-payload add_card (the on_exhaust "compost" loop) — class-only, with a
             // valid card_id/pile and the amount cap. Runtime resolves the id against the player's class + refuses a
             // nested add_card (depth-1). Targeting add_card is already rejected above (only damage/apply_status target).
@@ -1168,7 +1229,7 @@ public static class ForgedCards
                 return "'once_per_turn' goes on the add_trigger op, not on a payload effect.";
             if (t.OncePerCombat) // Phase AK (v41)
                 return "'once_per_combat' goes on the add_trigger op, not on a payload effect.";
-            if (t.Hits > 1) return "multi-hit is not allowed inside a trigger.";
+            // (Phase AL, v42: multi-hit inside a trigger is legal on damage/summon_attack — see the hits rule above.)
         }
         if (e.When != null && (e.When.Kind == "target_has_status" || e.When.Kind == "retained_last_turn"))
             return $"a trigger's 'when' can't use {e.When.Kind} (a trigger fires with no card/target).";
@@ -1390,27 +1451,53 @@ public static class ForgedCards
         return $"{when}, {(frags.Count > 0 ? string.Join(", ", frags) : "do nothing")}{once}.";
     }
 
+    /// <summary>Phase AL (v42): the "equal to …" phrase for a REPLACE-semantics payload scalar. cards_retained keeps
+    /// its F5 wording ("equal to cards retained"); the two new player reads reuse the card-level ScalePhrase text.
+    /// Lockstep with cardgen._trigger_scale_phrase.</summary>
+    private static string TriggerScalePhrase(string? scale) => scale switch
+    {
+        "cards_retained"           => "cards retained",
+        "cards_in_hand"            => "the cards in your hand",
+        "unspent_energy_last_turn" => "your unspent energy last turn",
+        _                          => "X",
+    };
+
     private static string TriggerFragment(EffectSpec e)
     {
-        // F5: a numeric trigger effect may scale to cards_retained → phrase it instead of a fixed number.
-        bool cr = e.Scale == "cards_retained";
+        // F5 / Phase AL (v42): a numeric trigger effect may scale to a player read → phrase it instead of a fixed
+        // number. `forged` is the ADDITIVE exception ("gain 2 Block, plus your Forge" — the card-level wording).
+        bool sc = e.IsScaled && e.Scale != "forged";
+        bool fg = e.Scale == "forged";
+        string eq = TriggerScalePhrase(e.Scale);
         // H4 (gap #14): a targeted payload effect is worded "… to ALL enemies" for AoE (single-enemy → no suffix,
         // matching the base-card Describe convention). Phase AK (v41): "… to the attacker" for the riposte target.
         string to = e.Target == "all_enemies" ? " to ALL enemies" : e.Target == "attacker" ? " to the attacker" : "";
         return e.Op switch
         {
-            "damage"        => e.Target != null ? $"deal {e.Amount} damage{to}" : "",
-            "block"         => cr ? "gain Block equal to cards retained" : $"gain {e.Amount} Block",
-            "draw"          => cr ? "draw cards equal to cards retained" : $"draw {e.Amount} card(s)",
-            "gain_energy"   => cr ? "gain energy equal to cards retained" : $"gain {e.Amount} energy",
-            "heal"          => cr ? "heal HP equal to cards retained" : $"heal {e.Amount} HP",
-            "lose_hp"       => cr ? "lose HP equal to cards retained" : $"lose {e.Amount} HP",
-            "gain_orb_slot" => cr ? "gain orb slots equal to cards retained" : $"gain {e.Amount} orb slot(s)",
+            "damage"        => e.Target == null ? ""
+                                  : sc ? $"deal damage equal to {eq}{to}"
+                                  : fg ? $"deal {e.Amount} damage{to}, plus your Forge"
+                                  : e.Hits > 1 ? $"deal {e.Amount} damage {e.Hits} times{to}" // Phase AL: multi-hit payload
+                                  : $"deal {e.Amount} damage{to}",
+            "block"         => sc ? $"gain Block equal to {eq}" : fg ? $"gain {e.Amount} Block, plus your Forge" : $"gain {e.Amount} Block",
+            "draw"          => sc ? $"draw cards equal to {eq}" : $"draw {e.Amount} card(s)",
+            "gain_energy"   => sc ? $"gain energy equal to {eq}" : $"gain {e.Amount} energy",
+            "heal"          => sc ? $"heal HP equal to {eq}" : $"heal {e.Amount} HP",
+            "lose_hp"       => sc ? $"lose HP equal to {eq}" : $"lose {e.Amount} HP",
+            "gain_orb_slot" => sc ? $"gain orb slots equal to {eq}" : $"gain {e.Amount} orb slot(s)",
             "forge"         => $"Forge {e.Amount}", // Phase M: fixed-amount income ("At the start of your turn, Forge 2.")
             "balance_step"  => BalanceSentence(e, capitalize: false), // Phase S (gap #1): the trigger-income fragment
             "apply_status"  => e.Target != null
                                   ? $"apply {e.Amount} {StatusName(e.Status)}{to}"
-                                  : (cr ? $"gain {StatusName(e.Status)} equal to cards retained" : $"gain {e.Amount} {StatusName(e.Status)}"),
+                                  : (sc ? $"gain {StatusName(e.Status)} equal to {eq}" : $"gain {e.Amount} {StatusName(e.Status)}"),
+            // Phase AL (v42): the class engines as payload fragments (lockstep with cardgen._trigger_fragment). No
+            // class context here (same choice as the card-level Describe): a custom status is worded by its name,
+            // GAIN when untargeted (the self-buff form) / APPLY when targeted (the debuff form).
+            "summon_attack" => e.Hits > 1 ? $"deal {e.Amount} damage {e.Hits} times with your summon{to}"
+                                          : $"deal {e.Amount} damage with your summon{to}",
+            "buff_summon"   => $"your summon gains {Math.Max(1, e.Amount)} {SummonRunner.StatusDisplay(e.Status ?? "strength")}",
+            "apply_status_custom" => e.Target != null ? $"apply {Math.Max(1, e.Amount)} {e.StatusName}{to}"
+                                                      : $"gain {Math.Max(1, e.Amount)} {e.StatusName}",
             "channel_orb"   => ChannelFragment(e),
             "evoke"         => Math.Max(1, e.Amount) > 1 ? $"evoke {e.Amount} times" : "evoke your next orb",
             "discard"       => $"discard {e.Amount} random card(s)", // Phase R (gap #17): forced-churn payload

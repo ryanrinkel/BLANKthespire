@@ -255,35 +255,70 @@ def cond_phrase(w: dict) -> str:
     return kind
 
 
+def _trigger_scale_phrase(scale: str) -> str:
+    # Phase AL (v42): the "equal to …" phrase for a REPLACE-semantics payload scalar. cards_retained keeps its F5
+    # wording; the two new player reads reuse the card-level phrase. Mirrors ForgedCards.TriggerScalePhrase.
+    return {
+        "cards_retained": "cards retained",
+        "cards_in_hand": "the cards in your hand",
+        "unspent_energy_last_turn": "your unspent energy last turn",
+    }.get(scale, "X")
+
+
 def _trigger_fragment(e: dict) -> str:
     # A single payload-effect phrase inside a trigger sentence. Mirrors ForgedCards.TriggerFragment.
     op = e["op"]
     amt = e.get("amount", 0)
-    cr = str(e.get("scale", "")).lower() == "cards_retained"  # F5: trigger payload may scale to cards_retained
+    scale = str(e.get("scale", "") or "").lower()
+    # F5 / Phase AL (v42): a numeric payload may scale to a player read → phrase it instead of a fixed number;
+    # `forged` is the ADDITIVE exception ("gain 2 Block, plus your Forge" — the card-level wording).
+    sc = bool(scale) and scale != "forged"
+    fg = scale == "forged"
+    eq = _trigger_scale_phrase(scale)
+    hits = e.get("hits", 1)
+    hits = hits if isinstance(hits, int) and not isinstance(hits, bool) else 1
     tgt = e.get("target")
     # H4: targeted AoE suffix (single enemy → none); Phase AK (v41): the riposte target reads "to the attacker".
     to = " to ALL enemies" if tgt == "all_enemies" else " to the attacker" if tgt == "attacker" else ""
     if op == "damage":  # H4 (gap #14): only meaningful with a target
-        return f"deal {amt} damage{to}" if e.get("target") else ""
+        if not tgt:
+            return ""
+        if sc:
+            return f"deal damage equal to {eq}{to}"
+        if fg:
+            return f"deal {amt} damage{to}, plus your Forge"
+        if hits > 1:  # Phase AL (v42): a multi-hit payload
+            return f"deal {amt} damage {hits} times{to}"
+        return f"deal {amt} damage{to}"
     if op == "block":
-        return "gain Block equal to cards retained" if cr else f"gain {amt} Block"
+        return f"gain Block equal to {eq}" if sc else f"gain {amt} Block, plus your Forge" if fg else f"gain {amt} Block"
     if op == "draw":
-        return "draw cards equal to cards retained" if cr else f"draw {amt} card(s)"
+        return f"draw cards equal to {eq}" if sc else f"draw {amt} card(s)"
     if op == "gain_energy":
-        return "gain energy equal to cards retained" if cr else f"gain {amt} energy"
+        return f"gain energy equal to {eq}" if sc else f"gain {amt} energy"
     if op == "heal":
-        return "heal HP equal to cards retained" if cr else f"heal {amt} HP"
+        return f"heal HP equal to {eq}" if sc else f"heal {amt} HP"
     if op == "lose_hp":
-        return "lose HP equal to cards retained" if cr else f"lose {amt} HP"
+        return f"lose HP equal to {eq}" if sc else f"lose {amt} HP"
     if op == "gain_orb_slot":
-        return "gain orb slots equal to cards retained" if cr else f"gain {amt} orb slot(s)"
+        return f"gain orb slots equal to {eq}" if sc else f"gain {amt} orb slot(s)"
     if op == "forge":  # Phase M (gap #36): fixed-amount income ("At the start of your turn, Forge 2.")
         return f"Forge {amt}"
     if op == "apply_status":
         nm = STATUS_NAME.get(e.get('status'), e.get('status'))
         if e.get("target"):  # H4 (gap #14): a targeted enemy debuff
             return f"apply {amt} {nm}{to}"
-        return f"gain {nm} equal to cards retained" if cr else f"gain {amt} {nm}"
+        return f"gain {nm} equal to {eq}" if sc else f"gain {amt} {nm}"
+    # Phase AL (v42): the class engines as payload fragments. Mirrors ForgedCards.TriggerFragment (no class context —
+    # a custom status is worded by its name: GAIN when untargeted (buff form) / APPLY when targeted (debuff form)).
+    if op == "summon_attack":
+        return f"deal {amt} damage {hits} times with your summon{to}" if hits > 1 else f"deal {amt} damage with your summon{to}"
+    if op == "buff_summon":
+        bst = e.get("status") or "strength"
+        return f"your summon gains {max(1, amt)} {STATUS_NAME.get(bst, bst)}"
+    if op == "apply_status_custom":
+        nm = e.get("status_name", "")
+        return f"apply {max(1, amt)} {nm}{to}" if tgt else f"gain {max(1, amt)} {nm}"
     if op == "channel_orb":
         name = _orb_display(e.get("orb"))
         oc = max(1, amt)

@@ -25,7 +25,12 @@ import sys
 import zlib
 from pathlib import Path
 
-VOCAB_VERSION = 41  # must be <= ForgedCards.VocabVersion (41: Phase AK — ATTACKER TARGET + ONCE PER COMBAT: a
+VOCAB_VERSION = 42  # must be <= ForgedCards.VocabVersion (42: Phase AL — RICHER TRIGGER PAYLOADS: the class engines
+                    # inside add_trigger payloads — apply_status_custom (status class), summon_attack / buff_summon
+                    # (summon class; the dormant move-cycle as a card engine) — `hits` on a payload damage /
+                    # summon_attack, payload scale += cards_in_hand / unspent_energy_last_turn / forged (additive),
+                    # and a TARGETED payload damage may be scaled.
+                    # 41: Phase AK — ATTACKER TARGET + ONCE PER COMBAT: a
                     # trigger-payload effect on `attacked` may target "attacker" (the creature that just hit you);
                     # `once_per_combat` on the power-hosted reactive triggers.
                     # 40: Phase AJ — HIDDEN CAPACITY. No new runtime mechanic:
