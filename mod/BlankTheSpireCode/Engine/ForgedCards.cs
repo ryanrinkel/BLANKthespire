@@ -42,7 +42,15 @@ public static class ForgedCards
     /// v10 (forged statuses, Phase J): + CharacterSpec.StatusPool (a class's ≤4 custom modifier-family statuses
     /// read from `status_pool`; see ForgedCharacters / ForgedStatusPower). Class cards may apply a custom status
     /// by pool name via the `apply_status_custom` op (class-only, like custom-orb channels).</summary>
-    public const int VocabVersion = 44; // 44: Phase AN (VOCAB_GAP_REMEDIATION Wave 3) — SMALL OPS. New card-only op
+    public const int VocabVersion = 45; // 45: Phase AO (VOCAB_GAP_REMEDIATION Wave 3) — CARD-TYPE-SCOPED COST MODIFIERS.
+                                        //     New card-only op `cost_shift {card_type: attack|skill|power|all, amount: 1..2,
+                                        //     scope: this_turn|combat, count?: 1..3}` — "Your Attacks cost 1 less this turn" /
+                                        //     "Your next Skill costs 2 less this turn" / "Your Skills cost 1 less this combat"
+                                        //     (ForgedCostShiftPower: ONE power holding a list of live discounts; the early
+                                        //     TryModifyEnergyCostInCombat pass, so it composes with relic cost_reduction and
+                                        //     Corruption). Also a relic hook op (this_turn only). scope:combat is amount-1 +
+                                        //     rare-only (generation side) and ≤1 per class (character_validator).
+                                        // 44: Phase AN (VOCAB_GAP_REMEDIATION Wave 3) — SMALL OPS. New card-only op
                                         //     `gain_max_hp` (1..5; the base-game Feed payoff: raise Max HP AND heal that
                                         //     much), a `damage` flag `unblockable:true` (ValueProp.Unblockable rides the
                                         //     damage var, so preview and resolution both ignore Block; card-level only),
@@ -268,6 +276,7 @@ public static class ForgedCards
     private static readonly HashSet<string> SupportedOps =
         ["damage", "block", "draw", "apply_status", "gain_energy", "lose_hp", "heal",
          "gain_max_hp", // Phase AN (v44): Feed — raise your Max HP by amount (and heal that much). Card-only, 1..5.
+         "cost_shift", // Phase AO (v45): a card-type-scoped energy discount (this turn / this combat / next N plays). Card-only.
          "exhaust", "innate", "retain", "ethereal",
          "gain_orb_slot", "channel_orb", "evoke", // Phase G orbs (opened to the LLM contract in G3)
          "forge", // Phase M (gap #36): stoke the per-combat Forge counter (payoff = scale:"forged")
@@ -343,6 +352,32 @@ public static class ForgedCards
     // Phase AN (v44): the gain_max_hp cap (Feed is +3/+4; a run-permanent stat, so the band is tight). Lockstep with
     // validator._GAIN_MAX_HP_MAX and the schema clause.
     private const int GainMaxHpMaxAmount = 5;
+    // Phase AO (v45): the cost_shift shape — which cards it discounts, how long it lives, the discount band, the use
+    // budget band. Lockstep with validator._COST_SHIFT_* and the schema clauses.
+    private static readonly HashSet<string> CostShiftKinds = ["attack", "skill", "power", "all"];
+    private static readonly HashSet<string> CostShiftScopes = ["this_turn", "combat"];
+    private const int CostShiftMaxAmount = 2;
+    private const int CostShiftMaxCount = 3;
+
+    /// <summary>Phase AO (v45): the cost_shift shape rules, shared by the card validator and the relic parser
+    /// (<paramref name="relic"/> adds the hook-side rule: this_turn only — a hook fires every turn, so a combat-scoped
+    /// entry would accumulate; the whole-combat relic discount is the <c>cost_reduction</c> modifier).</summary>
+    internal static string? ValidateCostShift(EffectSpec e, bool relic = false)
+    {
+        if (e.CardKind == null || !CostShiftKinds.Contains(e.CardKind))
+            return $"cost_shift needs a 'card_type' (one of {string.Join("/", CostShiftKinds)}); got '{e.CardKind}'.";
+        if (e.Scope == null || !CostShiftScopes.Contains(e.Scope))
+            return $"cost_shift needs a 'scope' (one of {string.Join("/", CostShiftScopes)}); got '{e.Scope}'.";
+        if (e.Amount < 1 || e.Amount > CostShiftMaxAmount)
+            return $"cost_shift 'amount' (the discount) must be 1..{CostShiftMaxAmount}; got {e.Amount}.";
+        if (e.Count < 0 || e.Count > CostShiftMaxCount)
+            return $"cost_shift 'count' (the plays it applies to) must be 1..{CostShiftMaxCount}; got {e.Count}.";
+        if (e.Scope == "combat" && e.Amount != 1)
+            return "cost_shift with scope 'combat' must use amount 1 (a whole-combat -2 is degenerate).";
+        if (relic && e.Scope != "this_turn")
+            return "a relic cost_shift must use scope 'this_turn' (a hook fires every turn; the whole-combat relic discount is the cost_reduction modifier).";
+        return null;
+    }
     private static readonly HashSet<string> SupportedOrbs = ["lightning", "frost", "dark", "random"]; // Phase G/H
     // Phase Q (gap #16): the combat piles add_card may drop generated copies into. Mirrors PileType (hand/discard/
     // draw) — the base-game "generate a card into combat" destinations. Kept in lockstep with validator._ADD_CARD_PILES.
@@ -391,6 +426,7 @@ public static class ForgedCards
     private static readonly HashSet<string> AmountOps =
         ["damage", "block", "draw", "apply_status", "gain_energy", "lose_hp", "heal", "gain_orb_slot",
          "gain_max_hp", // Phase AN (v44): Max HP to gain (needs amount>=1; capped 1..5 in Validate)
+         "cost_shift", // Phase AO (v45): the discount (needs amount>=1; capped 1..2 in ValidateCostShift)
          "discard", // Phase R (gap #17): how many random cards to discard (needs amount>=1)
          "scry", // Phase AA (gap #17 R-2): how many top-of-draw cards to look at (needs amount>=1)
          "forge", // Phase M (gap #36): how much Forge to stoke (needs amount>=1)
@@ -751,9 +787,15 @@ public static class ForgedCards
             string? tag = e.ContainsKey("tag") ? Str(e, "tag").Trim().ToLowerInvariant() : null;
             // Phase AN (v44): `unblockable` flags a damage op to ignore Block (damage-only, card-level; validated below).
             bool unblockable = e.ContainsKey("unblockable") && e["unblockable"].AsBool();
+            // Phase AO (v45): cost_shift's card-type filter / lifetime (lowercased; membership in ValidateCostShift) and
+            // its optional use budget (0 = the flat form).
+            string? cardKind = e.ContainsKey("card_type") ? Str(e, "card_type").Trim().ToLowerInvariant() : null;
+            string? scope = e.ContainsKey("scope") ? Str(e, "scope").Trim().ToLowerInvariant() : null;
+            int count = e.ContainsKey("count") ? Int(e, "count") : 0;
             list.Add(new EffectSpec(op, amount, status, hits, scale, orb, when, trigger, triggered, statusName,
                                     summonName, oncePerTurn, target, cardId, pile, pole, grow, cards, tag,
-                                    OncePerCombat: oncePerCombat, Unblockable: unblockable));
+                                    OncePerCombat: oncePerCombat, Unblockable: unblockable,
+                                    CardKind: cardKind, Scope: scope, Count: count));
         }
         return list.ToArray();
     }
@@ -791,6 +833,15 @@ public static class ForgedCards
             // Phase AN (v44): gain_max_hp is a run-permanent stat gain (Feed) — a tight band. amount>=1 via AmountOps.
             if (e.Op == "gain_max_hp" && e.Amount > GainMaxHpMaxAmount)
                 return $"gain_max_hp 'amount' may be at most {GainMaxHpMaxAmount}; got {e.Amount}.";
+            // Phase AO (v45): cost_shift shape rules (shared with the relic parser); its three fields belong to it alone.
+            // Card-only: not in TriggerOps (ValidateTrigger rejects a payload cost_shift).
+            if (e.Op == "cost_shift")
+            {
+                var cserr = ValidateCostShift(e);
+                if (cserr != null) return cserr;
+            }
+            else if (e.CardKind != null || e.Scope != null || e.Count != 0)
+                return $"'card_type'/'scope'/'count' only apply to cost_shift (op '{e.Op}').";
             if (e.IsScaled)
             {
                 if (!SupportedScales.Contains(e.Scale!))
@@ -1060,6 +1111,10 @@ public static class ForgedCards
         // Phase AB (gap #20): at most one corruption per card (Corruption is a binary power — a second grant is noise).
         if (effects.Count(e => e.Op == "corruption") > 1)
             return "at most one 'corruption' effect per card (Corruption is a binary power — one grant is enough).";
+        // Phase AO (v45): at most one cost_shift per EFFECT LIST (one discount sentence per play; base + upgrade counted
+        // independently, like graft_card — an upgrade repeating it is the normal replace-on-upgrade pattern).
+        if (effects.Count(e => e.Op == "cost_shift") > 1 || (upgrade ?? []).Count(e => e.Op == "cost_shift") > 1)
+            return "at most one 'cost_shift' effect per card (one discount per play).";
         // Phase P (gap #21): a lifesteal heal reads the unblocked damage this card ALREADY dealt this play, so it
         // needs a damage op earlier in the SAME list (base and upgrade checked independently — the runtime runs
         // each list top-to-bottom, so a heal with no prior damage would always lifesteal 0).
@@ -1296,6 +1351,20 @@ public static class ForgedCards
     /// <summary>The DynamicVar key an effect declares in <see cref="DataCard"/> (null = declares none). Two
     /// effects with the same key would make the game's DynamicVarSet ctor throw — see the dup check above.
     /// damage/block collapse to one key each (normal or scale:x) since the attack/block path reads one var.</summary>
+    /// <summary>Phase AO (v45): the cost_shift sentence — "Your Attacks cost 1 less this turn." / "Your next Skill costs 2
+    /// less this turn." / "Your next 2 cards cost 1 less this combat." Literal numbers (no DynamicVar, like forge /
+    /// balance_step). Byte-lockstep with cardgen._cost_shift_sentence.</summary>
+    private static string CostShiftSentence(EffectSpec e)
+    {
+        string plural = e.CardKind switch { "attack" => "Attacks", "skill" => "Skills", "power" => "Powers", _ => "cards" };
+        string single = e.CardKind switch { "attack" => "Attack", "skill" => "Skill", "power" => "Power", _ => "card" };
+        string life = e.Scope == "combat" ? "this combat" : "this turn";
+        int amt = Math.Max(1, e.Amount);
+        if (e.Count == 1) return $"Your next {single} costs {amt} less {life}.";
+        if (e.Count > 1) return $"Your next {e.Count} {plural} cost {amt} less {life}.";
+        return $"Your {plural} cost {amt} less {life}.";
+    }
+
     private static string? VarKey(EffectSpec e) => e.Op switch
     {
         "damage"       => "Damage",
@@ -1384,6 +1453,7 @@ public static class ForgedCards
                 case "purge":       parts.Add("Purge. (Removed from your deck for the rest of the run.)"); break; // Phase W (gap #19)
                 case "purge_card":  parts.Add("Choose a card in your hand and Purge it. (Removed from your deck for the rest of the run.)"); break; // Phase Z (gap #19 choose)
                 case "corruption":  parts.Add("Your Skills cost 0."); parts.Add("Your Skills Exhaust when played."); break; // Phase AB (gap #20)
+                case "cost_shift":  parts.Add(CostShiftSentence(e)); break; // Phase AO (v45): the discount sentence (literal, no var)
                 case "blade_empower": parts.Add($"Your blade deals {Math.Max(2, e.Amount)}x damage this turn."); break; // Phase AF (gap #41)
                 case "transform_card": parts.Add($"Transforms into {AddCardName(e.CardId)} for the rest of the run."); break; // Phase AH (gaps #35/#38): target title title-cased from the id (no sibling context here, like add_card)
                 case "graft_card":  parts.Add($"Choose a card in your hand. It transforms into {AddCardName(e.CardId)} for the rest of the run."); break; // Phase AI (gap #7): the choose-form transform (target title from the id, like transform_card)

@@ -273,7 +273,8 @@ its FANTASY onto a DISTINCT shape first, generic debuffs last: "freeze" -> a cus
 damage to all enemies, or Poison; "bleed" -> `lose_hp` fuel + `on_hp_lost` / `hp_lost_ge` payoffs; "berserk" \
 -> `forge` income + `scale:"forged"` payoffs, or temp_strength; "venom" -> Poison + a `target_debuff_count` \
 payoff; "tempo" -> draw + gain_energy; "devour/hunger" -> a rare `gain_max_hp` attack; "piercing" -> a damage with \
-`unblockable`; "bristle" -> temp_thorns. Stay strictly INSIDE the vocabulary (a brief that can't be built from \
+`unblockable`; "bristle" -> temp_thorns; "discount / free spell / momentum" -> a `cost_shift` skill ("your Attacks \
+cost 1 less this turn"). Stay strictly INSIDE the vocabulary (a brief that can't be built from \
 it will be dropped) — but WITHIN it, range widely rather than conservatively.
 
 Both archetypes must be built from this vocabulary and CROSS-SYNERGIZE (cards of one get better with the \
@@ -431,7 +432,10 @@ costs 0 but Exhausts. Build AROUND it: (1) SKILL DENSITY — a corruption class 
 Skills all Exhaust, so pair with an `on_exhaust` engine (gap #13: a power whose `add_trigger` trigger `on_exhaust` \
 payload gives Block/draw each time a card Exhausts — Feel No Pain / Dark Embrace). The exhausting free Skills FEED \
 that engine. Rules: put `corruption` on a POWER or SKILL (never an attack); ONE per class (it is a binary power — \
-a second grant does nothing); card-only (never in a trigger payload).
+a second grant does nothing); card-only (never in a trigger payload). The LIGHTER cousin (v45) is `cost_shift` — a \
+typed discount with no Exhaust tax: `{{"op":"cost_shift","card_type":"attack","amount":1,"scope":"this_turn"}}` = \
+"Your Attacks cost 1 less this turn"; add `"count":1` for "your next Attack costs 1 less"; `"scope":"combat"` is \
+rare-only, amount 1, ONE per class.
 
 METAMORPH (`transform_card` — a card that PERMANENTLY becomes another of your cards mid-run): reach for this when \
 the fantasy is a SHAPE THAT LEARNS / a weapon that reconfigures / a circuit that rewrites itself — the deck \
@@ -1037,7 +1041,8 @@ _RELIC_TRIGGERS = {"turn_start", "turn_end", "attacked", "on_exhaust", "on_card_
                    "on_hp_lost"}  # L-4 adds the middle four; Phase P adds on_hp_lost (own unblocked HP loss)
 _RELIC_EFFECT_OPS = {"damage", "block", "draw", "gain_energy", "heal", "lose_hp", "apply_status",
                      "channel_orb", "summon",  # Phase L compose: channel_orb/summon — CLASS-CONDITIONAL (gated on bp below)
-                     "forge"}  # Phase M (gap #36): relic-side Forge income (the smoldering-heirloom keystone)
+                     "forge",  # Phase M (gap #36): relic-side Forge income (the smoldering-heirloom keystone)
+                     "cost_shift"}  # Phase AO (v45): a this-turn typed discount ("your first card each turn costs 1 less")
 _RELIC_TARGETS = {"self", "enemy", "all_enemies", "attacker"}  # "attacker" valid only on the "attacked" trigger
 _RELIC_CONDITION_KINDS = {"hp_below_half", "no_block",
                           "has_block", "enemy_count_ge", "turn_at_least", "hand_size_ge"}  # L-4 player-state reads
@@ -1104,6 +1109,16 @@ def _validate_relic(relic, bp=None) -> list[str]:
                     errs.append(f"hook[{i}].effects[{j}] summon needs a 'summon_name'")
                 elif bp is not None and nm.lower() not in summon_names:
                     errs.append(f"hook[{i}] summon '{nm}' is not in this class's summon_pool {sorted(summon_names)}")
+            elif op == "cost_shift":
+                # Phase AO (v45): mirrors ForgedCards.ValidateCostShift(relic: true) — this_turn only on a hook.
+                if str(e.get("card_type", "")).strip().lower() not in {"attack", "skill", "power", "all"}:
+                    errs.append(f"hook[{i}].effects[{j}] cost_shift needs a 'card_type' (attack/skill/power/all)")
+                if str(e.get("scope", "")).strip().lower() != "this_turn":
+                    errs.append(f"hook[{i}].effects[{j}] a relic cost_shift must use scope 'this_turn' (the whole-combat relic discount is the cost_reduction modifier)")
+                if not 1 <= int(e.get("amount", 0) or 0) <= 2:
+                    errs.append(f"hook[{i}].effects[{j}] cost_shift 'amount' (the discount) must be 1..2")
+                if not 0 <= int(e.get("count", 0) or 0) <= 3:
+                    errs.append(f"hook[{i}].effects[{j}] cost_shift 'count' must be 1..3")
             elif int(e.get("amount", 0) or 0) < 1:
                 errs.append(f"hook[{i}].effects[{j}] op '{op}' needs amount >= 1")
             if trigger == "combat_end" and op != "heal":

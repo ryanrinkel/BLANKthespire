@@ -169,6 +169,13 @@ def effect_literal(e: dict) -> str:
         # Phase V (gap #18): named Cards arg (order-independent in C#). No amount. Default scope `random`.
         cards = str(e.get("cards", "random")).replace("\\", "\\\\").replace('"', '\\"')
         lit = f'new EffectSpec("upgrade_card", Cards: "{cards}")'
+    elif op == "cost_shift":
+        # Phase AO (v45): named CardKind / Scope (+ Count) args, lockstep with ForgedCards.ParseEffects. Amount = the discount.
+        ck = str(e.get("card_type", "all")).replace("\\", "\\\\").replace('"', '\\"')
+        sc = str(e.get("scope", "this_turn")).replace("\\", "\\\\").replace('"', '\\"')
+        lit = f'new EffectSpec("cost_shift", {e.get("amount", 1)}, CardKind: "{ck}", Scope: "{sc}")'
+        if e.get("count"):
+            lit = f"{lit[:-1]}, Count: {int(e['count'])})"
     else:
         amount = e.get("amount", 0)
         hits = e.get("hits", 1)
@@ -396,6 +403,22 @@ def trigger_sentence(t: dict) -> str:
     return f"{when}, {', '.join(frags) if frags else 'do nothing'}{once}."
 
 
+def _cost_shift_sentence(e: dict) -> str:
+    """Phase AO (v45): "Your Attacks cost 1 less this turn." / "Your next Skill costs 2 less this turn." / "Your next 2
+    cards cost 1 less this combat." Byte-lockstep with ForgedCards.CostShiftSentence."""
+    kind = str(e.get("card_type", "all")).lower()
+    plural = {"attack": "Attacks", "skill": "Skills", "power": "Powers"}.get(kind, "cards")
+    single = {"attack": "Attack", "skill": "Skill", "power": "Power"}.get(kind, "card")
+    life = "this combat" if str(e.get("scope", "")).lower() == "combat" else "this turn"
+    amt = max(1, int(e.get("amount", 1) or 1))
+    count = int(e.get("count", 0) or 0)
+    if count == 1:
+        return f"Your next {single} costs {amt} less {life}."
+    if count > 1:
+        return f"Your next {count} {plural} cost {amt} less {life}."
+    return f"Your {plural} cost {amt} less {life}."
+
+
 def describe(effects: list[dict], target: str) -> str:
     # STS2 AoE cards spell out "to ALL enemies" in their text (the game does not auto-append it), so the
     # target informs the wording. Keep in lockstep with ForgedCards.Describe() (the C# slot-runtime mirror).
@@ -474,6 +497,9 @@ def describe(effects: list[dict], target: str) -> str:
         elif op == "blade_empower":
             # Phase AF (gap #41): the blade-multiplier sentence (literal). Lockstep with ForgedCards.Describe.
             parts.append(f"Your blade deals {max(2, e.get('amount', 0))}x damage this turn.")
+        elif op == "cost_shift":
+            # Phase AO (v45): the discount sentence (literal, no var). Lockstep with ForgedCards.CostShiftSentence.
+            parts.append(_cost_shift_sentence(e))
         elif op == "transform_card":
             # Phase AH (gaps #35/#38): the target title is title-cased from the card_id (no sibling-name context in
             # describe(), same choice as add_card / ForgedCards.AddCardName). Lockstep with ForgedCards.Describe.

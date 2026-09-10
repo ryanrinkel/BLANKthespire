@@ -34,7 +34,8 @@ from .character_validator import (BlueprintValidator, CharacterValidator,
                                   balance_pairing_warnings, balance_payoff_density_warnings,
                                   balance_reachability_warnings, blade_empower_warnings, combo_loop_warnings,
                                   debuff_monotony_warnings,
-                                  corruption_warnings, forge_manipulation_warnings, forge_pairing_warnings,
+                                  corruption_warnings, cost_shift_warnings, forge_manipulation_warnings,
+                                  forge_pairing_warnings,
                                   identity_overlap_warnings, lifesteal_warnings, purge_warnings,
                                   rampage_grow_warnings, summon_support_warnings, tag_synergy_warnings,
                                   transform_warnings)
@@ -214,6 +215,12 @@ def generate_character(brief: Brief, model: str | None = None, fake: bool = Fals
         res.warnings["corruption"] = cw
         for w in cw:
             note("  CORRUPTION WARN " + w)
+    # Phase AO (v45): at most one whole-combat cost_shift per class (they stack). Advisory, same treatment.
+    csw = cost_shift_warnings([m["card"] for m in made])
+    if csw:
+        res.warnings["cost_shift"] = csw
+        for w in csw:
+            note("  COST-SHIFT WARN " + w)
     # Phase AC (gap #2): a class with heal_summon/shield_summon but no summon op — the medic ops always no-op.
     sw = summon_support_warnings([m["card"] for m in made])
     if sw:

@@ -456,6 +456,7 @@
         "ops": [
           "draw",
           "gain_energy",
+          "cost_shift",
           "scale"
         ],
         "class_kind": "normal"
@@ -854,6 +855,7 @@
         "ops": [
           "gain_energy",
           "damage",
+          "cost_shift",
           "scale",
           "energy_ge"
         ],

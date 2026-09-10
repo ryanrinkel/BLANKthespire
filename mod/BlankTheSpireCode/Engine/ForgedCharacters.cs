@@ -440,7 +440,8 @@ public static class ForgedCharacters
     /// no-op at runtime unless the class declares orbs / summons (the generator gates them on class content).</summary>
     private static readonly HashSet<string> RelicEffectOps =
         ["damage", "block", "draw", "gain_energy", "heal", "lose_hp", "apply_status", "channel_orb", "summon",
-         "forge"]; // Phase M (gap #36): relic-side Forge income (the "smoldering heirloom" keystone)
+         "forge", // Phase M (gap #36): relic-side Forge income (the "smoldering heirloom" keystone)
+         "cost_shift"]; // Phase AO (v45): a this-turn card-type discount ("at turn start, your first card costs 1 less")
     /// <summary><c>attacker</c> (the creature that just hit you) is valid only on the <c>attacked</c> trigger.</summary>
     private static readonly HashSet<string> RelicTargets = ["self", "enemy", "all_enemies", "attacker"];
     /// <summary>Fire-time condition kinds valid with NO target (target_has_status / orb conditions forbidden here).
@@ -548,6 +549,8 @@ public static class ForgedCharacters
         { error = $"relic effect op '{op}' is not supported (v1: {string.Join("/", RelicEffectOps)})."; return false; }
         int amount = Int(d, "amount", 1);
         string? status = null, orb = null, summonName = null;
+        string? cardKind = null, scope = null; // Phase AO (v45): cost_shift fields
+        int count = 0;
         if (op == "apply_status")
         {
             status = Str(d, "status").Trim().ToLowerInvariant();
@@ -567,11 +570,21 @@ public static class ForgedCharacters
             summonName = Str(d, "summon_name").Trim();
             if (summonName.Length == 0) { error = "relic 'summon' needs a 'summon_name' (a class minion)."; return false; }
         }
+        else if (op == "cost_shift")
+        {
+            // Phase AO (v45): the same shape rules as the card op, plus the hook-side this_turn-only rule.
+            cardKind = d.ContainsKey("card_type") ? Str(d, "card_type").Trim().ToLowerInvariant() : null;
+            scope = d.ContainsKey("scope") ? Str(d, "scope").Trim().ToLowerInvariant() : null;
+            count = d.ContainsKey("count") ? Int(d, "count") : 0;
+            var cserr = ForgedCards.ValidateCostShift(new EffectSpec(op, amount, CardKind: cardKind, Scope: scope, Count: count), relic: true);
+            if (cserr != null) { error = "relic " + cserr; return false; }
+        }
         else if (amount < 1) { error = $"relic effect '{op}' needs amount >= 1."; return false; }
         if (op == "damage" && hookTarget == "self")
         { error = "relic 'damage' needs an enemy target (set the hook 'target' to enemy/all_enemies)."; return false; }
 
-        eff = new EffectSpec(op, amount, status, Orb: orb, SummonName: summonName);
+        eff = new EffectSpec(op, amount, status, Orb: orb, SummonName: summonName,
+                             CardKind: cardKind, Scope: scope, Count: count); // Phase AO (v45)
         error = "";
         return true;
     }

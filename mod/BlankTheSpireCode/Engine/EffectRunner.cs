@@ -208,6 +208,12 @@ public static class EffectRunner
                     await ForgedCorruptionPower.Apply(ctx, card.Owner);
                     MainFile.Logger.Info("[AB] corruption power applied.");
                     break;
+                case "cost_shift":
+                    // Phase AO (v45): add a card-type-scoped discount to the owner's Cost Shift power (ONE power, a list
+                    // of live entries — see ForgedCostShiftPower). amt is the discount (1..2, upgrade-aware); the card
+                    // itself is passed as the granter so a "next Skill costs less" Skill never spends its own use.
+                    await ForgedCostShiftPower.Add(ctx, card.Owner, e.CardKind, amt, e.Scope, e.Count, spec.Id, card);
+                    break;
                 case "exhaust":
                 case "innate":
                 case "retain":
@@ -967,6 +973,11 @@ public static class EffectRunner
                     // Phase T: a turn-1 relic Forge summons the blade too (Stoke centralizes all three paths).
                     await ForgedForgePower.Stoke(ctx, player, Math.Max(1, amt));
                     MainFile.Logger.Info($"[M] forge +{amt} (relic) -> Forge {ForgeStacks(player)}.");
+                    break;
+                case "cost_shift":
+                    // Phase AO (v45): relic-side discount — the "first card each turn costs 1 less" keystone (the Phase-L
+                    // deferral). this_turn only (import-validated), so a per-turn hook never accumulates; no granter.
+                    await ForgedCostShiftPower.Add(ctx, player, e.CardKind, amt, e.Scope, e.Count, "relic", null);
                     break;
                 // Phase L compose ops — a relic reaches its OWN class's orb/summon pool (RelicClass == class index).
                 // Defensive no-op if the class declares no orbs/summons (the generator gates these; the runtime guards).

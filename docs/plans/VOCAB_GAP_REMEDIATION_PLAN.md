@@ -254,6 +254,67 @@ pointers. Tests: `tests/test_phase_an.py` (71 checks); `test_featured` / `test_e
 `generation/scratch/gaptest-an/build_tester.py` — an ORB class so temp_focus is live, staged into slot 04, unstaged
 afterwards): **GAPTESTAN1** **387 `[AN]` tags** — gain_max_hp ×47 (Devouring Bite +3/+4 ×23, Greedy Gulp +1/+2 ×24; Max HP climbed **80 → 206** across the run, every line showing the matching heal — "80 -> 83 (HP now 67)"), unblockable ×118 (Piercing Lunge ×37 + Body Pierce ×39 single-target with the target's Block read at resolution — including a hit into "target Block 6" — and Rending Volley ×42 AoE multi-hit; every line shows the var's props as "Unblockable, Move", the CalculatedDamageVar path via Body Pierce), temp_thorns +4/+6 ×75 with 60 end-of-turn expiries (stacked to "had 16" on a big turn), temp_focus +2/+3 ×30 with 57 expiries (the 27 extra expiries with no card-level apply are the Surge Stance trigger path — TriggerRunner.ApplySelfBuff → the same power; stacked to "had 5") · **0 mod-attributable exception frames** (the 7 Exception lines are BaseLib's two startup Harmony patch failures + their inner-exception echoes). Harness caveat, same as AM: the Python harness was killed by the OS for low memory (~1.9 GB free at launch; no tool verdict) while the game kept playing under AutoSlay — tags harvested from the live godot.log, game stopped by hand (`Stop-Process`); no hang was mod-attributable. One seed only (memory). Tag evidence: `generation/scratch/gaptest-an/godot_AN_tags_GAPTESTAN*.txt`.
 
+**STATUS (2026-09-09): Phase AO EXECUTED (vocab v45)** — the op landed in lockstep, plus the relic form the plan promised.
+**`cost_shift {card_type: attack|skill|power|all, amount: 1..2, scope: this_turn|combat, count?: 1..3}`** — "Your Attacks cost 1
+less this turn." / "Your next Skill costs 2 less this turn." / "Your next 2 cards cost 1 less this turn." / "Your Skills cost 1 less
+this combat." **Deviation, deliberate:** the plan wrote `amount: -1..-2`; the contract's `amount` is `minimum: 1` everywhere and
+every op reads it as a magnitude, so `amount` is the DISCOUNT (1..2) and the sentence says "cost N less". The plan's "count:1 gives
+'next Skill costs 0'" is the count-1 form with amount 2 (every Skill in the 0..3 band but a 3-cost goes free); a set-to-0 would
+have been a second semantic on the same op, so it was not added. **Engine:** `Powers/ForgedCostShiftPower.cs` — ONE power per
+player holding a LIST of live discounts (the game keys powers by type per creature, so a class-per-card_type would still collide
+on scope/count; the list lets "Attacks -1 this turn" and "Skills -1 this combat" coexist). Native Amount mirrors the live entry
+count (the Phase-J/S live-stack mutation; RemovePowerInternal when the list empties). Hooks, all verified against the decompiled
+source before building: `TryModifyEnergyCostInCombat` (the EARLY pass — `Hook.ModifyEnergyCostInCombat` runs every early listener
+before the Late pass, so the discount composes additively with a relic `cost_reduction` and Corruption's Late set-to-0 still wins;
+`CardEnergyCost.GetWithModifiers` skips the global hook for X-cost and floors at 0, so nothing goes negative or touches X);
+`AfterCardPlayed` consumes a use of each matching budgeted entry (`PlayCardAction.SpendResources` runs before `OnPlayWrapper`
+fires the card-played hooks, so a use is never spent before the discounted card is paid for — the base game's `FreeAttackPower`
+decrements on the same edge); an `Armed` flag keeps the GRANTING card from spending its own use (the power is added in that card's
+OnPlay and its AfterCardPlayed fires right after — "your next Skill costs 1 less" on a Skill would otherwise eat itself);
+`AfterSideTurnEnd` (owner's side) drops the this_turn entries, the temp-stat lifetime. Only cards in hand / in play are
+discounted (the FreeAttackPower pile check). **Found by the smoke, fixed before commit:** `card_type:"all"` matched Statuses and
+Curses — GAPTESTAO1 logged Ascender's Bane (cost -1, unplayable) rewritten to 0 (the engine's own hook skips negative costs, but
+`CardCostHelper.TryModifyEnergyCostWithHooks` hands listeners the raw preview cost); `all` now means Attacks/Skills/Powers and the
+hook passes any `originalCost <= 0` through untouched. Rules (both validators + schema): `card_type` ∈ attack/skill/power/all,
+`scope` ∈ this_turn/combat, `amount` 1..2, `count` 1..3 optional; `scope:combat` is amount 1 (a whole-combat -2 is Corruption
+without the tax), **rare-only** (generation side) and **≤1 such card per class** (`character_validator.cost_shift_warnings` — the
+plan's loop-discipline rule; they stack); the three fields belong to cost_shift alone; at most one per effect list; never on a
+BASIC; card-only (not in `TriggerOps` / the `triggerEffect` op enum — a turn_start "your next Attack costs 1 less" engine is a
+follow-up if demanded). **Relic form** (closes the Phase-L "first card costs 0" deferral, `PHASE_L…:367-369`): `cost_shift` is a
+relic hook op (`RelicEffectOps`, `TryParseRelicEffect` via the shared `ForgedCards.ValidateCostShift(relic:true)`,
+`RunRelicEffects`, `relic.schema.json`, `RELIC_VOCABULARY.md`, `class_forge._RELIC_EFFECT_OPS` + `_validate_relic`) — `scope`
+must be `this_turn` on a hook (a per-turn hook adding combat-scoped entries would accumulate; the whole-combat relic discount
+stays the `cost_reduction` modifier); `turn_start` + `card_type:"all"` + `count:1` = "your first card each turn costs 1 less".
+Describe, byte-lockstep (`ForgedCards.CostShiftSentence` / `cardgen._cost_shift_sentence`): literal numbers, no DynamicVar (like
+forge / balance_step). Pricing (`validator._score_effect`): energy in disguise — a this-turn typed discount at 4/pt (`all` 5.5, just
+under gain_energy's 6), the count form ×0.6 per covered play, the combat scope ×3 (a rare build-around; in `_BUILD_AROUND_OPS`).
+Log tag `[AO]`: every add (entry text + live count), every discounted card's cost once per combat (`a -> b (-r)`, with the
+card type), every consumed use (uses left), every end-of-turn expiry, the power removal. Lockstep: `CardSpec.cs` (`CardKind` /
+`Scope` / `Count` — named CardKind so it doesn't shadow the game's `CardType` enum), `ForgedCards.cs` (VocabVersion 45,
+SupportedOps / AmountOps, `CostShiftKinds` / `CostShiftScopes` / caps, `ValidateCostShift`, parse, Validate, the ≤1 rule,
+Describe + `CostShiftSentence`), `EffectRunner.cs` (card + relic cases), `DataCard.cs`, `ForgedCharacters.cs`, `MainFile.cs`
+(🏷️ icon kick), `ForgedCostShiftPower.cs` (new), `card.schema.json` (op enum + description, `card_type` / `scope` / `count`
+properties, two allOf clauses), `relic.schema.json` (op + the three properties with `scope` const this_turn, two clauses),
+`VOCABULARY.md` (one row), `RELIC_VOCABULARY.md` (one row), `DESIGN_HEURISTICS.md` (one sentence on the tempo_draw note),
+`bts1.py` VOCAB_VERSION 45, `cardgen.py` (emit named `CardKind:` / `Scope:` / `Count:` args; describe), `validator.py`
+(constants, per-effect + per-card rules, build-around, pricing), `character_validator.py` (`cost_shift_warnings`) +
+`character_pipeline.py`, `featured.py` (+ `cost_trick`), `class_forge.py` (a fantasy pointer, a one-clause pointer in the
+CORRUPTION section, the relic op gate), `archetypes.json` (tempo_draw + big_energy += cost_shift), `exemplar_pool.json` (+3:
+Open Throttle, Quiet Step, War Economy; pool 104 → 107), `web/static/app.js` (the phrase). **Rule 0.9 budget:** blueprint prompt
+**+1,233 chars (87,623 → 88,856, seed 1)** — pointers only, no new section. Tests: `tests/test_phase_ao.py` (75 checks: shape /
+every reject / describe in 12 shapes / emit / census + detector / pricing order / relic through both gates / the set warning /
+contract presence); `test_featured` sample extended; suite **390 passed**; every `test_phase_*.py` (25) runs standalone; C# build
+0 errors. AutoSlay (tester `generation/scratch/gaptest-ao/build_tester.py` — a normal class with all six shapes + the
+Apprentice's Patience relic, staged into slot 04, unstaged afterwards): **GAPTESTAO1** (pre-fix build) **2,938 `[AO]` tags** —
+cost hook ×1,696 (Skill 895 / Attack 742 / Power 59; costs `2 -> 1`, `1 -> 0`, stacked `2 -> 0` when two entries overlapped),
+adds ×663 across every shape (relic "next 1 cards -1" every turn start, `quiet_step` next-1-skill, `twin_edge` next-2-attacks,
+`momentum` next-3-cards, `open_throttle` / `cheap_powers` flat, `war_economy` ×19 combat-scoped — each "N live" climbing as the
+list grew), uses consumed ×377 (the count forms ran down to "0 left"; Quiet Step never spent itself), 138 end-of-turn expiries,
+the list emptying to "power removed" · **0 mod-attributable exception frames** (the 7 Exception lines are BaseLib's two startup
+Harmony patch failures + echoes) · verdict "HANG — wall-clock timeout" is the harness's 10-minute wall clock (the AutoSlay log
+shows "Turn 5: playing cards" at the cut; no mod frame) · the 63 Curse/Status lines are the bug described above.
+**GAPTESTAO2** (the fixed build) **2,289 `[AO]` tags** — cost hook ×1,239 (Attack 654 / Skill 482 / Power 103), adds ×500+ across the same six shapes, uses consumed ×384, 56 expiries · **0 Curse/Status lines** (the filter holds) · 0 mod-attributable exception frames · the same wall-clock verdict with the AutoSlay log mid-turn at the cut. Tag evidence: `generation/scratch/gaptest-ao/godot_AO_tags_GAPTESTAO{1,2}.txt`.
+
 ---
 
 ## 0. Ground rules

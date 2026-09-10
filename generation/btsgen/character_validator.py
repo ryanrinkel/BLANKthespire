@@ -643,6 +643,20 @@ def corruption_warnings(cards: list[dict]) -> list[str]:
     return []
 
 
+def cost_shift_warnings(cards: list[dict]) -> list[str]:
+    """Set-level Cost Shift discipline (Phase AO, v45): a whole-combat `cost_shift` (scope "combat") is a rare
+    build-around discount — the plan's loop-discipline rule is AT MOST ONE such card per class (two stack into a
+    Corruption-without-the-tax). Advisory (a human decides), like corruption_warnings."""
+    combat_cards = sorted({str(c.get("id", "?")) for c in cards if isinstance(c, dict)
+                           and any(isinstance(e, dict) and e.get("op") == "cost_shift"
+                                   and str(e.get("scope", "")).strip().lower() == "combat"
+                                   for e in (c.get("effects") or []) + ((c.get("upgrade") or {}).get("effects") or []))})
+    if len(combat_cards) > 1:
+        return [f"more than one whole-combat cost_shift card: {', '.join(combat_cards)} each discount a card type for "
+                "the rest of the combat — they stack; keep it to one per class (loop discipline)."]
+    return []
+
+
 def blade_empower_warnings(cards: list[dict]) -> list[str]:
     """Set-level Blade-Empower pairing (Phase AF, gap #41): `blade_empower` multiplies the forge class's signature
     blade — it is dead in a class with no `forge` income (no blade to empower). A class shipping blade_empower must

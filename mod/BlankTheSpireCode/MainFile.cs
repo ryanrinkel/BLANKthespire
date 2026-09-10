@@ -41,6 +41,9 @@ public partial class MainFile : Node
         // Phase AF (gap #41): the Blade Empower power's icon (ForgedBladeEmpowerPower).
         Engine.EmojiIconRenderer.Kick("blade_empower", "💥");
 
+        // Phase AO (v45): the Cost Shift power's icon (ForgedCostShiftPower).
+        Engine.EmojiIconRenderer.Kick("cost_shift", "🏷️");
+
         // Phase J: pre-render each forged class status's emoji to a .res icon (key = "status{K}_{M}", matching
         // ForgedStatusPower.IconKey). Best-effort — a status with no/failed emoji falls back to the placeholder.
         for (int k = 1; k <= Engine.ForgedCharacters.ClassCount; k++)

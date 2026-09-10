@@ -188,6 +188,7 @@ public abstract class DataCard : ConstructedCardModel
                 case "purge":                 // Phase W (gap #19): run-deck removal in OnPlay + pile override (no card var); text via Describe
                 case "purge_card":            // Phase Z (gap #19 choose): pick-a-hand-card purge in OnPlay (no card var); text via Describe
                 case "corruption":            // Phase AB (gap #20): grants the Corruption power in OnPlay (no card var); text via Describe
+                case "cost_shift":            // Phase AO (v45): adds a discount to the Cost Shift power in OnPlay (literal, no var); text via Describe
                 case "blade_empower":         // Phase AF (gap #41): applies the one-turn blade multiplier in OnPlay (literal, no var)
                 case "transform_card":        // Phase AH (gaps #35/#38): run-permanent self-transform in OnPlay (no card var); text via Describe
                 case "graft_card":            // Phase AI (gap #7): pick-a-hand-card + transform the pick in OnPlay (no card var); text via Describe

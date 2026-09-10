@@ -131,6 +131,8 @@ def test_detectors_round_trip() -> None:
         # Phase AN (v44)
         "devourer": _card([{"op": "damage", "amount": 10}, {"op": "gain_max_hp", "amount": 3}, {"op": "exhaust"}]),
         "piercing_strike": _card([{"op": "damage", "amount": 7, "unblockable": True}]),
+        # Phase AO (v45)
+        "cost_trick": _card([{"op": "cost_shift", "card_type": "attack", "amount": 1, "scope": "this_turn"}, {"op": "draw", "amount": 1}]),
         # Phase AM (v43)
         "body_slam": _card([{"op": "damage", "amount": 1, "scale": "block"}]),
         "executioner": _card([{"op": "damage", "amount": 7}, {"op": "gain_energy", "amount": 1, "when": {"kind": "target_hp_below_half"}}]),

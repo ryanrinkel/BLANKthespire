@@ -49,16 +49,21 @@
       "additionalProperties": false,
       "required": ["op"],
       "properties": {
-        "op": { "enum": ["damage", "block", "draw", "gain_energy", "heal", "lose_hp", "apply_status", "forge", "channel_orb", "summon"] },
+        "op": { "enum": ["damage", "block", "draw", "gain_energy", "heal", "lose_hp", "apply_status", "forge", "channel_orb", "summon", "cost_shift"] },
         "amount": { "type": "integer", "minimum": 1 },
         "status": { "enum": ["strength", "dexterity", "thorns", "regen", "metallicize", "artifact", "buffer", "intangible", "ritual", "blur", "temp_strength", "temp_dexterity", "barricade", "focus", "temp_thorns", "temp_focus", "vulnerable", "weak", "frail", "poison"] },
         "orb": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "channel_orb: 'random' or a name in the class's orb_pool." },
-        "summon_name": { "type": "string", "minLength": 1, "description": "summon: the minion declared in the class's summon_pool." }
+        "summon_name": { "type": "string", "minLength": 1, "description": "summon: the minion declared in the class's summon_pool." },
+        "card_type": { "enum": ["attack", "skill", "power", "all"], "description": "cost_shift (Phase AO, v45): which of your cards the discount applies to." },
+        "scope": { "const": "this_turn", "description": "cost_shift (Phase AO, v45): a relic discount is THIS TURN only (a hook fires every turn; the whole-combat relic discount is the cost_reduction modifier)." },
+        "count": { "type": "integer", "minimum": 1, "maximum": 3, "description": "cost_shift (Phase AO, v45): optional — only the NEXT N matching cards you play (turn_start + count 1 = \"your first card each turn costs 1 less\")." }
       },
       "allOf": [
         { "if": { "properties": { "op": { "const": "apply_status" } } }, "then": { "required": ["status", "amount"] } },
         { "if": { "properties": { "op": { "const": "channel_orb" } } }, "then": { "required": ["orb"] } },
         { "if": { "properties": { "op": { "const": "summon" } } }, "then": { "required": ["summon_name"] } },
+        { "if": { "properties": { "op": { "const": "cost_shift" } } }, "then": { "required": ["card_type", "scope", "amount"], "properties": { "amount": { "type": "integer", "minimum": 1, "maximum": 2 } } } },
+        { "if": { "anyOf": [ { "required": ["card_type"] }, { "required": ["scope"] }, { "required": ["count"] } ] }, "then": { "properties": { "op": { "const": "cost_shift" } } } },
         { "if": { "properties": { "op": { "enum": ["damage", "block", "draw", "gain_energy", "heal", "lose_hp", "forge"] } } }, "then": { "required": ["amount"] } }
       ]
     },

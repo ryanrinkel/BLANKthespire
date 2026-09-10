@@ -821,6 +821,11 @@ function effPhrase(e, target) {
     case "gain_energy": return `Gain ${a ?? 1} energy`;
     case "lose_hp": return `Lose ${a ?? ""} HP`;
     case "gain_max_hp": return `Gain ${a ?? ""} Max HP`; // Phase AN (v44)
+    case "cost_shift": { // Phase AO (v45)
+      const kind = { attack: "Attacks", skill: "Skills", power: "Powers" }[e.card_type] || "cards";
+      const life = e.scope === "combat" ? "this combat" : "this turn";
+      return e.count ? `Your next ${e.count > 1 ? e.count + " " : ""}${kind} cost ${a ?? 1} less ${life}` : `Your ${kind} cost ${a ?? 1} less ${life}`;
+    }
     case "heal": return `Heal ${a ?? ""}`;
     case "gain_orb_slot": return `Gain ${a ?? 1} orb slot${(a ?? 1) == 1 ? "" : "s"}`;
     case "forge": return `Forge ${a ?? 1}`; // Phase M (gap #36): stoke the Forge counter

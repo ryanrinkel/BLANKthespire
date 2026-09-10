@@ -153,6 +153,12 @@ FEATURED_MENU: list[Featured] = [
              'Skills cost 0 but Exhaust when played (base-game Corruption). Give the class Skill density + an '
              '"on_exhaust" payoff (Feel No Pain / Dark Embrace) so the free exhausting Skills feed an engine. One per class.',
              lambda cc: "corruption" in cc.ops),
+    # Phase AO (v45): the typed energy discount (the lighter cousin of corruption).
+    Featured("cost_trick", 'a TEMPO card that makes your Attacks / Skills / Powers cost less for a turn (op "cost_shift")',
+             'REQUIRED: add a skill with op "cost_shift" (card_type attack/skill/power/all, amount 1, scope "this_turn"; '
+             'add count 1 for "your next Skill costs 1 less") so one turn of the class\'s main card type gets cheaper; '
+             'a whole-combat scope is rare-only, amount 1, one per class.',
+             lambda cc: "cost_shift" in cc.ops),
     Featured("strike_synergy", 'a payoff that scales with how many cards of a TAG you own (scale "tag_cards_owned")',
              'REQUIRED: tag 3-5 cards of the class with the SAME lowercase "tags" slug (e.g. ["strike"]), then add '
              '1-2 damage/block payoffs carrying scale:"tag_cards_owned" + a matching "tag" so they deal/block their '

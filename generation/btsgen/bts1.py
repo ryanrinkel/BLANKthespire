@@ -25,7 +25,9 @@ import sys
 import zlib
 from pathlib import Path
 
-VOCAB_VERSION = 44  # must be <= ForgedCards.VocabVersion (44: Phase AN — SMALL OPS: card-only `gain_max_hp` (1..5,
+VOCAB_VERSION = 45  # must be <= ForgedCards.VocabVersion (45: Phase AO — CARD-TYPE-SCOPED COST MODIFIERS: card-only
+                    # `cost_shift {card_type, amount 1..2, scope this_turn|combat, count? 1..3}` + the relic hook form.
+                    # 44: Phase AN — SMALL OPS: card-only `gain_max_hp` (1..5,
                     # the Feed payoff: raise Max HP and heal that much), a `damage` flag `unblockable:true` (ignores
                     # Block; card-level only), and the one-turn self-buffs `temp_thorns` / `temp_focus`.
                     # 43: Phase AM — NEW SCALES AND CONDITIONS: card-level

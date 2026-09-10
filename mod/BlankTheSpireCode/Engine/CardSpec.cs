@@ -64,12 +64,20 @@ namespace BlankTheSpire.BlankTheSpireCode.Engine;
 /// instance, so it is a fired flag on the power (the relic-hook <c>once_per_combat</c> pattern). Rejected on
 /// turn_start/turn_end/ripen and on the card-latent on_discard; never combined with <see cref="OncePerTurn"/>
 /// (it already implies it). Default false.</param>
+/// <param name="CardKind">Phase AO (v45): on a <c>cost_shift</c> op, which of the owner's cards the discount applies to —
+/// <c>"attack"</c> / <c>"skill"</c> / <c>"power"</c> / <c>"all"</c> (the CardType filter; named CardKind so it doesn't shadow
+/// the game's CardType enum). Null for every other op.</param>
+/// <param name="Scope">Phase AO (v45): a <c>cost_shift</c>'s lifetime — <c>"this_turn"</c> (expires at the end of your turn)
+/// or <c>"combat"</c> (rides until the combat ends; rare-only, amount 1). Null for every other op.</param>
+/// <param name="Count">Phase AO (v45): a <c>cost_shift</c>'s use budget — 0 = every matching card (the flat form);
+/// 1..3 = only the next N matching cards you play ("Your next Skill costs 1 less this turn"), then the discount is spent.</param>
 public sealed record EffectSpec(string Op, int Amount = 0, string? Status = null, int Hits = 1, string? Scale = null,
     string? Orb = null, Condition? When = null, string? Trigger = null, EffectSpec[]? Triggered = null,
     string? StatusName = null, string? SummonName = null, bool OncePerTurn = false, string? Target = null,
     string? CardId = null, string? Pile = null, string? Pole = null, int Grow = 0, string? Cards = null,
     string? Tag = null, bool OncePerCombat = false,
-    bool Unblockable = false) // Phase AN (v44): a `damage` op that IGNORES Block (ValueProp.Unblockable on its damage var)
+    bool Unblockable = false, // Phase AN (v44): a `damage` op that IGNORES Block (ValueProp.Unblockable on its damage var)
+    string? CardKind = null, string? Scope = null, int Count = 0) // Phase AO (v45): the cost_shift filter / lifetime / use budget
 {
     /// <summary>This op's amount comes from a live scalar (any <see cref="Scale"/>), not <see cref="Amount"/>.</summary>
     public bool IsScaled => Scale != null;

@@ -67,7 +67,8 @@ _BUILD_AROUND_OPS = {"add_trigger", "apply_status_custom",
                      "purge_card",  # Phase Z (gap #19 choose): targeted deck-thinning is a build-around, not a flat stat line
                      "transform_card",  # Phase AH (gaps #35/#38): a run-permanent self-rewrite is a build-around, not a stat line
                      "graft_card",  # Phase AI (gap #7): a choose-a-card run-permanent transform is a build-around, not a stat line
-                     "scry"}  # Phase AA (gap #17 R-2): a draw-filter / on_discard fuel is a build-around, not a flat stat line
+                     "scry",  # Phase AA (gap #17 R-2): a draw-filter / on_discard fuel is a build-around, not a flat stat line
+                     "cost_shift"}  # Phase AO (v45): a typed energy discount is a tempo utility, not a flat stat line
 # F5: the live state scalars an effect's amount may scale to (mirrors ForgedCards.SupportedScales). "x" stays
 # the X-cost scalar; the rest are hand/energy state reads. Only "cards_retained" is allowed inside a trigger.
 # Phase M: "forged" is the ADDITIVE exception (printed amount + the Forge counter) and is damage/block-only.
@@ -121,6 +122,13 @@ _SHIELD_SUMMON_MAX = 12
 # Phase AN (v44): the gain_max_hp cap (mirrors ForgedCards.GainMaxHpMaxAmount + the schema clause). A run-permanent
 # stat (Feed is +3/+4), so the band is tight; card-only (the triggerEffect op enum omits it).
 _GAIN_MAX_HP_MAX = 5
+# Phase AO (v45): the cost_shift shape (mirrors ForgedCards.CostShiftKinds / CostShiftScopes / CostShiftMaxAmount /
+# CostShiftMaxCount + the schema clauses). Card-only (the triggerEffect op enum omits it); scope:"combat" is amount 1
+# and RARE-ONLY here (the C# has no rarity at effect level), ≤1 such card per class (character_validator).
+_COST_SHIFT_KINDS = {"attack", "skill", "power", "all"}
+_COST_SHIFT_SCOPES = {"this_turn", "combat"}
+_COST_SHIFT_MAX = 2
+_COST_SHIFT_MAX_COUNT = 3
 # Phase V/X (gap #18): the hand-scopes upgrade_card may use. Mirrors ForgedCards.UpgradeScopes. `random` is legal on
 # cards AND in trigger payloads; `all` (whole hand) and `choose` (Phase X — the player picks one card) are card-only
 # (a repeating whole-hand upgrade / a repeating pick-UI every turn is degenerate — rejected in a trigger by both this
@@ -473,6 +481,24 @@ class CardValidator:
                 gm = e.get("amount")
                 if isinstance(gm, int) and not isinstance(gm, bool) and gm > _GAIN_MAX_HP_MAX:
                     out.append(f"gain_max_hp 'amount' may be at most {_GAIN_MAX_HP_MAX}; got {gm}.")
+            # Phase AO (v45): cost_shift shape rules; its three fields belong to it alone. Mirrors ForgedCards.ValidateCostShift.
+            if op == "cost_shift":
+                ck = str(e.get("card_type", "")).strip().lower()
+                sc = str(e.get("scope", "")).strip().lower()
+                ca = e.get("amount")
+                cn = e.get("count", 0)
+                if ck not in _COST_SHIFT_KINDS:
+                    out.append(f"cost_shift needs a 'card_type' (one of {'/'.join(sorted(_COST_SHIFT_KINDS))}); got '{e.get('card_type')}'.")
+                if sc not in _COST_SHIFT_SCOPES:
+                    out.append(f"cost_shift needs a 'scope' (one of {'/'.join(sorted(_COST_SHIFT_SCOPES))}); got '{e.get('scope')}'.")
+                if not (isinstance(ca, int) and not isinstance(ca, bool) and 1 <= ca <= _COST_SHIFT_MAX):
+                    out.append(f"cost_shift 'amount' (the discount) must be 1..{_COST_SHIFT_MAX}; got {ca!r}.")
+                if not (isinstance(cn, int) and not isinstance(cn, bool) and 0 <= cn <= _COST_SHIFT_MAX_COUNT):
+                    out.append(f"cost_shift 'count' (the plays it applies to) must be 1..{_COST_SHIFT_MAX_COUNT}; got {cn!r}.")
+                if sc == "combat" and ca != 1:
+                    out.append("cost_shift with scope 'combat' must use amount 1 (a whole-combat -2 is degenerate).")
+            elif e.get("card_type") is not None or e.get("scope") is not None or e.get("count") is not None:
+                out.append(f"'card_type'/'scope'/'count' only apply to cost_shift (op '{op}').")
             if scale:
                 if scale not in _SUPPORTED_SCALES:
                     out.append(f"unsupported scale '{scale}' (one of {'/'.join(sorted(_SUPPORTED_SCALES))}).")
@@ -596,6 +622,21 @@ class CardValidator:
         if any(e.get("op") == "blade_empower" for e in effects + up_effects):
             if str(card.get("type", "")).strip().lower() == "attack":
                 out.append("'blade_empower' only applies to a skill or power card (not an attack — the empowered swing is the blade's).")
+        # Phase AO (v45): cost_shift — at most one per EFFECT LIST (one discount sentence per play; base + upgrade
+        # independent, like graft_card); a whole-combat discount is RARE-ONLY (a build-around power, loop discipline:
+        # the per-class ≤1 rule is set-level, character_validator.cost_shift_warnings). Never on a BASIC card (a
+        # discount in the starting deck warps the floors). Card-only (the schema triggerEffect op enum omits it).
+        # Mirrors ForgedCards.Validate (the ≤1 rule) — rarity/basic are generation-side rules.
+        cs_fx = [e for e in effects + up_effects if e.get("op") == "cost_shift"]
+        if cs_fx:
+            if (sum(1 for e in effects if e.get("op") == "cost_shift") > 1
+                    or sum(1 for e in up_effects if e.get("op") == "cost_shift") > 1):
+                out.append("at most one 'cost_shift' effect per card (one discount per play).")
+            if is_basic:
+                out.append("'cost_shift' is not allowed on a BASIC card (a discount in the starting deck warps the floors).")
+            if (any(str(e.get("scope", "")).strip().lower() == "combat" for e in cs_fx)
+                    and str(card.get("rarity", "")).strip().lower() != "rare"):
+                out.append("'cost_shift' with scope 'combat' is RARE-ONLY (a whole-combat discount is a build-around power).")
         cost = card.get("cost", 0)
         costs_x = isinstance(cost, str) and cost.strip().upper() == "X"
         any_scale = any(str(e.get("scale", "")).lower() == "x" for e in effects)
@@ -799,6 +840,19 @@ class CardValidator:
             # Phase AN (v44): a run-permanent stat (+ an immediate heal of the same amount) — priced like a permanent
             # buff so a common can't carry it cheaply (the vocabulary pins it to uncommon/rare).
             return amt * 4.0
+        if op == "cost_shift":
+            # Phase AO (v45): energy in disguise. A this-turn typed discount is worth ~2/3 of gain_energy per point
+            # (only the matching cards cash it; "all" is nearly gain_energy); a use budget scales with the plays it
+            # covers; a whole-combat discount is a rare build-around (priced like a per-turn energy power).
+            kind = str(eff.get("card_type", "all")).strip().lower()
+            scope = str(eff.get("scope", "this_turn")).strip().lower()
+            count = self._amt(eff.get("count", 0))
+            width = 5.5 if kind == "all" else 4.0
+            if scope == "combat":
+                return amt * width * 3.0
+            if count > 0:
+                return amt * width * min(count, 3.0) * 0.6
+            return amt * width
         if op == "block":
             return amt * 0.8 + (6.0 if forged else 0.0)
         if op == "draw":
