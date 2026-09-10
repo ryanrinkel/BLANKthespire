@@ -119,6 +119,7 @@ build) · `building` · `done` (now in vocabulary) · `rejected`.
 - **Priority:** unset (triage).
 - **Status:** **rejected (2026-07-14, wave-4 scout triage)**
 - **Triage (2026-07-14, wave-4 scout):** the burst half is expressible (`apply_status` vulnerable/weak/poison + `ripen`), but the freeze half needs an enemy STUN primitive (prevent enemy action) that has no surface in the vocab or scouted API. Re-open only if a stun/disable power is ever scouted.
+- **Update (2026-09-10, Phase AQ, vocab v47):** the "resolves into a damage-over-time effect" reading is now a first-class class shape — a `status_pool` debuff with hook **`damage_over_time`** (the afflicted enemy loses HP = stacks at its turn start, Poison-shaped, must decay), plus `mode: multiplicative` on `damage_taken` for the "shatter" amplifier. The stun half stays rejected.
 
 ### 12. Ice Shatter
 - **Surfaced by:** staged front-end ("a frost mage who freezes then shatters")

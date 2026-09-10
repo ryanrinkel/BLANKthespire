@@ -330,13 +330,21 @@ public static class ForgedCharacters
     /// <summary>The max custom statuses a single class may forge (keep in sync with slotgen STATUSES_PER_CLASS).</summary>
     public const int MaxCustomStatuses = 4;
 
-    /// <summary>The Modify* hooks a forged status may bind to (MVP additive set; hit_count + multiplicative + the
-    /// reactive After* hooks are deferred to J-3).</summary>
+    /// <summary>The hooks a forged status may bind to: the J-1 Modify* additive set, plus (Phase AQ, v47)
+    /// <c>damage_over_time</c> (a Poison-shaped debuff tick at the afflicted enemy's turn start) and <c>hit_count</c>
+    /// (a buff: +stacks hits on the owner's card attacks — the J-1 cut is lifted because <c>AttackCommand.Attacker</c>
+    /// is a public accessor, so the hook gates on the attacker cleanly). Reactive After* hooks stay with add_trigger.</summary>
     private static readonly HashSet<string> StatusHooks =
-        ["damage_dealt", "damage_taken", "block_gained", "energy_gain", "card_draw"];
+        ["damage_dealt", "damage_taken", "block_gained", "energy_gain", "card_draw", "damage_over_time", "hit_count"];
 
     private static readonly HashSet<string> StatusDecays = ["none", "lose_one_eot", "lose_all_eot"];
-    private static readonly HashSet<string> StatusModes = ["additive"]; // multiplicative deferred (J-1)
+    /// <summary>Modifier modes. <c>multiplicative</c> (Phase AQ) is legal on the two damage hooks only: the status
+    /// multiplies powered-attack damage by (1 + 0.1·stacks), capped at ×2 (<see cref="Powers.ForgedStatusPower"/>).</summary>
+    private static readonly HashSet<string> StatusModes = ["additive", "multiplicative"];
+    private static readonly HashSet<string> MultiplicativeHooks = ["damage_dealt", "damage_taken"];
+    /// <summary>Hooks whose stacks would be degenerate as a permanent counter (an endless burn / a permanent extra hit):
+    /// they must declare a decay (lose_one_eot / lose_all_eot). Mirrored in class_forge._validate_status_pool.</summary>
+    private static readonly HashSet<string> MustDecayHooks = ["damage_over_time", "hit_count"];
 
     private static bool TryParseStatusPool(Godot.Collections.Array arr, out StatusSpec[] pool, out string error)
     {
@@ -381,13 +389,22 @@ public static class ForgedCharacters
         if (!StatusHooks.Contains(hook)) { error = $"status '{name}': hook must be one of {string.Join("/", StatusHooks)} (got '{hook}')."; return false; }
 
         string mode = (d.ContainsKey("mode") ? Str(d, "mode") : "additive").Trim().ToLowerInvariant();
-        if (!StatusModes.Contains(mode)) { error = $"status '{name}': mode '{mode}' is not supported (J-1 is additive only)."; return false; }
+        if (!StatusModes.Contains(mode)) { error = $"status '{name}': mode must be one of {string.Join("/", StatusModes)} (got '{mode}')."; return false; }
+        // Phase AQ: multiplicative scaling is a damage-pipeline concept (Hook.ModifyDamageMultiplicative); the
+        // block/energy/draw/DoT/hit-count hooks have no multiplicative reading.
+        if (mode == "multiplicative" && !MultiplicativeHooks.Contains(hook))
+        { error = $"status '{name}': mode multiplicative is only valid on {string.Join("/", MultiplicativeHooks)} (got hook '{hook}')."; return false; }
 
         // damage_dealt only makes sense as a buff (it boosts the owner's attacks); damage_taken as a debuff
         // (it makes the afflicted enemy take more). Block/energy/draw are owner-only → buffs.
         if (hook == "damage_dealt" && !isBuff) { error = $"status '{name}': damage_dealt must be a buff."; return false; }
         if (hook is "block_gained" or "energy_gain" or "card_draw" && !isBuff) { error = $"status '{name}': {hook} must be a buff (it changes your own numbers)."; return false; }
         if (hook == "damage_taken" && isBuff) { error = $"status '{name}': damage_taken should be a debuff (it makes the afflicted creature take more damage)."; return false; }
+        // Phase AQ: a DoT lands on the enemy (debuff); an extra-hit stance is yours (buff); both must burn out.
+        if (hook == "damage_over_time" && isBuff) { error = $"status '{name}': damage_over_time must be a debuff (the afflicted enemy loses HP at its turn start)."; return false; }
+        if (hook == "hit_count" && !isBuff) { error = $"status '{name}': hit_count must be a buff (it adds hits to your own attacks)."; return false; }
+        if (MustDecayHooks.Contains(hook) && decay == "none")
+        { error = $"status '{name}': {hook} must decay (lose_one_eot or lose_all_eot) — a permanent {hook} is degenerate."; return false; }
 
         spec = new StatusSpec(name, emoji, desc, isBuff, stack == "single", decay, hook, mode);
         error = "";

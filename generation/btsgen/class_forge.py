@@ -269,8 +269,10 @@ includes `when` gates (conditional payoffs), `scale`d amounts (state-scaling), `
 powers), `add_card` tokens (card generation), multi-hit, and the class-kind pools (custom orbs / statuses / a \
 summon). If the concept implies a mechanic that doesn't exist BY NAME (freeze, burn, bleed, rage…), translate \
 its FANTASY onto a DISTINCT shape first, generic debuffs last: "freeze" -> a custom `status_pool` debuff \
-(hook damage_taken: Brittle) or Frail + a Block engine; "burn" -> a `turn_start` power whose payload deals \
-damage to all enemies, or Poison; "bleed" -> `lose_hp` fuel + `on_hp_lost` / `hp_lost_ge` payoffs; "berserk" \
+(hook damage_taken: Brittle) or Frail + a Block engine; "burn / bleed / venom on the enemy" -> a custom \
+`status_pool` debuff (hook damage_over_time: Scorch, a Poison-shaped tick), or a `turn_start` power whose payload \
+deals damage to all enemies; "bleed" (yours) -> `lose_hp` fuel + `on_hp_lost` / `hp_lost_ge` payoffs; "flurry / \
+frenzy" -> a custom `status_pool` buff (hook hit_count) or multi-hit `hits`; "berserk" \
 -> `forge` income + `scale:"forged"` payoffs, or temp_strength; "venom" -> Poison + a `target_debuff_count` \
 payoff; "tempo" -> draw + gain_energy; "devour/hunger" -> a rare `gain_max_hp` attack; "piercing" -> a damage with \
 `unblockable`; "bristle" -> temp_thorns; "discount / free spell / momentum" -> a `cost_shift` skill ("your Attacks \
@@ -526,9 +528,14 @@ an alchemist's "Corrosion", a monk's "Flow") rather than orbs or generic statuse
 "description" }}. The `hook` (and its REQUIRED side) is one of: `damage_dealt` (BUFF — your attacks deal +stacks \
 damage, Strength-like), `damage_taken` (DEBUFF — the afflicted enemy takes +stacks damage, a Brittle/expose), \
 `block_gained` (BUFF — +stacks Block when you gain Block, Dexterity-like), `energy_gain` (BUFF — +stacks energy \
-per turn), `card_draw` (BUFF — draw +stacks cards). `decay` is "none" (permanent), "lose_one_eot" (−1 stack at end \
-of your turn), or "lose_all_eot" (clears at end of your turn). BUFFS are applied by SELF-target cards (worded \
-"Gain N <Name>"); the single DEBUFF hook (damage_taken) by ENEMY-target cards ("Apply N <Name>"). Card briefs \
+per turn), `card_draw` (BUFF — draw +stacks cards), `damage_over_time` (DEBUFF — at the start of ITS turn the \
+afflicted enemy loses HP equal to its stacks, Poison-shaped; the burn / bleed / venom fantasy; MUST decay), \
+`hit_count` (BUFF — your Attacks hit +stacks extra times this turn, a flurry stance; MUST decay; 1 stack is a lot). \
+`decay` is "none" (permanent), "lose_one_eot" (−1 stack at end of the owner's turn), or "lose_all_eot" (clears at \
+end of the owner's turn). Optional `mode`: "additive" (default — stacks are a flat bonus) or, on damage_dealt / \
+damage_taken ONLY, "multiplicative" (each stack = +10% damage, capped at double — a Vulnerable-like scaler). BUFFS \
+are applied by SELF-target cards (worded "Gain N <Name>"); the DEBUFF hooks (damage_taken, damage_over_time) by \
+ENEMY-target cards ("Apply N <Name>"). Card briefs \
 apply them by name: write "gain 2 Razor Focus" or "apply 2 Brittle to the enemy" and the card emits \
 apply_status_custom status_name:"Razor Focus". Keep numbers SMALL (these fire every relevant event). Example: \
 "status_pool": [ {{ "name": "Razor Focus", "emoji": "\U0001F5E1", "type": "buff", "hook": "damage_dealt", \
@@ -1914,8 +1921,12 @@ def _orb_pool_custom_names(bp: dict) -> set[str]:
 
 # --- Phase J: status pool validation (mirrors the C# ForgedCharacters status-pool parser) ----------
 
-_STATUS_HOOKS = {"damage_dealt", "damage_taken", "block_gained", "energy_gain", "card_draw"}
+_STATUS_HOOKS = {"damage_dealt", "damage_taken", "block_gained", "energy_gain", "card_draw",
+                 "damage_over_time", "hit_count"}  # Phase AQ (v47): + the DoT debuff and the extra-hit buff
 _STATUS_DECAYS = {"none", "lose_one_eot", "lose_all_eot"}
+_STATUS_MODES = {"additive", "multiplicative"}          # Phase AQ: multiplicative opens (damage hooks only)
+_MULTIPLICATIVE_HOOKS = {"damage_dealt", "damage_taken"}  # the only hooks with a multiplicative reading (C# mirror)
+_MUST_DECAY_HOOKS = {"damage_over_time", "hit_count"}     # a permanent burn / permanent extra hit is degenerate (C# mirror)
 _MAX_CUSTOM_STATUSES = 4  # must equal ForgedCharacters.MaxCustomStatuses
 
 
@@ -1949,6 +1960,12 @@ def _validate_status_pool(pool) -> list[str]:
         stack = str(st.get("stack", "counter")).strip().lower()
         if stack not in ("counter", "single"):
             errs.append(f"status '{nm or i}': stack must be counter/single")
+        mode = str(st.get("mode", "additive")).strip().lower()
+        if mode not in _STATUS_MODES:
+            errs.append(f"status '{nm or i}': mode must be one of {sorted(_STATUS_MODES)}")
+        elif mode == "multiplicative" and hook not in _MULTIPLICATIVE_HOOKS:
+            errs.append(f"status '{nm or i}': mode multiplicative is only valid on {sorted(_MULTIPLICATIVE_HOOKS)} "
+                        f"(got hook '{hook}')")
         # side rules (mirror C#): damage_dealt/block_gained/energy_gain/card_draw are buffs (your own numbers);
         # damage_taken is a debuff (the afflicted enemy takes more).
         is_buff = typ == "buff"
@@ -1956,6 +1973,13 @@ def _validate_status_pool(pool) -> list[str]:
             errs.append(f"status '{nm or i}': {hook} must be a buff (it changes your own numbers)")
         if hook == "damage_taken" and is_buff:
             errs.append(f"status '{nm or i}': damage_taken must be a debuff (the afflicted enemy takes more)")
+        # Phase AQ (mirror C#): a DoT lands on the enemy, an extra-hit stance is yours, and both must burn out.
+        if hook == "damage_over_time" and is_buff:
+            errs.append(f"status '{nm or i}': damage_over_time must be a debuff (the afflicted enemy loses HP at its turn start)")
+        if hook == "hit_count" and not is_buff:
+            errs.append(f"status '{nm or i}': hit_count must be a buff (it adds hits to your own attacks)")
+        if hook in _MUST_DECAY_HOOKS and decay == "none":
+            errs.append(f"status '{nm or i}': {hook} must decay (lose_one_eot or lose_all_eot) — a permanent {hook} is degenerate")
     return errs
 
 

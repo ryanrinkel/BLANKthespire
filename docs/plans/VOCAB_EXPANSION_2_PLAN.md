@@ -361,7 +361,9 @@ archetype get PICKED.
 #3/#35/#38) · `#19 purge` (BaseLib `PurgePatch` likely carries the runtime) · `#18 upgrade-op`
 (no-choice variant buildable today per the Phase M research note) · `#25 strike-count` (needs a card-tag
 convention first) · **status-pool hook expansion** (`damage_over_time` hook — cheaply serves the
-recurring burn/freeze fantasies, gap #11). Re-rank by gap-resurface counts when the time comes.
+recurring burn/freeze fantasies, gap #11) — **LANDED 2026-09-10 as Phase AQ (vocab v47,
+`VOCAB_GAP_REMEDIATION_PLAN.md`): `damage_over_time` + `hit_count` hooks and `mode: multiplicative`.**
+Re-rank by gap-resurface counts when the time comes.
 
 ---
 

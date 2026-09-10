@@ -312,10 +312,17 @@ Each `status_pool` entry is an object:
   | `block_gained` | **buff** | +stacks Block whenever you gain Block (Dexterity-like) |
   | `energy_gain`  | **buff** | +stacks energy per turn |
   | `card_draw`    | **buff** | draw +stacks cards |
+  | `damage_over_time` | **debuff** | at the start of ITS turn the afflicted enemy loses HP = stacks, unblockable (Poison-shaped: the burn / bleed / venom fantasy; v47). MUST decay |
+  | `hit_count`    | **buff** | your Attacks hit +stacks extra times (a flurry stance; v47). MUST decay — 1 stack is a lot |
 - `type` — `buff` (applied to YOU; ride it on a `self`-target card → worded "Gain N <Name>") or `debuff` (applied to
   the enemy; ride it on an `enemy`-target card → "Apply N <Name>"). The side MUST match the hook (table above).
-- `decay` — `none` (permanent), `lose_one_eot` (−1 stack at end of your turn), or `lose_all_eot` (clears at end of
-  your turn). `emoji` is a single emoji (the status's text glyph + icon). Optional `stack` = `counter` (default) / `single`.
+- `decay` — `none` (permanent), `lose_one_eot` (−1 stack at end of the owner's turn), or `lose_all_eot` (clears at
+  end of the owner's turn) — a buff decays on YOUR turn end, a debuff on the ENEMY's. `damage_over_time` and
+  `hit_count` may not be `none`. `emoji` is a single emoji (the status's text glyph + icon). Optional `stack` =
+  `counter` (default) / `single`.
+- `mode` (optional, v47) — `additive` (default: stacks are a flat bonus) or `multiplicative`, legal on `damage_dealt` /
+  `damage_taken` ONLY: each stack is +10% damage on powered attacks, capped at ×2 (a Vulnerable-like scaler; stacks
+  past 10 add nothing).
 - Cards apply by name: a brief like "gain 2 Razor Focus" → `{ "op":"apply_status_custom", "status_name":"Razor Focus",
   "amount":2 }` on a self-target card; "apply 2 Brittle" → the same op on an enemy-target card. Numbers fire every
   relevant event, so keep them **small**.

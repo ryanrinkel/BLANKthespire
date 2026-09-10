@@ -366,6 +366,51 @@ DISCARD pile (`grave_hand`), got **0 plays** because the bot's Neow pick ("Preca
 start — the code path is the same `FromCombatPile` call the exhaust form fired 9 times, so not re-run. Tag evidence:
 `generation/scratch/gaptest-ap/godot_AP_tags_GAPTESTAP1.txt`.
 
+**STATUS (2026-09-10): Phase AQ EXECUTED (vocab v47)** — all three items landed in lockstep; the verify-first item PASSED, so
+nothing was stopped. **(1) `damage_over_time` hook** — a `status_pool` DEBUFF: at the start of the afflicted enemy's turn it loses HP
+equal to its stacks, unblockable + unpowered (PoisonPower's exact recipe — `ForgedStatusPower.AfterSideTurnStart` +
+`CreatureCmd.Damage(new ThrowingPlayerChoiceContext(), Owner, stacks, Unblockable | Unpowered)`), then the EXISTING end-of-turn
+decay burns it down (`lose_one_eot` = Poison's N + N−1 + …; `lose_all_eot` = a one-shot delayed hit). The spec MUST decay (both
+validators reject `none` — a permanent burn is strictly better than Poison). **Deviation, deliberate:** the plan wrote
+"BeforeTurnStart"; the first build used `BeforeSideTurnStart` (it hands over a choice context) and GAPTESTAQ1 hung at "Combat turn 2"
+— that hook runs BEFORE the game's per-creature turn start (`Creature.AfterTurnStart → ClearBlock → Hook.ShouldClearBlock`), so a
+LETHAL tick pulled Nibbit out from under the next `IterateCombatHookListeners` (NRE, turn-end task faulted, watchdog). Poison ticks
+in `AfterSideTurnStart`; mirroring it byte-for-byte fixed it (GAPTESTAQ2 full run). **(2) `mode: multiplicative`** on `damage_dealt`
+/ `damage_taken` ONLY (both validators + C# reject it elsewhere): `ModifyDamageMultiplicative` returns a FACTOR the game multiplies
+into the running damage (Vulnerable/Weak convention, verified in `Hook.ModifyDamageInternal` — product of returns) = ×(1 + 0.1·stacks)
+capped ×2 (`ForgedStatusPower.MultiplicativeFactor`; stacks past 10 add nothing), gated on `IsPoweredAttack()` like Vulnerable /
+Weak / Strength so DoT ticks, Poison and thorns are never scaled; the additive hook returns 0 for a multiplicative spec (no
+double-dip). **(3) `hit_count` hook — verify-first PASSED:** `AttackCommand.Attacker { get; private set; }` is PUBLIC in both the
+decompile and the runtime reflect dump (`prop Creature Attacker`) — the J-1 "no clean dealer accessor" note was stale (the
+PetDamageAttributionPatch point wasn't needed). `ModifyAttackHitCount(AttackCommand attack, int hitCount)` returns
+`hitCount + stacks` when `attack.Attacker == Owner && attack.ModelSource is CardModel` (your CARD attacks; never enemy / pet /
+relic attacks); the game runs its hit loop `attackCount` times, so a Strike becomes 2 hits, a 2-hit card 3. A BUFF that MUST decay
+(a permanent extra hit is degenerate). Status-pool side/decay/mode rules are mirrored in `ForgedCharacters.TryParseStatus` and
+`class_forge._validate_status_pool` (`_MULTIPLICATIVE_HOOKS`, `_MUST_DECAY_HOOKS`). No card-level change (cards still
+`apply_status_custom` by name), so the card schema / cardgen / validator.py are untouched. Lockstep: `StatusSpec.cs` (docs),
+`ForgedCharacters.cs` (StatusHooks / StatusModes / MultiplicativeHooks / MustDecayHooks + rules), `ForgedStatusPower.cs` (three
+hooks, `[AQ]` logs, Describe incl. the buff/debuff-aware decay sentence), `ForgedCards.cs` VocabVersion 47, `bts1.py` 47,
+`class_forge.py` (validator + the status-pool prompt paragraph + the fantasy table: "burn / bleed / venom on the enemy" now routes
+to a `damage_over_time` status FIRST, Poison dropped from the burn line; "flurry / frenzy" → `hit_count`), `VOCABULARY.md` (two
+hook rows, the decay bullet now says whose turn, a `mode` bullet), `DESIGN_HEURISTICS.md` (status_signature pricing for all three),
+`web/static/app.js` (labels + the multiplicative suffix), `harness_v2.EXEMPLAR_CONTEXT` (+ Scorch, Flurry), `exemplar_pool.json`
+(+2: Scorching Brand, Flurry Stance; pool 110 → 112), `archetypes.json` (status_signature metaphors "the lingering burn" / "the
+extra cut" — the first picks collided with strike_tempo / countdown_ripen under `test_no_shared_strings`), `PHASE_J…PLAN.md` (cuts
+lifted), `VOCAB_EXPANSION_2_PLAN.md` §6 LANDED, `VOCABULARY_GAPS.md` #11 (the DoT half). **Rule 0.9 budget:** blueprint prompt
+**+1,402 chars (90,547 → 91,949, seed 1)** — under AP's +1,691. Tests: `tests/test_phase_aq.py` (63 checks: every legal / illegal
+pool shape with the C# wording family, the C# mirror greps incl. the AfterSideTurnStart assertion, card-level describe, both
+exemplars under `exemplar_validator`, contract / heuristics / web / archetype / prompt tokens); suite **394 passed**; C# build 0 errors.
+AutoSlay (tester `generation/scratch/gaptest-aq/build_tester.py` — pool Scorch 🔥 DoT lose_one_eot / Flurry hit_count lose_all_eot /
+Kindle damage_dealt ×mult none / Ashen damage_taken ×mult lose_one_eot, 13 cards, 15-card aggression deck, staged into slot 04,
+unstaged afterwards): **GAPTESTAQ1** (first build) 57 `[AQ]` tags then the lethal-tick NRE above (mod-attributable — fixed).
+**GAPTESTAQ2** (fixed build) **PASS: RunCompleted — a FULL run, 48 rooms, 2,033 `[AQ]` tags**: damage_over_time ×87 (ticks of 3–15
+on 15 distinct enemy kinds, lethal ticks included, no NRE), hit_count ×25 (24× `1 -> 2`, 1× `2 -> 3` on Twin Cut), damage_dealt
+multiplicative ×1,517 (Kindle ×1.3 … ×2.0 — 210 fires AT the cap, so the cap holds), damage_taken multiplicative ×404 (Ashen ×1.1 …
+×2.0, 79 at the cap, and the factor stepping down 1 per enemy turn = the debuff decay) · 0 mod-attributable exception frames (the
+ERROR lines are BaseLib's startup pair + AutoSlay's post-run "Options NButton not found" abandon step after RunCompleted). The
+multiplicative tag fires ~3× per attack because the game runs `Hook.ModifyDamage` for card-text previews too — idempotent, expected.
+Tag evidence: `generation/scratch/gaptest-aq/godot_AQ_tags_GAPTESTAQ{1,2}.txt`.
+
 ---
 
 ## 0. Ground rules

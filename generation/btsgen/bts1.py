@@ -25,7 +25,11 @@ import sys
 import zlib
 from pathlib import Path
 
-VOCAB_VERSION = 46  # must be <= ForgedCards.VocabVersion (46: Phase AP — PILE MANIPULATION AND STATUS CARDS: `discard`
+VOCAB_VERSION = 47  # must be <= ForgedCards.VocabVersion (47: Phase AQ — STATUS-POOL HOOKS: class `status_pool` gains
+                    # `damage_over_time` (debuff, must decay — the afflicted enemy loses HP = stacks at its turn start,
+                    # Poison-shaped) and `hit_count` (buff, must decay — your card attacks hit +stacks extra times); `mode:
+                    # multiplicative` opens on damage_dealt / damage_taken (x(1 + 0.1*stacks), capped x2). No card-level change.
+                    # 46: Phase AP — PILE MANIPULATION AND STATUS CARDS: `discard`
                     # gains `cards: random|choose` (choose is card-only); card-only `retrieve_card {pile discard|exhaust,
                     # cards random|choose, amount? 1..2}` (return pile cards to hand) and card-only `add_status_card
                     # {card dazed|wound|burn, pile hand|discard|draw, amount? 1..3}` (the self-drawback Status cards).

@@ -164,7 +164,8 @@ def load_exemplar_pool() -> tuple:
 # The placeholder class context the pool's CLASS-ONLY exemplars are written against: one custom status
 # (`apply_status_custom`), one minion (`summon` & co). Custom orbs are deliberately absent — the orb exemplars
 # channel base orbs only, so a dealt exemplar never names an orb the receiving class's pool lacks.
-EXEMPLAR_CONTEXT = {"extra_statuses": frozenset({"Razor Focus"}), "extra_summons": frozenset({"Bone Thrall"})}
+EXEMPLAR_CONTEXT = {"extra_statuses": frozenset({"Razor Focus", "Scorch", "Flurry"}),  # Phase AQ: + a DoT, a hit_count stance
+                    "extra_summons": frozenset({"Bone Thrall"})}
 
 
 def exemplar_validator():

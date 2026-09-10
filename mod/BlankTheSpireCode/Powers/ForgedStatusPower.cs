@@ -1,9 +1,13 @@
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using BaseLib.Abstracts;
 using BaseLib.Utils;
 using BlankTheSpire.BlankTheSpireCode.Engine;
 using MegaCrit.Sts2.Core.Combat;
+using MegaCrit.Sts2.Core.Commands;          // Phase AQ: CreatureCmd.Damage for the damage_over_time tick
+using MegaCrit.Sts2.Core.Commands.Builders; // Phase AQ: AttackCommand (ModifyAttackHitCount's attack.Attacker gate)
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Entities.Players;
@@ -31,8 +35,17 @@ namespace BlankTheSpire.BlankTheSpireCode.Powers;
 /// <c>ModifyDamageAdditive</c> by the spike). <c>energy_gain</c>/<c>card_draw</c> use the bare transform hooks
 /// (<c>ModifyEnergyGain</c>/<c>ModifyHandDraw</c>), which are handed the running value and return the modified
 /// one. Every hook is gated on the relevant creature/player being THIS power's <see cref="PowerModel.Owner"/>, so
-/// a buff only ever changes the owning player's numbers and a debuff only the afflicted enemy's. Multiplicative
-/// scaling, <c>hit_count</c> (no clean dealer gate on AttackCommand), and reactive hooks are deferred to J-3.
+/// a buff only ever changes the owning player's numbers and a debuff only the afflicted enemy's.
+///
+/// Phase AQ (v47) lifted the J-1 cuts: <c>mode: multiplicative</c> on the two damage hooks rides
+/// <c>ModifyDamageMultiplicative</c> (a FACTOR — the game multiplies the running damage by the product of every
+/// power's return, Vulnerable/Weak-style; ×(1 + 0.1·stacks), capped at ×2, powered attacks only);
+/// <c>hit_count</c> rides <c>ModifyAttackHitCount(AttackCommand, int)</c> gated on <c>attack.Attacker == Owner</c>
+/// (the accessor the J-1 note thought was missing is public on the current AttackCommand) and returns
+/// <c>hitCount + stacks</c> for the owner's CARD attacks; <c>damage_over_time</c> is the Poison recipe — at the
+/// start of the OWNER's side's turn (<c>AfterSideTurnStart</c>, PoisonPower's hook) the owner takes <c>stacks</c>
+/// unblockable, unpowered damage (<c>CreatureCmd.Damage</c>, the same props PoisonPower passes), then the existing
+/// end-of-turn decay burns it down. Reactive hooks stay with <c>add_trigger</c>.
 /// </summary>
 public abstract class ForgedStatusPower : BlankTheSpirePower
 {
@@ -90,10 +103,74 @@ public abstract class ForgedStatusPower : BlankTheSpirePower
     public override decimal ModifyDamageAdditive(
         Creature target, decimal amount, ValueProp props, Creature dealer, CardModel cardSource)
     {
-        var h = Source?.Hook;
+        var s = Source;
+        if (s == null || s.Mode == "multiplicative") return 0m; // AQ: a multiplicative status contributes below, not here
+        var h = s.Hook;
         if (h == "damage_dealt" && dealer == Owner) return Amount;  // your attacks deal +stacks (Strength-like)
         if (h == "damage_taken" && target == Owner) return Amount;  // this creature takes +stacks (Brittle-like)
         return 0m;
+    }
+
+    // --- Phase AQ (v47): multiplicative mode, hit_count, damage_over_time ------------------------------------
+
+    /// <summary>Per-stack step of a multiplicative status (×1.1 per stack).</summary>
+    public const decimal MultiplicativeStep = 0.1m;
+
+    /// <summary>The hard cap on a multiplicative status's factor (×2 — stacks past 10 add nothing).</summary>
+    public const decimal MultiplicativeCap = 2.0m;
+
+    /// <summary>The factor <paramref name="stacks"/> of a multiplicative status contributes: 1 + 0.1·stacks, capped.</summary>
+    public static decimal MultiplicativeFactor(int stacks) =>
+        Math.Min(MultiplicativeCap, 1m + MultiplicativeStep * Math.Max(0, stacks));
+
+    /// <summary>The game multiplies the running damage by the product of every power's return (Vulnerable ×1.5, Weak
+    /// ×0.75), so a no-match returns 1m. Gated like those two: the owner as dealer (damage_dealt) / as target
+    /// (damage_taken) AND a powered attack (never a DoT tick, Poison, or thorns — the same
+    /// <c>IsPoweredAttack</c> gate Vulnerable/Weak/Strength use).</summary>
+    public override decimal ModifyDamageMultiplicative(
+        Creature target, decimal amount, ValueProp props, Creature dealer, CardModel cardSource)
+    {
+        var s = Source;
+        if (s == null || s.Mode != "multiplicative" || !props.IsPoweredAttack()) return 1m;
+        bool match = (s.Hook == "damage_dealt" && dealer == Owner) || (s.Hook == "damage_taken" && target == Owner);
+        if (!match) return 1m;
+        decimal f = MultiplicativeFactor(Amount);
+        MainFile.Logger.Info($"[AQ] {s.Hook} multiplicative '{s.Name}' x{f} ({Amount} stacks) on {amount} damage.");
+        return f;
+    }
+
+    /// <summary>hit_count: the owner's CARD attacks hit +stacks extra times. <c>AttackCommand.Attacker</c> is the
+    /// creature performing the attack (set by the card/monster builder before Execute runs the hook), so gating on
+    /// it keeps a player stance off enemy attacks; the <c>ModelSource is CardModel</c> gate keeps it off relic /
+    /// potion / pet attacks ("your attacks" = your cards). The game runs the loop <c>attackCount</c> times, so the
+    /// return is the new total.</summary>
+    public override int ModifyAttackHitCount(AttackCommand attack, int hitCount)
+    {
+        var s = Source;
+        if (s == null || s.Hook != "hit_count" || Amount <= 0) return hitCount;
+        if (attack.Attacker != Owner || attack.ModelSource is not CardModel) return hitCount;
+        MainFile.Logger.Info($"[AQ] hit_count '{s.Name}' +{Amount} hits ({hitCount} -> {hitCount + Amount}) on {attack.ModelSource.Id}.");
+        return hitCount + Amount;
+    }
+
+    /// <summary>damage_over_time: at the start of the OWNER's side's turn (a debuff on an enemy ticks on the enemy's
+    /// turn, like Poison), the owner loses HP equal to its stacks — unblockable AND unpowered, the exact props
+    /// PoisonPower passes, so Block, Strength, Vulnerable and our own damage statuses never touch the tick. The
+    /// stacks then burn down through the existing end-of-turn decay (the spec MUST declare one — validated).
+    /// This is PoisonPower's hook and context, byte-for-byte: <c>AfterSideTurnStart</c> + a
+    /// <c>ThrowingPlayerChoiceContext</c> (no player choice can occur under a damage tick). NOT
+    /// <c>BeforeSideTurnStart</c> — that runs before the game's per-creature turn-start (<c>ClearBlock</c> etc.),
+    /// and a LETHAL tick there pulls the creature out from under the next hook iteration
+    /// (<c>Hook.ShouldClearBlock → IterateCombatHookListeners</c> NRE, seen on GAPTESTAQ1 turn 2).</summary>
+    public override async Task AfterSideTurnStart(CombatSide side, IReadOnlyList<Creature> participants, ICombatState combatState)
+    {
+        var s = Source;
+        if (s == null || s.Hook != "damage_over_time" || Amount <= 0) return;
+        if (side != Owner.Side || !participants.Contains(Owner) || !Owner.IsAlive) return;
+        int n = Amount;
+        MainFile.Logger.Info($"[AQ] damage_over_time '{s.Name}' ticks {n} on {Owner.Name} (decay {s.Decay}).");
+        await CreatureCmd.Damage(new ThrowingPlayerChoiceContext(), Owner, n,
+                                 ValueProp.Unblockable | ValueProp.Unpowered, (Creature?)null, (CardModel?)null);
     }
 
     public override decimal ModifyBlockAdditive(
@@ -151,21 +228,30 @@ public abstract class ForgedStatusPower : BlankTheSpirePower
     {
         if (!string.IsNullOrWhiteSpace(s.Description)) return s.Description;
         string who = s.IsBuff ? "Your" : "This enemy's";
+        bool mult = s.Mode == "multiplicative";
         string body = s.Hook switch
         {
-            "damage_dealt" => $"{who} attacks deal bonus damage equal to its stacks.",
-            "damage_taken" => s.IsBuff
-                ? "You take bonus damage equal to its stacks."
-                : "This enemy takes bonus damage equal to its stacks.",
+            "damage_dealt" => mult
+                ? $"{who} attacks deal 10% more damage per stack (up to double)."
+                : $"{who} attacks deal bonus damage equal to its stacks.",
+            "damage_taken" => mult
+                ? (s.IsBuff ? "You take 10% more damage per stack (up to double)."
+                            : "This enemy takes 10% more damage per stack (up to double).")
+                : (s.IsBuff ? "You take bonus damage equal to its stacks."
+                            : "This enemy takes bonus damage equal to its stacks."),
             "block_gained" => "You gain bonus Block equal to its stacks when you gain Block.",
             "energy_gain"  => "You gain bonus energy equal to its stacks each turn.",
             "card_draw"    => "You draw bonus cards equal to its stacks.",
+            "damage_over_time" => "At the start of its turn, this enemy loses HP equal to its stacks.", // AQ
+            "hit_count"    => "Your Attacks hit an extra time per stack.",                             // AQ
             _ => "A forged status.",
         };
+        // Decay runs at the end of the OWNER's side's turn: "your" turn for a buff, "its" turn for a debuff on an enemy.
+        string whose = s.IsBuff ? "your" : "its";
         string decay = s.Decay switch
         {
-            "lose_one_eot" => " Loses 1 stack at the end of your turn.",
-            "lose_all_eot" => " Expires at the end of your turn.",
+            "lose_one_eot" => $" Loses 1 stack at the end of {whose} turn.",
+            "lose_all_eot" => $" Expires at the end of {whose} turn.",
             _ => "",
         };
         return body + decay;

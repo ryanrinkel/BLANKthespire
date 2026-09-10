@@ -4,6 +4,12 @@ Status: **✅ SHIPPED END-TO-END — reconciled 2026-06-27.** J-2 (generator) is
 class `status_pool` and the LLM forges custom statuses. The v9→v10 website redeploy noted below is long superseded:
 the live site now ships vocab **v17**. Original J-1/J-2 status preserved below.
 
+**2026-09-10 — the J-1 cuts are LIFTED (Phase AQ, vocab v47, `VOCAB_GAP_REMEDIATION_PLAN.md`):** `hit_count` rides
+`ModifyAttackHitCount(AttackCommand, int)` gated on `attack.Attacker == Owner` (the accessor is public on the current
+`AttackCommand` — the "no clean dealer gate" note below is stale) and `attack.ModelSource is CardModel`; `mode:
+multiplicative` opens on `damage_dealt` / `damage_taken` via `ModifyDamageMultiplicative` (a factor, ×(1 + 0.1·stacks)
+capped ×2, `IsPoweredAttack` gate); plus the new `damage_over_time` hook (Poison's recipe on `AfterSideTurnStart`).
+
 ORIGINAL STATUS: **J-1 ENGINE BUILT + DEPLOYED + VERIFIED IN-GAME 2026-06-17. Vocab v10. NEXT = J-2 (open to the LLM
 contract). NOT in the LLM contract yet.** User confirmed Razor Focus (damage_dealt), Brittle (damage_taken
 debuff), Quickstep (card_draw + lose_one_eot decay) and Ironweave (block_gained) all work — the unverified

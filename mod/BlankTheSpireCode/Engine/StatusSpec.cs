@@ -12,8 +12,11 @@ namespace BlankTheSpire.BlankTheSpireCode.Engine;
 /// Cards apply a status by its lowercased <see cref="Name"/> via the <c>apply_status_custom</c> op; the side
 /// (<see cref="IsBuff"/> → self, debuff → the card's target) mirrors the orb/effect runner's buff/debuff split.
 ///
-/// MVP (J-1) is the ADDITIVE modifier hooks only; multiplicative scaling and reactive (After*/retaliate) hooks
-/// are deferred (J-3). Emoji is the default art (text glyph + a rendered <c>.res</c> icon, see EmojiIconRenderer).
+/// J-1 shipped the ADDITIVE modifier hooks; Phase AQ (v47) added the two status-pool hooks the J-1 cut deferred —
+/// <c>damage_over_time</c> (a Poison-shaped debuff: the afflicted enemy loses HP equal to its stacks at the start of
+/// its turn) and <c>hit_count</c> (a buff: your card attacks hit +stacks extra times) — plus <c>mode:
+/// multiplicative</c> for the two damage hooks (×(1 + 0.1·stacks), capped at ×2). Reactive (After*/retaliate) hooks
+/// stay with <c>add_trigger</c>. Emoji is the default art (text glyph + a rendered <c>.res</c> icon, see EmojiIconRenderer).
 /// </summary>
 /// <param name="Name">The status's display name (e.g. "Razor Focus"). Cards reference it by lowercased name.</param>
 /// <param name="Emoji">A single emoji used as the status's text glyph + on-creature icon badge.</param>
@@ -23,8 +26,11 @@ namespace BlankTheSpire.BlankTheSpireCode.Engine;
 /// <param name="Decay">Per-turn decay: <c>none</c> | <c>lose_one_eot</c> (−1 stack at end of your turn) |
 /// <c>lose_all_eot</c> (clears at end of your turn, Temporary-* style).</param>
 /// <param name="Hook">Which number it changes: <c>damage_dealt</c> | <c>damage_taken</c> | <c>block_gained</c> |
-/// <c>energy_gain</c> | <c>card_draw</c> (MVP additive set; see <c>ForgedStatusPower</c>).</param>
-/// <param name="Mode">Modifier mode — <c>additive</c> only in J-1 (multiplicative deferred).</param>
+/// <c>energy_gain</c> | <c>card_draw</c> (J-1 additive set) | <c>damage_over_time</c> (AQ: debuff, HP loss = stacks at
+/// the afflicted enemy's turn start; must decay) | <c>hit_count</c> (AQ: buff, +stacks hits on your card attacks; must
+/// decay). See <c>ForgedStatusPower</c>.</param>
+/// <param name="Mode">Modifier mode — <c>additive</c> (stacks are a flat bonus) or, on <c>damage_dealt</c> /
+/// <c>damage_taken</c> only, <c>multiplicative</c> (×(1 + 0.1·stacks), capped at ×2; Phase AQ).</param>
 public sealed record StatusSpec(
     string Name,
     string Emoji,

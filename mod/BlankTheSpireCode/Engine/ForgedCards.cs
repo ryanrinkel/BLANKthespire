@@ -42,7 +42,16 @@ public static class ForgedCards
     /// v10 (forged statuses, Phase J): + CharacterSpec.StatusPool (a class's ≤4 custom modifier-family statuses
     /// read from `status_pool`; see ForgedCharacters / ForgedStatusPower). Class cards may apply a custom status
     /// by pool name via the `apply_status_custom` op (class-only, like custom-orb channels).</summary>
-    public const int VocabVersion = 46; // 46: Phase AP (VOCAB_GAP_REMEDIATION Wave 3) — PILE MANIPULATION AND STATUS CARDS.
+    public const int VocabVersion = 47; // 47: Phase AQ (VOCAB_GAP_REMEDIATION Wave 3) — STATUS-POOL HOOKS. Two new class
+                                        //     `status_pool` hooks: `damage_over_time` (DEBUFF, must decay — at the start of the
+                                        //     afflicted enemy's turn it loses HP equal to its stacks, unblockable + unpowered like
+                                        //     Poison; ForgedStatusPower.AfterSideTurnStart + CreatureCmd.Damage) and `hit_count`
+                                        //     (BUFF, must decay — your card attacks hit +stacks extra times;
+                                        //     ModifyAttackHitCount gated on AttackCommand.Attacker == Owner). `mode: multiplicative`
+                                        //     opens on damage_dealt / damage_taken (×(1 + 0.1·stacks), capped ×2, powered attacks
+                                        //     only; ModifyDamageMultiplicative). No card-level change: cards still apply by name via
+                                        //     apply_status_custom. Closes the burn/DoT fantasy (VOCAB_EXPANSION_2 §6).
+                                        // 46: Phase AP (VOCAB_GAP_REMEDIATION Wave 3) — PILE MANIPULATION AND STATUS CARDS.
                                         //     `discard` gains `cards: random|choose` (choose = the player picks which hand cards
                                         //     to discard via the base-game hand picker — CardSelectCmd.FromHandForDiscard; card-only,
                                         //     a payload discard stays random). New card-only op `retrieve_card {pile: discard|exhaust,

@@ -608,12 +608,16 @@ function orbLines(orb) {
 const STATUS_HOOK_LABELS = {
   damage_dealt: "your attacks", damage_taken: "damage you take",
   block_gained: "block you gain", turn_start: "turn start", turn_end: "turn end",
+  energy_gain: "energy you gain", card_draw: "cards you draw",
+  damage_over_time: "HP lost at its turn start", hit_count: "hits per attack",  // Phase AQ (v47)
 };
 function statusLines(st) {
   const out = [];
   const kind = st.type === "debuff" ? "Debuff" : "Buff";
   const hook = STATUS_HOOK_LABELS[st.hook] || (st.hook ? String(st.hook).replace(/_/g, " ") : "");
-  out.push(hook ? `${kind} — affects ${hook}` : kind);
+  // Phase AQ: a multiplicative damage status reads as a percent scaler, not a flat stack bonus.
+  const mode = st.mode === "multiplicative" ? " (+10% per stack, up to double)" : "";
+  out.push(hook ? `${kind} — affects ${hook}${mode}` : kind);
   if (st.decay && st.decay !== "none") out.push(`Decays: ${String(st.decay).replace(/_/g, " ")}`);
   return out;
 }
