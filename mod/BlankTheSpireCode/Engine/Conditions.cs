@@ -25,7 +25,21 @@ public static class Conditions
          "has_block", "enemy_count_ge", "turn_at_least", "hand_size_ge", "retained_last_turn", "forged_ge",
          "draw_pile_empty", // Phase P (gap #24): Grand-Finale boolean gate (no value)
          "hp_lost_ge", // Phase AD (gap #12): you have lost >= value HP this turn (Ice Shatter threshold)
-         "light_ge", "dark_ge", "centered"]; // Phase S (gap #1): the Balance gauge reads (light/dark pole magnitude; |gauge| <= N)
+         "light_ge", "dark_ge", "centered", // Phase S (gap #1): the Balance gauge reads (light/dark pole magnitude; |gauge| <= N)
+         // Phase AM (v43, VOCAB_GAP_REMEDIATION Wave 3): two TARGET reads (the chosen enemy — single-target cards only,
+         // never in a trigger) + two player reads (legal on cards AND as a trigger's fire-time gate).
+         "target_hp_below_half", "target_has_block", "energy_ge", "cards_played_this_turn_ge"];
+
+    /// <summary>Phase AM (v43): the condition kinds that read the CHOSEN TARGET (play.Target). Only meaningful on a
+    /// single-enemy card (target:"enemy"); an AoE / self / random_enemy card has no chosen target, and a trigger fires
+    /// with none — the validators reject them there (mirrors validator._TARGET_CONDITIONS). target_has_status predates
+    /// this set and keeps its looser legacy rule (random_enemy + trigger only).</summary>
+    public static readonly HashSet<string> TargetKinds = ["target_hp_below_half", "target_has_block"];
+
+    /// <summary>Phase AM (v43): value caps — a threshold no realistic turn reaches is a dead effect. energy_ge tops
+    /// out at 6 (3 base + a few gains); cards_played_this_turn_ge at 10 (a whole hand and then some).</summary>
+    public const int EnergyGeMax = 6;
+    public const int CardsPlayedGeMax = 10;
 
     /// <summary>Statuses that <c>target_has_status</c> can test (a debuff subset — maps to a HasPower&lt;T&gt;).</summary>
     public static readonly HashSet<string> StatusChecks = ["poison", "vulnerable", "weak", "frail"];
@@ -42,8 +56,14 @@ public static class Conditions
              // Phase S (gap #1): light_ge/dark_ge are pole magnitude thresholds; centered N tests |gauge| <= N (a
              // window >= 1). All need value >= 1 (matching card.schema.json's global value minimum).
              || c.Kind == "light_ge" || c.Kind == "dark_ge" || c.Kind == "centered"
-             || c.Kind == "hp_lost_ge") && c.Value < 1) // Phase AD (gap #12)
+             || c.Kind == "hp_lost_ge" // Phase AD (gap #12)
+             || c.Kind == "energy_ge" || c.Kind == "cards_played_this_turn_ge") && c.Value < 1) // Phase AM (v43)
             return $"condition '{c.Kind}' needs value >= 1.";
+        // Phase AM (v43): cap the two new thresholds (see EnergyGeMax / CardsPlayedGeMax).
+        if (c.Kind == "energy_ge" && c.Value > EnergyGeMax)
+            return $"condition 'energy_ge' may be at most {EnergyGeMax}.";
+        if (c.Kind == "cards_played_this_turn_ge" && c.Value > CardsPlayedGeMax)
+            return $"condition 'cards_played_this_turn_ge' may be at most {CardsPlayedGeMax}.";
         // Phase AD (gap #12): the HP-spent threshold is capped (a self-fuel payoff shouldn't gate on more HP than
         // any realistic single-turn spend — keeps it in the Ice Shatter band, not "lose 40 HP").
         if (c.Kind == "hp_lost_ge" && c.Value > 15)
@@ -114,6 +134,19 @@ public static class Conditions
                 return -ForgedBalancePower.Gauge(player) >= c.Value;
             case "centered":  // you are within value of center (|gauge| <= value)
                 return Math.Abs(ForgedBalancePower.Gauge(player)) <= c.Value;
+            // Phase AM (v43): target reads — null target (AoE/self/trigger) = false, like target_has_status.
+            case "target_hp_below_half": // the chosen enemy is below half HP (an execute payoff)
+                return target != null && target.CurrentHp * 2 < target.MaxHp;
+            case "target_has_block": // the chosen enemy has Block up (a shatter/sunder payoff)
+                return target != null && target.Block > 0;
+            // Phase AM (v43): player reads. energy_ge on a CARD reads the energy left AFTER this card's cost was paid
+            // (PlayCardAction spends resources before OnPlay); on a trigger it is the energy at fire time.
+            case "energy_ge":
+                return (player.PlayerCombatState?.Energy ?? 0) >= c.Value;
+            // cards_played_this_turn_ge: cards YOU have FINISHED playing this turn (the in-flight card is not yet in
+            // the finished history, so on a card it counts the OTHER cards played before it — the Finisher pattern).
+            case "cards_played_this_turn_ge":
+                return EffectRunner.CardsPlayedThisTurn(player) >= c.Value;
             default:
                 return false;
         }
@@ -148,6 +181,10 @@ public static class Conditions
         "dark_ge"            => $"your Dark is {c.Value}+",              // Phase S (gap #1)
         "light_ge"           => $"your Light is {c.Value}+",            // Phase S (gap #1)
         "centered"           => $"you are centered (within {c.Value})", // Phase S (gap #1)
+        "target_hp_below_half" => "the enemy is below half HP",                          // Phase AM (v43)
+        "target_has_block"     => "the enemy has Block",                                 // Phase AM (v43)
+        "energy_ge"            => $"you have {c.Value}+ energy",                         // Phase AM (v43)
+        "cards_played_this_turn_ge" => $"you have played {c.Value}+ cards this turn",   // Phase AM (v43)
         _ => c.Kind,
     };
 }

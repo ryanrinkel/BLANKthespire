@@ -215,12 +215,16 @@ def test_w2_menu_keys_wired() -> None:
     print("W2.2: every new menu key has a directive, a census detector, and a DIRECTIVE_BY_KEY entry:")
     from btsgen import census
     when_keys = {k for k, _ in coverage.WHEN_MENU_V2}
-    for need in ("retained_last_turn", "draw_pile_empty", "hp_lost_ge", "target_has_status"):
+    for need in ("retained_last_turn", "draw_pile_empty", "hp_lost_ge", "target_has_status",
+                 "target_hp_below_half", "target_has_block", "energy_ge", "cards_played_this_turn_ge"):  # + Phase AM (v43)
         check(need in when_keys, f"WHEN_MENU_V2 carries {need}")
     check({k for k, _d, _k in coverage.WHEN_MENU_KIND} == {"forged_ge", "dark_ge", "light_ge", "centered",
                                                            "orbs_match", "orb_count_ge"}, "the gated when keys")
     check({k for k, _ in coverage.SCALE_MENU} == {"cards_in_hand", "cards_retained", "unspent_energy_last_turn",
-                                                  "target_debuff_count", "damage_dealt_unblocked"}, "the scale menu")
+                                                  "target_debuff_count", "damage_dealt_unblocked",
+                                                  # Phase AM (v43)
+                                                  "block", "hp_lost_this_turn", "draw_pile_count", "energy",
+                                                  "plays_this_combat"}, "the scale menu")
     check({k for k, _d, _k in coverage.SCALE_MENU_KIND} == {"tag_cards_owned", "forged"}, "the gated scale keys")
     check({k for k, _ in coverage.EXOTIC_NOMINATE_ONLY} == {"ritual", "barricade", "intangible"}, "nominate-only exotics")
     check({k for k, _ in coverage.KEYWORD_MENU} == {"retain", "innate", "ethereal", "hits"}, "the keyword menu")
@@ -259,6 +263,16 @@ def test_w2_menu_keys_wired() -> None:
         "intangible": {"op": "apply_status", "status": "intangible", "amount": 1},
         "retain": {"op": "retain"}, "innate": {"op": "innate"}, "ethereal": {"op": "ethereal"},
         "hits": {"op": "damage", "amount": 4, "hits": 3},
+        # Phase AM (v43): four `when` kinds + five scales
+        "target_hp_below_half": {"op": "gain_energy", "amount": 1, "when": {"kind": "target_hp_below_half"}},
+        "target_has_block": {"op": "apply_status", "status": "vulnerable", "amount": 2, "when": {"kind": "target_has_block"}},
+        "energy_ge": {"op": "draw", "amount": 1, "when": {"kind": "energy_ge", "value": 2}},
+        "cards_played_this_turn_ge": {"op": "apply_status", "status": "weak", "amount": 1, "when": {"kind": "cards_played_this_turn_ge", "value": 2}},
+        "block": {"op": "damage", "amount": 1, "scale": "block"},
+        "hp_lost_this_turn": {"op": "damage", "amount": 1, "scale": "hp_lost_this_turn"},
+        "draw_pile_count": {"op": "block", "amount": 1, "scale": "draw_pile_count"},
+        "energy": {"op": "damage", "amount": 1, "scale": "energy"},
+        "plays_this_combat": {"op": "damage", "amount": 1, "scale": "plays_this_combat"},
     }
     check(set(samples) == set(_w2_keys()), "a sample exists for every W2.2 key")
     for key, eff in samples.items():

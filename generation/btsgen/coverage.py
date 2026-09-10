@@ -85,6 +85,15 @@ WHEN_MENU_V2 = WHEN_MENU + [
                    'hp_lost_ge value:3 (the Ice Shatter threshold: pay HP, cash it the same turn).'),
     ("target_has_status", 'REQUIRED: gate a bonus with `when` target_has_status status:vulnerable (an exploit payoff '
                           'against an enemy you already debuffed).'),
+    # Phase AM (v43): two chosen-target reads (single-enemy cards) + two player reads.
+    ("target_hp_below_half", 'REQUIRED: on a single-enemy attack, gate a bonus with `when` target_hp_below_half (an '
+                             'execute payoff: stronger against an enemy below half HP).'),
+    ("target_has_block", 'REQUIRED: on a single-enemy attack, gate a bonus with `when` target_has_block (a shatter '
+                         'payoff: stronger against an enemy with Block up).'),
+    ("energy_ge", 'REQUIRED: gate a bonus with `when` energy_ge value:2 (an overcharge payoff: stronger while you still '
+                  'hold 2+ energy after paying for it).'),
+    ("cards_played_this_turn_ge", 'REQUIRED: gate a bonus with `when` cards_played_this_turn_ge value:2 (the Finisher '
+                                  'combo gate: stronger once you have played 2+ other cards this turn).'),
 ]
 # W2.2: class-kind-GATED `when` entries — (key, directive, kind). Dealt only to a class whose kind set (see
 # harness_v2.pool_kind: the blueprint's orb/status/summon kind UNIONED with the selected archetypes' mechanic_kind)
@@ -112,6 +121,16 @@ SCALE_MENU = [
                             'number of debuffs on the struck enemy - flechettes).'),
     ("damage_dealt_unblocked", 'REQUIRED: put a damage effect FIRST, then a heal with scale "damage_dealt_unblocked" '
                                '(lifesteal: heal for the unblocked damage this card dealt).'),
+    # Phase AM (v43): five more live player reads.
+    ("block", 'REQUIRED: make one damage amount scale "block" (deal damage equal to your current Block - Body Slam).'),
+    ("hp_lost_this_turn", 'REQUIRED: put a small lose_hp self-cost FIRST, then make a damage or block amount scale '
+                          '"hp_lost_this_turn" (equal to the HP you have lost this turn - the blood price).'),
+    ("draw_pile_count", 'REQUIRED: make one block or damage amount scale "draw_pile_count" (equal to the cards left in '
+                        'your draw pile - a fat-deck payoff).'),
+    ("energy", 'REQUIRED: make a COST-0 card whose damage, block or draw amount scales "energy" (equal to your current '
+               'energy; you keep the energy).'),
+    ("plays_this_combat", 'REQUIRED: make one damage or block amount scale "plays_this_combat" (equal to the cards you '
+                          'have played this combat - grows all fight, so keep it uncommon/rare).'),
 ]
 SCALE_MENU_KIND = [
     ("tag_cards_owned", 'REQUIRED: make one damage or block amount scale "tag_cards_owned" with a matching "tag" '

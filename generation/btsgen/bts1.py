@@ -25,7 +25,11 @@ import sys
 import zlib
 from pathlib import Path
 
-VOCAB_VERSION = 42  # must be <= ForgedCards.VocabVersion (42: Phase AL — RICHER TRIGGER PAYLOADS: the class engines
+VOCAB_VERSION = 43  # must be <= ForgedCards.VocabVersion (43: Phase AM — NEW SCALES AND CONDITIONS: card-level
+                    # scale += block / hp_lost_this_turn / draw_pile_count / plays_this_combat (damage/block only) and
+                    # energy (damage/block/draw, cost-0 cards only); `when` += target_hp_below_half / target_has_block
+                    # (single-enemy cards, never in a trigger), energy_ge {1..6} / cards_played_this_turn_ge {1..10}.
+                    # 42: Phase AL — RICHER TRIGGER PAYLOADS: the class engines
                     # inside add_trigger payloads — apply_status_custom (status class), summon_attack / buff_summon
                     # (summon class; the dormant move-cycle as a card engine) — `hits` on a payload damage /
                     # summon_attack, payload scale += cards_in_hand / unspent_energy_last_turn / forged (additive),

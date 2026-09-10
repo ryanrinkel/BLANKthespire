@@ -194,7 +194,14 @@ public abstract class ForgedTriggerPower : BlankTheSpirePower
         if (_firing.Contains(kind)) return;
         if (t.OncePerTurn && _firedThisTurn.Contains(kind)) return;
         if (t.OncePerCombat && _firedThisCombat.Contains(kind)) return;
-        if (t.When != null && !Conditions.Evaluate(t.When, Owner.Player, null)) return;
+        if (t.When != null)
+        {
+            bool open = Conditions.Evaluate(t.When, Owner.Player, null);
+            if (EffectRunner.PhaseAmConditions.Contains(t.When.Kind)) // Phase AM (v43): prove the reactive-trigger gate
+                MainFile.Logger.Info($"[AM] trigger {kind} gate {t.When.Kind} {(open ? "OPEN" : "closed")} " +
+                                     $"(energy {Owner.Player.PlayerCombatState?.Energy ?? 0}, played {EffectRunner.CardsPlayedThisTurn(Owner.Player)} this turn; need {t.When.Value}).");
+            if (!open) return;
+        }
         _firing.Add(kind);
         try
         {

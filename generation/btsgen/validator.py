@@ -75,7 +75,15 @@ _SUPPORTED_SCALES = {"x", "cards_in_hand", "cards_retained", "unspent_energy_las
                      "damage_dealt_unblocked", "target_debuff_count",
                      # Phase AE (gap #25): tag_cards_owned = ADDITIVE (printed amount + count of cards with a tag),
                      # damage/block-only, requires a sibling `tag`.
-                     "tag_cards_owned"}
+                     "tag_cards_owned",
+                     # Phase AM (v43): five more live player reads (replace-semantics). `energy` is damage/block/draw
+                     # but COST-0 ONLY (the cost is paid before the card resolves — checked at the card level, below);
+                     # the other four are damage/block-only (_DAMAGE_BLOCK_ONLY_SCALES). Mirrors ForgedCards.
+                     "block", "hp_lost_this_turn", "draw_pile_count", "energy", "plays_this_combat"}
+_DAMAGE_BLOCK_ONLY_SCALES = {"block", "hp_lost_this_turn", "draw_pile_count", "plays_this_combat"}
+# Phase AM (v43): the `when` kinds that read the CHOSEN target — single-enemy cards only, never in a trigger
+# (mirrors Conditions.TargetKinds). target_has_status predates this set and keeps its looser legacy rule.
+_TARGET_CONDITIONS = {"target_hp_below_half", "target_has_block"}
 # Phase AL (v42): the scalars a trigger payload may use — PLAYER-level reads only (mirror ForgedCards.TriggerScales);
 # and the payload ops whose amount a scale may replace / add to (mirror ForgedCards.TriggerScalableOps). `forged`
 # keeps its ADDITIVE damage/block-only shape; a TARGETED payload may be scaled only when it is `damage`.
@@ -468,6 +476,9 @@ class CardValidator:
                         out.append("a 'scale:tag_cards_owned' effect needs a 'tag' (the card tag it counts).")
                     if int(e.get("amount", 0) or 0) < 1:
                         out.append("a 'scale:tag_cards_owned' effect needs amount >= 1 (the count ADDS to the printed amount).")
+                elif scale in _DAMAGE_BLOCK_ONLY_SCALES:  # Phase AM (v43)
+                    if op not in ("damage", "block"):
+                        out.append(f"'scale:{scale}' only applies to damage/block (op '{op}').")
                 elif op not in ("damage", "block", "draw"):
                     out.append(f"'scale' only applies to damage/block/draw (op '{op}').")
                 # Phase M (gap #36): the additive "forged" scalar adds Forge to a PRINTED damage/block base —
@@ -576,6 +587,18 @@ class CardValidator:
             out.append("an X-cost card needs a 'scale:x' effect (otherwise X does nothing).")
         if not costs_x and any_scale:
             out.append("'scale:x' requires the card cost to be \"X\".")
+        # Phase AM (v43): scale:"energy" is cost-0 ONLY — the game pays the cost BEFORE the card resolves, so on a
+        # paid card the in-hand preview (pre-pay) and the dealt amount (post-pay) would differ by the cost. X-cost is
+        # excluded too (X spends everything -> always 0). Mirrors ForgedCards.TryParseCardJson.
+        if any(str(e.get("scale", "")).strip().lower() == "energy" for e in effects + up_effects) and (costs_x or cost != 0):
+            out.append("'scale:energy' requires a cost-0 card (the cost is paid before the card resolves, so a paid card would preview one number and deal another).")
+        # Phase AM (v43): the chosen-target conditions need a chosen target — a single-enemy card. AoE (no play
+        # target), self and random_enemy cards have none (the gate would silently never open). Mirrors ForgedCards.Validate.
+        if str(card.get("target", "")).strip().lower() != "enemy":
+            for e in effects + up_effects:
+                w = e.get("when")
+                if isinstance(w, dict) and w.get("kind") in _TARGET_CONDITIONS:
+                    out.append(f"'when:{w.get('kind')}' needs a single-enemy card (target \"enemy\") — it reads the chosen target.")
         # the dup-var crash guard: a card may declare each canonical value only once
         seen: set[str] = set()
         for k in (self._var_key(e) for e in effects):
@@ -601,7 +624,8 @@ class CardValidator:
             if e.get("op") != "add_trigger":
                 continue
             if (isinstance(e.get("when"), dict)
-                    and e["when"].get("kind") in ("target_has_status", "retained_last_turn")):
+                    and (e["when"].get("kind") in ("target_has_status", "retained_last_turn")
+                         or e["when"].get("kind") in _TARGET_CONDITIONS)):  # Phase AM (v43): the chosen-target reads
                 out.append(f"a trigger's 'when' can't use {e['when'].get('kind')} (no card/target at end/start of turn).")
             # gap #6 "ripen": a one-shot after N turns — the add_trigger amount is the countdown (>= 1).
             if e.get("trigger") == "ripen" and int(e.get("amount", 0) or 0) < 1:

@@ -231,7 +231,8 @@
         "ops": [
           "block",
           "apply_status",
-          "add_trigger"
+          "add_trigger",
+          "scale"
         ],
         "class_kind": "normal"
       },
@@ -484,7 +485,8 @@
         "ops": [
           "lose_hp",
           "heal",
-          "apply_status"
+          "apply_status",
+          "scale"
         ],
         "class_kind": "normal"
       },
@@ -850,7 +852,8 @@
         "ops": [
           "gain_energy",
           "damage",
-          "scale"
+          "scale",
+          "energy_ge"
         ],
         "class_kind": "normal"
       },
@@ -916,7 +919,10 @@
           "hp_below_half",
           "turn_at_least",
           "no_block",
-          "has_block"
+          "has_block",
+          "target_hp_below_half",
+          "target_has_block",
+          "cards_played_this_turn_ge"
         ],
         "class_kind": "normal"
       },

@@ -84,6 +84,13 @@ FEATURED_MENU: list[Featured] = [
     Featured("patient_reserve", 'a card that rewards UNSPENT energy (scale "unspent_energy_last_turn")',
              'REQUIRED: make one damage/block/draw amount scale "unspent_energy_last_turn" (reward energy left over last turn).',
              lambda cc: "unspent_energy_last_turn" in cc.scales),
+    # Phase AM (v43): the Body Slam / execute / Finisher shapes.
+    Featured("body_slam", 'a Block-into-damage attack (scale "block": deal damage equal to your Block)',
+             _d("block"), lambda cc: "block" in cc.scales),
+    Featured("executioner", 'a single-enemy execute payoff (`when` target_hp_below_half)',
+             _d("target_hp_below_half"), lambda cc: "target_hp_below_half" in cc.whens),
+    Featured("combo_finisher", 'a combo finisher that rewards cards already played this turn (`when` cards_played_this_turn_ge)',
+             _d("cards_played_this_turn_ge"), lambda cc: "cards_played_this_turn_ge" in cc.whens),
     Featured("x_dump", 'an X-cost dump card (cost "x" plus a scale "x" effect)',
              'REQUIRED: make this an X-cost card (cost "x") with one damage or block effect scale "x".',
              lambda cc: cc.x_cost),

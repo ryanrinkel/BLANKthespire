@@ -32,7 +32,14 @@ public static class TriggerRunner
     /// it (the RelicRunner L-3 pattern); null on every other trigger.</summary>
     public static async Task Run(EffectSpec trigger, Player player, PlayerChoiceContext ctx, Creature? attacker = null)
     {
-        if (trigger.When != null && !Conditions.Evaluate(trigger.When, player, null)) return;
+        if (trigger.When != null)
+        {
+            bool open = Conditions.Evaluate(trigger.When, player, null);
+            if (EffectRunner.PhaseAmConditions.Contains(trigger.When.Kind)) // Phase AM (v43): prove the trigger-level gate
+                MainFile.Logger.Info($"[AM] trigger {trigger.Trigger} gate {trigger.When.Kind} {(open ? "OPEN" : "closed")} " +
+                                     $"(energy {player.PlayerCombatState?.Energy ?? 0}, played {EffectRunner.CardsPlayedThisTurn(player)} this turn; need {trigger.When.Value}).");
+            if (!open) return;
+        }
 
         // F5: a trigger payload may scale to cards_retained, resolved at FIRE time. For a turn_END trigger that
         // means what you're holding OUT of this turn (live retained-hand count); for a turn_start trigger it's

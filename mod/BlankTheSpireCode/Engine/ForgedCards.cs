@@ -42,7 +42,16 @@ public static class ForgedCards
     /// v10 (forged statuses, Phase J): + CharacterSpec.StatusPool (a class's ≤4 custom modifier-family statuses
     /// read from `status_pool`; see ForgedCharacters / ForgedStatusPower). Class cards may apply a custom status
     /// by pool name via the `apply_status_custom` op (class-only, like custom-orb channels).</summary>
-    public const int VocabVersion = 42; // 42: Phase AL (VOCAB_GAP_REMEDIATION Wave 3) — RICHER TRIGGER PAYLOADS: apply_status_custom /
+    public const int VocabVersion = 43; // 43: Phase AM (VOCAB_GAP_REMEDIATION Wave 3) — NEW SCALES AND CONDITIONS. Card-level
+                                        //     scale += block (Body Slam / Entrench), hp_lost_this_turn (the AD snapshot read),
+                                        //     draw_pile_count, energy (cost-0 ONLY — preview and resolution agree), plays_this_combat
+                                        //     (the cards you have played this combat, PLAYER-level; the per-instance count stays
+                                        //     `grow`). block/hp_lost/draw_pile/plays are damage/block-only; energy is damage/block/draw.
+                                        //     `when` += target_hp_below_half / target_has_block (chosen-target reads: single-enemy
+                                        //     cards only, never in a trigger), energy_ge {1..6} / cards_played_this_turn_ge {1..10}
+                                        //     (player reads; legal as a trigger gate). One ScaleValue case each; Conditions
+                                        //     Kinds/Validate/Eval/Phrase. Log tag [AM].
+                                        // 42: Phase AL (VOCAB_GAP_REMEDIATION Wave 3) — RICHER TRIGGER PAYLOADS: apply_status_custom /
                                         //     summon_attack / buff_summon inside add_trigger payloads (class-only), `hits` on a payload
                                         //     damage/summon_attack, payload scale += cards_in_hand / unspent_energy_last_turn / forged
                                         //     (a targeted payload damage may be scaled). 41: Phase AK — ATTACKER TARGET + ONCE PER COMBAT.
@@ -349,7 +358,14 @@ public static class ForgedCards
     private static readonly HashSet<string> SupportedScales =
         ["x", "cards_in_hand", "cards_retained", "unspent_energy_last_turn", "forged",
          "damage_dealt_unblocked", "target_debuff_count",
-         "tag_cards_owned"]; // Phase AE (gap #25): ADDITIVE (printed amount + count of cards with the sibling `tag`); damage/block-only
+         "tag_cards_owned", // Phase AE (gap #25): ADDITIVE (printed amount + count of cards with the sibling `tag`); damage/block-only
+         // Phase AM (v43): five more live player reads (replace-semantics). `energy` is damage/block/draw but cost-0
+         // ONLY (checked at the card level where the cost is known); the other four are damage/block-only (a draw
+         // equal to your Block / draw pile is absurd; see DamageBlockOnlyScales).
+         "block", "hp_lost_this_turn", "draw_pile_count", "energy", "plays_this_combat"];
+    // Phase AM (v43): the AM scales that may NOT drive a draw.
+    private static readonly HashSet<string> DamageBlockOnlyScales =
+        ["block", "hp_lost_this_turn", "draw_pile_count", "plays_this_combat"];
     // The scalars a trigger payload may use — PLAYER-level reads only (a trigger fires with no card, so `x` and the
     // target/lifesteal/tag reads make no sense). cards_retained (F5) is the per-turn snapshot; Phase AL (v42) adds
     // cards_in_hand (the hand when it fires), unspent_energy_last_turn (the turn-end snapshot) and the ADDITIVE
@@ -553,6 +569,12 @@ public static class ForgedCards
         { error = "an X-cost card needs a 'scale:x' effect (otherwise X does nothing)."; return false; }
         if (!costsX && anyX)
         { error = "'scale:x' requires the card cost to be \"X\"."; return false; }
+        // Phase AM (v43): scale:"energy" reads your CURRENT energy. The game spends the card's cost BEFORE OnPlay
+        // (PlayCardAction.SpendResources), so on a paid card the in-hand preview (pre-pay) and the resolved amount
+        // (post-pay) would disagree by the cost — only a cost-0 card keeps them equal. X-cost is excluded too
+        // (X spends everything → always 0).
+        if (effects.Concat(upgrade ?? []).Any(e => e.Scale == "energy") && (costsX || cost != 0))
+        { error = "'scale:energy' requires a cost-0 card (the cost is paid before the card resolves, so a paid card would preview one number and deal another)."; return false; }
 
         // Phase AG (gap #39): an upgrade may LOWER the card's energy cost (absolute, 0..3). House rules: never on an
         // X-cost card (X has no fixed cost to change); the upgraded cost must be <= the base cost (upgrades cheapen,
@@ -775,6 +797,11 @@ public static class ForgedCards
                     if (e.Amount < 1)
                         return "a 'scale:tag_cards_owned' effect needs amount >= 1 (the count ADDS to the printed amount).";
                 }
+                else if (DamageBlockOnlyScales.Contains(e.Scale!)) // Phase AM (v43)
+                {
+                    if (e.Op is not ("damage" or "block"))
+                        return $"'scale:{e.Scale}' only applies to damage/block (op '{e.Op}').";
+                }
                 else if (e.Op is not ("damage" or "block" or "draw"))
                     return $"'scale' only applies to damage/block/draw (op '{e.Op}').";
                 // Phase M: the additive "forged" scalar adds Forge to a PRINTED damage/block base; a draw has
@@ -817,6 +844,10 @@ public static class ForgedCards
                 if (e.Scale == "target_debuff_count")
                     return "'scale:target_debuff_count' can't be used on a random_enemy card (no chosen target to read — each effect rolls its own random enemy).";
             }
+            // Phase AM (v43): the chosen-target conditions need a chosen target — a single-enemy card. AoE (play.Target
+            // is null), self and random_enemy cards have none (the gate would silently never open).
+            if (e.When != null && Conditions.TargetKinds.Contains(e.When.Kind) && target != null && target != TargetType.AnyEnemy)
+                return $"'when:{e.When.Kind}' needs a single-enemy card (target \"enemy\") — it reads the chosen target.";
             if (e.Orb != null && e.Op != "channel_orb")
                 return $"'orb' only applies to channel_orb (op '{e.Op}').";
             // Phase J: apply_status_custom is class-only (a forged status lives in a class's status_pool, resolved
@@ -1231,7 +1262,8 @@ public static class ForgedCards
                 return "'once_per_combat' goes on the add_trigger op, not on a payload effect.";
             // (Phase AL, v42: multi-hit inside a trigger is legal on damage/summon_attack — see the hits rule above.)
         }
-        if (e.When != null && (e.When.Kind == "target_has_status" || e.When.Kind == "retained_last_turn"))
+        if (e.When != null && (e.When.Kind == "target_has_status" || e.When.Kind == "retained_last_turn"
+                               || Conditions.TargetKinds.Contains(e.When.Kind))) // Phase AM (v43): the chosen-target reads
             return $"a trigger's 'when' can't use {e.When.Kind} (a trigger fires with no card/target).";
         return null;
     }
@@ -1261,6 +1293,11 @@ public static class ForgedCards
         "unspent_energy_last_turn" => "your unspent energy last turn",
         "target_debuff_count"      => "the debuffs on the target",     // Phase P (gap #22)
         "damage_dealt_unblocked"   => "the unblocked damage dealt",    // Phase P (gap #21, lifesteal heal)
+        "block"                    => "your Block",                                    // Phase AM (v43)
+        "hp_lost_this_turn"        => "the HP you have lost this turn",                // Phase AM (v43)
+        "draw_pile_count"          => "the cards in your draw pile",                   // Phase AM (v43)
+        "energy"                   => "your energy",                                   // Phase AM (v43)
+        "plays_this_combat"        => "the cards you have played this combat",         // Phase AM (v43)
         _ => "X",
     };
 

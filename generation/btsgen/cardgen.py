@@ -213,6 +213,12 @@ def _scale_phrase(scale: str) -> str:
         "unspent_energy_last_turn": "your unspent energy last turn",
         "target_debuff_count": "the debuffs on the target",    # Phase P (gap #22)
         "damage_dealt_unblocked": "the unblocked damage dealt",  # Phase P (gap #21, lifesteal heal)
+        # Phase AM (v43): five more live player reads (replace-semantics). Mirrors ForgedCards.ScalePhrase.
+        "block": "your Block",
+        "hp_lost_this_turn": "the HP you have lost this turn",
+        "draw_pile_count": "the cards in your draw pile",
+        "energy": "your energy",
+        "plays_this_combat": "the cards you have played this combat",
     }.get(scale, "X")
 
 
@@ -252,6 +258,15 @@ def cond_phrase(w: dict) -> str:
         return f"you are centered (within {int(w.get('value', 0) or 0)})"
     if kind == "hp_lost_ge":  # Phase AD (gap #12): the HP-spent threshold (Ice Shatter)
         return f"you have lost {int(w.get('value', 0) or 0)} or more HP this turn"
+    # Phase AM (v43): two chosen-target reads + two player reads. Mirrors Conditions.Phrase.
+    if kind == "target_hp_below_half":
+        return "the enemy is below half HP"
+    if kind == "target_has_block":
+        return "the enemy has Block"
+    if kind == "energy_ge":
+        return f"you have {int(w.get('value', 0) or 0)}+ energy"
+    if kind == "cards_played_this_turn_ge":
+        return f"you have played {int(w.get('value', 0) or 0)}+ cards this turn"
     return kind
 
 

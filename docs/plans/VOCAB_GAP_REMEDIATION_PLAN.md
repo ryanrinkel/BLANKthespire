@@ -153,6 +153,61 @@ non-Harmony errors are the base game's own "Dev console used before being create
 slot 04 (the smoke tool restores only its relic injection). Tag evidence:
 `generation/scratch/gaptest-al/godot_AL_tags_GAPTESTAL{1,2,3}.txt`.
 
+**STATUS (2026-09-09): Phase AM EXECUTED (vocab v43)** — both items landed in lockstep. **(1) Five card-level scales:**
+`SupportedScales` += `block` (Body Slam; on a `block` effect = Entrench), `hp_lost_this_turn` (the AD `HpLossTracker`
+snapshot read as a number), `draw_pile_count`, `energy`, `plays_this_combat` — one `EffectRunner.ScaleValue` case each
+(`Creature.Block` / `HpLossTracker.HpLostThisTurn` / `DrawPile.Cards.Count` / `PlayerCombatState.Energy` / a new
+`CardsPlayedThisCombat(player)`), so the `DataCard.BonusFor` calc-var preview and the resolved number share one read.
+Rules: `block` / `hp_lost_this_turn` / `draw_pile_count` / `plays_this_combat` are damage/block-ONLY (`DamageBlockOnlyScales`
+/ `_DAMAGE_BLOCK_ONLY_SCALES` — a draw equal to your Block or draw pile is absurd); `energy` is damage/block/draw but
+**cost-0 cards ONLY** (checked after the cost is parsed, beside the X-cost coupling): the game spends the cost BEFORE
+OnPlay (`PlayCardAction.SpendResources` → `OnPlayWrapper`, verified in the decompiled source), so on a paid card the
+in-hand preview (pre-pay) and the dealt amount (post-pay) would differ by the cost. **Deviation, deliberate:** the plan's
+`plays_this_combat` pointed at `EffectRunner.PlaysThisCombat` (the per-card-INSTANCE count that feeds `grow`); with
+replace semantics that reads 0 on the first play, so the scale is the PLAYER-level count of cards you have finished playing
+this combat (`CombatHistory.CardPlaysFinished` filtered by owner, the base-game Finisher pattern; the in-flight card is not
+yet counted). Wording (byte-lockstep `ScalePhrase` / `cardgen._scale_phrase`): "your Block" / "the HP you have lost this
+turn" / "the cards in your draw pile" / "your energy" / "the cards you have played this combat". **(2) Four conditions:**
+`Conditions.Kinds` += `target_hp_below_half`, `target_has_block` (chosen-target reads off `play.Target` — a new
+`Conditions.TargetKinds` / `_TARGET_CONDITIONS` set: **single-enemy cards only** (`target:"enemy"`; AoE has a null play
+target, self/random_enemy none) and never on an `add_trigger` `when`, both validators), `energy_ge` {1..6} (on a card:
+the energy left AFTER this card's cost is paid — same SpendResources ordering; on a trigger: energy at fire time) and
+`cards_played_this_turn_ge` {1..10} (`CardsPlayedThisTurn(player)` = finished plays with `HappenedThisTurn` + owner filter;
+on a card it counts the OTHER cards; on a `turn_end` trigger the whole turn). Caps are `Conditions.EnergyGeMax` /
+`CardsPlayedGeMax` + schema `allOf` clauses. Phrases: "the enemy is below half HP" / "the enemy has Block" / "you have
+N+ energy" / "you have played N+ cards this turn". Log tag `[AM]`: the five scales log their live read at resolution
+(damage/block/draw sites), the four gates log BOTH branches with the value they compared against (card level in
+`EffectRunner.Execute`; trigger level in `TriggerRunner.Run` + `ForgedTriggerPower.FireReactive`). Lockstep: `Conditions.cs`,
+`EffectRunner.cs`, `ForgedCards.cs` (VocabVersion 43, SupportedScales, Validate, ValidateTrigger, ScalePhrase, the cost-0
+rule), `TriggerRunner.cs`, `ForgedTriggerPower.cs`, `card.schema.json` (scale + kind enums, two value-cap clauses),
+`VOCABULARY.md` (five scale bullets, four condition rows — ONE LINE each), `cardgen.py`, `validator.py`, `bts1.py`
+VOCAB_VERSION 43, `coverage.py` (WHEN_MENU_V2 += 4, SCALE_MENU += 5), `featured.py` (+ `body_slam`, `executioner`,
+`combo_finisher`), `class_forge.py` (one-line pointers in the CONDITIONS and SCALED AMOUNTS paragraphs), `archetypes.json`
+(threshold_duelist / big_energy / block_bulwark / self_sacrifice ops), `exemplar_pool.json` (+9: Iron Tackle, Blood Toll,
+Deep Reserves, Surge Strike, Crescendo, Culling Blow, Shatter Guard, Overcharge, Flurry Finish; pool 91 → 100). **Rule 0.9
+budget:** the blueprint prompt embeds VOCABULARY.md verbatim, so the first draft (multi-line bullets) grew it by 2.8k chars;
+compressed to one-line pointers + two duplicate phrases trimmed, the net is **+1.5k chars (84,764 → 86,283, seed 1)** — all
+of it one-line menu pointers per the rule's second clause. Tests: `tests/test_phase_am.py` (105 checks); `test_phase_al`
+re-pinned to `>= 42`; `test_coverage` / `test_featured` samples extended; suite **386 passed**; every `test_phase_*.py` runs
+standalone; C# build 0 errors. AutoSlay (tester `generation/scratch/gaptest-am/build_tester.py` — a plain class, staged into slot 04 over the AL tester,
+unstaged afterwards; two seeds): **GAPTESTAM1** **407 `[AM]` tags** — scale block ×66 (18 distinct reads, 2 → 157), energy ×62
+(3–6, damage AND draw, cost-0 cards), hp_lost_this_turn ×31 (4/8/12/20 — the Blood Toll self-cost plus damage taken),
+draw_pile_count ×20 (1 → 47, shrinking as the fight draws), plays_this_combat ×18 (0 → 41, climbing within a combat and
+resetting per combat); gates: cards_played_this_turn_ge OPEN ×69 / closed ×21, energy_ge OPEN ×36 (the bot always held
+2+ after paying), target_hp_below_half OPEN ×12 / closed ×9 ("target HP 5/47" vs "30/58"), target_has_block OPEN ×1 /
+closed ×12 ("target Block N"); trigger-level gates on turn_end: energy_ge ×34, cards_played_this_turn_ge ×16 ("played 7
+this turn; need 3") · **0 mod-attributable exception frames** (the only exception blocks are BaseLib's two startup Harmony
+patches). **GAPTESTAM2** 146 `[AM]` tags — every scale and gate fired again (energy ×31, block ×18, plays_this_combat ×11,
+hp_lost ×10, draw_pile ×7; both branches of target_hp_below_half and cards_played_this_turn_ge; target_has_block closed
+×17 — the second seed never met a blocking enemy on that card) · 0 mod exceptions. Harness caveat: BOTH smoke runs had
+their Python harness killed by the OS for low memory mid-run (no tool verdict), while the game kept playing under AutoSlay —
+the tags above were harvested from the live godot.log and the game stopped by hand (`Stop-Process`); neither run reached
+RunCompleted or the map-nav watchdog, and no hang was mod-attributable. Tag evidence:
+`generation/scratch/gaptest-am/godot_AM_tags_GAPTESTAM{1,2}.txt`. Follow-ups (not in scope): the five AM scales are
+card-level only — `block` / `energy` inside a trigger payload ("at turn end, deal damage equal to your Block") would need
+`TriggerScales` + `ResolveAmount` + the trigger wording; `plays_this_combat` reads 41 in a long fight, so the vocabulary
+pins it to uncommon/rare on a nominal base.
+
 ---
 
 ## 0. Ground rules

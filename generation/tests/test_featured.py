@@ -128,6 +128,11 @@ def test_detectors_round_trip() -> None:
         "horde_payoff": _card([{"op": "damage", "amount": 6, "target": "all_enemies", "when": {"kind": "enemy_count_ge", "value": 2}}]),
         "desperation": _card([{"op": "damage", "amount": 10, "when": {"kind": "hp_below_half"}}]),
         "patient_reserve": _card([{"op": "damage", "amount": 1, "scale": "unspent_energy_last_turn"}]),
+        # Phase AM (v43)
+        "body_slam": _card([{"op": "damage", "amount": 1, "scale": "block"}]),
+        "executioner": _card([{"op": "damage", "amount": 7}, {"op": "gain_energy", "amount": 1, "when": {"kind": "target_hp_below_half"}}]),
+        "combo_finisher": _card([{"op": "damage", "amount": 9}, {"op": "apply_status", "status": "weak", "amount": 1,
+                                                                  "when": {"kind": "cards_played_this_turn_ge", "value": 2}}]),
         "x_dump": _card([{"op": "damage", "amount": 1, "scale": "x"}], cost="x"),
         "opening_gambit": _card([{"op": "innate"}, {"op": "damage", "amount": 6}]),
         "fleeting_power": _card([{"op": "ethereal"}, {"op": "damage", "amount": 12}]),

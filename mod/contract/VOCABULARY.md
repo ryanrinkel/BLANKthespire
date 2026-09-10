@@ -121,8 +121,7 @@ ride any card (e.g. an attack that also grants you Block-over-time).
     printed `amount` (**NOT ignored** here — keep it real, ≥1) **plus your Forge**, the per-combat counter the
     `forge` op builds. `damage`/`block` only (never `draw`). This is "the signature blade that grows hit-by-hit":
     stoke the counter with `forge` income (cards, per-turn triggers, maybe a relic), cash it with ONE or TWO
-    `scale:"forged"` payoff cards. A set with `forge` income MUST include a `scale:"forged"` payoff and vice versa
-    (income without a payoff is a dead engine; a payoff without income is a dead card).
+    `scale:"forged"` payoff cards. A set with `forge` income MUST include a `scale:"forged"` payoff and vice versa.
   - `damage_dealt_unblocked` — **HEAL-ONLY (lifesteal).** A `heal` effect heals for the **unblocked** damage this
     card's earlier `damage` effect(s) dealt this play (blocked damage doesn't count; multi-hit and AoE all add up).
     The card MUST place a `damage` op **before** the `heal`. "Deal 8 damage to ALL enemies. Heal HP equal to the
@@ -134,10 +133,13 @@ ride any card (e.g. an attack that also grants you Block-over-time).
     effect deals/blocks its printed `amount` (**NOT ignored** — keep it real, ≥1) **plus 1 per card carrying a
     given tag** across your combat piles. Requires a sibling **`tag`** field (a lowercase slug that must be one of
     your class's declared card `tags`, present on **≥2** cards so the payoff is never dead). "Deal 6 damage, plus 1
-    per 'strike' card you own." Tag 3–5 cards of the class with the same slug (see **`tags`** below), then add
-    1–2 payoffs referencing it — the base-game strikes-matter identity.
-  - The non-`x` scalars — `cards_in_hand`, `cards_retained`, `unspent_energy_last_turn`, `forged`,
-    `damage_dealt_unblocked`, `target_debuff_count`, `tag_cards_owned` — have **no cost coupling** (use any cost).
+    per 'strike' card you own." Tag 3–5 cards with the same slug (see **`tags`** below), then add 1–2 payoffs.
+  - `block` — your current Block (`damage`/`block` only): "Deal damage equal to your Block" = **Body Slam**; on `block` = Entrench. One or two per class.
+  - `hp_lost_this_turn` — the HP you have lost this turn, net of healing (`damage`/`block` only): "Lose 4 HP. Deal damage equal to the HP you have lost this turn."
+  - `draw_pile_count` — the cards in your draw pile (`damage`/`block` only): a fat-deck payoff that shrinks as you draw.
+  - `energy` — your current energy (`damage`/`block`/`draw`); **COST-0 CARDS ONLY** (the cost is paid before the card resolves — a paid card would preview one number and deal another). You keep the energy.
+  - `plays_this_combat` — the cards you have played this combat (player-level, not counting this one; `damage`/`block` only). Grows all fight → uncommon/rare. The per-CARD count is `grow`.
+  - The non-`x` scalars have **no cost coupling** (use any cost) — except `energy` (cost 0).
     At most **one scaled damage/block per card** (a scaled `draw` or lifesteal `heal` is exempt). A scaled effect
     can't also be multi-hit. The four PLAYER-level reads (`cards_retained`, `cards_in_hand`,
     `unspent_energy_last_turn`, `forged`) also work inside `add_trigger` payloads (v42) — see Triggers.
@@ -189,6 +191,10 @@ condition.
 | `light_ge`          | `value` (int ≥1) | your **Balance** gauge leans Light by at least `value` (the mirror Light-pole payoff). **BALANCE-CLASS.** |
 | `centered`          | `value` (int ≥1) | your **Balance** gauge is within `value` of center (|gauge| ≤ `value`) — the **knife's-edge** payoff, rewarding staying balanced rather than committing to a pole. **BALANCE-CLASS.** |
 | `hp_lost_ge`        | `value` (int 1–15) | you have lost at least `value` **HP this turn** (any source, net of healing — mostly your own `lose_hp` / card costs). The **Ice Shatter** threshold: pair a self-damage `lose_hp` fuel effect earlier on the card with a payoff gated on `hp_lost_ge` ("Lose 3 HP. Deal 18 damage if you've lost 3+ HP this turn."). Resets each turn. |
+| `target_hp_below_half` | —        | the **chosen enemy** is below half HP (an execute payoff: "Deal 7 damage. Gain 1 energy if the enemy is below half HP."). **Single-enemy cards only** (`target:"enemy"`); never on an `add_trigger`. |
+| `target_has_block`  | —           | the **chosen enemy** has Block up (a shatter payoff: "Deal 6 damage. Apply Vulnerable if the enemy has Block."). **Single-enemy cards only**; never on an `add_trigger`. |
+| `energy_ge`         | `value` (int 1–6) | you have at least `value` energy — on a card, the energy left AFTER this card's cost is paid; on a `turn_end` trigger, your unspent energy. |
+| `cards_played_this_turn_ge` | `value` (int 1–10) | you have finished playing at least `value` OTHER cards this turn (the **Finisher** combo gate: "Deal 9 damage. Apply Weak if you have played 2+ cards this turn."; a `turn_end` trigger counts the whole turn). |
 
 > Composition is the point: pair `channel_orb orb:"random"` (the pull) with effects gated on `when:{kind:"orbs_match"}`
 > (the jackpot) to build a **"sentient slot machine"** orb class — channel random orbs, and great things happen when

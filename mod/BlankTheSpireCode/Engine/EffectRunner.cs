@@ -78,6 +78,10 @@ public static class EffectRunner
                 if (e.When.Kind == "hp_lost_ge")
                     MainFile.Logger.Info($"[AD] hp_lost_ge gate {(gateOpen ? "OPEN" : "closed")} " +
                                          $"(lost {HpLossTracker.HpLostThisTurn(card.Owner)} this turn, need {e.When.Value}).");
+                // Phase AM (v43): log both branches of the four new gates with the live read they compared against.
+                if (PhaseAmConditions.Contains(e.When.Kind))
+                    MainFile.Logger.Info($"[AM] {e.When.Kind} gate {(gateOpen ? "OPEN" : "closed")}{(e.When.Negate ? " (negated)" : "")} " +
+                                         $"({PhaseAmConditionRead(e.When, card, play)}; need {e.When.Value}).");
                 if (!gateOpen) continue;
             }
             // The card's vars (read by CommonActions) already carry the upgrade; for the scalar ops we
@@ -102,6 +106,8 @@ public static class EffectRunner
                     }
                     if (e.Scale == "tag_cards_owned") // Phase AE (gap #25): prove the live tag scan (count varies as piles shift)
                         MainFile.Logger.Info($"[AE] tag_cards_owned('{e.Tag}') = {TagCardsOwned(card.Owner, e.Tag)} (damage base {amt}).");
+                    if (PhaseAmScales.Contains(e.Scale ?? "")) // Phase AM (v43): prove the live read at resolution
+                        MainFile.Logger.Info($"[AM] scale {e.Scale} -> {ScaleValue(e.Scale, card)} (damage, '{card.Id}').");
                     if (e.HasGrow) // Phase U (gap #23) smoke logging: prove per-play growth (plays so far = count)
                     {
                         int plays = PlaysThisCombat(card);
@@ -123,13 +129,21 @@ public static class EffectRunner
                         MainFile.Logger.Info($"[M] forged payoff: block base {amt} + Forge {ForgeStacks(card.Owner)}.");
                     if (e.Scale == "tag_cards_owned") // Phase AE (gap #25)
                         MainFile.Logger.Info($"[AE] tag_cards_owned('{e.Tag}') = {TagCardsOwned(card.Owner, e.Tag)} (block base {amt}).");
+                    if (PhaseAmScales.Contains(e.Scale ?? "")) // Phase AM (v43)
+                        MainFile.Logger.Info($"[AM] scale {e.Scale} -> {ScaleValue(e.Scale, card)} (block, '{card.Id}').");
                     await CommonActions.CardBlock(card, play);
                     break;
                 case "draw":
                     // A scaled draw (F5: x / cards_in_hand / cards_retained / unspent_energy_last_turn) has no
                     // fixed Cards var; resolve the live scalar here and draw that many. CommonActions.Draw only
                     // reads a fixed Cards var, so the unscaled path keeps using the card's Cards var as before.
-                    if (e.IsScaled) await CardPileCmd.Draw(ctx, ResolveScaleAmount(e, card), card.Owner);
+                    if (e.IsScaled)
+                    {
+                        int n = ResolveScaleAmount(e, card);
+                        if (PhaseAmScales.Contains(e.Scale ?? "")) // Phase AM (v43): only `energy` is draw-legal
+                            MainFile.Logger.Info($"[AM] scale {e.Scale} -> {n} (draw, '{card.Id}').");
+                        await CardPileCmd.Draw(ctx, n, card.Owner);
+                    }
                     else await CommonActions.Draw(card, ctx);
                     break;
                 case "apply_status":
@@ -739,8 +753,47 @@ public static class EffectRunner
         "cards_retained"           => HandStateTracker.CardsRetained,
         "unspent_energy_last_turn" => HandStateTracker.UnspentEnergyLastTurn,
         "forged"                   => ForgeStacks(card.Owner),
+        // Phase AM (v43): five more live player reads (replace-semantics, like the F5 hand/energy reads).
+        "block"                    => card.Owner?.Creature?.Block ?? 0,                   // Body Slam / Entrench
+        "hp_lost_this_turn"        => HpLossTracker.HpLostThisTurn(card.Owner),           // the AD snapshot read
+        "draw_pile_count"          => card.Owner?.PlayerCombatState?.DrawPile?.Cards?.Count ?? 0,
+        // `energy` is cost-0-ONLY (validator-enforced) so the in-hand preview (pre-pay) and the resolved amount
+        // (post-pay — PlayCardAction.SpendResources runs before OnPlay) always agree.
+        "energy"                   => card.Owner?.PlayerCombatState?.Energy ?? 0,
+        "plays_this_combat"        => CardsPlayedThisCombat(card.Owner),                  // the OTHER cards you played
         _ => 0,
     };
+
+    /// <summary>Phase AM (v43): the scales this phase added (for the [AM] play-time log below).</summary>
+    internal static readonly HashSet<string> PhaseAmScales =
+        ["block", "hp_lost_this_turn", "draw_pile_count", "energy", "plays_this_combat"];
+
+    /// <summary>Phase AM (v43): the condition kinds this phase added (for the [AM] gate log below).</summary>
+    internal static readonly HashSet<string> PhaseAmConditions =
+        ["target_hp_below_half", "target_has_block", "energy_ge", "cards_played_this_turn_ge"];
+
+    /// <summary>Phase AM (v43): cards <paramref name="player"/> has FINISHED playing this combat (any turn). The
+    /// PLAYER-level sibling of <see cref="PlaysThisCombat"/> (which is per-card-instance and feeds `grow`): the
+    /// <c>plays_this_combat</c> scale — "deal damage equal to the cards you have played this combat". The in-flight
+    /// play is not yet in the finished history, so it counts the OTHER cards played before it. Combat-scoped
+    /// history → per-combat reset is free. Owner-filtered (the base-game Finisher pattern) for multiplayer safety.</summary>
+    internal static int CardsPlayedThisCombat(Player? player)
+    {
+        var cm = CombatManager.Instance;
+        if (player == null || cm?.History?.CardPlaysFinished == null) return 0;
+        return cm.History.CardPlaysFinished.Count(entry => entry.CardPlay.Card.Owner == player);
+    }
+
+    /// <summary>Phase AM (v43): cards <paramref name="player"/> has FINISHED playing THIS turn — the
+    /// <c>cards_played_this_turn_ge</c> condition (Finisher: <c>HappenedThisTurn</c> + owner filter). On a card it
+    /// counts the other cards played earlier this turn; on a turn_end trigger it is the whole turn's plays.</summary>
+    internal static int CardsPlayedThisTurn(Player? player)
+    {
+        var cm = CombatManager.Instance;
+        var cs = player?.Creature?.CombatState;
+        if (player == null || cs == null || cm?.History?.CardPlaysFinished == null) return 0;
+        return cm.History.CardPlaysFinished.Count(entry => entry.HappenedThisTurn(cs) && entry.CardPlay.Card.Owner == player);
+    }
 
     /// <summary>Phase P (gap #22): count of DEBUFF powers on <paramref name="target"/> (0 if null). Read by the
     /// <c>target_debuff_count</c> calc-var (<see cref="DataCard"/>.BonusFor) at attack resolution, once per struck
@@ -815,6 +868,16 @@ public static class EffectRunner
     }
 
     private static int ResolveScaleAmount(EffectSpec e, ConstructedCardModel card) => ScaleValue(e.Scale, card);
+
+    /// <summary>Phase AM (v43): the live value an [AM]-logged gate compared against (log text only).</summary>
+    private static string PhaseAmConditionRead(Condition w, ConstructedCardModel card, CardPlay play) => w.Kind switch
+    {
+        "target_hp_below_half" => play?.Target == null ? "no target" : $"target HP {play.Target.CurrentHp}/{play.Target.MaxHp}",
+        "target_has_block"     => play?.Target == null ? "no target" : $"target Block {play.Target.Block}",
+        "energy_ge"            => $"energy {card.Owner?.PlayerCombatState?.Energy ?? 0} after paying this card",
+        "cards_played_this_turn_ge" => $"played {CardsPlayedThisTurn(card.Owner)} other cards this turn",
+        _ => "",
+    };
 
     /// <summary>The creature(s) a card-played custom DEBUFF lands on: the chosen single target if any, else the
     /// card's resolved targets (AoE). Mirrors BaseLib CommonActions.Apply(ctx, card, cardPlay).</summary>

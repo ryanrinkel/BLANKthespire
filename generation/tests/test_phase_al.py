@@ -51,8 +51,8 @@ def _desc(card) -> str:
 
 
 def test_version() -> None:
-    print("Phase AL vocab stamp is v42:")
-    check(bts1.VOCAB_VERSION == 42, f"bts1.VOCAB_VERSION must be 42 (Phase AL), got {bts1.VOCAB_VERSION}")
+    print("Phase AL vocab stamp is at least v42:")
+    check(bts1.VOCAB_VERSION >= 42, f"bts1.VOCAB_VERSION must be >= 42 (Phase AL), got {bts1.VOCAB_VERSION}")
 
 
 def _t_class_engines(vc: CardValidator, vn: CardValidator) -> None:

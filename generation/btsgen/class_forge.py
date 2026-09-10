@@ -319,9 +319,10 @@ archetype should pair "pull random orbs" cards with "if your orbs match, <someth
 (`orbs_match` is the jackpot; `orb_count_ge` rewards filling slots). Conditional payoffs are swings, so put \
 the splashy numbers at uncommon/rare. Conditions also work OFF the orb engine on ANY class — \
 `when:{{kind:"hp_below_half"}}` (execute), `when:{{kind:"no_block"}}` (reward aggression), \
-`when:{{kind:"target_has_status", status:"poison|vulnerable|weak|frail"}}` (follow-up) — use these to give a \
-card a real "if X then bonus" twist instead of a flat stat line. `orbs_match`/`orb_count_ge` are ORB-CLASS \
-ONLY; the other three are generic.
+`when:{{kind:"target_has_status", status:"poison|vulnerable|weak|frail"}}` (follow-up), `target_hp_below_half` / \
+`target_has_block` (single-enemy cards), `energy_ge` / `cards_played_this_turn_ge` (value N — the Finisher combo \
+gate) — a real "if X then bonus" twist, not a flat stat line. `orbs_match`/`orb_count_ge` are ORB-CLASS ONLY; \
+the rest are generic.
 
 TRIGGERS / POWER ENGINES (`add_trigger`): a `power`-type card can grant an ONGOING effect that fires every turn \
 — "At the end of your turn, gain Block" (Metallicize), "…gain Strength" (a Demon-Form ramp), "At the start of \
@@ -339,13 +340,13 @@ minion strikes / the signature status ticks every turn on its own).
 
 SCALED AMOUNTS / RETAIN PAYOFF (`scale`): a damage/block/draw card effect can make its amount a LIVE value \
 instead of a fixed number by adding `"scale": "<source>"` (keep a nominal "amount"; it is ignored). Sources: \
-"cards_in_hand" (other cards in hand), "cards_retained" (cards you HELD into this turn = your hand at turn \
-start), "unspent_energy_last_turn", and "x" (X-cost only). Reach for these — especially "cards_retained" plus \
-the `retain` keyword and the `retained_last_turn`/`hand_size_ge` conditions — when the concept's fantasy is \
-PATIENCE / coiling / holding cards back for a big release (a duelist who waits for the opening, a sniper, a \
-hoarder). A signature Retain archetype = cheap/zero-cost cards with `retain`, payoffs that `scale` to \
-cards_retained or are gated `when:{{"kind":"retained_last_turn"}}` / `when:{{"kind":"hand_size_ge","value":N}}`, \
-and maybe a power that each turn gains Block equal to cards retained. At most one scaled damage/block per card.
+"cards_in_hand" (other cards in hand), "cards_retained" (cards HELD into this turn), "unspent_energy_last_turn", \
+"block" (Body Slam), "hp_lost_this_turn", "draw_pile_count", "plays_this_combat" (these four damage/block only), \
+"energy" (cost-0 cards only), and "x" (X-cost only). Reach for "cards_retained" plus the `retain` keyword and the \
+`retained_last_turn`/`hand_size_ge` conditions when the concept's fantasy is PATIENCE / coiling / holding cards \
+back for a big release. A signature Retain archetype = cheap/zero-cost cards with `retain`, payoffs that `scale` to \
+cards_retained or are gated `when:{{"kind":"retained_last_turn"}}` / `when:{{"kind":"hand_size_ge","value":N}}`. \
+At most one scaled damage/block per card.
 
 PRECISION READS (small, high-leverage scalars/gates — reach for one only when the concept invites it; never \
 sprinkle): LIFESTEAL — a `damage` card may then `heal` for the UNBLOCKED damage it just dealt via \
