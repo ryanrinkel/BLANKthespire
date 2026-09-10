@@ -457,6 +457,41 @@ BaseLib's startup pair + the dependency-version notice). Verdict "HANG — wall-
 log was still mid-combat at 600 s, two 5 s watchdog blips over the run), not a mod hang. Tag evidence:
 `generation/scratch/gaptest-as/godot_AS_tags_GAPTESTAS1.txt`.
 
+**STATUS (2026-09-10): Phase AR EXECUTED (vocab v49 — built after AS, so it took the next number per rule 0.8)** — every item
+landed in lockstep, plus one finding the plan did not anticipate. **(1) `when` inside custom-orb effects** — an orb-effect's gate
+rides on its inner `EffectSpec.When` (the same JSON shape as a card effect's `when`; `OrbEffect.When` exposes it), parsed in
+`ForgedCharacters.TryParseOrbEffects` through the shared `Conditions.Validate` plus the orb rule
+(`OrbForbiddenConditionKinds` = `target_has_status` / `retained_last_turn` / `..Conditions.TargetKinds` — an orb fires with no
+card and no chosen target, the trigger rule; everything else is legal, `orbs_match` / `orb_count_ge` included). `OrbRunner.RunEffect`
+evaluates it at fire time with the player-state overload and logs `[AR] … gate <kind> OPEN|closed`; the HUD tooltip prints
+"… if/unless …" via `Conditions.Phrase`. **(2) Plasma / Glass as RECIPES, not base orbs** — both in `VOCABULARY.md` Orbs as
+backticked JSON (the phase test parses + validates them). **(3) The verify-first item FAILED in a useful way:** `gain_energy` IS
+legal in an orb passive, but a forged passive ticked only on `BeforeTurnEndOrbTrigger` (the Lightning/Frost/Glass hook), so energy
+gained there evaporated and a `draw` passive fed the end-of-turn discard — both ops were DEAD in a passive. The game's own
+`PlasmaOrb` ticks on `AfterTurnStartOrbTrigger` (decompile; `OrbQueue` calls both hooks for every queued orb). Fix: a custom orb
+gains **`passive_timing`** (`turn_end` default / `turn_start`), `ForgedOrb` overrides `AfterTurnStartOrbTrigger` and each orb ticks
+on exactly one hook, and a passive carrying `gain_energy` / `draw` MUST declare `turn_start` (`OrbTurnStartOnlyOps`, both
+importers). **(4) Lockstep:** `OrbSpec.cs` (When / PassiveTiming / PassiveAtTurnStart), `ForgedCharacters.cs`
+(OrbPassiveTimings / OrbTurnStartOnlyOps / OrbForbiddenConditionKinds + both parsers), `OrbRunner.cs` (gate, `[AR]` tags,
+"Passive (turn start):", the if/unless fragment), `ForgedOrb.cs`, `ForgedCards.cs` VocabVersion 49, `bts1.py` 49, `class_forge.py`
+(`_ORB_CONDITION_KINDS` / `_ORB_FORBIDDEN_CONDITION_KINDS` / value caps / `_validate_orb_when` / `_ORB_PASSIVE_TIMINGS` /
+`_ORB_TURN_START_ONLY_OPS`, the ORB POOL prompt sentence + recipes, the fake orb blueprint gains a Plasma orb with a gated
+evoke), `VOCABULARY.md` (Orbs: `when` + `passive_timing` bullets + both recipes; Conditions cross-reference),
+`DESIGN_HEURISTICS.md` (orb_channel note: gated orbs pay off orb count; a Plasma passive is a full energy — cap 1, never with
+`max_energy`), `web/static/app.js` (turn_start passive label; `condCore` gained the nine post-Phase-M kinds that were falling
+through to titleCase), PHASE_I plan deferrals (`:95`, `:118`) marked LANDED; `tests/test_phase_ar.py` (122 checks, incl. a
+three-way kind lockstep: card.schema.json enum == C# `Conditions.Kinds` == Python orb kinds + forbidden); suite 397, all 35
+standalone modules green. Prompt budget: blueprint 91,949 → 93,674 (+1,725: the two recipe lines + the ORB POOL sentence;
+within rule 0.9's ±5%). **AutoSlay GAPTESTAR1** (`generation/scratch/gaptest-ar/` — a "Glass Cannon" orb class: Plasma
+(turn_start energy; evoke energy + draw if 2+ orbs), Glass (evoke-only: 9 to all if 2+ orbs, Vulnerable if 2+ enemies), Cinder
+(passive 2 dmg if turn 2+ / Block 2 if no Block; evoke 6 unless Block / Weak if 1+ energy); three channel skills + a 2-random pull +
+evoke + Focus): **316 `[AR]` tags** — Plasma turn-start tick ×20, Plasma evoke draw gate ×25 open / ×1 closed, Glass shatter gate
+×30 open / ×3 closed, Glass crowd-Vulnerable ×4 open / ×29 closed, Cinder turn gate ×39 open / ×10 closed, Cinder energy gate
+×53 open, Cinder `no_block` ×49 closed and negated `has_block` ×53 closed (the AutoSlay bot carries ~1,000 Block, so the Block reads
+never flip — harness, not mod; both kinds are card-proven since Phase H/L-4) · 0 mod-attributable exception frames. Verdict
+"FAIL — Watchdog timeout … Navigating map" = the documented random-bot map stall, not a mod hang. Tag evidence:
+`generation/scratch/gaptest-ar/godot_AR_tags_GAPTESTAR1.txt`.
+
 ---
 
 ## 0. Ground rules

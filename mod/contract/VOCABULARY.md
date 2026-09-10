@@ -167,6 +167,16 @@ never sprinkle them onto an ordinary class.
   can sear an enemy each turn, shield you, debuff foes, etc. A class's `orb_pool` is an ordered mix of base
   names + custom orbs; cards `channel_orb` them **by pool name** (`orb:"ember"`), and `orb:"random"` rolls only
   that class's pool. (Custom orbs are STRICTLY per-class — never global, never in another class's `random`.)
+- **Orb-effect `when` (v49):** any orb-effect may carry a `when` gate — every condition below EXCEPT the
+  chosen-target / retained reads (`target_has_status`, `target_hp_below_half`, `target_has_block`,
+  `retained_last_turn`: an orb fires with no card or chosen target). Checked each tick/evoke; the tooltip prints
+  "… if …". E.g. `{"op":"damage","amount":12,"target":"all_enemies","when":{"kind":"orb_count_ge","value":3}}`.
+- **`passive_timing` (v49):** a custom orb's passive ticks at `turn_end` (default) or `turn_start`. A passive that
+  `gain_energy` / `draw` MUST be `"passive_timing": "turn_start"` (energy/cards gained at turn end are lost).
+- **Recipes** (custom orbs, not base orbs): **Plasma** =
+  `{"name":"Plasma","passive_val":1,"evoke_val":2,"passive_timing":"turn_start","passive":[{"op":"gain_energy","amount":1}],"evoke":[{"op":"gain_energy","amount":2}]}`;
+  **Glass** (evoke-only: nothing while channeled, a big shatter) =
+  `{"name":"Glass","passive_val":0,"evoke_val":12,"passive":[],"evoke":[{"op":"damage","amount":12,"target":"all_enemies"}]}`.
 - `channel_orb` fills your next open slot; channeling into full slots evokes the oldest first. `evoke` triggers +
   consumes your oldest orb now. `focus` (a `power`) raises the value of every orb — the orb-class scaling payoff.
 - Design an orb class as a **channel-engine** (cards that channel orbs) + **payoffs** (evoke bursts, Focus
@@ -177,7 +187,7 @@ Any effect may carry an optional `"when"` predicate; the effect runs **only if i
 on the card, just skipped when false). This is how you build **conditional payoffs** — the "if X, then a big
 thing happens" half of a card. Shape: `"when": { "kind": "...", ... }`; add `"negate": true` to invert it
 (worded "unless …"). One `when` per effect. There is no `else` — model it as a second effect with the negated
-condition.
+condition. (v49: the same `when` is legal inside a custom orb's `passive` / `evoke` effects — see Orbs.)
 
 | condition `kind`    | extra param | true when |
 |---------------------|-------------|-----------|

@@ -844,6 +844,25 @@ public static class ForgedCharacters
     private static readonly HashSet<string> OrbEnemyStatuses = ["vulnerable", "weak", "frail", "poison"];
     private static readonly HashSet<string> OrbTargets = ["self", "enemy", "all_enemies"];
 
+    /// <summary>Phase AR (v49): when a custom orb's passive list ticks. <c>turn_end</c> = the game's
+    /// <c>BeforeTurnEndOrbTrigger</c> (Lightning/Frost/Glass; the default); <c>turn_start</c> = its
+    /// <c>AfterTurnStartOrbTrigger</c> (Plasma). Mirrors class_forge._ORB_PASSIVE_TIMINGS.</summary>
+    public static readonly HashSet<string> OrbPassiveTimings = ["turn_end", "turn_start"];
+
+    /// <summary>Phase AR (v49): passive ops that are DEAD at turn end (energy gained there evaporates; cards drawn
+    /// there are discarded) — a passive carrying one of these must declare <c>passive_timing: turn_start</c>.
+    /// Mirrors class_forge._ORB_TURN_START_ONLY_OPS.</summary>
+    public static readonly HashSet<string> OrbTurnStartOnlyOps = ["gain_energy", "draw"];
+
+    /// <summary>Phase AR (v49): condition kinds an orb effect's <c>when</c> may NOT use — an orb fires with no card
+    /// and no chosen target (the passive's supplied Creature is null on our tick; an evoke enumerates the board),
+    /// so the card-instance read and every chosen-target read are meaningless there — the same rule a trigger's
+    /// fire-time gate follows (<see cref="ForgedCards"/>.ValidateTrigger). Every other <see cref="Conditions.Kinds"/>
+    /// entry is legal (orbs_match / orb_count_ge included: "if you have 3+ orbs, shatter for 12").
+    /// Mirrors class_forge._ORB_FORBIDDEN_CONDITION_KINDS.</summary>
+    public static readonly HashSet<string> OrbForbiddenConditionKinds =
+        ["target_has_status", "retained_last_turn", .. Conditions.TargetKinds];
+
     /// <summary>The max custom orb defs a single class may forge (the rest of its pool is base orbs).</summary>
     public const int MaxCustomOrbs = 3;
 
@@ -902,7 +921,16 @@ public static class ForgedCharacters
         if (passive.Length == 0 && evoke.Length == 0)
         { error = $"custom orb '{name}' has neither a passive nor an evoke effect."; return false; }
 
-        var spec = new OrbSpec(name, desc, hue, passiveVal, evokeVal, passive, evoke);
+        // Phase AR (v49): when the passive ticks. Default turn_end (the Lightning/Frost shape); turn_start is the
+        // Plasma shape — and REQUIRED for a passive that grants energy or draws (dead at turn end).
+        string timing = d.ContainsKey("passive_timing") ? Str(d, "passive_timing").Trim().ToLowerInvariant() : "turn_end";
+        if (!OrbPassiveTimings.Contains(timing))
+        { error = $"custom orb '{name}': passive_timing '{timing}' is not one of {string.Join("/", OrbPassiveTimings)}."; return false; }
+        foreach (var pe in passive)
+            if (OrbTurnStartOnlyOps.Contains(pe.Effect.Op) && timing != "turn_start")
+            { error = $"custom orb '{name}': a passive '{pe.Effect.Op}' needs passive_timing \"turn_start\" (at turn end the energy/cards are lost)."; return false; }
+
+        var spec = new OrbSpec(name, desc, hue, passiveVal, evokeVal, passive, evoke, timing);
         entry = new OrbPoolEntry(name, spec, customIndex);
         error = "";
         return true;
@@ -958,7 +986,26 @@ public static class ForgedCharacters
             if (op != "channel_orb" && amount < 1)
             { error = $"{where}: op '{op}' needs amount >= 1."; return false; }
 
-            list.Add(new OrbEffect(new EffectSpec(op, amount, status, Orb: orb), target));
+            // Phase AR (v49): an optional fire-time gate — the same JSON shape as a card effect's `when`, validated by
+            // the shared Conditions.Validate plus the no-card/no-target rule (OrbForbiddenConditionKinds).
+            Condition? when = null;
+            if (e.ContainsKey("when"))
+            {
+                if (e["when"].VariantType != Godot.Variant.Type.Dictionary)
+                { error = $"{where}: 'when' must be an object {{ \"kind\": ... }}."; return false; }
+                var w = e["when"].AsGodotDictionary();
+                when = new Condition(
+                    Str(w, "kind").Trim().ToLowerInvariant(),
+                    Int(w, "value"),
+                    w.ContainsKey("status") ? Str(w, "status").Trim().ToLowerInvariant() : null,
+                    Bool(w, "negate", false));
+                var cerr = Conditions.Validate(when);
+                if (cerr != null) { error = $"{where}: {cerr}"; return false; }
+                if (OrbForbiddenConditionKinds.Contains(when.Kind))
+                { error = $"{where}: an orb effect's 'when' can't use {when.Kind} (an orb fires with no card/chosen target)."; return false; }
+            }
+
+            list.Add(new OrbEffect(new EffectSpec(op, amount, status, Orb: orb, When: when), target));
         }
         effects = list.ToArray();
         error = "";

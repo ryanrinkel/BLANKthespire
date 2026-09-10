@@ -134,10 +134,18 @@ public abstract class ForgedOrb : CustomOrbModel
     // override); OrbModel.Passive(ctx, target) is only a helper a subclass's tick may call, so overriding Passive
     // ALONE does nothing — confirmed in-game 2026-06-17 (the orb showed its value but the passive never fired).
     // We run the passive list here and resolve the target ourselves (null -> first hittable enemy for `enemy`).
+    // Phase AR (v49): an orb whose spec says `passive_timing: turn_start` ticks on AfterTurnStartOrbTrigger instead
+    // (the game's PlasmaOrb hook — energy/draw passives land where they are usable); each orb ticks on exactly one.
     public override Task BeforeTurnEndOrbTrigger(PlayerChoiceContext ctx)
     {
         var s = Source;
-        return s == null ? Task.CompletedTask : OrbRunner.RunPassive(s, this, ctx, null);
+        return s == null || s.PassiveAtTurnStart ? Task.CompletedTask : OrbRunner.RunPassive(s, this, ctx, null);
+    }
+
+    public override Task AfterTurnStartOrbTrigger(PlayerChoiceContext ctx)
+    {
+        var s = Source;
+        return s == null || !s.PassiveAtTurnStart ? Task.CompletedTask : OrbRunner.RunPassive(s, this, ctx, null);
     }
 
     public override async Task<IEnumerable<Creature>> Evoke(PlayerChoiceContext ctx)

@@ -92,7 +92,10 @@ To maximize modalities, orb effects carry a `target` (`self` / `enemy` / `all_en
   unlike a turn-trigger), **draw** / **gain_energy** / **heal** (self), **gain_orb_slot** (self),
   **channel_orb** (chain another of the class's orbs).
 - Passive numbers fire EVERY turn → keep small; evoke is the burst → bigger. The validator enforces sane caps.
-- Conditions (`when`) inside orb effects: **deferred** to a follow-up (recommended) unless we find it cheap.
+- Conditions (`when`) inside orb effects: **LANDED — Phase AR (2026-09-10, vocab v49)**: an orb-effect's `when`
+  rides on its EffectSpec (every condition except the chosen-target / retained reads — the trigger rule), evaluated
+  in `OrbRunner.RunEffect`; the same phase added `passive_timing` (turn_end / turn_start = the game's Plasma hook)
+  because a `gain_energy` / `draw` passive was dead at the end-of-turn tick.
 
 ## MVP cut
 Phase I-1 (engine): `OrbSpec`/`OrbEffect` + `ForgedOrb` shell + `OrbRunner` (full targeting) + class `orb_pool` +
@@ -115,7 +118,7 @@ generator (contract/cardgen/validator/class_forge) → fake+real forge → redep
 4. **Focus scaling:** wire `ModifyOrbValue` to the orb's primary `PassiveVal`/`EvokeVal` (so Focus matters on custom
    orbs like it does on base orbs). ✅ (small; keep if cheap, else defer to I-2.)
 5. **Art:** placeholder sprite/color for the MVP (custom hue ok; real per-orb art deferred). ✅
-6. **Conditions (`when`) inside orb effects:** **deferred** to a follow-up. ✅
+6. **Conditions (`when`) inside orb effects:** **deferred** to a follow-up. ✅ → LANDED in Phase AR (v49, 2026-09-10).
 
 ## Risk notes
 - `Passive`/`Evoke` exact return types + how the game supplies the passive `target` (single? per-enemy?) — verify with

@@ -25,7 +25,12 @@ import sys
 import zlib
 from pathlib import Path
 
-VOCAB_VERSION = 48  # must be <= ForgedCards.VocabVersion (48: Phase AS — RELIC VOCABULARY: relic hooks gain `card_type`
+VOCAB_VERSION = 49  # must be <= ForgedCards.VocabVersion (49: Phase AR — CONDITIONS INSIDE CUSTOM ORB EFFECTS: an
+                    # orb_pool custom orb's passive/evoke effect may carry a `when` gate (every card condition except
+                    # the chosen-target / retained reads — the trigger rule); a custom orb gains `passive_timing`
+                    # (turn_end default / turn_start = the Plasma hook) and an energy/draw passive MUST be turn_start.
+                    # No base orbs: Plasma / Glass are VOCABULARY.md custom-orb recipes. No card-level change.
+                    # 48: Phase AS — RELIC VOCABULARY: relic hooks gain `card_type`
                     # (on_card_played only: attack/skill/power) and an `every_n` per-combat counter (2..9); modifiers gain
                     # `attack_base` (+N every card attack, 1..3) and the SIGNED `max_hp` (±N once on obtain — the negative
                     # form is the price of a flat energy stat); relic drawback op `discard` (1..2 random) and a self-target

@@ -601,12 +601,14 @@ function elementDetailHtml(description, lines) {
     + (lines && lines.length ? `<ul class="fb-detail-eff">${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>` : "");
 }
 
-const ORB_VAL_LABELS = { passive: "Each turn while channeled", evoke: "On evoke" };
+// Phase AR (v49): a `passive_timing: turn_start` orb (the Plasma shape) says so; fmtEffect already appends a
+// per-effect `when` gate ("… (if you have 3+ orbs)").
+const ORB_VAL_LABELS = { passive: "Each turn while channeled", passive_turn_start: "At the start of each turn while channeled", evoke: "On evoke" };
 function orbLines(orb) {
   const out = [];
   const passive = (orb.passive || []).map((e) => fmtEffect(e, "enemy")).join(", ");
   const evoke = (orb.evoke || []).map((e) => fmtEffect(e, "enemy")).join(", ");
-  if (passive) out.push(`${ORB_VAL_LABELS.passive}: ${passive}`);
+  if (passive) out.push(`${orb.passive_timing === "turn_start" ? ORB_VAL_LABELS.passive_turn_start : ORB_VAL_LABELS.passive}: ${passive}`);
   if (evoke) out.push(`${ORB_VAL_LABELS.evoke}: ${evoke}`);
   return out;
 }
@@ -814,6 +816,16 @@ function condCore(c) {
     case "hand_size_ge": return `your hand has ${v ?? "enough"}+ cards`;
     case "retained_last_turn": return "you retained a card last turn";
     case "forged_ge": return `your Forge is ${v ?? "enough"}+`;
+    // Phase AR (v49): the later kinds, now reachable from an orb chip too (were falling through to titleCase).
+    case "draw_pile_empty": return "your draw pile is empty";
+    case "hp_lost_ge": return `you've lost ${v ?? "enough"}+ HP this turn`;
+    case "dark_ge": return `your Dark is ${v ?? "enough"}+`;
+    case "light_ge": return `your Light is ${v ?? "enough"}+`;
+    case "centered": return `you're centered (within ${v ?? "?"})`;
+    case "target_hp_below_half": return "the enemy is below half HP";
+    case "target_has_block": return "the enemy has Block";
+    case "energy_ge": return `you have ${v ?? "enough"}+ energy`;
+    case "cards_played_this_turn_ge": return `you've played ${v ?? "enough"}+ cards this turn`;
     default: return titleCase(c.kind);
   }
 }

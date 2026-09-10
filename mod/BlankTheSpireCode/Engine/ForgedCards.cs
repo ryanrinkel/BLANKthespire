@@ -42,7 +42,16 @@ public static class ForgedCards
     /// v10 (forged statuses, Phase J): + CharacterSpec.StatusPool (a class's ≤4 custom modifier-family statuses
     /// read from `status_pool`; see ForgedCharacters / ForgedStatusPower). Class cards may apply a custom status
     /// by pool name via the `apply_status_custom` op (class-only, like custom-orb channels).</summary>
-    public const int VocabVersion = 48; // 48: Phase AS (VOCAB_GAP_REMEDIATION Wave 3) — RELIC VOCABULARY. Relic hooks gain a
+    public const int VocabVersion = 49; // 49: Phase AR (VOCAB_GAP_REMEDIATION Wave 3) — CONDITIONS INSIDE CUSTOM ORB EFFECTS. An
+                                        //     orb_pool custom orb's passive/evoke effect may carry a `when` gate (any Conditions.Kinds
+                                        //     entry except the chosen-target / retained reads — an orb fires with no card/target, the
+                                        //     trigger rule; OrbRunner evaluates it at fire time, the tooltip prints "… if …"). A custom
+                                        //     orb also gains `passive_timing` (turn_end default = BeforeTurnEndOrbTrigger; turn_start =
+                                        //     the game's Plasma hook AfterTurnStartOrbTrigger) and a passive `gain_energy`/`draw` MUST
+                                        //     be turn_start (dead at turn end). No base orbs added: Plasma / Glass are VOCABULARY.md
+                                        //     custom-orb recipes. Engine: OrbSpec / ForgedCharacters.TryParseOrbEffects+TryParseCustomOrb
+                                        //     / OrbRunner / ForgedOrb.
+                                        // 48: Phase AS (VOCAB_GAP_REMEDIATION Wave 3) — RELIC VOCABULARY. Relic hooks gain a
                                         //     `card_type` filter (on_card_played only: attack/skill/power — CardModel.Type) and an
                                         //     `every_n` per-combat counter (2..9: fires on the Nth, 2Nth… matching occurrence; the
                                         //     icon shows the running count). Modifiers gain `attack_base` (+N to every card attack,

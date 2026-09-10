@@ -29,8 +29,11 @@ public static class OrbRunner
     public static async Task RunPassive(OrbSpec spec, ForgedOrb orb, PlayerChoiceContext ctx, Creature? passiveTarget)
     {
         var affected = new List<Creature>();
+        // Phase AR (v49): a turn_start passive is the Plasma shape (energy/draw land where they are usable).
+        if (spec.PassiveAtTurnStart)
+            MainFile.Logger.Info($"[AR] orb '{spec.Name}' passive ticks at turn start ({spec.Passive.Length} effect(s)).");
         foreach (var oe in spec.Passive)
-            await RunEffect(oe, orb, ctx, passiveTarget, affected);
+            await RunEffect(oe, orb, ctx, passiveTarget, affected, spec.Name, "passive");
     }
 
     /// <summary>Run the orb's evoke (burst) list and return the enemies it affected (for VFX/animation). No
@@ -39,15 +42,26 @@ public static class OrbRunner
     {
         var affected = new List<Creature>();
         foreach (var oe in spec.Evoke)
-            await RunEffect(oe, orb, ctx, null, affected);
+            await RunEffect(oe, orb, ctx, null, affected, spec.Name, "evoke");
         return affected.Distinct().ToList();
     }
 
     private static async Task RunEffect(OrbEffect oe, ForgedOrb orb, PlayerChoiceContext ctx, Creature? passiveTarget,
-        List<Creature> affected)
+        List<Creature> affected, string orbName, string phase)
     {
         var e = oe.Effect;
         var player = orb.Owner;
+        // Phase AR (v49): the fire-time gate. Evaluated with NO target (like a trigger's `when`) — the validator
+        // already forbids the chosen-target / card-instance reads here, so the player-state overload is exact.
+        if (e.When != null)
+        {
+            bool open = Conditions.Evaluate(e.When, player, null);
+            MainFile.Logger.Info($"[AR] orb '{orbName}' {phase} {e.Op} gate {e.When.Kind}{(e.When.Negate ? " (negated)" : "")} " +
+                                 $"{(open ? "OPEN" : "closed")} (need {e.When.Value}; orbs {player.PlayerCombatState?.OrbQueue.Orbs.Count ?? 0}, " +
+                                 $"block {player.Creature.Block}, energy {player.PlayerCombatState?.Energy ?? 0}, " +
+                                 $"turn {player.Creature.CombatState.RoundNumber}, enemies {orb.CombatState.HittableEnemies.Count(c => c.IsAlive)}).");
+            if (!open) return;
+        }
         switch (e.Op)
         {
             case "damage":
@@ -178,7 +192,8 @@ public static class OrbRunner
         string passive = Phrase(spec.Passive);
         string evoke = Phrase(spec.Evoke);
         var parts = new List<string>(2);
-        if (passive.Length > 0) parts.Add($"Passive: {passive}");
+        // Phase AR (v49): a turn_start passive says so (the Plasma shape) — the default tick is end of turn.
+        if (passive.Length > 0) parts.Add(spec.PassiveAtTurnStart ? $"Passive (turn start): {passive}" : $"Passive: {passive}");
         if (evoke.Length > 0) parts.Add($"Evoke: {evoke}");
         return parts.Count > 0 ? string.Join("\n", parts) : "A forged orb.";
     }
@@ -190,6 +205,15 @@ public static class OrbRunner
     }
 
     private static string Fragment(OrbEffect oe)
+    {
+        string core = FragmentCore(oe);
+        // Phase AR (v49): the gate reads like a card's — "deal 12 damage to ALL enemies if you have 3+ orbs".
+        if (core.Length > 0 && oe.When != null)
+            core += " " + (oe.When.Negate ? "unless " : "if ") + Conditions.Phrase(oe.When);
+        return core;
+    }
+
+    private static string FragmentCore(OrbEffect oe)
     {
         var e = oe.Effect;
         string to = oe.Target switch { "all_enemies" => " to ALL enemies", "enemy" => "", _ => "" };

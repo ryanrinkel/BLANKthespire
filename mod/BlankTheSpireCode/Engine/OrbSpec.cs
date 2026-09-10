@@ -7,8 +7,16 @@ namespace BlankTheSpire.BlankTheSpireCode.Engine;
 /// its own target because an orb's <c>Passive</c> is handed a Creature and its <c>Evoke</c> can reach the
 /// board — so a passive can damage an enemy, an evoke can hit all enemies, etc. <paramref name="Target"/> is
 /// <c>self</c> / <c>enemy</c> / <c>all_enemies</c> (see <c>OrbRunner</c>).
+/// Phase AR (v49): an orb effect may carry a <c>when</c> gate — it rides on the inner <see cref="EffectSpec.When"/>
+/// (the same JSON shape as a card effect's <c>when</c>) and is exposed here as <see cref="When"/>; <c>OrbRunner</c>
+/// evaluates it at fire time (player-state reads only — an orb fires with no card and no chosen target, so the
+/// target / retained reads are validator-forbidden, exactly like a trigger's fire-time gate).
 /// </summary>
-public sealed record OrbEffect(EffectSpec Effect, string Target);
+public sealed record OrbEffect(EffectSpec Effect, string Target)
+{
+    /// <summary>The fire-time gate (null = unconditional). Phase AR (v49).</summary>
+    public Condition? When => Effect.When;
+}
 
 /// <summary>
 /// A custom (forged) orb type (Phase I). A class declares 0–3 of these inside its <c>orb_pool</c>; each is
@@ -18,6 +26,11 @@ public sealed record OrbEffect(EffectSpec Effect, string Target);
 /// (per-turn tick) and <see cref="EvokeVal"/> (burst) shown on the HUD and scaled by Focus, and runs its
 /// <see cref="Passive"/> / <see cref="Evoke"/> effect lists. <see cref="Hue"/> drives the placeholder color
 /// (real per-orb art is deferred).
+/// Phase AR (v49): <see cref="PassiveTiming"/> says WHEN the passive list ticks — <c>turn_end</c> (the default;
+/// Lightning/Frost/Glass's <c>BeforeTurnEndOrbTrigger</c>) or <c>turn_start</c> (Plasma's
+/// <c>AfterTurnStartOrbTrigger</c>). A passive that grants energy or draws MUST tick at turn start (at turn end
+/// the energy evaporates and the cards are discarded); the validator enforces it (see
+/// <c>ForgedCharacters.OrbTurnStartOnlyOps</c>).
 /// </summary>
 public sealed record OrbSpec(
     string Name,
@@ -26,7 +39,12 @@ public sealed record OrbSpec(
     int PassiveVal,
     int EvokeVal,
     OrbEffect[] Passive,
-    OrbEffect[] Evoke);
+    OrbEffect[] Evoke,
+    string PassiveTiming = "turn_end")
+{
+    /// <summary>True when the passive list ticks at the start of your turn (Phase AR, v49).</summary>
+    public bool PassiveAtTurnStart => PassiveTiming == "turn_start";
+}
 
 /// <summary>
 /// One entry in a class's ordered <c>orb_pool</c> (Phase I): either a BASE orb (referenced by name —

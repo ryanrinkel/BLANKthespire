@@ -308,7 +308,12 @@ custom orb's "passive" fires EVERY turn (keep its numbers SMALL) and its "evoke"
 all_enemies), `apply_status` (a self-buff on "self", OR a debuff vulnerable/weak/frail/poison on enemy/ \
 all_enemies), `block`/`draw`/`gain_energy`/`heal`/`gain_orb_slot` (always "self"), `channel_orb` (chain another \
 pool orb). "passive_val"/"evoke_val" are the HUD numbers (Focus scales them; set them to the orb's main damage/ \
-block). You MAY also give a custom orb a "hue" (0.0–1.0) for its color (e.g. fire ≈0.03, poison ≈0.3, ice \
+block). Any orb-effect may carry a "when" gate (v49 — every card condition except the chosen-target / retained \
+reads): {{"op":"damage","amount":12,"target":"all_enemies","when":{{"kind":"orb_count_ge","value":3}}}} = "shatter \
+for 12 if you have 3+ orbs". A passive that gain_energy / draw MUST set "passive_timing": "turn_start" (default \
+turn_end — energy/cards gained at turn end are lost); recipes: a Plasma orb = passive_timing turn_start + passive \
+gain_energy 1 / evoke gain_energy 2; a Glass orb = no passive, evoke damage 12 to all_enemies (see VOCABULARY Orbs). \
+You MAY also give a custom orb a "hue" (0.0–1.0) for its color (e.g. fire ≈0.03, poison ≈0.3, ice \
 ≈0.55); otherwise each gets a distinct auto color. Cards channel a pool orb BY NAME — write the brief as "channel an Ember orb" and the card will emit \
 channel_orb orb:"ember" (the orb's name LOWERCASED), or "channel a lightning orb"; `orb:"random"` rolls only \
 THIS class's pool. Make each custom orb express the class fantasy (e.g. a fire orb that sears an enemy each turn \
@@ -1945,6 +1950,50 @@ _ORB_DEBUFFS = {"vulnerable", "weak", "frail", "poison"}
 _ORB_TARGETS = {"self", "enemy", "all_enemies"}
 _MAX_CUSTOM_ORBS = 3  # must equal ForgedCharacters.MaxCustomOrbs
 
+# Phase AR (v49): when a custom orb's passive ticks (mirror ForgedCharacters.OrbPassiveTimings). turn_end = the
+# game's BeforeTurnEndOrbTrigger (Lightning/Frost/Glass; the default); turn_start = AfterTurnStartOrbTrigger (Plasma).
+_ORB_PASSIVE_TIMINGS = {"turn_end", "turn_start"}
+# Passive ops that are DEAD at turn end (energy evaporates, drawn cards are discarded) — such a passive must declare
+# passive_timing "turn_start" (mirror ForgedCharacters.OrbTurnStartOnlyOps).
+_ORB_TURN_START_ONLY_OPS = {"gain_energy", "draw"}
+# Phase AR (v49): an orb effect's `when` — every card condition kind (card.schema.json's condition enum / C#
+# Conditions.Kinds) EXCEPT the card-instance and chosen-target reads: an orb fires with no card and no chosen target
+# (the trigger rule — mirror ForgedCharacters.OrbForbiddenConditionKinds).
+_ORB_FORBIDDEN_CONDITION_KINDS = {"target_has_status", "retained_last_turn", "target_hp_below_half", "target_has_block"}
+_ORB_CONDITION_KINDS = {
+    "orbs_match", "orb_count_ge", "no_block", "hp_below_half", "has_block", "enemy_count_ge", "turn_at_least",
+    "hand_size_ge", "forged_ge", "draw_pile_empty", "light_ge", "dark_ge", "centered", "hp_lost_ge", "energy_ge",
+    "cards_played_this_turn_ge"}
+# value bounds (mirror C# Conditions.Validate): kinds that NEED value >= 1, and the three capped thresholds.
+_ORB_CONDITION_VALUE_KINDS = {"orb_count_ge", "enemy_count_ge", "turn_at_least", "hand_size_ge", "forged_ge",
+                              "light_ge", "dark_ge", "centered", "hp_lost_ge", "energy_ge", "cards_played_this_turn_ge"}
+_ORB_CONDITION_VALUE_MAX = {"energy_ge": 6, "cards_played_this_turn_ge": 10, "hp_lost_ge": 15}
+
+
+def _validate_orb_when(when, where: str) -> list[str]:
+    """Phase AR (v49): validate one orb effect's `when` gate (the C# TryParseOrbEffects wording family)."""
+    if not isinstance(when, dict):
+        return [f"{where}: 'when' must be an object {{\"kind\": ...}}"]
+    kind = str(when.get("kind", "")).strip().lower()
+    if kind in _ORB_FORBIDDEN_CONDITION_KINDS:
+        return [f"{where}: an orb effect's 'when' can't use {kind} (an orb fires with no card/chosen target)"]
+    if kind not in _ORB_CONDITION_KINDS:
+        return [f"{where}: unknown condition kind '{kind}' (one of {sorted(_ORB_CONDITION_KINDS)})"]
+    errs: list[str] = []
+    try:
+        value = int(when.get("value", 0) or 0)
+    except (TypeError, ValueError):
+        value = 0
+        errs.append(f"{where}: condition 'value' must be an integer")
+    if kind in _ORB_CONDITION_VALUE_KINDS and value < 1:
+        errs.append(f"{where}: condition '{kind}' needs value >= 1")
+    cap = _ORB_CONDITION_VALUE_MAX.get(kind)
+    if cap is not None and value > cap:
+        errs.append(f"{where}: condition '{kind}' may be at most {cap}")
+    if "negate" in when and not isinstance(when.get("negate"), bool):
+        errs.append(f"{where}: condition 'negate' must be true/false")
+    return errs
+
 
 def _validate_orb_pool(pool, orb_slots: int) -> list[str]:
     errs: list[str] = []
@@ -1975,6 +2024,17 @@ def _validate_orb_pool(pool, orb_slots: int) -> list[str]:
             errs += _validate_orb_effects(entry.get("evoke") or [], f"orb '{nm or i}' evoke")
             if not (entry.get("passive") or entry.get("evoke")):
                 errs.append(f"custom orb '{nm or i}' needs a passive or an evoke effect")
+            # Phase AR (v49): passive timing — default turn_end; an energy/draw passive must tick at turn start.
+            timing = str(entry.get("passive_timing", "turn_end") or "turn_end").strip().lower()
+            if timing not in _ORB_PASSIVE_TIMINGS:
+                errs.append(f"custom orb '{nm or i}': passive_timing '{timing}' is not one of turn_end/turn_start")
+            elif timing != "turn_start":
+                for pe in (entry.get("passive") or []):
+                    pop = str(pe.get("op", "")).lower() if isinstance(pe, dict) else ""
+                    if pop in _ORB_TURN_START_ONLY_OPS:
+                        errs.append(f"custom orb '{nm or i}': a passive '{pop}' needs passive_timing \"turn_start\" "
+                                    "(at turn end the energy/cards are lost)")
+                        break
         else:
             errs.append(f"orb_pool[{i}] must be a base-orb name string or a custom-orb object")
     if custom > _MAX_CUSTOM_ORBS:
@@ -2012,6 +2072,8 @@ def _validate_orb_effects(effs, where: str) -> list[str]:
                 errs.append(f"{where}: channel_orb needs an 'orb' name")
         elif int(e.get("amount", 0) or 0) < 1:
             errs.append(f"{where}: op '{op}' needs amount >= 1")
+        if "when" in e:  # Phase AR (v49): the optional fire-time gate
+            errs += _validate_orb_when(e.get("when"), where)
     return errs
 
 
@@ -3253,12 +3315,17 @@ def _fake_blueprint_variant(brief: ClassBrief) -> dict:
             "max_energy": 3,
             "color": {"hue": 200},
             "orb_slots": 3,
-            # MIXED pool: base lightning + a custom Ember orb (exercises the Phase I forged-orb path offline).
+            # MIXED pool: base lightning + a custom Ember orb (exercises the Phase I forged-orb path offline) + a
+            # Plasma-recipe orb (Phase AR, v49: a turn_start energy passive and a `when`-gated evoke).
             "orb_pool": [
                 "lightning",
                 {"name": "Ember", "passive_val": 2, "evoke_val": 8,
                  "passive": [{"op": "damage", "amount": 2, "target": "enemy"}],
                  "evoke": [{"op": "damage", "amount": 8, "target": "all_enemies"}]},
+                {"name": "Plasma", "passive_val": 1, "evoke_val": 2, "passive_timing": "turn_start",
+                 "passive": [{"op": "gain_energy", "amount": 1}],
+                 "evoke": [{"op": "gain_energy", "amount": 2},
+                           {"op": "draw", "amount": 1, "when": {"kind": "orb_count_ge", "value": 2}}]},
             ],
             "archetypes": [
                 {"id": "channel", "name": "Channel", "description": "channel orbs that tick each turn"},
