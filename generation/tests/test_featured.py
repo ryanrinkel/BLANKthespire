@@ -128,6 +128,9 @@ def test_detectors_round_trip() -> None:
         "horde_payoff": _card([{"op": "damage", "amount": 6, "target": "all_enemies", "when": {"kind": "enemy_count_ge", "value": 2}}]),
         "desperation": _card([{"op": "damage", "amount": 10, "when": {"kind": "hp_below_half"}}]),
         "patient_reserve": _card([{"op": "damage", "amount": 1, "scale": "unspent_energy_last_turn"}]),
+        # Phase AN (v44)
+        "devourer": _card([{"op": "damage", "amount": 10}, {"op": "gain_max_hp", "amount": 3}, {"op": "exhaust"}]),
+        "piercing_strike": _card([{"op": "damage", "amount": 7, "unblockable": True}]),
         # Phase AM (v43)
         "body_slam": _card([{"op": "damage", "amount": 1, "scale": "block"}]),
         "executioner": _card([{"op": "damage", "amount": 7}, {"op": "gain_energy", "amount": 1, "when": {"kind": "target_hp_below_half"}}]),
@@ -256,6 +259,7 @@ def test_class_kind_detectors_and_presence() -> None:
     print("W2.3: every class-kind detector round-trips; min_cards + detect_pool presence:")
     samples = {
         "orb_evoke_burst": _card([{"op": "evoke", "amount": 2}]),
+        "orb_flash_focus": _card([{"op": "apply_status", "status": "temp_focus", "amount": 2}]),  # Phase AN (v44)
         "orb_slot_growth": _card([{"op": "gain_orb_slot", "amount": 1}]),
         "orb_focus_power": _card([{"op": "apply_status", "status": "focus", "amount": 1}]),
         "custom_status_spread": _card([{"op": "apply_status_custom", "status_name": "Rust", "amount": 2}]),

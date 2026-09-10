@@ -42,12 +42,14 @@ STATUS_NAME = {
     "intangible": "Intangible", "ritual": "Ritual", "blur": "Blur",
     "temp_strength": "Strength", "temp_dexterity": "Dexterity", "barricade": "Barricade",
     "focus": "Focus",
+    "temp_thorns": "Thorns", "temp_focus": "Focus",  # Phase AN (v44): worded like the temp stats (ForgedCards.StatusName)
 }
 # Self-buffs are worded "Gain" and always land on the player; debuffs are "Apply"-ed to the target.
 # Keep in lockstep with EffectRunner.SelfBuffStatuses (the C# single source of truth for buff-vs-debuff side).
 _BUFFS = {
     "strength", "dexterity", "thorns", "regen", "metallicize", "artifact", "buffer",
     "intangible", "ritual", "blur", "temp_strength", "temp_dexterity", "barricade", "focus",
+    "temp_thorns", "temp_focus",  # Phase AN (v44)
 }
 
 
@@ -195,6 +197,8 @@ def effect_literal(e: dict) -> str:
         lit = f"{lit[:-1]}, OncePerTurn: true)"
     if e.get("once_per_combat"):  # Phase AK (v41): named arg, lockstep with ForgedCards.ParseEffects
         lit = f"{lit[:-1]}, OncePerCombat: true)"
+    if e.get("unblockable") is True:  # Phase AN (v44): the damage flag as a named arg, lockstep with ForgedCards.ParseEffects
+        lit = f"{lit[:-1]}, Unblockable: true)"
     tgt = e.get("target")
     if tgt:
         lit = f'{lit[:-1]}, Target: "{tgt}")'
@@ -403,19 +407,22 @@ def describe(effects: list[dict], target: str) -> str:
         op = e["op"]
         if op == "damage":
             scale = str(e.get("scale", "")).lower()
+            # Phase AN (v44): an unblockable hit reads "…, ignoring Block." — the clause closes the damage sentence in
+            # every shape. Byte-match ForgedCards.Describe.
+            ub = ", ignoring Block" if e.get("unblockable") is True else ""
             if scale:
                 # Phase M (gap #36): "forged" is ADDITIVE — the printed amount is real, plus your Forge.
-                parts.append(f"Deal X damage{dmg_suffix}." if scale == "x"
-                             else f"Deal {e.get('amount', 0)} damage{dmg_suffix}, plus your Forge." if scale == "forged"
-                             else f"Deal {e.get('amount', 0)} damage{dmg_suffix}, plus 1 per '{e.get('tag', '')}' card you own." if scale == "tag_cards_owned"
-                             else f"Deal damage equal to {_scale_phrase(scale)}{dmg_suffix}.")
+                parts.append(f"Deal X damage{dmg_suffix}{ub}." if scale == "x"
+                             else f"Deal {e.get('amount', 0)} damage{dmg_suffix}, plus your Forge{ub}." if scale == "forged"
+                             else f"Deal {e.get('amount', 0)} damage{dmg_suffix}, plus 1 per '{e.get('tag', '')}' card you own{ub}." if scale == "tag_cards_owned"
+                             else f"Deal damage equal to {_scale_phrase(scale)}{dmg_suffix}{ub}.")
             elif e.get("grow", 0):
                 # Phase U (gap #23, Rampage): {Damage} shows the CURRENT grown value (calc-var). Byte-match ForgedCards.Describe.
-                parts.append(f"Deal {{Damage}} damage{dmg_suffix}. Grows by {e['grow']} each time it is played this combat.")
+                parts.append(f"Deal {{Damage}} damage{dmg_suffix}{ub}. Grows by {e['grow']} each time it is played this combat.")
             elif e.get("hits", 1) > 1:
-                parts.append(f"Deal {{Damage}} damage {{Hits}} times{dmg_suffix}.")
+                parts.append(f"Deal {{Damage}} damage {{Hits}} times{dmg_suffix}{ub}.")
             else:
-                parts.append(f"Deal {{Damage}} damage{dmg_suffix}.")
+                parts.append(f"Deal {{Damage}} damage{dmg_suffix}{ub}.")
         elif op == "block":
             scale = str(e.get("scale", "")).lower()
             parts.append("Gain {Block} Block." if not scale
@@ -437,6 +444,9 @@ def describe(effects: list[dict], target: str) -> str:
             parts.append(f"Heal HP equal to {_scale_phrase(scale)}." if scale else "Heal {Heal} HP.")
         elif op == "lose_hp":
             parts.append("Lose {Loss} HP.")
+        elif op == "gain_max_hp":
+            # Phase AN (v44): the Feed payoff via the {MaxHp} var (a real MaxHpVar). Lockstep with ForgedCards.Describe.
+            parts.append("Gain {MaxHp} Max HP.")
         elif op == "discard":
             # Phase R (gap #17): random-discard count via the {Discard} var. Lockstep with ForgedCards.Describe.
             parts.append("Discard {Discard} random card(s).")

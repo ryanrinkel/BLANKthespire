@@ -272,7 +272,8 @@ its FANTASY onto a DISTINCT shape first, generic debuffs last: "freeze" -> a cus
 (hook damage_taken: Brittle) or Frail + a Block engine; "burn" -> a `turn_start` power whose payload deals \
 damage to all enemies, or Poison; "bleed" -> `lose_hp` fuel + `on_hp_lost` / `hp_lost_ge` payoffs; "berserk" \
 -> `forge` income + `scale:"forged"` payoffs, or temp_strength; "venom" -> Poison + a `target_debuff_count` \
-payoff; "tempo" -> draw + gain_energy. Stay strictly INSIDE the vocabulary (a brief that can't be built from \
+payoff; "tempo" -> draw + gain_energy; "devour/hunger" -> a rare `gain_max_hp` attack; "piercing" -> a damage with \
+`unblockable`; "bristle" -> temp_thorns. Stay strictly INSIDE the vocabulary (a brief that can't be built from \
 it will be dropped) — but WITHIN it, range widely rather than conservatively.
 
 Both archetypes must be built from this vocabulary and CROSS-SYNERGIZE (cards of one get better with the \
@@ -287,7 +288,7 @@ ORB CLASSES (optional — only when the concept fits): the vocabulary includes a
 (see the "Orbs" section above). If — and ONLY if — the concept is an elemental/channeling/"slot-machine"/ \
 alchemist identity (storm-caller, elementalist, gambler, etc.), you MAY make this an ORB CLASS: set top-level \
 "orb_slots" to 3, 4 or 5, declare an "orb_pool" (below), make ONE archetype the orb engine (briefs that \
-channel_orb + evoke + a `focus` payoff), and use the orb ops/`focus` freely in THAT archetype's briefs. For \
+channel_orb + evoke + a `focus` payoff), and use the orb ops/`focus`/temp_focus freely in THAT archetype's briefs. For \
 every NON-orb concept, set "orb_slots": 0, OMIT "orb_pool", and do NOT use channel_orb / evoke / gain_orb_slot \
 / focus anywhere — they do nothing without orb slots.
 
@@ -932,7 +933,7 @@ for a second signature under the card cap)."""
 # for archetypes actually chosen (the prompt shrinks by roughly a third, and examples the model must not use
 # are gone). Everything not listed here (triggers, scaled amounts, precision reads, strategic lines, the
 # format + rules) always stays.
-_ORB_TOKENS = frozenset({"channel_orb", "evoke", "gain_orb_slot", "focus", "orbs_match", "orb_count_ge"})
+_ORB_TOKENS = frozenset({"channel_orb", "evoke", "gain_orb_slot", "focus", "temp_focus", "orbs_match", "orb_count_ge"})
 # (heading prefix, keep-if-any-of-these-ops-selected, keep-if-class_kind, section KEY, one-phrase pitch).
 # The KEY is what a caller may pre-nominate under coverage_nominations.sections (coverage.SECTION_KEYS mirrors
 # the set) to force the section back in; the PITCH is what the ALSO-AVAILABLE line says when it is pruned.
@@ -1028,7 +1029,8 @@ def _nomination_ask() -> str:
 # These sets MIRROR the C# ForgedCharacters.TryParseRelic gate so generation never emits a relic the mod would
 # reject on import (the lockstep discipline). focus is in SelfBuffStatuses (orb-only at runtime; harmless here).
 _RELIC_SELF_BUFFS = {"strength", "dexterity", "thorns", "regen", "metallicize", "artifact", "buffer",
-                     "intangible", "ritual", "blur", "temp_strength", "temp_dexterity", "barricade", "focus"}
+                     "intangible", "ritual", "blur", "temp_strength", "temp_dexterity", "barricade", "focus",
+                     "temp_thorns", "temp_focus"}  # Phase AN (v44)
 _RELIC_DEBUFFS = {"vulnerable", "weak", "frail", "poison"}
 _RELIC_TRIGGERS = {"turn_start", "turn_end", "attacked", "on_exhaust", "on_card_played",
                    "combat_end", "on_card_drawn", "on_damage_dealt", "on_block_gained",
@@ -1804,7 +1806,8 @@ def validate_blueprint_for(strategies) -> "callable":
 _BASE_ORBS = {"lightning", "frost", "dark"}
 _ORB_EFFECT_OPS = {"damage", "block", "apply_status", "draw", "gain_energy", "heal", "gain_orb_slot", "channel_orb"}
 _ORB_SELF_BUFFS = {"strength", "dexterity", "thorns", "regen", "metallicize", "artifact", "buffer",
-                   "intangible", "ritual", "blur", "temp_strength", "temp_dexterity", "barricade", "focus"}
+                   "intangible", "ritual", "blur", "temp_strength", "temp_dexterity", "barricade", "focus",
+                   "temp_thorns", "temp_focus"}  # Phase AN (v44)
 _ORB_DEBUFFS = {"vulnerable", "weak", "frail", "poison"}
 _ORB_TARGETS = {"self", "enemy", "all_enemies"}
 _MAX_CUSTOM_ORBS = 3  # must equal ForgedCharacters.MaxCustomOrbs
@@ -2093,7 +2096,7 @@ def _card_uses_orbs(card: dict) -> bool:
     for e in effs:
         if e.get("op") in _ORB_OPS:
             return True
-        if e.get("op") == "apply_status" and e.get("status") == "focus":
+        if e.get("op") == "apply_status" and e.get("status") in ("focus", "temp_focus"):  # Phase AN (v44): temp_focus too
             return True
         when = e.get("when")
         if isinstance(when, dict) and when.get("kind") in _ORB_CONDITIONS:

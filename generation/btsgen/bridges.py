@@ -47,6 +47,8 @@ def card_tokens(card: dict) -> set[str]:
         toks.add("scale")
     if cc.x_cost:
         toks.add("x")
+    if cc.unblockable:  # Phase AN (v44): the damage flag is a vocabulary token an archetype may claim
+        toks.add("unblockable")
     return toks
 
 

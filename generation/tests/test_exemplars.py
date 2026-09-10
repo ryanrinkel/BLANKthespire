@@ -30,7 +30,8 @@ NEEDS_KINDS = frozenset({"", "orb", "status", "summon", "forge", "balance"})
 # Class-only vocabulary -> the `needs` tag an exemplar touching it must carry (so a plain class is never dealt
 # an orb / custom-status / summon / forge / balance card it can't run).
 CLASS_ONLY_TOKENS = {
-    "orb": {"channel_orb", "evoke", "gain_orb_slot", "focus", "orbs_match", "orb_count_ge"},
+    "orb": {"channel_orb", "evoke", "gain_orb_slot", "focus", "orbs_match", "orb_count_ge",
+            "temp_focus"},  # Phase AN (v44): the one-turn Focus is orb-class-only like focus
     "status": {"apply_status_custom"},
     "summon": {"summon", "summon_attack", "buff_summon", "heal_summon", "shield_summon"},
     "forge": {"forge", "forged", "forged_ge", "blade_empower", "summon_blade", "on_blade_played"},

@@ -117,6 +117,9 @@ public static class EffectRunner
                     // unblocked total feeds a later damage_dealt_unblocked heal (Phase P gap #21, lifesteal).
                     if (card.TargetType == TargetType.RandomEnemy) // Phase AJ smoke: BaseLib rolls a random enemy per hit
                         MainFile.Logger.Info($"[AJ] random_enemy damage x{hits} from '{card.Id}' (BaseLib TargetingRandomOpponents).");
+                    if (e.Unblockable) // Phase AN (v44) smoke: the Unblockable prop rides the damage var (BaseLib CardAttack reads .Props)
+                        MainFile.Logger.Info($"[AN] unblockable damage x{hits} from '{card.Id}' (target Block {(play?.Target != null ? play.Target.Block.ToString() : "n/a")}; " +
+                                             $"props {(card.DynamicVars.ContainsKey("CalculatedDamage") ? card.DynamicVars.CalculatedDamage.Props : card.DynamicVars.Damage.Props)}).");
                     var atk = CommonActions.CardAttack(card, play, hits);
                     await atk.Execute(ctx);
                     // Results is per-hit lists of per-target DamageResults — flatten both to sum every unblocked hit.
@@ -149,6 +152,8 @@ public static class EffectRunner
                 case "apply_status":
                     if (card.TargetType == TargetType.RandomEnemy && !SelfBuffStatuses.Contains(e.Status ?? "")) // Phase AJ smoke
                         MainFile.Logger.Info($"[AJ] random_enemy debuff '{e.Status}' from '{card.Id}' (BaseLib GetTargets rolls one enemy).");
+                    if (e.Status is "temp_thorns" or "temp_focus") // Phase AN (v44) smoke: the one-turn shells apply (expiry logs from the power)
+                        MainFile.Logger.Info($"[AN] {e.Status} +{amt} (this turn only) from '{card.Id}'.");
                     await ApplyStatus(e.Status, card, ctx, play);
                     break;
                 case "gain_energy":
@@ -166,6 +171,16 @@ public static class EffectRunner
                     // so the player's Strength does not scale self-damage.
                     await CreatureCmd.Damage(ctx, card.Owner.Creature, amt, ValueProp.Unblockable, card);
                     break;
+                case "gain_max_hp":
+                {
+                    // Phase AN (v44): the base-game Feed payoff — CreatureCmd.GainMaxHp raises Max HP by amt AND heals
+                    // the gained amount (verified in the decompiled CreatureCmd: SetMaxHp, then Heal(num)). The amount
+                    // is the upgrade-aware {MaxHp} var (a real MaxHpVar on the card). Card-only; capped 1..5 by Validate.
+                    int before = card.Owner.Creature.MaxHp;
+                    await CreatureCmd.GainMaxHp(card.Owner.Creature, amt);
+                    MainFile.Logger.Info($"[AN] gain_max_hp +{amt}: Max HP {before} -> {card.Owner.Creature.MaxHp} (HP now {card.Owner.Creature.CurrentHp}) ('{card.Id}').");
+                    break;
+                }
                 case "forge":
                     // Phase M (gap #36): stoke the player-level Forge counter (a stacking power). The payoff
                     // is a damage/block effect with scale:"forged", which ADDS the stacks to its printed amount.
@@ -718,6 +733,7 @@ public static class EffectRunner
         "strength", "dexterity", "thorns", "regen", "metallicize", "artifact", "buffer",
         "intangible", "ritual", "blur", "temp_strength", "temp_dexterity", "barricade",
         "focus", // orb output scaling (Phase G)
+        "temp_thorns", "temp_focus", // Phase AN (v44): one-turn Thorns / Focus (ForgedTempThornsPower / ForgedTempFocusPower)
     ];
 
     /// <summary>Orb type for the <c>channel_orb</c> op (Phase G; lightning/frost/dark for the MVP).
@@ -907,6 +923,8 @@ public static class EffectRunner
             "temp_dexterity" => ApplyPower<ForgedTempDexterityPower>(self, card, ctx, play),
             "barricade"      => ApplyPower<BarricadePower>(self, card, ctx, play),
             "focus"          => ApplyPower<FocusPower>(self, card, ctx, play),
+            "temp_thorns"    => ApplyPower<ForgedTempThornsPower>(self, card, ctx, play), // Phase AN (v44)
+            "temp_focus"     => ApplyPower<ForgedTempFocusPower>(self, card, ctx, play),  // Phase AN (v44)
             _ => throw new NotSupportedException($"EffectRunner.ApplyStatus: unsupported status '{status}'"),
         };
     }
@@ -1092,6 +1110,8 @@ public static class EffectRunner
             "temp_dexterity" => RelicApplyT<ForgedTempDexterityPower>(ctx, target, source, amount),
             "barricade"      => RelicApplyT<BarricadePower>(ctx, target, source, amount),
             "focus"          => RelicApplyT<FocusPower>(ctx, target, source, amount),
+            "temp_thorns"    => RelicApplyT<ForgedTempThornsPower>(ctx, target, source, amount), // Phase AN (v44)
+            "temp_focus"     => RelicApplyT<ForgedTempFocusPower>(ctx, target, source, amount),  // Phase AN (v44)
             _ => Task.CompletedTask,
         };
 

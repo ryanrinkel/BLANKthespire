@@ -51,7 +51,7 @@
       "properties": {
         "op": { "enum": ["damage", "block", "draw", "gain_energy", "heal", "lose_hp", "apply_status", "forge", "channel_orb", "summon"] },
         "amount": { "type": "integer", "minimum": 1 },
-        "status": { "enum": ["strength", "dexterity", "thorns", "regen", "metallicize", "artifact", "buffer", "intangible", "ritual", "blur", "temp_strength", "temp_dexterity", "barricade", "focus", "vulnerable", "weak", "frail", "poison"] },
+        "status": { "enum": ["strength", "dexterity", "thorns", "regen", "metallicize", "artifact", "buffer", "intangible", "ritual", "blur", "temp_strength", "temp_dexterity", "barricade", "focus", "temp_thorns", "temp_focus", "vulnerable", "weak", "frail", "poison"] },
         "orb": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "channel_orb: 'random' or a name in the class's orb_pool." },
         "summon_name": { "type": "string", "minLength": 1, "description": "summon: the minion declared in the class's summon_pool." }
       },

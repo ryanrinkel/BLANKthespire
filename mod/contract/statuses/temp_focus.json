@@ -1,0 +1,6 @@
+{
+  "id": "temp_focus",
+  "name": "Focus",
+  "kind": "buff",
+  "decay": "turn"
+}

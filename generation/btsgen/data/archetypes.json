@@ -294,6 +294,7 @@
         "ops": [
           "damage",
           "scale",
+          "unblockable",
           "apply_status"
         ],
         "class_kind": "normal"
@@ -326,7 +327,8 @@
           "channel_orb",
           "evoke",
           "gain_orb_slot",
-          "focus"
+          "focus",
+          "temp_focus"
         ],
         "class_kind": "orb"
       },
@@ -1077,6 +1079,7 @@
         "ops": [
           "temp_strength",
           "temp_dexterity",
+          "temp_thorns",
           "damage"
         ],
         "class_kind": "normal"
@@ -1107,6 +1110,7 @@
         "ops": [
           "heal",
           "regen",
+          "gain_max_hp",
           "apply_status"
         ],
         "class_kind": "normal"

@@ -73,8 +73,8 @@ class-conditional `channel_orb` / `summon` ops above (and only if your class has
 
 ### Statuses (for `apply_status`)
 - **Buffs (land on you):** `strength`, `dexterity`, `thorns`, `regen`, `metallicize`, `artifact`, `buffer`,
-  `intangible`, `ritual`, `blur`, `temp_strength`, `temp_dexterity`, `barricade` (`focus` is orb-only — don't use
-  it on a relic). Numbers fire **every turn** the hook runs, so keep them **small** (1–2).
+  `intangible`, `ritual`, `blur`, `temp_strength`, `temp_dexterity`, `temp_thorns`, `barricade` (`focus` / `temp_focus`
+  are orb-only — don't use them on a relic). Numbers fire **every turn** the hook runs, so keep them **small** (1–2).
 - **Debuffs (land on the enemy target):** `vulnerable`, `weak`, `frail`, `poison`. The hook needs `target`
   `enemy`/`all_enemies`.
 

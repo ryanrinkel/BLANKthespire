@@ -7,13 +7,15 @@ validator. (The vocabulary grows as the interpreter grows — more ops/statuses 
 ## Effect ops
 | op             | params            | meaning |
 |----------------|-------------------|---------|
-| `damage`       | `amount` (int ≥1), optional `hits` (int ≥2) | Deal `amount` attack damage to the card's target(s). Routed through Strength/Weak/Vulnerable/Block by the engine. Add `hits` to make it **multi-hit**: deal `amount` damage `hits` times (e.g. `amount:4, hits:3` = "Deal 4 damage 3 times"). At most one multi-hit effect per card. |
+| `damage`       | `amount` (int ≥1), optional `hits` (int ≥2) | Deal `amount` attack damage to the card's target(s). Routed through Strength/Weak/Vulnerable/Block by the engine. Add `hits` to make it **multi-hit**: deal `amount` damage `hits` times (e.g. `amount:4, hits:3` = "Deal 4 damage 3 times"). At most one multi-hit effect per card. Add `unblockable` (`"unblockable": true`, v44) and the hit **ignores Block** entirely ("Deal 9 damage, ignoring Block." — Strength/Vulnerable still apply; card-level only, never in a trigger payload; price it above a plain hit, uncommon/rare). |
 | `block`        | `amount` (int ≥1) | Gain `amount` Block (always on the player, regardless of the card's target). |
 | `draw`         | `amount` (int ≥1) | Draw `amount` cards. |
 | `apply_status` | `status`, `amount`| Apply `amount` stacks of a status to the card's target(s) (buffs go on the player, debuffs on enemies — see Statuses). |
 | `gain_energy`  | `amount` (int ≥1) | Gain `amount` energy this turn. |
 | `heal`         | `amount` (int ≥1) | Heal the player `amount` HP. |
 | `lose_hp`      | `amount` (int ≥1) | The player loses `amount` HP (ignores Block; a self-cost, not an attack). |
+| `gain_max_hp`  | `amount` (int 1–5) | **Gain `amount` Max HP** for the rest of the run AND heal that much (the base-game **Feed** payoff; v44). A run-permanent stat, so it is **rare-tier**: uncommon/rare only, 1–3 typical, usually on an `exhaust` attack so it fires once; card-only (never in a trigger payload). |
+| `gain_max_hp`  | `amount` (int 1–5) | **Gain `amount` Max HP** for the rest of the run AND heal that much (the base-game **Feed** payoff; v44). A run-permanent stat, so it is **rare-tier**: uncommon/rare only, 1–3 typical, usually on an `exhaust` attack so it fires once; card-only (never in a trigger payload). |
 | `exhaust`      | *(none)*          | This card Exhausts when played (removed from the deck for the rest of combat). A card property, not a targeted effect. |
 | `innate`       | *(none)*          | This card starts in your opening hand every combat. A card property (no targeted effect). |
 | `retain`       | *(none)*          | This card is NOT discarded at end of turn — it stays in your hand. A card property. |
@@ -67,6 +69,7 @@ ride any card (e.g. an attack that also grants you Block-over-time).
 | `dexterity`     | buff   | +`amount` Block gained per Block effect. Permanent. |
 | `temp_strength` | buff   | Like `strength` but only for this turn (a safe burst with no lasting power). |
 | `temp_dexterity`| buff   | Like `dexterity` but only for this turn. |
+| `temp_thorns`   | buff   | Like `thorns` but only for this turn (v44 — a one-turn bristle: the riposte window without a permanent Thorns ramp). |
 | `thorns`        | buff   | When an enemy attacks you, it takes `amount` damage back. Permanent. |
 | `regen`         | buff   | Heal `amount` HP at the end of your turn (typically decays). |
 | `metallicize`   | buff   | Gain `amount` Block at the end of every turn, then lose 1 stack at the start of each of your later turns (STS2 **Plating**: `amount` N yields N + (N-1) + … + 1 Block over N turns, NOT a permanent per-turn engine — it decays by one per turn, not when hit). |
@@ -77,6 +80,7 @@ ride any card (e.g. an attack that also grants you Block-over-time).
 | `ritual`        | buff   | Gain `amount` Strength at the end of every turn. Snowballs hard — rare-tier. |
 | `barricade`     | buff   | Your Block is never removed (it persists between turns). A toggle — use `amount: 1`. |
 | `focus`         | buff   | +`amount` to the value of every orb you channel (Lightning damage, Frost Block, Dark hit). **ORB-CLASS ONLY.** |
+| `temp_focus`    | buff   | Like `focus` but only for this turn (v44 — boosts this turn's evokes AND the end-of-turn passives, then expires). **ORB-CLASS ONLY.** |
 <!-- metallicize is implemented as PlatingPower (EffectRunner.cs:832 / TriggerRunner.cs:192 / DataCard.cs:199). Semantics verified 2026-09-09 against the decompiled PlatingPower.cs: +Amount Block at end of turn (BeforeSideTurnEndEarly); -1 stack at each player turn start after turn 1 (AfterSideTurnStart -> Decrement); no decay on being hit. -->
 
 > `vulnerable`/`weak` are the most generic debuff filler and `strength`/`block`-shaped buffs the most generic
@@ -150,7 +154,7 @@ ride any card (e.g. an attack that also grants you Block-over-time).
 
 ## Orbs (a CLASS IDENTITY — orb-class cards only)
 Orbs are a Defect-style subsystem: a class with **orb slots** channels elemental orbs that trigger every turn and
-can be "evoked" for a burst. **Only use the orb ops (`channel_orb`/`evoke`/`gain_orb_slot`) and the `focus` status
+can be "evoked" for a burst. **Only use the orb ops (`channel_orb`/`evoke`/`gain_orb_slot`) and the `focus` / `temp_focus` statuses
 for an ORB CLASS** — one whose character sets `orb_slots > 0`. On a non-orb class they do nothing (no slots), so
 never sprinkle them onto an ordinary class.
 - **Base orbs:** `lightning` (deal damage to an enemy each turn; bigger burst on evoke), `frost` (gain Block
@@ -238,7 +242,7 @@ draw/energy engine at turn start, an orb auto-channeler, etc.
 - `effects`: the payload, run each time it fires. By default **a trigger fires with no target**, so a payload effect
   is a **SELF/orb-only sub-vocabulary**: `block`, `draw`, `gain_energy`, `heal`, `lose_hp`, `apply_status` (**self-buffs
   ONLY** — strength/dexterity/thorns/regen/metallicize/artifact/buffer/intangible/ritual/blur/temp_strength/
-  temp_dexterity/barricade/focus), `gain_orb_slot`, `channel_orb` (any orb in YOUR class's pool — base, `random`, or
+  temp_dexterity/barricade/focus/temp_thorns/temp_focus), `gain_orb_slot`, `channel_orb` (any orb in YOUR class's pool — base, `random`, or
   a custom orb: "At the start of your turn, channel an Ember"), `evoke`, `forge` (fixed amount only — the Forge
   engine: "At the start of your turn, Forge 2"), `balance_step` (fixed amount only — the Balance engine: "At the
   start of your turn, shift 2 toward the Dark"), `add_card` (**CLASS-ONLY** — the compost loop: "Whenever a card is

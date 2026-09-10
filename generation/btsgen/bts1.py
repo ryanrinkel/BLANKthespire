@@ -25,7 +25,10 @@ import sys
 import zlib
 from pathlib import Path
 
-VOCAB_VERSION = 43  # must be <= ForgedCards.VocabVersion (43: Phase AM — NEW SCALES AND CONDITIONS: card-level
+VOCAB_VERSION = 44  # must be <= ForgedCards.VocabVersion (44: Phase AN — SMALL OPS: card-only `gain_max_hp` (1..5,
+                    # the Feed payoff: raise Max HP and heal that much), a `damage` flag `unblockable:true` (ignores
+                    # Block; card-level only), and the one-turn self-buffs `temp_thorns` / `temp_focus`.
+                    # 43: Phase AM — NEW SCALES AND CONDITIONS: card-level
                     # scale += block / hp_lost_this_turn / draw_pile_count / plays_this_combat (damage/block only) and
                     # energy (damage/block/draw, cost-0 cards only); `when` += target_hp_below_half / target_has_block
                     # (single-enemy cards, never in a trigger), energy_ge {1..6} / cards_played_this_turn_ge {1..10}.

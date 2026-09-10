@@ -42,7 +42,13 @@ public static class ForgedCards
     /// v10 (forged statuses, Phase J): + CharacterSpec.StatusPool (a class's ≤4 custom modifier-family statuses
     /// read from `status_pool`; see ForgedCharacters / ForgedStatusPower). Class cards may apply a custom status
     /// by pool name via the `apply_status_custom` op (class-only, like custom-orb channels).</summary>
-    public const int VocabVersion = 43; // 43: Phase AM (VOCAB_GAP_REMEDIATION Wave 3) — NEW SCALES AND CONDITIONS. Card-level
+    public const int VocabVersion = 44; // 44: Phase AN (VOCAB_GAP_REMEDIATION Wave 3) — SMALL OPS. New card-only op
+                                        //     `gain_max_hp` (1..5; the base-game Feed payoff: raise Max HP AND heal that
+                                        //     much), a `damage` flag `unblockable:true` (ValueProp.Unblockable rides the
+                                        //     damage var, so preview and resolution both ignore Block; card-level only),
+                                        //     and two one-turn self-buffs `temp_thorns` / `temp_focus` (CustomTemporaryPowerModel
+                                        //     shells like temp_strength; temp_focus is orb-class-only like focus).
+                                        // 43: Phase AM (VOCAB_GAP_REMEDIATION Wave 3) — NEW SCALES AND CONDITIONS. Card-level
                                         //     scale += block (Body Slam / Entrench), hp_lost_this_turn (the AD snapshot read),
                                         //     draw_pile_count, energy (cost-0 ONLY — preview and resolution agree), plays_this_combat
                                         //     (the cards you have played this combat, PLAYER-level; the per-instance count stays
@@ -261,6 +267,7 @@ public static class ForgedCards
     // The intersection the C# EffectRunner / DataCard actually execute (kept in lockstep with both).
     private static readonly HashSet<string> SupportedOps =
         ["damage", "block", "draw", "apply_status", "gain_energy", "lose_hp", "heal",
+         "gain_max_hp", // Phase AN (v44): Feed — raise your Max HP by amount (and heal that much). Card-only, 1..5.
          "exhaust", "innate", "retain", "ethereal",
          "gain_orb_slot", "channel_orb", "evoke", // Phase G orbs (opened to the LLM contract in G3)
          "forge", // Phase M (gap #36): stoke the per-combat Forge counter (payoff = scale:"forged")
@@ -331,7 +338,11 @@ public static class ForgedCards
     private static readonly HashSet<string> SupportedStatuses =
         ["vulnerable", "weak", "frail", "poison",
          "strength", "dexterity", "thorns", "regen", "metallicize", "artifact", "buffer",
-         "intangible", "ritual", "blur", "temp_strength", "temp_dexterity", "barricade", "focus"];
+         "intangible", "ritual", "blur", "temp_strength", "temp_dexterity", "barricade", "focus",
+         "temp_thorns", "temp_focus"]; // Phase AN (v44): one-turn Thorns / Focus (removed at the end of your turn)
+    // Phase AN (v44): the gain_max_hp cap (Feed is +3/+4; a run-permanent stat, so the band is tight). Lockstep with
+    // validator._GAIN_MAX_HP_MAX and the schema clause.
+    private const int GainMaxHpMaxAmount = 5;
     private static readonly HashSet<string> SupportedOrbs = ["lightning", "frost", "dark", "random"]; // Phase G/H
     // Phase Q (gap #16): the combat piles add_card may drop generated copies into. Mirrors PileType (hand/discard/
     // draw) — the base-game "generate a card into combat" destinations. Kept in lockstep with validator._ADD_CARD_PILES.
@@ -379,6 +390,7 @@ public static class ForgedCards
     // Ops that carry a numeric amount (>= 1 required). exhaust/innate/retain/ethereal are flag ops (no amount).
     private static readonly HashSet<string> AmountOps =
         ["damage", "block", "draw", "apply_status", "gain_energy", "lose_hp", "heal", "gain_orb_slot",
+         "gain_max_hp", // Phase AN (v44): Max HP to gain (needs amount>=1; capped 1..5 in Validate)
          "discard", // Phase R (gap #17): how many random cards to discard (needs amount>=1)
          "scry", // Phase AA (gap #17 R-2): how many top-of-draw cards to look at (needs amount>=1)
          "forge", // Phase M (gap #36): how much Forge to stoke (needs amount>=1)
@@ -737,9 +749,11 @@ public static class ForgedCards
             string? cards = e.ContainsKey("cards") ? Str(e, "cards").Trim().ToLowerInvariant() : null;
             // Phase AE (gap #25): the `tag` the tag_cards_owned scalar counts (lowercased; membership/legality in Validate).
             string? tag = e.ContainsKey("tag") ? Str(e, "tag").Trim().ToLowerInvariant() : null;
+            // Phase AN (v44): `unblockable` flags a damage op to ignore Block (damage-only, card-level; validated below).
+            bool unblockable = e.ContainsKey("unblockable") && e["unblockable"].AsBool();
             list.Add(new EffectSpec(op, amount, status, hits, scale, orb, when, trigger, triggered, statusName,
                                     summonName, oncePerTurn, target, cardId, pile, pole, grow, cards, tag,
-                                    OncePerCombat: oncePerCombat));
+                                    OncePerCombat: oncePerCombat, Unblockable: unblockable));
         }
         return list.ToArray();
     }
@@ -770,6 +784,13 @@ public static class ForgedCards
                 return $"op '{e.Op}' has hits < 1.";
             if (e.Hits > 1 && e.Op != "damage" && e.Op != "summon_attack")
                 return $"'hits' only applies to 'damage'/'summon_attack' (op '{e.Op}' had hits {e.Hits}).";
+            // Phase AN (v44): `unblockable` is a damage-op flag (it rides the damage var's ValueProp); a trigger payload
+            // is rejected separately (ValidateTrigger) — the flag is card-level only.
+            if (e.Unblockable && e.Op != "damage")
+                return $"'unblockable' only applies to damage (op '{e.Op}').";
+            // Phase AN (v44): gain_max_hp is a run-permanent stat gain (Feed) — a tight band. amount>=1 via AmountOps.
+            if (e.Op == "gain_max_hp" && e.Amount > GainMaxHpMaxAmount)
+                return $"gain_max_hp 'amount' may be at most {GainMaxHpMaxAmount}; got {e.Amount}.";
             if (e.IsScaled)
             {
                 if (!SupportedScales.Contains(e.Scale!))
@@ -1105,6 +1126,10 @@ public static class ForgedCards
             // has no meaning in a trigger payload (which re-runs from a granted power, not a card the player replays).
             if (t.HasGrow)
                 return "'grow' is not allowed in a trigger payload (it's a per-card-play attack mechanic).";
+            // Phase AN (v44): `unblockable` rides a CARD's damage var; a payload damage is an intrinsic CreatureCmd hit
+            // with no var to flag. Card-level only.
+            if (t.Unblockable)
+                return "'unblockable' is not allowed in a trigger payload (it flags a card-level damage).";
             // Phase AL (v42): `hits` inside a payload — on damage (targeted) and summon_attack only, like the card
             // level ("Whenever you are attacked, deal 2 damage 3 times to the attacker"). TriggerRunner loops the
             // hits; no DynamicVar is involved (payload amounts are literal).
@@ -1279,6 +1304,7 @@ public static class ForgedCards
         "gain_energy"  => "Energy",
         "heal"         => "Heal",
         "lose_hp"      => "Loss",
+        "gain_max_hp"  => "MaxHp", // Phase AN (v44): the Max HP gain (a real MaxHpVar, upgrade-aware in card text)
         "discard"      => "Discard", // Phase R (gap #17): the random-discard count (upgrade-aware in card text)
         "scry"         => "Scry", // Phase AA (gap #17 R-2): the top-of-draw look count (upgrade-aware in card text)
         "apply_status" => "status:" + e.Status,
@@ -1319,20 +1345,23 @@ public static class ForgedCards
             switch (e.Op)
             {
                 case "damage":
+                    // Phase AN (v44): an unblockable hit reads "…, ignoring Block." (the clause closes the damage sentence
+                    // in every shape; lockstep with cardgen.describe).
+                    string ub = e.Unblockable ? ", ignoring Block" : "";
                     if (e.IsScaled)
                         parts.Add(e.Scale == "x"
-                            ? $"Deal X damage{dmgSuffix}."
+                            ? $"Deal X damage{dmgSuffix}{ub}."
                             : e.Scale == "forged"
-                                ? $"Deal {e.Amount} damage{dmgSuffix}, plus your Forge."
+                                ? $"Deal {e.Amount} damage{dmgSuffix}, plus your Forge{ub}."
                                 : e.Scale == "tag_cards_owned"
-                                    ? $"Deal {e.Amount} damage{dmgSuffix}, plus 1 per '{e.Tag}' card you own."
-                                    : $"Deal damage equal to {ScalePhrase(e.Scale)}{dmgSuffix}.");
+                                    ? $"Deal {e.Amount} damage{dmgSuffix}, plus 1 per '{e.Tag}' card you own{ub}."
+                                    : $"Deal damage equal to {ScalePhrase(e.Scale)}{dmgSuffix}{ub}.");
                     else if (e.HasGrow) // Phase U (gap #23): {Damage} shows the CURRENT grown value (calc-var)
-                        parts.Add($"Deal {{Damage}} damage{dmgSuffix}. Grows by {e.Grow} each time it is played this combat.");
+                        parts.Add($"Deal {{Damage}} damage{dmgSuffix}{ub}. Grows by {e.Grow} each time it is played this combat.");
                     else
                         parts.Add(e.Hits > 1
-                            ? $"Deal {{Damage}} damage {{Hits}} times{dmgSuffix}."
-                            : $"Deal {{Damage}} damage{dmgSuffix}.");
+                            ? $"Deal {{Damage}} damage {{Hits}} times{dmgSuffix}{ub}."
+                            : $"Deal {{Damage}} damage{dmgSuffix}{ub}.");
                     break;
                 case "block":       parts.Add(!e.IsScaled ? "Gain {Block} Block."
                                         : e.Scale == "x" ? "Gain X Block."
@@ -1345,6 +1374,7 @@ public static class ForgedCards
                 case "gain_energy": parts.Add("Gain {Energy} energy."); break;
                 case "heal":        parts.Add(e.IsScaled ? $"Heal HP equal to {ScalePhrase(e.Scale)}." : "Heal {Heal} HP."); break;
                 case "lose_hp":     parts.Add("Lose {Loss} HP."); break;
+                case "gain_max_hp": parts.Add("Gain {MaxHp} Max HP."); break; // Phase AN (v44): the Feed payoff (MaxHpVar)
                 case "discard":     parts.Add("Discard {Discard} random card(s)."); break; // Phase R (gap #17)
                 case "scry":        parts.Add("Scry {Scry}. (Look at that many cards from the top of your draw pile and discard any.)"); break; // Phase AA (gap #17 R-2)
                 case "exhaust":     parts.Add("Exhaust."); break;
@@ -1428,6 +1458,7 @@ public static class ForgedCards
                         "buffer" => "Buffer", "intangible" => "Intangible", "ritual" => "Ritual", "blur" => "Blur",
                         "temp_strength" => "Strength", "temp_dexterity" => "Dexterity", "barricade" => "Barricade",
                         "focus" => "Focus",
+                        "temp_thorns" => "Thorns", "temp_focus" => "Focus", // Phase AN (v44): worded like the temp stats
                         _ => e.Status ?? "",
                     };
                     // Self-buffs are worded "Gain"; debuffs are "Apply"-ed to the target. SelfBuffStatuses is the
@@ -1627,7 +1658,9 @@ public static class ForgedCards
         "metallicize" => "Metallicize", "artifact" => "Artifact", "buffer" => "Buffer",
         "intangible" => "Intangible", "ritual" => "Ritual", "blur" => "Blur",
         "temp_strength" => "Strength", "temp_dexterity" => "Dexterity", "barricade" => "Barricade",
-        "focus" => "Focus", _ => status ?? "",
+        "focus" => "Focus",
+        "temp_thorns" => "Thorns", "temp_focus" => "Focus", // Phase AN (v44)
+        _ => status ?? "",
     };
 
     private static string Str(Godot.Collections.Dictionary d, string key, string fallback = "") =>

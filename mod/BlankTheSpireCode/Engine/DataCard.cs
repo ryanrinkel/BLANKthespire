@@ -8,8 +8,10 @@ using BlankTheSpire.BlankTheSpireCode.Powers;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
+using MegaCrit.Sts2.Core.Localization.DynamicVars; // Phase AN (v44): DamageVar (unblockable props) + MaxHpVar
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Powers;
+using MegaCrit.Sts2.Core.ValueProps; // Phase AN (v44): ValueProp.Unblockable
 
 namespace BlankTheSpire.BlankTheSpireCode.Engine;
 
@@ -137,9 +139,14 @@ public abstract class DataCard : ConstructedCardModel
                     // Scaled (F5) → damage var = the live scalar; CommonActions.CardAttack auto-reads CalculatedDamage.
                     // Phase U (gap #23): a `grow` damage is ALSO a calc-var (amount + grow×plays_this_combat), so the
                     // in-hand preview + resolved hit both track the live count. grow ⊥ scale (validator-enforced).
-                    if (e.HasGrow) WithCalculatedDamage(0, GrowBonusFor(e, up));
-                    else if (e.IsScaled) WithCalculatedDamage(0, BonusFor(e, up));
-                    else WithDamage(e.Amount, up); // per-hit damage
+                    // Phase AN (v44): `unblockable` rides the damage var's ValueProp (Move | Unblockable). BaseLib's
+                    // CardAttack reads DamageVar/CalculatedDamageVar.Props for the AttackCommand, and Hook.ModifyDamage
+                    // previews with the same Props — so the in-hand number and every dealt hit both bypass Block.
+                    // Strength still applies (Move without Unpowered = a powered attack; Thorns still answers it).
+                    ValueProp dprops = e.Unblockable ? ValueProp.Move | ValueProp.Unblockable : ValueProp.Move;
+                    if (e.HasGrow) WithCalculatedDamage(0, GrowBonusFor(e, up), dprops);
+                    else if (e.IsScaled) WithCalculatedDamage(0, BonusFor(e, up), dprops);
+                    else WithVar(new DamageVar(e.Amount, dprops).WithUpgrade(up)); // per-hit damage (WithDamage pins Move-only)
                     // Multi-hit: a "Hits" var carries the count (upgrade-aware, shown as {Hits} in text).
                     // Single-hit (Hits<=1) declares no var, so EffectRunner defaults to 1 — unchanged path.
                     if (e.Hits > 1) WithVar("Hits", e.Hits, EffectRunner.HitsUpgradeDelta(Spec, i));
@@ -156,6 +163,7 @@ public abstract class DataCard : ConstructedCardModel
                 // resolves at execution from the unblocked damage dealt, like the scaled-draw path above.
                 case "heal":        if (!e.IsScaled) WithHeal(e.Amount, up); break;     // var "Heal"
                 case "lose_hp":     WithVar("Loss", e.Amount, up); break; // generic var "Loss"
+                case "gain_max_hp": WithVar(new MaxHpVar(e.Amount).WithUpgrade(up)); break; // Phase AN (v44): the base-game MaxHpVar ({MaxHp})
                 case "discard":     WithVar("Discard", e.Amount, up); break; // Phase R (gap #17): random-discard count
                 case "scry":        WithVar("Scry", e.Amount, up); break;    // Phase AA (gap #17 R-2): top-of-draw look count
                 case "exhaust":     WithKeyword(CardKeyword.Exhaust); break;   // keyword: game exhausts on play
@@ -206,6 +214,8 @@ public abstract class DataCard : ConstructedCardModel
                         case "temp_dexterity": WithPower<ForgedTempDexterityPower>(e.Amount, up); break;
                         case "barricade":      WithPower<BarricadePower>(e.Amount, up); break;
                         case "focus":          WithPower<FocusPower>(e.Amount, up); break;
+                        case "temp_thorns":    WithPower<ForgedTempThornsPower>(e.Amount, up); break; // Phase AN (v44)
+                        case "temp_focus":     WithPower<ForgedTempFocusPower>(e.Amount, up); break;  // Phase AN (v44)
                         default:
                             throw new NotSupportedException($"DataCard: unsupported status '{e.Status}'");
                     }

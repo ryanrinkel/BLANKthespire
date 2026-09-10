@@ -103,9 +103,18 @@ FEATURED_MENU: list[Featured] = [
     Featured("untouchable", 'a mitigation card using buffer / artifact / intangible instead of flat Block',
              'REQUIRED: apply_status buffer, artifact, or intangible (mitigation exotica; keep it rare-tier).',
              lambda cc: bool(cc.statuses.keys() & {"buffer", "artifact", "intangible"}), exclusion="rare-tier"),
-    Featured("burst_window", 'a burst card spiking temp_strength / temp_dexterity for one turn',
-             'REQUIRED: apply_status temp_strength or temp_dexterity (a one-turn stat spike).',
-             lambda cc: bool(cc.statuses.keys() & {"temp_strength", "temp_dexterity"})),
+    Featured("burst_window", 'a burst card spiking temp_strength / temp_dexterity / temp_thorns for one turn',
+             'REQUIRED: apply_status temp_strength, temp_dexterity or temp_thorns (a one-turn stat spike).',
+             lambda cc: bool(cc.statuses.keys() & {"temp_strength", "temp_dexterity", "temp_thorns"})),
+    # Phase AN (v44): the Feed payoff and the Block-piercing hit.
+    Featured("devourer", 'a rare-tier attack that GROWS your Max HP for the run (op "gain_max_hp", 1-3, usually with exhaust)',
+             'REQUIRED: add an uncommon/rare attack with op "gain_max_hp" (amount 1-3) alongside its damage - it raises your '
+             'Max HP for the rest of the run and heals that much (the Feed payoff); give it "exhaust" so it fires once per combat.',
+             lambda cc: "gain_max_hp" in cc.ops, exclusion="rare-tier"),
+    Featured("piercing_strike", 'an attack whose damage IGNORES Block ("unblockable": true on the damage effect)',
+             'REQUIRED: add an attack whose damage effect carries "unblockable": true (it ignores the enemy\'s Block '
+             'entirely - modest numbers, uncommon/rare; it reads "..., ignoring Block.").',
+             lambda cc: cc.unblockable > 0),
     Featured("token_conjure", 'a card that CONJURES copies of one of your OWN cards into a pile (op "add_card")',
              'REQUIRED: add a card with op "add_card" that copies one of THIS class\'s own cards into a pile '
              '(hand/discard/draw; small amounts — send self-copies to the discard pile). CLASS-ONLY.',
@@ -173,6 +182,11 @@ FEATURED_CLASS_KIND: dict[str, list[Featured]] = {
                  'REQUIRED: add a burst card with op "evoke" (amount 2-3) that cashes your orb rack in one go; '
                  'pair it with the channel income the class already has.',
                  lambda cc: "evoke" in cc.ops),
+        # Phase AN (v44): the one-turn Focus spike (boosts this turn's evokes AND the end-of-turn passives).
+        Featured("orb_flash_focus", 'an orb-class SPIKE card granting Focus for this turn only (apply_status temp_focus)',
+                 'REQUIRED: add a cheap skill with apply_status temp_focus (2-3) - Focus for this turn only, so this '
+                 'turn\'s evokes and end-of-turn passives hit harder; pair it with an evoke or a channel on the same turn.',
+                 lambda cc: "temp_focus" in cc.statuses),
         Featured("orb_slot_growth", 'an orb-class card that GROWS the rack (op "gain_orb_slot")',
                  'REQUIRED: add a skill or power with op "gain_orb_slot" (amount 1-2) so the class can widen its '
                  'orb rack mid-combat.',

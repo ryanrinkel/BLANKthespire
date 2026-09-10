@@ -118,6 +118,8 @@ public static class SummonRunner
             "temp_dexterity" => Apply<ForgedTempDexterityPower>(ctx, target, source, amount),
             "barricade"      => Apply<BarricadePower>(ctx, target, source, amount),
             "focus"          => Apply<FocusPower>(ctx, target, source, amount),
+            "temp_thorns"    => Apply<ForgedTempThornsPower>(ctx, target, source, amount), // Phase AN (v44)
+            "temp_focus"     => Apply<ForgedTempFocusPower>(ctx, target, source, amount),  // Phase AN (v44)
             _ => Task.CompletedTask,
         };
 
@@ -188,6 +190,8 @@ public static class SummonRunner
         "metallicize" => "Metallicize", "artifact" => "Artifact", "buffer" => "Buffer",
         "intangible" => "Intangible", "ritual" => "Ritual", "blur" => "Blur",
         "temp_strength" => "Strength", "temp_dexterity" => "Dexterity", "barricade" => "Barricade",
-        "focus" => "Focus", _ => status ?? "",
+        "focus" => "Focus",
+        "temp_thorns" => "Thorns", "temp_focus" => "Focus", // Phase AN (v44)
+        _ => status ?? "",
     };
 }

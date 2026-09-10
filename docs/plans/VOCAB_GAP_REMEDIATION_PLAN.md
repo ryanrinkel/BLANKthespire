@@ -208,6 +208,52 @@ card-level only — `block` / `energy` inside a trigger payload ("at turn end, d
 `TriggerScales` + `ResolveAmount` + the trigger wording; `plays_this_combat` reads 41 in a long fight, so the vocabulary
 pins it to uncommon/rare on a nominal base.
 
+**STATUS (2026-09-09): Phase AN EXECUTED (vocab v44)** — all three items landed in lockstep. **(1) `gain_max_hp`** (card-only,
+`amount` 1..5): `CreatureCmd.GainMaxHp(player, amt)` — verified in the decompiled `CreatureCmd`: it SETS the new max, then
+`Heal(num)` for the gained amount, so the op is exactly the base-game Feed payoff (max HP up AND healed). The card carries a
+real `MaxHpVar` (the game's own `{MaxHp}` var, upgrade-aware; VarKey `MaxHp` → "each value once"), text "Gain {MaxHp} Max
+HP."; not in `TriggerOps` / the `triggerEffect` op enum (a per-turn max-HP engine is degenerate). Cap `GainMaxHpMaxAmount` /
+`_GAIN_MAX_HP_MAX` = 5 + a schema clause; the vocabulary pins it to uncommon/rare on an exhausting attack; the validator
+prices it at 4/pt (a permanent buff) so a common can't carry it cheaply. **(2) `unblockable:true` on `damage`:** the flag
+rides the damage var's ValueProp — `DataCard` declares `new DamageVar(amount, Move | Unblockable)` (BaseLib's `WithDamage`
+pins Move-only, so the var is built directly and passed via `WithVar`) or `WithCalculatedDamage(…, props)` for the scale /
+`grow` shapes — and BaseLib's `CommonActions.CardAttack` reads `DamageVar/CalculatedDamageVar.Props` into the AttackCommand
+while `Hook.ModifyDamage` previews with the same Props, so the in-hand number and every dealt hit both bypass Block (Block is
+neither reduced nor consumed; Move without Unpowered stays a powered attack: Strength/Vulnerable/Weak apply, Thorns answers
+it). Damage-only (both validators), CARD-LEVEL ONLY (a payload damage is an intrinsic `CreatureCmd` hit with no var to flag;
+`ValidateTrigger` + validator + the `triggerEffect` schema all reject it). Wording: the clause ", ignoring Block" closes the
+damage sentence in every shape ("Deal {Damage} damage {Hits} times to ALL enemies, ignoring Block." / "Deal damage equal to
+your Block, ignoring Block." / "Deal {Damage} damage, ignoring Block. Grows by 3 …"); byte-lockstep `Describe` /
+`cardgen.describe`, emit `Unblockable: true` named arg. Scoring premium +50% of the number. **(3) `temp_thorns` /
+`temp_focus`:** `ForgedTempThornsPower` / `ForgedTempFocusPower` — `CustomTemporaryPowerModel` shells exactly like the temp
+stats (internal `ThornsPower` / `FocusPower`; the base removes the stacks in `AfterSideTurnEnd`). Verified ordering for
+temp_focus: orb passives fire in `OrbQueue.BeforeTurnEnd` (decompiled), BEFORE the AfterSideTurnEnd removal — so a one-turn
+Focus boosts this turn's evokes AND the end-of-turn passives, then expires (worth shipping; orb-class-only like `focus`:
+`class_forge._card_uses_orbs` + `_ORB_TOKENS` treat it as an orb mechanic). Worded like the temp stats ("Gain Thorns." /
+"gain 3 Thorns" in a payload; `SelfBuffStatuses` so they always land on the player); legal as a SELF trigger payload, never
+targeted. Wired through every status switch: `EffectRunner` (card + relic), `DataCard` (`WithPower<T>`), `TriggerRunner`,
+`OrbRunner`, `SummonRunner`, both `StatusName` maps, the relic schema/vocabulary, `statuses/temp_*.json` (ref-integrity),
+census (temp_thorns exotic, temp_focus specialty), `_STATUS_WEIGHT` (1.0 / 1.5). Log tag `[AN]`: gain_max_hp logs
+before → after Max HP + current HP; unblockable logs the hit count, the target's Block at resolution and the var's Props;
+temp_* log the apply (card path) and the power itself logs its expiry at the end of the owner's turn (`ExpiryLogTag` on the
+abstract `ForgedTempStatPower`, after the base removal). Lockstep: `CardSpec.cs` (`Unblockable`), `ForgedCards.cs`
+(VocabVersion 44, SupportedOps/AmountOps/SupportedStatuses, `GainMaxHpMaxAmount`, parse, Validate, ValidateTrigger, VarKey,
+Describe, StatusName), `EffectRunner.cs`, `DataCard.cs`, `TriggerRunner.cs`, `OrbRunner.cs`, `SummonRunner.cs`,
+`ForgedTempStatPowers.cs`, `card.schema.json` (op enum + description, `unblockable` property, two status enums, two allOf
+clauses), `relic.schema.json`, `VOCABULARY.md` (damage-row clause, `gain_max_hp` row, two status rows, the payload self-buff
+list, the orb paragraph — ONE LINE each), `RELIC_VOCABULARY.md`, `DESIGN_HEURISTICS.md` (one sentence on the burst note),
+`statuses/temp_thorns.json` + `temp_focus.json`, `cardgen.py`, `validator.py`, `census.py` (+ `unblockable` counter),
+`bridges.py` (`unblockable` witness token), `bts1.py` VOCAB_VERSION 44, `coverage.py` (EXOTIC_MENU_V2 += temp_thorns),
+`featured.py` (+ `devourer`, `piercing_strike`; burst_window detects temp_thorns; orb menu + `orb_flash_focus`),
+`class_forge.py` (self-buff sets, orb tokens, three fantasy→mechanic pointers), `archetypes.json` (iron_regrowth +=
+gain_max_hp, strike_tempo += unblockable, burst_window += temp_thorns, orb_channel += temp_focus), `exemplar_pool.json`
+(+4: Devouring Bite, Piercing Lunge, Bristle Up, Flash Focus [needs orb]; pool 100 → 104), `web/static/app.js` (status
+names + the two phrases). **Rule 0.9 budget:** blueprint prompt **+1,340 chars (86,283 → 87,623, seed 1)** — all one-line
+pointers. Tests: `tests/test_phase_an.py` (71 checks); `test_featured` / `test_exemplars` samples extended; suite
+**388 passed**; every `test_phase_*.py` runs standalone; C# build 0 errors. AutoSlay (tester
+`generation/scratch/gaptest-an/build_tester.py` — an ORB class so temp_focus is live, staged into slot 04, unstaged
+afterwards): **GAPTESTAN1** **387 `[AN]` tags** — gain_max_hp ×47 (Devouring Bite +3/+4 ×23, Greedy Gulp +1/+2 ×24; Max HP climbed **80 → 206** across the run, every line showing the matching heal — "80 -> 83 (HP now 67)"), unblockable ×118 (Piercing Lunge ×37 + Body Pierce ×39 single-target with the target's Block read at resolution — including a hit into "target Block 6" — and Rending Volley ×42 AoE multi-hit; every line shows the var's props as "Unblockable, Move", the CalculatedDamageVar path via Body Pierce), temp_thorns +4/+6 ×75 with 60 end-of-turn expiries (stacked to "had 16" on a big turn), temp_focus +2/+3 ×30 with 57 expiries (the 27 extra expiries with no card-level apply are the Surge Stance trigger path — TriggerRunner.ApplySelfBuff → the same power; stacked to "had 5") · **0 mod-attributable exception frames** (the 7 Exception lines are BaseLib's two startup Harmony patch failures + their inner-exception echoes). Harness caveat, same as AM: the Python harness was killed by the OS for low memory (~1.9 GB free at launch; no tool verdict) while the game kept playing under AutoSlay — tags harvested from the live godot.log, game stopped by hand (`Stop-Process`); no hang was mod-attributable. One seed only (memory). Tag evidence: `generation/scratch/gaptest-an/godot_AN_tags_GAPTESTAN*.txt`.
+
 ---
 
 ## 0. Ground rules

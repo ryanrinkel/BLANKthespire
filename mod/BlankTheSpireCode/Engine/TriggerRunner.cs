@@ -315,6 +315,8 @@ public static class TriggerRunner
         "temp_dexterity" => ApplyT<ForgedTempDexterityPower>(ctx, player, amount),
         "barricade"      => ApplyT<BarricadePower>(ctx, player, amount),
         "focus"          => ApplyT<FocusPower>(ctx, player, amount),
+        "temp_thorns"    => ApplyT<ForgedTempThornsPower>(ctx, player, amount), // Phase AN (v44)
+        "temp_focus"     => ApplyT<ForgedTempFocusPower>(ctx, player, amount),  // Phase AN (v44)
         _ => Task.CompletedTask,
     };
 

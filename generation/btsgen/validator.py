@@ -32,6 +32,7 @@ _STATUS_WEIGHT = {
     "poison": 1.2,          # N damage over N turns, decaying — a slow burn, cheaper than a flat hit
     "strength": 4.0, "dexterity": 3.0,
     "temp_strength": 2.0, "temp_dexterity": 1.5,   # this-turn only: ~half the permanent stat
+    "temp_thorns": 1.0, "temp_focus": 1.5,         # Phase AN (v44): this-turn only, ~half of thorns / focus
     "thorns": 2.0,          # pays out per enemy hit taken
     "regen": 2.0,           # heal per turn, decaying
     "metallicize": 3.0,     # STS2 Plating: N + (N-1) + ... + 1 Block over N turns
@@ -46,7 +47,8 @@ _STATUS_WEIGHT = {
 
 _RARITY_RANK = {"basic": 0, "common": 1, "uncommon": 2, "rare": 3}
 # ops whose integer `amount` is a flat, player-positive benefit (used by the dominance check)
-_SIMPLE_BENEFIT_OPS = {"damage", "block", "draw", "gain_energy", "heal"}
+_SIMPLE_BENEFIT_OPS = {"damage", "block", "draw", "gain_energy", "heal",
+                       "gain_max_hp"}  # Phase AN (v44): a flat (run-permanent) stat gain
 # Phase H3: composite/build-around ops (the schema/triggerEffect $def enforces add_trigger's payload shape;
 # these are for the balance heuristics — a trigger is a build-around, not a flat stat line).
 # Phase AJ-b: the prototype's composite ops (multi / conditional / from_state / fuse) are NOT in this set any more —
@@ -92,7 +94,8 @@ _TRIGGER_SCALABLE_OPS = {"damage", "block", "draw", "gain_energy", "heal", "lose
 # Self-buff statuses (mirror C# EffectRunner.SelfBuffStatuses) — a buff_summon's status must be one of these
 # (it lands on the minion, like Strength). Kept in lockstep with the mod's ForgedCards.buff_summon validation.
 _SELF_BUFF_STATUSES = {"strength", "dexterity", "thorns", "regen", "metallicize", "artifact", "buffer",
-                       "intangible", "ritual", "blur", "temp_strength", "temp_dexterity", "barricade", "focus"}
+                       "intangible", "ritual", "blur", "temp_strength", "temp_dexterity", "barricade", "focus",
+                       "temp_thorns", "temp_focus"}  # Phase AN (v44): one-turn Thorns / Focus
 # H4 (gaps #13/#14): the reactive triggers that can fire many times a turn → eligible for 'once_per_turn'
 # (mirror ForgedCards.MultiFireTriggers); and the debuffs a TARGETED trigger apply_status may apply.
 _MULTI_FIRE_TRIGGERS = {"on_hp_lost", "on_exhaust", "on_card_played", "on_card_drawn", "on_damage_dealt",
@@ -115,6 +118,9 @@ _BALANCE_STEP_MAX = 5
 # Phase AC (gap #2): summon heal/shield per-op caps (mirror ForgedCards.HealSummonMaxAmount / ShieldSummonMaxAmount).
 _HEAL_SUMMON_MAX = 9
 _SHIELD_SUMMON_MAX = 12
+# Phase AN (v44): the gain_max_hp cap (mirrors ForgedCards.GainMaxHpMaxAmount + the schema clause). A run-permanent
+# stat (Feed is +3/+4), so the band is tight; card-only (the triggerEffect op enum omits it).
+_GAIN_MAX_HP_MAX = 5
 # Phase V/X (gap #18): the hand-scopes upgrade_card may use. Mirrors ForgedCards.UpgradeScopes. `random` is legal on
 # cards AND in trigger payloads; `all` (whole hand) and `choose` (Phase X — the player picks one card) are card-only
 # (a repeating whole-hand upgrade / a repeating pick-UI every turn is degenerate — rejected in a trigger by both this
@@ -309,6 +315,8 @@ class CardValidator:
             return "Heal"
         if op == "lose_hp":
             return "Loss"
+        if op == "gain_max_hp":  # Phase AN (v44): the MaxHpVar (mirrors ForgedCards.VarKey)
+            return "MaxHp"
         if op == "discard":  # Phase R (gap #17): the random-discard count var (mirrors ForgedCards.VarKey)
             return "Discard"
         if op == "scry":  # Phase AA (gap #17 R-2): the top-of-draw look count var (mirrors ForgedCards.VarKey)
@@ -457,6 +465,14 @@ class CardValidator:
             # since Phase K; the vocabulary/schema advertised it, but this guard rejected it — hidden capacity).
             if isinstance(hits, int) and hits > 1 and op not in ("damage", "summon_attack"):
                 out.append(f"'hits' only applies to 'damage'/'summon_attack' (op '{op}' had hits {hits}).")
+            # Phase AN (v44): `unblockable` is a damage-op flag (card-level; the trigger loop rejects it), and
+            # gain_max_hp is banded 1..5. Mirrors ForgedCards.Validate.
+            if e.get("unblockable") and op != "damage":
+                out.append(f"'unblockable' only applies to damage (op '{op}').")
+            if op == "gain_max_hp":
+                gm = e.get("amount")
+                if isinstance(gm, int) and not isinstance(gm, bool) and gm > _GAIN_MAX_HP_MAX:
+                    out.append(f"gain_max_hp 'amount' may be at most {_GAIN_MAX_HP_MAX}; got {gm}.")
             if scale:
                 if scale not in _SUPPORTED_SCALES:
                     out.append(f"unsupported scale '{scale}' (one of {'/'.join(sorted(_SUPPORTED_SCALES))}).")
@@ -648,6 +664,8 @@ class CardValidator:
                 ts = str(t.get("scale", "")).strip().lower()
                 if t.get("once_per_turn") or t.get("once_per_combat"):
                     out.append("'once_per_turn' / 'once_per_combat' go on the add_trigger op, not on a payload effect.")
+                if t.get("unblockable"):  # Phase AN (v44): card-level only (mirrors ForgedCards.ValidateTrigger)
+                    out.append("'unblockable' is not allowed in a trigger payload (it flags a card-level damage).")
                 if tgt is not None:
                     # H4 (gap #14): a TARGETED payload effect hits enemies — damage / enemy-debuff apply_status only,
                     # and never scaled. (target enum + op-vs-target coupling are also enforced by the schema.)
@@ -774,7 +792,13 @@ class CardValidator:
             # Phase U (gap #23): a `grow` attack is a self-scaling engine — each grow point compounds over the
             # combat (a per-card forge). Priced a touch above forge income (2.5/pt) since it's built into the card.
             grow_premium = self._amt(eff.get("grow", 0)) * 2.5
-            return amt + (6.0 if forged else 0.0) + grow_premium
+            # Phase AN (v44): an unblockable hit is worth more than its number (it lands through any Block).
+            unblockable_premium = amt * 0.5 if eff.get("unblockable") is True else 0.0
+            return amt + (6.0 if forged else 0.0) + grow_premium + unblockable_premium
+        if op == "gain_max_hp":
+            # Phase AN (v44): a run-permanent stat (+ an immediate heal of the same amount) — priced like a permanent
+            # buff so a common can't carry it cheaply (the vocabulary pins it to uncommon/rare).
+            return amt * 4.0
         if op == "block":
             return amt * 0.8 + (6.0 if forged else 0.0)
         if op == "draw":

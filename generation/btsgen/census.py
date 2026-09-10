@@ -50,11 +50,12 @@ GENERIC_DEBUFFS = frozenset({"vulnerable", "weak"})
 EXOTIC_STATUSES = frozenset({
     "thorns", "regen", "metallicize", "artifact", "buffer", "blur", "intangible",
     "ritual", "barricade", "temp_strength", "temp_dexterity",
+    "temp_thorns",  # Phase AN (v44): the one-turn bristle (temp_focus joins focus in the specialty bucket)
 })
 # W2.1: the SPECIALTY statuses — neither the over-used generic debuffs nor "exotic" mitigation/buff exotica.
 # Poison is the DoT debuff, Frail the block-side debuff, Focus the orb-class buff. Their own bucket so a
 # poison class isn't scored as "generic" and an orb class's Focus isn't scored as "exotic".
-SPECIALTY_STATUSES = frozenset({"poison", "frail", "focus"})
+SPECIALTY_STATUSES = frozenset({"poison", "frail", "focus", "temp_focus"})  # Phase AN (v44): temp_focus is orb-class too
 # W2.1: the four card-property keywords (nullary ops). `multi_hit` joins them as a keyword KIND (see
 # CardCensus.keyword_kinds) because "Deal 4 damage 3 times" is a card shape, not an op.
 KEYWORD_OPS = frozenset({"exhaust", "retain", "innate", "ethereal"})
@@ -68,6 +69,7 @@ class CardCensus:
     the coverage quotas (N-1) read."""
     ops: Counter = field(default_factory=Counter)
     statuses: Counter = field(default_factory=Counter)     # apply_status statuses only (base game statuses)
+    unblockable: int = 0                                    # Phase AN (v44): damage effects flagged unblockable:true
     triggers: Counter = field(default_factory=Counter)     # add_trigger trigger kinds
     whens: Counter = field(default_factory=Counter)        # `when` condition kinds
     scales: Counter = field(default_factory=Counter)       # scale sources (cards_in_hand, x, forged, ...)
@@ -148,6 +150,8 @@ def _walk_effects(effects, cc: CardCensus, *, in_payload: bool = False) -> None:
         hits = eff.get("hits")
         if op in ("damage", "summon_attack") and isinstance(hits, int) and not isinstance(hits, bool) and hits >= 2:
             cc.multi_hit += 1
+        if op == "damage" and eff.get("unblockable") is True:  # Phase AN (v44)
+            cc.unblockable += 1
         if in_payload and isinstance(eff.get("target"), str) and eff.get("target"):
             cc.targeted_payloads += 1
         if in_payload:  # Phase AL (v42)

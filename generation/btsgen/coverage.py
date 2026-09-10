@@ -69,6 +69,8 @@ EXOTIC_MENU_V2 = [
     ("artifact", 'REQUIRED: apply_status artifact (negate the next debuff applied to you).'),
     ("buffer", 'REQUIRED: apply_status buffer (prevent the next instance of HP loss).'),
     ("temp_dexterity", 'REQUIRED: apply_status temp_dexterity (a burst of Dexterity for this turn only).'),
+    # Phase AN (v44): the one-turn bristle (temp_focus is orb-class-only and stays off this base menu).
+    ("temp_thorns", 'REQUIRED: apply_status temp_thorns (Thorns for this turn only - a one-turn bristle that punishes the attacks coming this turn).'),
 ]
 REACTIVE_MENU_V2 = REACTIVE_MENU + [
     ("on_card_drawn", 'REQUIRED: add an ongoing power (op "add_trigger", trigger "on_card_drawn", once_per_turn) that rewards drawing a card.'),

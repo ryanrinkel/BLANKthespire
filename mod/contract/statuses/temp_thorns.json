@@ -1,0 +1,6 @@
+{
+  "id": "temp_thorns",
+  "name": "Thorns",
+  "kind": "buff",
+  "decay": "turn"
+}

@@ -68,7 +68,8 @@ public sealed record EffectSpec(string Op, int Amount = 0, string? Status = null
     string? Orb = null, Condition? When = null, string? Trigger = null, EffectSpec[]? Triggered = null,
     string? StatusName = null, string? SummonName = null, bool OncePerTurn = false, string? Target = null,
     string? CardId = null, string? Pile = null, string? Pole = null, int Grow = 0, string? Cards = null,
-    string? Tag = null, bool OncePerCombat = false)
+    string? Tag = null, bool OncePerCombat = false,
+    bool Unblockable = false) // Phase AN (v44): a `damage` op that IGNORES Block (ValueProp.Unblockable on its damage var)
 {
     /// <summary>This op's amount comes from a live scalar (any <see cref="Scale"/>), not <see cref="Amount"/>.</summary>
     public bool IsScaled => Scale != null;

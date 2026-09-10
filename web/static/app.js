@@ -776,6 +776,7 @@ const STATUS_NAMES = {
   dexterity: "Dexterity", thorns: "Thorns", regen: "Regen", metallicize: "Metallicize", artifact: "Artifact",
   buffer: "Buffer", intangible: "Intangible", ritual: "Ritual", blur: "Blur", barricade: "Barricade",
   focus: "Focus", temp_strength: "Strength (this turn)", temp_dexterity: "Dexterity (this turn)",
+  temp_thorns: "Thorns (this turn)", temp_focus: "Focus (this turn)", // Phase AN (v44)
 };
 const TRIGGER_PREFIX = {
   turn_start: "At the start of each turn", turn_end: "At the end of each turn",
@@ -814,11 +815,12 @@ function effPhrase(e, target) {
   const hits = e.hits > 1 ? ` ×${e.hits}` : "";
   const toAll = target === "all_enemies" ? " to all enemies" : "";
   switch (e.op) {
-    case "damage": return `Deal ${a ?? ""} damage${scale}${toAll}${hits}`;
+    case "damage": return `Deal ${a ?? ""} damage${scale}${toAll}${hits}${e.unblockable === true ? " (ignores Block)" : ""}`; // Phase AN (v44)
     case "block": return `Gain ${a ?? ""} Block${scale}`;
     case "draw": return `Draw ${a ?? 1} card${(a ?? 1) == 1 ? "" : "s"}${scale}`;
     case "gain_energy": return `Gain ${a ?? 1} energy`;
     case "lose_hp": return `Lose ${a ?? ""} HP`;
+    case "gain_max_hp": return `Gain ${a ?? ""} Max HP`; // Phase AN (v44)
     case "heal": return `Heal ${a ?? ""}`;
     case "gain_orb_slot": return `Gain ${a ?? 1} orb slot${(a ?? 1) == 1 ? "" : "s"}`;
     case "forge": return `Forge ${a ?? 1}`; // Phase M (gap #36): stoke the Forge counter

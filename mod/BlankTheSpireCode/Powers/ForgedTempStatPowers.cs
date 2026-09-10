@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using BaseLib.Abstracts;
 using BaseLib.Utils;
 using BlankTheSpire.BlankTheSpireCode.Extensions;
+using MegaCrit.Sts2.Core.Combat; // Phase AN (v44): CombatSide for the expiry-log override
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.Models;
@@ -34,6 +36,21 @@ public abstract class ForgedTempStatPower : CustomTemporaryPowerModel
 
     protected abstract Task ApplyInternal(PlayerChoiceContext ctx, Creature target, decimal amount,
                                           Creature? applier, CardModel? cardSource, bool silent);
+
+    /// <summary>Phase AN (v44): a smoke-log tag (e.g. "[AN] temp_thorns"); null = no expiry log. The base removes the
+    /// internal power in AfterSideTurnEnd (verified in BaseLib's CustomTemporaryPowerModel); we log AFTER it so the
+    /// godot.log proves the one-turn shell expired at the end of the owner's turn.</summary>
+    protected virtual string? ExpiryLogTag => null;
+
+    public override async Task AfterSideTurnEnd(PlayerChoiceContext choiceContext, CombatSide side, IEnumerable<Creature> participants)
+    {
+        var people = participants as ICollection<Creature> ?? participants.ToList();
+        bool mine = people.Contains(Owner);
+        var had = Amount;
+        await base.AfterSideTurnEnd(choiceContext, side, people);
+        if (mine && ExpiryLogTag != null)
+            MainFile.Logger.Info($"{ExpiryLogTag} expired at the end of your turn (had {had}).");
+    }
 }
 
 /// <summary>Temporary Strength: +Strength now, removed at the end of your turn (Flex-style).</summary>
@@ -70,4 +87,49 @@ public sealed class ForgedTempDexterityPower : ForgedTempStatPower
         (List<(string, string)>)new PowerLoc("Temporary Dexterity",
             "Gain Dexterity for this turn (removed at the end of your turn).",
             "Gain Dexterity for this turn (removed at the end of your turn).");
+}
+
+/// <summary>Phase AN (v44) — Temporary Thorns: +Thorns now, removed at the end of your turn (a one-turn bristle: the
+/// riposte window without a permanent Thorns ramp). Same CustomTemporaryPowerModel shell as the temp stats — the base
+/// removes the internal ThornsPower stacks in AfterSideTurnEnd, AFTER the enemy has attacked into it this turn.</summary>
+public sealed class ForgedTempThornsPower : ForgedTempStatPower
+{
+    public override PowerModel InternallyAppliedPower => ModelDb.Power<ThornsPower>();
+
+    protected override Task ApplyInternal(PlayerChoiceContext ctx, Creature target, decimal amount,
+        Creature? applier, CardModel? cardSource, bool silent)
+        => BetaMainCompatibility.PowerCmd_.Apply.InvokeGeneric<Task<ThornsPower?>, ThornsPower>(
+               null, ctx, target, amount, applier ?? target, cardSource, silent)!;
+
+    protected override string? ExpiryLogTag => "[AN] temp_thorns";
+
+    public override string CustomPackedIconPath => "thorns_temp.png".PowerImagePath();
+    public override string CustomBigIconPath => "thorns_temp.png".BigPowerImagePath();
+    public override List<(string, string)>? Localization =>
+        (List<(string, string)>)new PowerLoc("Temporary Thorns",
+            "Gain Thorns for this turn (removed at the end of your turn).",
+            "Gain Thorns for this turn (removed at the end of your turn).");
+}
+
+/// <summary>Phase AN (v44) — Temporary Focus: +Focus now, removed at the end of your turn. Orb passives fire in
+/// OrbQueue.BeforeTurnEnd (verified in the decompiled source), which runs BEFORE this power's AfterSideTurnEnd removal —
+/// so a one-turn Focus boosts this turn's evokes AND this turn's end-of-turn passives, then expires. Orb-class only
+/// (like focus): on a class with no orb slots it does nothing.</summary>
+public sealed class ForgedTempFocusPower : ForgedTempStatPower
+{
+    public override PowerModel InternallyAppliedPower => ModelDb.Power<FocusPower>();
+
+    protected override Task ApplyInternal(PlayerChoiceContext ctx, Creature target, decimal amount,
+        Creature? applier, CardModel? cardSource, bool silent)
+        => BetaMainCompatibility.PowerCmd_.Apply.InvokeGeneric<Task<FocusPower?>, FocusPower>(
+               null, ctx, target, amount, applier ?? target, cardSource, silent)!;
+
+    protected override string? ExpiryLogTag => "[AN] temp_focus";
+
+    public override string CustomPackedIconPath => "focus_temp.png".PowerImagePath();
+    public override string CustomBigIconPath => "focus_temp.png".BigPowerImagePath();
+    public override List<(string, string)>? Localization =>
+        (List<(string, string)>)new PowerLoc("Temporary Focus",
+            "Gain Focus for this turn (removed at the end of your turn).",
+            "Gain Focus for this turn (removed at the end of your turn).");
 }
