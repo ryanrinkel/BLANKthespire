@@ -827,6 +827,19 @@ function effPhrase(e, target) {
       return e.count ? `Your next ${e.count > 1 ? e.count + " " : ""}${kind} cost ${a ?? 1} less ${life}` : `Your ${kind} cost ${a ?? 1} less ${life}`;
     }
     case "heal": return `Heal ${a ?? ""}`;
+    case "discard": return `Discard ${a ?? 1} ${e.cards === "choose" ? "chosen" : "random"} card${(a ?? 1) == 1 ? "" : "s"}`; // Phase AP (v46)
+    case "retrieve_card": { // Phase AP (v46)
+      const n = a ?? 1;
+      const pile = e.pile === "exhaust" ? "exhaust" : "discard";
+      return e.cards === "choose" ? `Return ${n} chosen card${n == 1 ? "" : "s"} from your ${pile} pile to hand`
+                                  : `Return ${n} random card${n == 1 ? "" : "s"} from your ${pile} pile to hand`;
+    }
+    case "add_status_card": { // Phase AP (v46)
+      const n = a ?? 1;
+      const name = { dazed: "Dazed", burn: "Burn" }[e.card] || "Wound";
+      const pile = { draw: "draw pile", discard: "discard pile" }[e.pile] || "hand";
+      return `Add ${n} ${n == 1 || name === "Dazed" ? name : name + "s"} to your ${pile}`;
+    }
     case "gain_orb_slot": return `Gain ${a ?? 1} orb slot${(a ?? 1) == 1 ? "" : "s"}`;
     case "forge": return `Forge ${a ?? 1}`; // Phase M (gap #36): stoke the Forge counter
     case "exhaust": return "Exhaust";

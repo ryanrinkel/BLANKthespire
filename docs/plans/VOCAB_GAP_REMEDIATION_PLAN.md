@@ -315,6 +315,57 @@ Harmony patch failures + echoes) · verdict "HANG — wall-clock timeout" is the
 shows "Turn 5: playing cards" at the cut; no mod frame) · the 63 Curse/Status lines are the bug described above.
 **GAPTESTAO2** (the fixed build) **2,289 `[AO]` tags** — cost hook ×1,239 (Attack 654 / Skill 482 / Power 103), adds ×500+ across the same six shapes, uses consumed ×384, 56 expiries · **0 Curse/Status lines** (the filter holds) · 0 mod-attributable exception frames · the same wall-clock verdict with the AutoSlay log mid-turn at the cut. Tag evidence: `generation/scratch/gaptest-ao/godot_AO_tags_GAPTESTAO{1,2}.txt`.
 
+**STATUS (2026-09-10): Phase AP EXECUTED (vocab v46)** — all three items landed in lockstep. **(1) `discard` gains `cards:
+random|choose`** — `choose` opens the base-game hand picker (`EffectRunner.DiscardChoose` → `CardSelectCmd.FromHandForDiscard`
+with a fixed-count `DiscardSelectionPrompt`; the discard-styled `FromHand`, so it auto-returns the whole hand at ≤ N cards and no-ops
+the empty hand), then discards through the SAME effect-discard path as the random form (`CardCmd.Discard` → `FireOnDiscardFor`), so a
+chosen discard fuels Reflex cards exactly like a random one. Card-only: a payload `discard` must be `random`/absent (both
+`ValidateTrigger` and `validator.py` reject `choose` in a payload — the repeating-pick-UI footgun; `TriggerRunner` still calls
+`DiscardRandom`). Describe: "Discard {Discard} card(s) of your choice." (the Phase-R random text is byte-unchanged; `VOCABULARY.md:37`
+reworded as W0.2 promised). **(2) `retrieve_card {pile: discard|exhaust, cards: random|choose, amount?: 1..2}`** — the Headbutt /
+Exhume shape: `EffectRunner.RetrieveCards` filters the pile to retrievable cards (never a Status/Curse — a random recursion pulling a
+Wound back is anti-fun), picks via `CardSelectCmd.FromCombatPile(ctx, pile, owner, prefs, filter)` (choose; the `DiscardSelectionPrompt`
+loc key is reused — the game has no "return to hand" prompt and inventing a key is the gap-#26 crash rule) or the run's
+`CombatCardSelection` RNG (random), then moves each card with `CardPileCmd.Add(card, Hand, Random)` — the exact call Phase T's blade
+retrieval already makes from any pile, exhaust included. **Deviation, deliberate:** the plan wrote `{pile, cards}`; an optional
+`amount` 1..2 was added (default 1, not in AmountOps — add_card's copies precedent) so "Return 2 random cards" is one op, not two.
+Card-only, at most one per card. Priced as a build-around: random 3/card (under a draw's 5), choose 5/card (a tutor), exhaust +1
+(Exhume). **(3) `add_status_card {card: dazed|wound|burn, pile: hand|discard|draw, amount?: 1..3}`** — `EffectRunner.AddStatusCards`
+builds each card owner-bound via `CombatState.CreateCard<Dazed|Wound|Burn>(owner)` and adds it with
+`CardPileCmd.AddGeneratedCardToCombat(card, pile, owner, Random)` — byte-for-byte the base-game recipe (`FightThrough` / `BoostAway` /
+`Overclock`, verified in the decompile) and the same generate-into-combat path add_card uses, so the cards are combat-transient. Field
+is `card` (the plan's spelling) → `EffectSpec.StatusCard`; `pile` reuses the add_card piles. Priced NEGATIVE (burn −2.5 / wound −2.0 /
+dazed −1.5 per card, ×1.25 into hand) so an over-statted carrier balances; never on a BASIC, at most one per card (generation side),
+≤2 such cards per class (`character_validator.status_card_warnings` + pipeline). Closes VOCAB_EXPANSION_PLAN F4 (marked LANDED there).
+**Field-legality rework:** `pile` is now legal on add_card / add_status_card (hand/discard/draw) and retrieve_card (discard/exhaust —
+schema: the `exhaust` value implies retrieve_card); `cards` on upgrade_card / discard / retrieve_card; `card` on add_status_card only
+(both validators + five new schema allOf clauses). Both new ops are card-only by omission from `TriggerOps` / the `triggerEffect` op enum.
+Lockstep: `CardSpec.cs` (`StatusCard`), `ForgedCards.cs` (VocabVersion 46, SupportedOps, `RetrievePiles` / `PickModes` / `StatusCards` /
+caps, parse, Validate, ValidateTrigger, Describe + `RetrieveSentence` / `StatusCardSentence` / `StatusCardName`, `PilePhrase` exhaust),
+`EffectRunner.cs` (three cases + `DiscardChoose` / `RetrieveCards` / `AddStatusCards`), `DataCard.cs` (no-var cases),
+`card.schema.json`, `VOCABULARY.md` (discard row reworded, two rows; the duplicated `gain_max_hp` row Phase AN left behind is
+removed; payload-discard note), `DESIGN_HEURISTICS.md` (the madness_discard note), `bts1.py` VOCAB_VERSION 46, `cardgen.py` (emit
+`Cards:` / `Pile:` / `StatusCard:` named args; describe; `_pile_phrase` exhaust), `validator.py` (constants, shape rules, trigger rule,
+per-card rules, pricing, build-around), `character_validator.py` + `character_pipeline.py` (`status_card_warnings`), `featured.py`
+(+ `grave_recall`, `tainted_power`), `class_forge.py` (two fantasy pointers, a one-clause pointer in the DISCARD section, the section
+token set), `archetypes.json` (madness_discard + exhaust_pyre += retrieve_card; strike_tempo + big_energy += add_status_card),
+`exemplar_pool.json` (+3: Cull the Hand, Ash Recall, Reckless Haymaker; pool 107 → 110), `web/static/app.js` (three phrases),
+`VOCAB_EXPANSION_PLAN.md` (F4 LANDED). **Rule 0.9 budget:** blueprint prompt **+1,691 chars (88,856 → 90,547, seed 1)** — pointers
+only; the three vocabulary rows were tightened by 432 chars after a first measure of +2,123. Tests: `tests/test_phase_ap.py` (133
+checks: every legal shape / every reject incl. payload forms / describe in 15 shapes / emit / pricing order and sign / stray fields /
+the set warning / census + both detectors / contract presence + the dup-row removal); `test_featured` samples extended; suite **392
+passed**; every `test_phase_*.py` (26) runs standalone; C# build 0 errors. AutoSlay (tester `generation/scratch/gaptest-ap/build_tester.py`
+— 12 shapes on a 16-card all-aggression deck, staged into slot 04, unstaged afterwards): **GAPTESTAP1** **348 `[AP]` tags** —
+add_status_card ×182 (Wound ×2 → Hand 82, Dazed ×2 → Draw 41, Burn → Hand 32, Wound → Discard 27), retrieve_card ×97 (random ×2
+from Discard 53, random from Exhaust 32, choose from Exhaust 9, random ×1 from Discard 3 — the min(n, pool) clamp), discard choose ×65
+(picks logged by title — incl. a Dazed the bot pitched), **5 `[R] on_discard fired`** from chosen discards (the Reflex chain through the
+new path), 4 empty-exhaust no-ops + 2 empty-hand no-ops, **69 `Auto-selected` selector lines** (rule 0.5: every pick UI driven by
+AutoSlay, no hang) · 0 mod-attributable exception frames (the 7 Exception lines are BaseLib's startup pair + echoes) · verdict "HANG —
+wall-clock timeout" with the AutoSlay log at Turn 28 mid-turn at the cut. The one un-fired shape, `retrieve_card choose` from the
+DISCARD pile (`grave_hand`), got **0 plays** because the bot's Neow pick ("Precarious Shears") removed that card from the deck at run
+start — the code path is the same `FromCombatPile` call the exhaust form fired 9 times, so not re-run. Tag evidence:
+`generation/scratch/gaptest-ap/godot_AP_tags_GAPTESTAP1.txt`.
+
 ---
 
 ## 0. Ground rules

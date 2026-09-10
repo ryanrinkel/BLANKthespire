@@ -154,6 +154,9 @@ def test_detectors_round_trip() -> None:
         "strike_synergy": _card([{"op": "damage", "amount": 6, "scale": "tag_cards_owned", "tag": "strike"}]),
         "metamorph": _card([{"op": "transform_card", "card_id": "ember"}]),
         "graft": _card([{"op": "graft_card", "card_id": "ember"}]),
+        # Phase AP (v46)
+        "grave_recall": _card([{"op": "retrieve_card", "pile": "discard", "cards": "choose", "amount": 1}]),
+        "tainted_power": _card([{"op": "damage", "amount": 12}, {"op": "add_status_card", "card": "wound", "pile": "discard"}]),
     }
     plain = census.walk_card(_card([{"op": "damage", "amount": 6}]))
     check(set(samples) == {f.id for f in featured.FEATURED_MENU}, "a sample exists for every menu entry")

@@ -308,7 +308,24 @@ public static class EffectRunner
                 case "discard":
                     // Phase R (gap #17): discard `amt` RANDOM cards from hand, then fire each discarded card's
                     // on_discard payload (effect-driven — turn-end cleanup never routes through here).
-                    await DiscardRandom(amt, card.Owner, ctx);
+                    // Phase AP (v46): `cards:"choose"` opens the base-game hand picker instead (the player picks which
+                    // cards to pitch — the true discard-fuel feel); under AutoSlay the selector auto-picks (no hang).
+                    if (e.Cards == "choose")
+                        await DiscardChoose(amt, ctx, card.Owner, card);
+                    else
+                        await DiscardRandom(amt, card.Owner, ctx);
+                    break;
+                case "retrieve_card":
+                    // Phase AP (v46): return `amt` card(s) from the discard/exhaust pile to hand — random (the Exhume-
+                    // roulette) or the player's pick (CardSelectCmd.FromCombatPile, the Headbutt surface). Status/Curse
+                    // cards are never offered (a random recursion pulling Wounds is anti-fun). Empty pile → no-op.
+                    await RetrieveCards(e, amt, ctx, card.Owner);
+                    break;
+                case "add_status_card":
+                    // Phase AP (v46): generate `amt` base-game Status cards (Dazed/Wound/Burn) into a pile — the
+                    // self-drawback of an over-statted card (Wild Strike / Power Through / Overclock). Combat-transient
+                    // (AddGeneratedCardToCombat), exactly like add_card copies.
+                    await AddStatusCards(e, amt, card.Owner);
                     break;
                 case "scry":
                     // Phase AA (gap #17 R-2): look at the top `amt` cards of the draw pile and discard any subset
@@ -497,6 +514,99 @@ public static class EffectRunner
         await CardCmd.Discard(ctx, chosen);
         MainFile.Logger.Info($"[R] discard x{chosen.Count} (random from hand).");
         await FireOnDiscardFor(chosen, ctx);
+    }
+
+    /// <summary>Phase AP (v46): the CHOOSE form of <c>discard</c> — the player picks <paramref name="n"/> cards in hand
+    /// to discard via the base-game hand picker (<c>CardSelectCmd.FromHandForDiscard</c> — the discard-styled
+    /// <c>FromHand</c>: it auto-returns the whole hand when there are ≤ n cards, no-ops the empty hand, and under AutoSlay
+    /// the run-scoped <c>AutoSlayCardSelector</c> auto-picks, so this never blocks the bot). The picked cards are
+    /// discarded through the same effect-discard path as the random form (<c>CardCmd.Discard</c> → <c>on_discard</c>
+    /// payoffs), so a chosen discard fuels Reflex cards exactly like a random one. The playing card is the choice
+    /// <paramref name="source"/> (as base-game Brand passes <c>this</c>).</summary>
+    internal static async Task DiscardChoose(int n, PlayerChoiceContext ctx, Player owner, AbstractModel source)
+    {
+        var hand = owner.PlayerCombatState.Hand.Cards;
+        if (n < 1 || hand.Count == 0) { MainFile.Logger.Info("[AP] discard choose: empty hand (no-op)."); return; }
+        int take = Math.Min(n, hand.Count);
+        var chosen = (await CardSelectCmd.FromHandForDiscard(ctx, owner,
+            new CardSelectorPrefs(CardSelectorPrefs.DiscardSelectionPrompt, take), filter: null, source)).ToList();
+        if (chosen.Count == 0) { MainFile.Logger.Info("[AP] discard choose: no selection (no-op)."); return; }
+        await CardCmd.Discard(ctx, chosen);
+        MainFile.Logger.Info($"[AP] discard choose x{chosen.Count} ({string.Join(", ", chosen.Select(c => $"'{c.Title}'"))}).");
+        await FireOnDiscardFor(chosen, ctx);
+    }
+
+    /// <summary>Phase AP (v46): is this pile card RETRIEVABLE — i.e. not a base-game Status / Curse card (a random
+    /// recursion pulling a Wound or a Curse back to hand is anti-fun, and the chosen form shouldn't offer them either).</summary>
+    private static bool Retrievable(CardModel c) => c.Type is not (CardType.Status or CardType.Curse);
+
+    /// <summary>Phase AP (v46): RETRIEVE — return <paramref name="n"/> card(s) from the owner's discard or exhaust pile
+    /// (<c>e.Pile</c>) to their hand. <c>e.Cards</c> = <c>"choose"</c> opens the base-game pile picker
+    /// (<c>CardSelectCmd.FromCombatPile</c> with a filter — the Headbutt surface; the discard-prompt loc key is reused
+    /// since the game has no "return to hand" prompt and inventing a loc key is the gap-#26 crash rule); otherwise the
+    /// picks are random (the run's card-selection RNG stream, seed-correct). The move is <c>CardPileCmd.Add(card, Hand,
+    /// Random)</c> — the exact call Phase T's blade retrieval uses from any pile, exhaust included. Empty / all-Status
+    /// pile is a logged no-op. Under AutoSlay the <c>AutoSlayCardSelector</c> auto-picks (no hang).</summary>
+    internal static async Task RetrieveCards(EffectSpec e, int n, PlayerChoiceContext ctx, Player owner)
+    {
+        PileType pileType = e.Pile == "exhaust" ? PileType.Exhaust : PileType.Discard;
+        var pile = pileType.GetPile(owner);
+        var pool = pile.Cards.Where(Retrievable).ToList();
+        if (n < 1 || pool.Count == 0) { MainFile.Logger.Info($"[AP] retrieve_card: nothing retrievable in the {pileType} pile (no-op)."); return; }
+        int take = Math.Min(n, pool.Count);
+        List<CardModel> chosen;
+        if (e.Cards == "choose")
+        {
+            chosen = (await CardSelectCmd.FromCombatPile(ctx, pile, owner,
+                new CardSelectorPrefs(CardSelectorPrefs.DiscardSelectionPrompt, take), Retrievable)).ToList();
+            if (chosen.Count == 0) { MainFile.Logger.Info("[AP] retrieve_card choose: no selection (no-op)."); return; }
+        }
+        else
+        {
+            var rng = owner.RunState.Rng.CombatCardSelection;
+            chosen = new List<CardModel>(take);
+            for (int i = 0; i < take; i++)
+            {
+                int idx = rng.NextInt(pool.Count);
+                chosen.Add(pool[idx]);
+                pool.RemoveAt(idx);
+            }
+        }
+        foreach (var c in chosen)
+            await CardPileCmd.Add(c, PileType.Hand, CardPilePosition.Random);
+        MainFile.Logger.Info($"[AP] retrieve_card {e.Cards ?? "random"} x{chosen.Count} from {pileType} -> hand " +
+                             $"({string.Join(", ", chosen.Select(c => $"'{c.Title}'"))}).");
+    }
+
+    /// <summary>Phase AP (v46): generate <paramref name="n"/> base-game STATUS cards (<c>e.StatusCard</c>: dazed / wound /
+    /// burn) into <c>e.Pile</c> (hand / discard / draw) for the owner — the self-drawback of an over-statted card. Each
+    /// card is built OWNER-BOUND through <c>CombatState.CreateCard&lt;T&gt;</c> and added via
+    /// <c>CardPileCmd.AddGeneratedCardToCombat</c> (creator = the player), which is byte-for-byte the base-game recipe
+    /// (FightThrough / BoostAway / Overclock) and the same generate-into-combat path Phase Q's add_card uses — so the cards
+    /// live only for this combat and never enter the deck. Position Random (a Wound shuffled into the draw pile, not
+    /// stacked on top).</summary>
+    internal static async Task AddStatusCards(EffectSpec e, int n, Player owner)
+    {
+        PileType pile = e.Pile switch
+        {
+            "draw"    => PileType.Draw,
+            "discard" => PileType.Discard,
+            _         => PileType.Hand,
+        };
+        int made = 0;
+        for (int i = 0; i < Math.Max(1, n); i++)
+        {
+            var cs = owner.Creature.CombatState;
+            CardModel card = e.StatusCard switch
+            {
+                "dazed" => cs.CreateCard<MegaCrit.Sts2.Core.Models.Cards.Dazed>(owner),
+                "burn"  => cs.CreateCard<MegaCrit.Sts2.Core.Models.Cards.Burn>(owner),
+                _       => cs.CreateCard<MegaCrit.Sts2.Core.Models.Cards.Wound>(owner),
+            };
+            await CardPileCmd.AddGeneratedCardToCombat(card, pile, owner, CardPilePosition.Random);
+            made++;
+        }
+        MainFile.Logger.Info($"[AP] add_status_card {ForgedCards.StatusCardName(e.StatusCard)} x{made} -> {pile}.");
     }
 
     /// <summary>Phase R (gap #17): fire the on_discard (Reflex) payoff for each just-EFFECT-discarded card — but

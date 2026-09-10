@@ -159,6 +159,17 @@ FEATURED_MENU: list[Featured] = [
              'add count 1 for "your next Skill costs 1 less") so one turn of the class\'s main card type gets cheaper; '
              'a whole-combat scope is rare-only, amount 1, one per class.',
              lambda cc: "cost_shift" in cc.ops),
+    # Phase AP (v46): pile recursion and the self-drawback Status cards.
+    Featured("grave_recall", 'a card that RETURNS a card from your discard or exhaust pile to your hand (op "retrieve_card")',
+             'REQUIRED: add a skill/attack with op "retrieve_card" (pile "discard" or "exhaust", cards "choose" = you pick '
+             'or "random", amount 1) so a spent card comes back to hand (the Headbutt / Exhume recursion); pair it with '
+             'a strong exhaust or a one-shot the class wants twice.',
+             lambda cc: "retrieve_card" in cc.ops),
+    Featured("tainted_power", 'an OVER-STATTED card whose price is a Status card you add to your own deck (op "add_status_card")',
+             'REQUIRED: add an attack/skill that is clearly over-statted for its cost and pays for it with op '
+             '"add_status_card" (card "wound"/"dazed"/"burn", pile "discard"/"draw"/"hand", amount 1-2) — the Wild '
+             'Strike / Power Through / Overclock shape. Never on a basic; at most two such cards per class.',
+             lambda cc: "add_status_card" in cc.ops),
     Featured("strike_synergy", 'a payoff that scales with how many cards of a TAG you own (scale "tag_cards_owned")',
              'REQUIRED: tag 3-5 cards of the class with the SAME lowercase "tags" slug (e.g. ["strike"]), then add '
              '1-2 damage/block payoffs carrying scale:"tag_cards_owned" + a matching "tag" so they deal/block their '

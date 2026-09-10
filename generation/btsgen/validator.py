@@ -68,7 +68,8 @@ _BUILD_AROUND_OPS = {"add_trigger", "apply_status_custom",
                      "transform_card",  # Phase AH (gaps #35/#38): a run-permanent self-rewrite is a build-around, not a stat line
                      "graft_card",  # Phase AI (gap #7): a choose-a-card run-permanent transform is a build-around, not a stat line
                      "scry",  # Phase AA (gap #17 R-2): a draw-filter / on_discard fuel is a build-around, not a flat stat line
-                     "cost_shift"}  # Phase AO (v45): a typed energy discount is a tempo utility, not a flat stat line
+                     "cost_shift",  # Phase AO (v45): a typed energy discount is a tempo utility, not a flat stat line
+                     "retrieve_card"}  # Phase AP (v46): pile recursion (Headbutt / Exhume) is a build-around, not a stat line
 # F5: the live state scalars an effect's amount may scale to (mirrors ForgedCards.SupportedScales). "x" stays
 # the X-cost scalar; the rest are hand/energy state reads. Only "cards_retained" is allowed inside a trigger.
 # Phase M: "forged" is the ADDITIVE exception (printed amount + the Forge counter) and is damage/block-only.
@@ -111,6 +112,19 @@ _ONCE_PER_COMBAT_TRIGGERS = _MULTI_FIRE_TRIGGERS - {"on_discard"}
 # / AddCardMaxAmount. card_id existence is the ref-integrity check (_ref_errors); these are the shape rules.
 _ADD_CARD_PILES = {"hand", "discard", "draw"}
 _ADD_CARD_MAX = 3
+# Phase AP (v46): the retrieve_card source piles (discard / exhaust — never draw), the pick modes shared by
+# discard / retrieve_card (random / choose), the base-game Status cards add_status_card may generate, and the per-play
+# caps. Mirrors ForgedCards.RetrievePiles / PickModes / StatusCards / RetrieveMaxAmount / StatusCardMaxAmount + the
+# schema clauses. Both new ops are card-only (the triggerEffect op enum omits them); a payload discard stays random.
+_RETRIEVE_PILES = {"discard", "exhaust"}
+_PICK_MODES = {"random", "choose"}
+_STATUS_CARDS = {"dazed", "wound", "burn"}
+_RETRIEVE_MAX = 2
+_STATUS_CARD_MAX = 3
+# Phase AP (v46): the relative sting of each Status card (a negative price — the drawback an over-statted card pays):
+# a Burn deals 2 when it sits in hand at end of turn; a Wound is a dead draw; a Dazed is a dead draw that at least
+# leaves the hand on its own (Ethereal).
+_STATUS_CARD_STING = {"burn": 2.5, "wound": 2.0, "dazed": 1.5}
 # Phase S (gap #1): the poles balance_step may move the gauge toward + the per-step cap. Mirrors ForgedCards
 # .BalancePoles / BalanceStepMaxAmount. The both-poles / gated-payoff PAIRING rule is a class-level check
 # (character_validator.balance_pairing_warnings) — a lone balance card is a warning there, not a per-card reject.
@@ -443,8 +457,37 @@ class CardValidator:
                 amt = e.get("amount")
                 if isinstance(amt, int) and not isinstance(amt, bool) and amt != 0:
                     out.append("graft_card carries no amount (it's a flag-op naming the card to graft into).")
+            # Phase AP (v46): retrieve_card returns pile card(s) to hand — a source pile (discard/exhaust), a pick mode
+            # (random/choose), an optional amount 1..2, no card_id. Not class-only. Mirrors ForgedCards.Validate.
+            elif e.get("op") == "retrieve_card":
+                pile = str(e.get("pile", "")).strip().lower()
+                if pile not in _RETRIEVE_PILES:
+                    out.append(f"retrieve_card 'pile':'{e.get('pile')}' must be one of {'/'.join(sorted(_RETRIEVE_PILES))}.")
+                if str(e.get("cards", "")).strip().lower() not in _PICK_MODES:
+                    out.append(f"retrieve_card 'cards':'{e.get('cards')}' must be one of {'/'.join(sorted(_PICK_MODES))}.")
+                if e.get("card_id") is not None:
+                    out.append("'card_id' does not apply to retrieve_card (it returns whatever is in the pile, not a named card).")
+                amt = e.get("amount")
+                if isinstance(amt, int) and not isinstance(amt, bool) and amt > _RETRIEVE_MAX:
+                    out.append(f"retrieve_card 'amount' (cards returned) may be at most {_RETRIEVE_MAX}; got {amt}.")
+            # Phase AP (v46): add_status_card generates base-game Status cards (dazed/wound/burn) into a pile — the
+            # self-drawback of an over-statted card. A kind (`card`), a destination pile (the add_card piles), an
+            # optional amount 1..3, no card_id. Not class-only. Mirrors ForgedCards.Validate.
+            elif e.get("op") == "add_status_card":
+                if str(e.get("card", "")).strip().lower() not in _STATUS_CARDS:
+                    out.append(f"add_status_card 'card':'{e.get('card')}' must be one of {'/'.join(sorted(_STATUS_CARDS))}.")
+                pile = str(e.get("pile", "")).strip().lower()
+                if pile not in _ADD_CARD_PILES:
+                    out.append(f"add_status_card 'pile':'{e.get('pile')}' must be one of {'/'.join(sorted(_ADD_CARD_PILES))}.")
+                if e.get("card_id") is not None:
+                    out.append("'card_id' does not apply to add_status_card (use 'card': dazed/wound/burn).")
+                amt = e.get("amount")
+                if isinstance(amt, int) and not isinstance(amt, bool) and amt > _STATUS_CARD_MAX:
+                    out.append(f"add_status_card 'amount' (cards added) may be at most {_STATUS_CARD_MAX}; got {amt}.")
             elif e.get("card_id") is not None or e.get("pile") is not None:
-                out.append(f"'card_id'/'pile' only apply to add_card/transform_card/graft_card (op '{e.get('op')}').")
+                out.append(f"'card_id'/'pile' only apply to add_card/transform_card/graft_card/retrieve_card/add_status_card (op '{e.get('op')}').")
+            if e.get("card") is not None and e.get("op") != "add_status_card":
+                out.append(f"'card' only applies to add_status_card (op '{e.get('op')}').")
             # Phase S (gap #1): balance_step shape rules. Mirrors ForgedCards.Validate — a valid pole + the step
             # cap. There is no class pool to gate on (any class CAN move the gauge); the both-poles/gated-payoff
             # pairing is a class-level warning (character_validator), so a lone balance card is legal here.
@@ -463,8 +506,13 @@ class CardValidator:
                 scope = str(e.get("cards", "")).strip().lower()
                 if scope not in _UPGRADE_SCOPES:
                     out.append(f"upgrade_card 'cards':'{e.get('cards')}' must be one of {'/'.join(sorted(_UPGRADE_SCOPES))}.")
-            elif e.get("cards") is not None:
-                out.append(f"'cards' only applies to upgrade_card (op '{e.get('op')}').")
+            # Phase AP (v46): discard's optional pick mode — random (the default) or choose (card-only; the trigger loop
+            # below rejects it). retrieve_card's pick mode is validated with its shape above. Mirrors ForgedCards.Validate.
+            elif e.get("op") == "discard":
+                if e.get("cards") is not None and str(e.get("cards", "")).strip().lower() not in _PICK_MODES:
+                    out.append(f"discard 'cards':'{e.get('cards')}' must be one of {'/'.join(sorted(_PICK_MODES))}.")
+            elif e.get("cards") is not None and e.get("op") != "retrieve_card":
+                out.append(f"'cards' only applies to upgrade_card/discard/retrieve_card (op '{e.get('op')}').")
         for e in effects + up_effects:  # per-effect shape rules apply to the upgrade too (lockstep w/ the
             op = e.get("op")            # mod's `effects.Concat(upgrade)` in ForgedCards.Validate)
             hits = e.get("hits", 1)
@@ -637,6 +685,22 @@ class CardValidator:
             if (any(str(e.get("scope", "")).strip().lower() == "combat" for e in cs_fx)
                     and str(card.get("rarity", "")).strip().lower() != "rare"):
                 out.append("'cost_shift' with scope 'combat' is RARE-ONLY (a whole-combat discount is a build-around power).")
+        # Phase AP (v46): add_status_card is a self-drawback (Wounds/Dazed/Burns clog the deck) — never on a BASIC card
+        # (a starter that poisons its own deck is a trap in every run), and at most one per effect list (one drawback
+        # sentence per play; base + upgrade independent). Card-only (the schema triggerEffect op enum omits it). The
+        # ≤2-per-class clog rule is set-level (character_validator.status_card_warnings).
+        sc_fx = [e for e in effects + up_effects if e.get("op") == "add_status_card"]
+        if sc_fx:
+            if is_basic:
+                out.append("'add_status_card' is not allowed on a BASIC card (a starter that clogs its own deck is a trap).")
+            if (sum(1 for e in effects if e.get("op") == "add_status_card") > 1
+                    or sum(1 for e in up_effects if e.get("op") == "add_status_card") > 1):
+                out.append("at most one 'add_status_card' effect per card (one drawback per play — raise the amount instead).")
+        # Phase AP (v46): retrieve_card — at most one per effect list (two recursions on one play is a loop; raise the
+        # amount to 2 instead). Card-only (the schema triggerEffect op enum omits it).
+        if (sum(1 for e in effects if e.get("op") == "retrieve_card") > 1
+                or sum(1 for e in up_effects if e.get("op") == "retrieve_card") > 1):
+            out.append("at most one 'retrieve_card' effect per card (one retrieval per play — raise the amount instead).")
         cost = card.get("cost", 0)
         costs_x = isinstance(cost, str) and cost.strip().upper() == "X"
         any_scale = any(str(e.get("scale", "")).lower() == "x" for e in effects)
@@ -795,8 +859,16 @@ class CardValidator:
                     if str(t.get("cards", "")).strip().lower() != "random":
                         out.append(f"a trigger upgrade_card must be 'cards':'random' ('all'/'choose' are card-only — "
                                    f"degenerate in a repeating payload); got '{t.get('cards')}'.")
+                # Phase AP (v46): a payload discard stays the choiceless form ('cards' absent or random) — a repeating
+                # pick UI every turn is the payload-upgrade_card-choose footgun. Mirrors ForgedCards.ValidateTrigger.
+                elif op == "discard":
+                    if t.get("cards") is not None and str(t.get("cards", "")).strip().lower() != "random":
+                        out.append(f"a trigger discard must be random ('cards':'choose' is card-only — a repeating pick "
+                                   f"UI); got '{t.get('cards')}'.")
                 elif t.get("cards") is not None:
-                    out.append(f"'cards' only applies to upgrade_card (trigger effect '{op}').")
+                    out.append(f"'cards' only applies to upgrade_card/discard (trigger effect '{op}').")
+                if t.get("card") is not None:
+                    out.append(f"'card' only applies to the card-level add_status_card (trigger effect '{op}').")
         up = card.get("upgrade")
         if isinstance(up, dict) and isinstance(up.get("effects"), list) and len(up["effects"]) != len(effects):
             out.append("upgrade effect count must match base effect count.")
@@ -918,6 +990,23 @@ class CardValidator:
             # Phase AA (gap #17 R-2): a draw-quality filter (look at top N, discard any) — real card-selection
             # value that also fuels on_discard, but weaker than raw draw; ~1.5 per card looked at.
             return self._amt(eff.get("amount", 0)) * 1.5
+        if op == "discard":
+            # Phase AP (v46): a RANDOM discard is a cost the archetype notes price (0 here, as before); the CHOSEN form is
+            # card selection — you pitch the dead card and keep the live one — worth ~1 per card (under scry's 1.5:
+            # scry also digs).
+            return self._amt(eff.get("amount", 0)) * (1.0 if str(eff.get("cards", "")).strip().lower() == "choose" else 0.0)
+        if op == "retrieve_card":
+            # Phase AP (v46): pile recursion — a random return is a weaker-than-draw card (3/card; a draw is 5), a chosen
+            # return is a tutor (5/card, draw-priced); pulling from the EXHAUST pile is Exhume (+1: the card was spent).
+            n = max(1.0, self._amt(eff.get("amount", 1)))
+            per = 5.0 if str(eff.get("cards", "")).strip().lower() == "choose" else 3.0
+            return n * (per + (1.0 if str(eff.get("pile", "")).strip().lower() == "exhaust" else 0.0))
+        if op == "add_status_card":
+            # Phase AP (v46): a NEGATIVE price — the drawback an over-statted card pays. Per-kind sting (Burn > Wound >
+            # Dazed); a Status card dropped straight into HAND bites now (×1.25), a draw-pile one bites next cycle.
+            n = max(1.0, self._amt(eff.get("amount", 1)))
+            sting = _STATUS_CARD_STING.get(str(eff.get("card", "")).strip().lower(), 2.0)
+            return -n * sting * (1.25 if str(eff.get("pile", "")).strip().lower() == "hand" else 1.0)
         if not self._mod_contract and op in _LEGACY_PROTOTYPE_OPS:
             return self._score_legacy_prototype_effect(op, eff)
         if op == "add_trigger":

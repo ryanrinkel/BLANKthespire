@@ -657,6 +657,17 @@ def cost_shift_warnings(cards: list[dict]) -> list[str]:
     return []
 
 
+def status_card_warnings(cards: list[dict]) -> list[str]:
+    """Set-level Status-card discipline (Phase AP, v46): `add_status_card` is a self-drawback (Wounds / Dazed / Burns
+    generated into your own piles). One or two such cards make an over-statted card honest; more than TWO per class
+    turns the deck into a clog no engine pays for. Advisory (a human decides), like cost_shift_warnings."""
+    clog = sorted({str(c.get("id", "?")) for c in cards if isinstance(c, dict) and _card_has_op(c, {"add_status_card"})})
+    if len(clog) > 2:
+        return [f"more than two Status-card generators: {', '.join(clog)} each add Wounds/Dazed/Burns to your own deck — "
+                "the clog compounds; keep add_status_card to at most two cards per class."]
+    return []
+
+
 def blade_empower_warnings(cards: list[dict]) -> list[str]:
     """Set-level Blade-Empower pairing (Phase AF, gap #41): `blade_empower` multiplies the forge class's signature
     blade — it is dead in a class with no `forge` income (no blade to empower). A class shipping blade_empower must

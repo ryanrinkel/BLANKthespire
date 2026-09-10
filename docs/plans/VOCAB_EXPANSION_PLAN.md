@@ -87,6 +87,9 @@ support and unlock a lot of card identity. Do them together since both touch dam
 - **VocabVersion → 5.**
 
 ## Phase F4 — Choice/card-ref manipulation  (effort: MEDIUM, **STRETCH / likely defer**)
+**LANDED (2026-09-10):** `discard` (random) shipped as Phase R; the player-choice surface came with spike Y / Phases X–AA;
+`add_status_card` (Wound/Dazed/Burn), `discard cards:"choose"` and `retrieve_card` shipped as **Phase AP (vocab v46,
+`VOCAB_GAP_REMEDIATION_PLAN.md`)**. Nothing in this section is still deferred.
 `CardCmd`/`CardPileCmd` expose scry-style filtering, discard, exhaust-chosen, and add-card-to-pile — but most
 need either a **player choice UI flow** or a **card-id reference** (e.g. "add a Wound"), which is more than a
 data op. Recommend deferring until after orbs unless a specific card wants one. Candidates if pursued:

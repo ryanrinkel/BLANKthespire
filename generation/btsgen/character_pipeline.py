@@ -37,8 +37,8 @@ from .character_validator import (BlueprintValidator, CharacterValidator,
                                   corruption_warnings, cost_shift_warnings, forge_manipulation_warnings,
                                   forge_pairing_warnings,
                                   identity_overlap_warnings, lifesteal_warnings, purge_warnings,
-                                  rampage_grow_warnings, summon_support_warnings, tag_synergy_warnings,
-                                  transform_warnings)
+                                  rampage_grow_warnings, status_card_warnings, summon_support_warnings,
+                                  tag_synergy_warnings, transform_warnings)
 from .generator import AnthropicGenerator, extract_card_json
 from .pipeline import _unique_id, generate_card
 from .relic_pipeline import generate_relic
@@ -221,6 +221,12 @@ def generate_character(brief: Brief, model: str | None = None, fake: bool = Fals
         res.warnings["cost_shift"] = csw
         for w in csw:
             note("  COST-SHIFT WARN " + w)
+    # Phase AP (v46): at most two add_status_card generators per class (the clog compounds). Advisory, same treatment.
+    scw = status_card_warnings([m["card"] for m in made])
+    if scw:
+        res.warnings["status_card"] = scw
+        for w in scw:
+            note("  STATUS-CARD WARN " + w)
     # Phase AC (gap #2): a class with heal_summon/shield_summon but no summon op — the medic ops always no-op.
     sw = summon_support_warnings([m["card"] for m in made])
     if sw:

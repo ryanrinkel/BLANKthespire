@@ -295,7 +295,8 @@
           "damage",
           "scale",
           "unblockable",
-          "apply_status"
+          "apply_status",
+          "add_status_card"
         ],
         "class_kind": "normal"
       },
@@ -685,7 +686,8 @@
           "discard",
           "scry",
           "add_trigger",
-          "draw"
+          "draw",
+          "retrieve_card"
         ],
         "class_kind": "normal"
       },
@@ -752,7 +754,8 @@
           "exhaust",
           "add_trigger",
           "draw",
-          "corruption"
+          "corruption",
+          "retrieve_card"
         ],
         "class_kind": "normal"
       },
@@ -856,6 +859,7 @@
           "gain_energy",
           "damage",
           "cost_shift",
+          "add_status_card",
           "scale",
           "energy_ge"
         ],

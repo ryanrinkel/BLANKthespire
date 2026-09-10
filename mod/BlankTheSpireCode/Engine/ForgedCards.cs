@@ -42,7 +42,17 @@ public static class ForgedCards
     /// v10 (forged statuses, Phase J): + CharacterSpec.StatusPool (a class's ≤4 custom modifier-family statuses
     /// read from `status_pool`; see ForgedCharacters / ForgedStatusPower). Class cards may apply a custom status
     /// by pool name via the `apply_status_custom` op (class-only, like custom-orb channels).</summary>
-    public const int VocabVersion = 45; // 45: Phase AO (VOCAB_GAP_REMEDIATION Wave 3) — CARD-TYPE-SCOPED COST MODIFIERS.
+    public const int VocabVersion = 46; // 46: Phase AP (VOCAB_GAP_REMEDIATION Wave 3) — PILE MANIPULATION AND STATUS CARDS.
+                                        //     `discard` gains `cards: random|choose` (choose = the player picks which hand cards
+                                        //     to discard via the base-game hand picker — CardSelectCmd.FromHandForDiscard; card-only,
+                                        //     a payload discard stays random). New card-only op `retrieve_card {pile: discard|exhaust,
+                                        //     cards: random|choose, amount?: 1..2}` — return card(s) from a pile to your hand (the
+                                        //     Headbutt / Exhume shape; CardSelectCmd.FromCombatPile + CardPileCmd.Add; Status/Curse
+                                        //     cards are never retrieved). New card-only op `add_status_card {card: dazed|wound|burn,
+                                        //     pile: hand|discard|draw, amount?: 1..3}` — generate base-game Status cards as the
+                                        //     self-drawback of an over-statted card (Wild Strike / Power Through / Overclock;
+                                        //     CombatState.CreateCard<T> + AddGeneratedCardToCombat). Closes VOCAB_EXPANSION F4.
+                                        // 45: Phase AO (VOCAB_GAP_REMEDIATION Wave 3) — CARD-TYPE-SCOPED COST MODIFIERS.
                                         //     New card-only op `cost_shift {card_type: attack|skill|power|all, amount: 1..2,
                                         //     scope: this_turn|combat, count?: 1..3}` — "Your Attacks cost 1 less this turn" /
                                         //     "Your next Skill costs 2 less this turn" / "Your Skills cost 1 less this combat"
@@ -288,7 +298,9 @@ public static class ForgedCards
          "heal_summon", // Phase AC (gap #2): heal your living summon (class-only; no summon out → no-op)
          "shield_summon", // Phase AC (gap #2): grant Block to your living summon (class-only; no summon out → no-op)
          "add_card", // Phase Q (gap #16): generate copies of a same-class card into a combat pile (class-only)
-         "discard", // Phase R (gap #17): discard N random cards from hand (choiceless)
+         "discard", // Phase R (gap #17): discard N random cards from hand. Phase AP (v46): + `cards:"choose"` (the player picks; card-only)
+         "retrieve_card", // Phase AP (v46): return card(s) from your discard/exhaust pile to your hand (random / choose). Card-only.
+         "add_status_card", // Phase AP (v46): generate base-game Status cards (dazed/wound/burn) into a pile — a self-drawback. Card-only.
          "balance_step", // Phase S (gap #1): move the signed Balance gauge toward a pole (light/dark)
          "summon_blade", // Phase T: put the class's signature blade into your hand from anywhere (class-only)
          "upgrade_card", // Phase V (gap #18): upgrade random/all cards in hand this combat (choiceless)
@@ -383,6 +395,15 @@ public static class ForgedCards
     // draw) — the base-game "generate a card into combat" destinations. Kept in lockstep with validator._ADD_CARD_PILES.
     private static readonly HashSet<string> AddCardPiles = ["hand", "discard", "draw"];
     private const int AddCardMaxAmount = 3; // amount cap (copies per play) — small numbers keep token engines bounded
+    // Phase AP (v46): the piles retrieve_card may pull a card back to hand FROM (the Headbutt / Exhume shape — never the
+    // draw pile: that is what draw/scry are for), the pick modes shared by discard / retrieve_card (random / choose),
+    // the base-game Status cards add_status_card may generate, and the per-play caps. Lockstep with validator.py
+    // (_RETRIEVE_PILES / _PICK_MODES / _STATUS_CARDS / _RETRIEVE_MAX / _STATUS_CARD_MAX) + card.schema.json.
+    private static readonly HashSet<string> RetrievePiles = ["discard", "exhaust"];
+    private static readonly HashSet<string> PickModes = ["random", "choose"];
+    private static readonly HashSet<string> StatusCards = ["dazed", "wound", "burn"];
+    private const int RetrieveMaxAmount = 2;   // "Return 2 cards" is the ceiling — a 3+ recursion is a degenerate loop
+    private const int StatusCardMaxAmount = 3; // Power Through adds 2 Wounds; 3 is the ceiling
     // Phase S (gap #1): the poles balance_step may move the gauge toward, and the per-step cap (small steps keep the
     // gauge a slow tug-of-war so the |8| extreme is a deliberate commitment, not one card). Lockstep with validator.
     private static readonly HashSet<string> BalancePoles = ["light", "dark"];
@@ -792,10 +813,12 @@ public static class ForgedCards
             string? cardKind = e.ContainsKey("card_type") ? Str(e, "card_type").Trim().ToLowerInvariant() : null;
             string? scope = e.ContainsKey("scope") ? Str(e, "scope").Trim().ToLowerInvariant() : null;
             int count = e.ContainsKey("count") ? Int(e, "count") : 0;
+            // Phase AP (v46): add_status_card's Status-card kind (lowercased: dazed/wound/burn; membership in Validate).
+            string? statusCard = e.ContainsKey("card") ? Str(e, "card").Trim().ToLowerInvariant() : null;
             list.Add(new EffectSpec(op, amount, status, hits, scale, orb, when, trigger, triggered, statusName,
                                     summonName, oncePerTurn, target, cardId, pile, pole, grow, cards, tag,
                                     OncePerCombat: oncePerCombat, Unblockable: unblockable,
-                                    CardKind: cardKind, Scope: scope, Count: count));
+                                    CardKind: cardKind, Scope: scope, Count: count, StatusCard: statusCard));
         }
         return list.ToArray();
     }
@@ -1018,8 +1041,39 @@ public static class ForgedCards
                 if (e.Amount != 0)
                     return "graft_card carries no amount (it's a flag-op naming the card to graft into).";
             }
+            // Phase AP (v46): retrieve_card pulls card(s) back to hand from the discard or exhaust pile (the Headbutt /
+            // Exhume shape). Not class-only (any pile card qualifies; Status/Curse cards are skipped at runtime). Carries a
+            // pile (discard/exhaust), a pick mode (random/choose) and an optional amount 1..2 (default 1 — not in
+            // AmountOps, like add_card's copies). No card_id. Card-only (not in TriggerOps).
+            else if (e.Op == "retrieve_card")
+            {
+                if (e.Pile == null || !RetrievePiles.Contains(e.Pile))
+                    return $"retrieve_card needs a 'pile' (one of {string.Join("/", RetrievePiles)}); got '{e.Pile}'.";
+                if (e.Cards == null || !PickModes.Contains(e.Cards))
+                    return $"retrieve_card needs a 'cards' pick mode (one of {string.Join("/", PickModes)}); got '{e.Cards}'.";
+                if (e.CardId != null)
+                    return "'card_id' does not apply to retrieve_card (it returns whatever is in the pile, not a named card).";
+                if (e.Amount > RetrieveMaxAmount)
+                    return $"retrieve_card 'amount' (cards returned) may be at most {RetrieveMaxAmount}; got {e.Amount}.";
+            }
+            // Phase AP (v46): add_status_card generates base-game STATUS cards (dazed/wound/burn) into a combat pile — the
+            // self-drawback of an over-statted card. Not class-only (the cards are the game's own). Carries the kind
+            // (`card`), a pile (hand/discard/draw — the add_card piles) and an optional amount 1..3 (default 1).
+            else if (e.Op == "add_status_card")
+            {
+                if (e.StatusCard == null || !StatusCards.Contains(e.StatusCard))
+                    return $"add_status_card needs a 'card' (one of {string.Join("/", StatusCards)}); got '{e.StatusCard}'.";
+                if (e.Pile == null || !AddCardPiles.Contains(e.Pile))
+                    return $"add_status_card needs a 'pile' (one of {string.Join("/", AddCardPiles)}); got '{e.Pile}'.";
+                if (e.CardId != null)
+                    return "'card_id' does not apply to add_status_card (use 'card': dazed/wound/burn).";
+                if (e.Amount > StatusCardMaxAmount)
+                    return $"add_status_card 'amount' (cards added) may be at most {StatusCardMaxAmount}; got {e.Amount}.";
+            }
             else if (e.CardId != null || e.Pile != null)
-                return $"'card_id'/'pile' only apply to add_card/transform_card/graft_card (op '{e.Op}').";
+                return $"'card_id'/'pile' only apply to add_card/transform_card/graft_card/retrieve_card/add_status_card (op '{e.Op}').";
+            if (e.StatusCard != null && e.Op != "add_status_card")
+                return $"'card' only applies to add_status_card (op '{e.Op}').";
             // Phase T: summon_blade retrieves THIS class's signature blade — class-only, like add_card/summon.
             // It carries no amount/card_id (the blade is resolved from the class at runtime; no such card → no-op).
             if (e.Op == "summon_blade" && !allowCustomOrbs)
@@ -1043,8 +1097,15 @@ public static class ForgedCards
                 if (e.Cards == null || !UpgradeScopes.Contains(e.Cards))
                     return $"upgrade_card needs a 'cards' scope (one of {string.Join("/", UpgradeScopes)}); got '{e.Cards}'.";
             }
-            else if (e.Cards != null)
-                return $"'cards' only applies to upgrade_card (op '{e.Op}').";
+            // Phase AP (v46): discard's optional pick mode — `random` (the Phase-R choiceless form, the default when
+            // absent) or `choose` (the player picks which hand cards to discard; card-only — ValidateTrigger rejects it).
+            else if (e.Op == "discard")
+            {
+                if (e.Cards != null && !PickModes.Contains(e.Cards))
+                    return $"discard 'cards' must be one of {string.Join("/", PickModes)}; got '{e.Cards}'.";
+            }
+            else if (e.Cards != null && e.Op != "retrieve_card") // retrieve_card's pick mode is validated above
+                return $"'cards' only applies to upgrade_card/discard/retrieve_card (op '{e.Op}').";
             // Phase AB (gap #20): corruption is a binary flag-op (grants the Corruption power). It carries no amount
             // (like exhaust/purge). Card-type legality (power/skill only, card-only) is enforced generation-side +
             // the payload rejection is automatic (corruption is not in TriggerOps → ValidateTrigger rejects it).
@@ -1328,8 +1389,17 @@ public static class ForgedCards
                 if (t.Cards != "random")
                     return $"a trigger upgrade_card must be 'cards':'random' ('all'/'choose' are card-only — degenerate in a repeating payload); got '{t.Cards}'.";
             }
+            // Phase AP (v46): a payload discard stays the choiceless form (`cards` absent or "random") — a repeating pick
+            // UI every turn is the same footgun as a payload upgrade_card choose. TriggerRunner always calls DiscardRandom.
+            else if (t.Op == "discard")
+            {
+                if (t.Cards != null && t.Cards != "random")
+                    return $"a trigger discard must be random ('cards':'choose' is card-only — a repeating pick UI); got '{t.Cards}'.";
+            }
             else if (t.Cards != null)
-                return $"'cards' only applies to upgrade_card (trigger effect '{t.Op}').";
+                return $"'cards' only applies to upgrade_card/discard (trigger effect '{t.Op}').";
+            if (t.StatusCard != null)
+                return $"'card' only applies to the card-level add_status_card (trigger effect '{t.Op}').";
             if (AmountOps.Contains(t.Op) && t.Amount < 1)
                 return $"trigger effect '{t.Op}' needs amount >= 1.";
             if (t.When != null)
@@ -1444,7 +1514,10 @@ public static class ForgedCards
                 case "heal":        parts.Add(e.IsScaled ? $"Heal HP equal to {ScalePhrase(e.Scale)}." : "Heal {Heal} HP."); break;
                 case "lose_hp":     parts.Add("Lose {Loss} HP."); break;
                 case "gain_max_hp": parts.Add("Gain {MaxHp} Max HP."); break; // Phase AN (v44): the Feed payoff (MaxHpVar)
-                case "discard":     parts.Add("Discard {Discard} random card(s)."); break; // Phase R (gap #17)
+                case "discard":     parts.Add(e.Cards == "choose" ? "Discard {Discard} card(s) of your choice." // Phase AP (v46): the chosen form
+                                                                  : "Discard {Discard} random card(s)."); break; // Phase R (gap #17)
+                case "retrieve_card":   parts.Add(RetrieveSentence(e)); break;   // Phase AP (v46): literal (no var), lockstep with cardgen
+                case "add_status_card": parts.Add(StatusCardSentence(e)); break; // Phase AP (v46): literal (no var), lockstep with cardgen
                 case "scry":        parts.Add("Scry {Scry}. (Look at that many cards from the top of your draw pile and discard any.)"); break; // Phase AA (gap #17 R-2)
                 case "exhaust":     parts.Add("Exhaust."); break;
                 case "innate":      parts.Add("Innate."); break;
@@ -1695,11 +1768,46 @@ public static class ForgedCards
         string.IsNullOrWhiteSpace(cardId) ? "a card"
             : System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(cardId.Replace('_', ' '));
 
-    /// <summary>The human phrase for an add_card destination pile. Lockstep with cardgen._pile_phrase.</summary>
+    /// <summary>Phase AP (v46): the retrieve_card sentence — "Return a random card from your discard pile to your hand." /
+    /// "Return 2 cards of your choice from your exhaust pile to your hand." Literal numbers (no DynamicVar, like add_card);
+    /// an absent/unknown pile reads as the discard pile and an absent mode as random (the engine defaults). Lockstep with
+    /// cardgen._retrieve_sentence.</summary>
+    private static string RetrieveSentence(EffectSpec e)
+    {
+        int n = Math.Max(1, e.Amount);
+        string pile = e.Pile == "exhaust" ? "exhaust pile" : "discard pile";
+        string what = e.Cards == "choose"
+            ? (n > 1 ? $"{n} cards of your choice" : "a card of your choice")
+            : (n > 1 ? $"{n} random cards" : "a random card");
+        return $"Return {what} from your {pile} to your hand.";
+    }
+
+    /// <summary>Phase AP (v46): the add_status_card sentence — "Add a Wound to your discard pile." / "Add 2 Wounds to your
+    /// hand." / "Add 2 Dazed to your draw pile." (Dazed is its own plural; Wound/Burn take an s). Literal numbers (no
+    /// DynamicVar). An unknown kind reads as Wound (the engine default). Lockstep with cardgen._status_card_sentence.</summary>
+    private static string StatusCardSentence(EffectSpec e)
+    {
+        int n = Math.Max(1, e.Amount);
+        string name = StatusCardName(e.StatusCard);
+        string what = n > 1 ? $"{n} {(name == "Dazed" ? name : name + "s")}" : $"a {name}";
+        return $"Add {what} to your {PilePhrase(e.Pile)}.";
+    }
+
+    /// <summary>Phase AP (v46): the display name of a base-game Status card kind. Lockstep with cardgen.STATUS_CARD_NAME.</summary>
+    internal static string StatusCardName(string? kind) => kind switch
+    {
+        "dazed" => "Dazed",
+        "burn"  => "Burn",
+        _       => "Wound",
+    };
+
+    /// <summary>The human phrase for an add_card / add_status_card destination pile, or a retrieve_card source pile
+    /// (Phase AP adds the exhaust pile). Lockstep with cardgen._pile_phrase.</summary>
     private static string PilePhrase(string? pile) => pile switch
     {
         "discard" => "discard pile",
         "draw"    => "draw pile",
+        "exhaust" => "exhaust pile", // Phase AP (v46): retrieve_card's second source
         _         => "hand",
     };
 

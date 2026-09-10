@@ -71,13 +71,21 @@ namespace BlankTheSpire.BlankTheSpireCode.Engine;
 /// or <c>"combat"</c> (rides until the combat ends; rare-only, amount 1). Null for every other op.</param>
 /// <param name="Count">Phase AO (v45): a <c>cost_shift</c>'s use budget — 0 = every matching card (the flat form);
 /// 1..3 = only the next N matching cards you play ("Your next Skill costs 1 less this turn"), then the discount is spent.</param>
+/// <param name="StatusCard">Phase AP (v46): on an <c>add_status_card</c> op, which base-game STATUS card to generate —
+/// <c>"dazed"</c> (Ethereal, Unplayable) / <c>"wound"</c> (Unplayable) / <c>"burn"</c> (Unplayable; 2 damage to you if it is
+/// in your hand at end of turn). The self-drawback of an over-statted card (Wild Strike / Power Through / Overclock).
+/// <see cref="Pile"/> is the destination (hand/discard/draw), <see cref="Amount"/> the count (1..3). Null for every other op.
+/// Phase AP also reuses <see cref="Cards"/> on <c>discard</c> (<c>"random"</c> / <c>"choose"</c> — the player picks which
+/// cards to discard) and on <c>retrieve_card</c> (random / choose), and <see cref="Pile"/> on <c>retrieve_card</c>
+/// (<c>"discard"</c> / <c>"exhaust"</c> — the pile a card is returned to your hand from).</param>
 public sealed record EffectSpec(string Op, int Amount = 0, string? Status = null, int Hits = 1, string? Scale = null,
     string? Orb = null, Condition? When = null, string? Trigger = null, EffectSpec[]? Triggered = null,
     string? StatusName = null, string? SummonName = null, bool OncePerTurn = false, string? Target = null,
     string? CardId = null, string? Pile = null, string? Pole = null, int Grow = 0, string? Cards = null,
     string? Tag = null, bool OncePerCombat = false,
     bool Unblockable = false, // Phase AN (v44): a `damage` op that IGNORES Block (ValueProp.Unblockable on its damage var)
-    string? CardKind = null, string? Scope = null, int Count = 0) // Phase AO (v45): the cost_shift filter / lifetime / use budget
+    string? CardKind = null, string? Scope = null, int Count = 0, // Phase AO (v45): the cost_shift filter / lifetime / use budget
+    string? StatusCard = null) // Phase AP (v46): the add_status_card kind (dazed/wound/burn)
 {
     /// <summary>This op's amount comes from a live scalar (any <see cref="Scale"/>), not <see cref="Amount"/>.</summary>
     public bool IsScaled => Scale != null;

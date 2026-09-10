@@ -63,8 +63,37 @@ def _orb_display(orb) -> str:
 
 
 def _pile_phrase(pile) -> str:
-    # The human phrase for an add_card destination pile (Phase Q). Mirrors ForgedCards.PilePhrase.
-    return {"discard": "discard pile", "draw": "draw pile"}.get(pile, "hand")
+    # The human phrase for an add_card / add_status_card destination pile, or a retrieve_card source pile (Phase Q;
+    # Phase AP adds the exhaust pile). Mirrors ForgedCards.PilePhrase.
+    return {"discard": "discard pile", "draw": "draw pile", "exhaust": "exhaust pile"}.get(pile, "hand")
+
+
+# Phase AP (v46): the display names of the base-game Status cards add_status_card may generate. Mirrors
+# ForgedCards.StatusCardName (an unknown kind reads as Wound, the engine default).
+STATUS_CARD_NAME = {"dazed": "Dazed", "wound": "Wound", "burn": "Burn"}
+
+
+def _retrieve_sentence(e: dict) -> str:
+    # Phase AP (v46): the retrieve_card sentence — "Return a random card from your discard pile to your hand." /
+    # "Return 2 cards of your choice from your exhaust pile to your hand." Literal numbers (no var, like add_card); an
+    # absent/unknown pile reads as the discard pile, an absent mode as random. Mirrors ForgedCards.RetrieveSentence.
+    n = max(1, int(e.get("amount", 1) or 1))
+    pile = "exhaust pile" if str(e.get("pile", "")).lower() == "exhaust" else "discard pile"
+    if str(e.get("cards", "")).lower() == "choose":
+        what = f"{n} cards of your choice" if n > 1 else "a card of your choice"
+    else:
+        what = f"{n} random cards" if n > 1 else "a random card"
+    return f"Return {what} from your {pile} to your hand."
+
+
+def _status_card_sentence(e: dict) -> str:
+    # Phase AP (v46): the add_status_card sentence — "Add a Wound to your discard pile." / "Add 2 Wounds to your hand." /
+    # "Add 2 Dazed to your draw pile." (Dazed is its own plural). Literal numbers (no var). Mirrors
+    # ForgedCards.StatusCardSentence.
+    n = max(1, int(e.get("amount", 1) or 1))
+    name = STATUS_CARD_NAME.get(str(e.get("card", "")).lower(), "Wound")
+    what = f"{n} {name if name == 'Dazed' else name + 's'}" if n > 1 else f"a {name}"
+    return f"Add {what} to your {_pile_phrase(e.get('pile'))}."
 
 
 def _add_card_name(card_id) -> str:
@@ -176,6 +205,19 @@ def effect_literal(e: dict) -> str:
         lit = f'new EffectSpec("cost_shift", {e.get("amount", 1)}, CardKind: "{ck}", Scope: "{sc}")'
         if e.get("count"):
             lit = f"{lit[:-1]}, Count: {int(e['count'])})"
+    elif op == "discard" and str(e.get("cards", "")).lower() == "choose":
+        # Phase AP (v46): the chosen form carries the named Cards arg; the random form stays the plain literal below.
+        lit = f'new EffectSpec("discard", {e.get("amount", 0)}, Cards: "choose")'
+    elif op == "retrieve_card":
+        # Phase AP (v46): named Pile / Cards args (order-independent in C#). Amount = cards returned (default 1).
+        pile = str(e.get("pile", "discard")).replace("\\", "\\\\").replace('"', '\\"')
+        cards = str(e.get("cards", "random")).replace("\\", "\\\\").replace('"', '\\"')
+        lit = f'new EffectSpec("retrieve_card", {e.get("amount", 1)}, Pile: "{pile}", Cards: "{cards}")'
+    elif op == "add_status_card":
+        # Phase AP (v46): named StatusCard / Pile args. Amount = Status cards added (default 1).
+        kind = str(e.get("card", "wound")).replace("\\", "\\\\").replace('"', '\\"')
+        pile = str(e.get("pile", "discard")).replace("\\", "\\\\").replace('"', '\\"')
+        lit = f'new EffectSpec("add_status_card", {e.get("amount", 1)}, Pile: "{pile}", StatusCard: "{kind}")'
     else:
         amount = e.get("amount", 0)
         hits = e.get("hits", 1)
@@ -471,8 +513,16 @@ def describe(effects: list[dict], target: str) -> str:
             # Phase AN (v44): the Feed payoff via the {MaxHp} var (a real MaxHpVar). Lockstep with ForgedCards.Describe.
             parts.append("Gain {MaxHp} Max HP.")
         elif op == "discard":
-            # Phase R (gap #17): random-discard count via the {Discard} var. Lockstep with ForgedCards.Describe.
-            parts.append("Discard {Discard} random card(s).")
+            # Phase R (gap #17): random-discard count via the {Discard} var. Phase AP (v46): the chosen form reads
+            # "... card(s) of your choice." Lockstep with ForgedCards.Describe.
+            parts.append("Discard {Discard} card(s) of your choice." if str(e.get("cards", "")).lower() == "choose"
+                         else "Discard {Discard} random card(s).")
+        elif op == "retrieve_card":
+            # Phase AP (v46): literal sentence (no var). Lockstep with ForgedCards.Describe / RetrieveSentence.
+            parts.append(_retrieve_sentence(e))
+        elif op == "add_status_card":
+            # Phase AP (v46): literal sentence (no var). Lockstep with ForgedCards.Describe / StatusCardSentence.
+            parts.append(_status_card_sentence(e))
         elif op == "scry":
             # Phase AA (gap #17 R-2): top-of-draw look count via the {Scry} var. Lockstep with ForgedCards.Describe.
             parts.append("Scry {Scry}. (Look at that many cards from the top of your draw pile and discard any.)")

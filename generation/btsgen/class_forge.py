@@ -274,7 +274,9 @@ damage to all enemies, or Poison; "bleed" -> `lose_hp` fuel + `on_hp_lost` / `hp
 -> `forge` income + `scale:"forged"` payoffs, or temp_strength; "venom" -> Poison + a `target_debuff_count` \
 payoff; "tempo" -> draw + gain_energy; "devour/hunger" -> a rare `gain_max_hp` attack; "piercing" -> a damage with \
 `unblockable`; "bristle" -> temp_thorns; "discount / free spell / momentum" -> a `cost_shift` skill ("your Attacks \
-cost 1 less this turn"). Stay strictly INSIDE the vocabulary (a brief that can't be built from \
+cost 1 less this turn"); "overexertion / reckless swing / a price paid in flesh" -> an over-statted card with \
+`add_status_card` (a Wound/Dazed/Burn into your own deck); "necromancy / salvage / second wind" -> `retrieve_card` \
+(return a card from your discard or exhaust pile). Stay strictly INSIDE the vocabulary (a brief that can't be built from \
 it will be dropped) — but WITHIN it, range widely rather than conservatively.
 
 Both archetypes must be built from this vocabulary and CROSS-SYNERGIZE (cards of one get better with the \
@@ -422,7 +424,10 @@ WANT to throw away: "Whenever this card is discarded, gain 6 Block" / "…draw 2
 `{{"op":"scry","amount":3}}` lets the player look at the top N of the DRAW pile and discard any (a draw-quality \
 filter; typical N 2-5). Scry-discards ALSO trigger `on_discard`, so a scry card doubles as controllable discard \
 FUEL (choose exactly which fuel card to pitch) — put a `scry` skill in any discard/`on_discard` class, and it also \
-fits sifting/foresight concepts on its own. Card-only (no repeating-trigger scry).
+fits sifting/foresight concepts on its own. Card-only (no repeating-trigger scry). (4) v46: `discard` takes \
+`"cards":"choose"` (the player picks which cards to pitch — card-only, a payload discard stays random), and \
+`{{"op":"retrieve_card","pile":"discard"|"exhaust","cards":"choose"|"random","amount":1}}` returns a spent card to \
+your hand (Headbutt / Exhume; Status/Curse cards never come back) — the recursion half of a churn or exhaust class.
 
 CORRUPTION (`corruption` — your Skills cost 0 but Exhaust when played): reach for this when the fantasy is \
 RECKLESS TEMPO / spending yourself / a Faustian bargain — a burst of free skills at the cost of burning them. ONE \
@@ -950,8 +955,8 @@ _PRUNABLE_SECTIONS: list[tuple[str, frozenset, str | None, str, str]] = [
     ("RAMPAGE", frozenset({"grow"}), None, "rampage", "rampage (a damage `grow` per replay)"),
     ("IN-RUN UPGRADE", frozenset({"upgrade_card"}), None, "upgrade", "in-run upgrade (upgrade_card, Armaments)"),
     ("DECK-THINNING", frozenset({"purge", "purge_card"}), None, "purge", "deck-thinning (purge / purge_card)"),
-    ("DISCARD / HAND-CHURN", frozenset({"discard", "scry", "on_discard"}), None, "discard",
-     "discard / scry income + on_discard fuel cards"),
+    ("DISCARD / HAND-CHURN", frozenset({"discard", "scry", "on_discard", "retrieve_card"}), None, "discard",
+     "discard / scry income + on_discard fuel cards + retrieve_card recursion"),
     ("CORRUPTION", frozenset({"corruption"}), None, "corruption", "corruption (Skills cost 0 but Exhaust)"),
     ("METAMORPH", frozenset({"transform_card", "graft_card"}), None, "transform",
      "metamorph (transform_card / graft_card: a card that permanently becomes another)"),

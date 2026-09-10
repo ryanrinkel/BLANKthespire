@@ -25,7 +25,11 @@ import sys
 import zlib
 from pathlib import Path
 
-VOCAB_VERSION = 45  # must be <= ForgedCards.VocabVersion (45: Phase AO — CARD-TYPE-SCOPED COST MODIFIERS: card-only
+VOCAB_VERSION = 46  # must be <= ForgedCards.VocabVersion (46: Phase AP — PILE MANIPULATION AND STATUS CARDS: `discard`
+                    # gains `cards: random|choose` (choose is card-only); card-only `retrieve_card {pile discard|exhaust,
+                    # cards random|choose, amount? 1..2}` (return pile cards to hand) and card-only `add_status_card
+                    # {card dazed|wound|burn, pile hand|discard|draw, amount? 1..3}` (the self-drawback Status cards).
+                    # 45: Phase AO — CARD-TYPE-SCOPED COST MODIFIERS: card-only
                     # `cost_shift {card_type, amount 1..2, scope this_turn|combat, count? 1..3}` + the relic hook form.
                     # 44: Phase AN — SMALL OPS: card-only `gain_max_hp` (1..5,
                     # the Feed payoff: raise Max HP and heal that much), a `damage` flag `unblockable:true` (ignores

@@ -183,6 +183,8 @@ public abstract class DataCard : ConstructedCardModel
                 case "heal_summon":           // Phase AC (gap #2): heals the summon in OnPlay (literal, no var)
                 case "shield_summon":         // Phase AC (gap #2): shields the summon in OnPlay (literal, no var)
                 case "add_card":              // Phase Q (gap #16): generates card copies in OnPlay (no card var)
+                case "retrieve_card":         // Phase AP (v46): returns pile card(s) to hand in OnPlay (literal, no var); text via Describe
+                case "add_status_card":       // Phase AP (v46): generates Status cards in OnPlay (literal, no var); text via Describe
                 case "summon_blade":          // Phase T: retrieves the class blade to hand in OnPlay (no card var)
                 case "upgrade_card":          // Phase V/X (gap #18): upgrades hand cards in OnPlay — random/all/choose (no card var)
                 case "purge":                 // Phase W (gap #19): run-deck removal in OnPlay + pile override (no card var); text via Describe
