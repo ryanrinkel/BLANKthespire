@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "bts/mod/relic.schema.json",
   "title": "BLANK the spire — forged starter relic (mod contract, v1)",
-  "description": "Phase AJ-b (VOCAB_GAP_REMEDIATION_PLAN): the JSON shape of a forged class's starter relic, mirroring mod/BlankTheSpireCode/Engine/RelicSpec.cs + ForgedCharacters.TryParseRelic and the generation-side class_forge._validate_relic. hooks[] = triggered behaviour (trigger + effects from the closed card op subset, optional target/when/once_per_combat); modifiers[] = passive stat bonuses. At least one of the two must be non-empty. Class-conditional ops (channel_orb / summon / forge) are shape-checked here; whether the class can support them is a class-context rule (see _validate_relic with a blueprint).",
+  "description": "Phase AJ-b (VOCAB_GAP_REMEDIATION_PLAN): the JSON shape of a forged class's starter relic, mirroring mod/BlankTheSpireCode/Engine/RelicSpec.cs + ForgedCharacters.TryParseRelic and the generation-side class_forge._validate_relic. hooks[] = triggered behaviour (trigger + effects from the closed card op subset, optional target/when/once_per_combat, and — Phase AS, v48 — card_type on on_card_played + an every_n counter); modifiers[] = passive stat bonuses (v48 adds attack_base and the signed max_hp). At least one of the two must be non-empty. Class-conditional ops (channel_orb / summon / forge) are shape-checked here; whether the class can support them is a class-context rule (see _validate_relic with a blueprint).",
   "type": "object",
   "additionalProperties": true,
   "required": ["name"],
@@ -30,6 +30,8 @@
         "trigger": { "enum": ["turn_start", "turn_end", "attacked", "on_exhaust", "on_card_played", "combat_end", "on_card_drawn", "on_damage_dealt", "on_block_gained", "on_hp_lost"] },
         "target": { "enum": ["self", "enemy", "all_enemies", "attacker"], "description": "Default self. 'attacker' only on the 'attacked' trigger. damage / an enemy-debuff apply_status need an enemy target." },
         "once_per_combat": { "type": "boolean" },
+        "card_type": { "enum": ["attack", "skill", "power"], "description": "Phase AS (v48): on_card_played only — the hook fires only when the played card is this type." },
+        "every_n": { "type": "integer", "minimum": 2, "maximum": 9, "description": "Phase AS (v48): a per-combat counter — the hook fires on the Nth, 2Nth… matching occurrence (the relic icon shows the count). Not on combat_end." },
         "when": { "$ref": "#/$defs/condition" },
         "effects": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/effect" } }
       },
@@ -37,6 +39,14 @@
         {
           "if": { "properties": { "target": { "const": "attacker" } }, "required": ["target"] },
           "then": { "properties": { "trigger": { "const": "attacked" } } }
+        },
+        {
+          "if": { "required": ["card_type"] },
+          "then": { "properties": { "trigger": { "const": "on_card_played" } } }
+        },
+        {
+          "if": { "required": ["every_n"] },
+          "then": { "properties": { "trigger": { "not": { "const": "combat_end" } } } }
         },
         {
           "if": { "properties": { "trigger": { "const": "combat_end" } } },
@@ -49,16 +59,19 @@
       "additionalProperties": false,
       "required": ["op"],
       "properties": {
-        "op": { "enum": ["damage", "block", "draw", "gain_energy", "heal", "lose_hp", "apply_status", "forge", "channel_orb", "summon", "cost_shift"] },
+        "op": { "enum": ["damage", "block", "draw", "gain_energy", "heal", "lose_hp", "apply_status", "forge", "channel_orb", "summon", "cost_shift", "discard"] },
         "amount": { "type": "integer", "minimum": 1 },
         "status": { "enum": ["strength", "dexterity", "thorns", "regen", "metallicize", "artifact", "buffer", "intangible", "ritual", "blur", "temp_strength", "temp_dexterity", "barricade", "focus", "temp_thorns", "temp_focus", "vulnerable", "weak", "frail", "poison"] },
         "orb": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$", "description": "channel_orb: 'random' or a name in the class's orb_pool." },
         "summon_name": { "type": "string", "minLength": 1, "description": "summon: the minion declared in the class's summon_pool." },
         "card_type": { "enum": ["attack", "skill", "power", "all"], "description": "cost_shift (Phase AO, v45): which of your cards the discount applies to." },
         "scope": { "const": "this_turn", "description": "cost_shift (Phase AO, v45): a relic discount is THIS TURN only (a hook fires every turn; the whole-combat relic discount is the cost_reduction modifier)." },
-        "count": { "type": "integer", "minimum": 1, "maximum": 3, "description": "cost_shift (Phase AO, v45): optional — only the NEXT N matching cards you play (turn_start + count 1 = \"your first card each turn costs 1 less\")." }
+        "count": { "type": "integer", "minimum": 1, "maximum": 3, "description": "cost_shift (Phase AO, v45): optional — only the NEXT N matching cards you play (turn_start + count 1 = \"your first card each turn costs 1 less\")." },
+        "cards": { "const": "random", "description": "discard (Phase AS, v48): optional, random only — a relic never opens a picker." }
       },
       "allOf": [
+        { "if": { "properties": { "op": { "const": "discard" } } }, "then": { "required": ["amount"], "properties": { "amount": { "type": "integer", "minimum": 1, "maximum": 2 } } } },
+        { "if": { "required": ["cards"] }, "then": { "properties": { "op": { "const": "discard" } } } },
         { "if": { "properties": { "op": { "const": "apply_status" } } }, "then": { "required": ["status", "amount"] } },
         { "if": { "properties": { "op": { "const": "channel_orb" } } }, "then": { "required": ["orb"] } },
         { "if": { "properties": { "op": { "const": "summon" } } }, "then": { "required": ["summon_name"] } },
@@ -85,9 +98,13 @@
       "additionalProperties": false,
       "required": ["stat", "amount"],
       "properties": {
-        "stat": { "enum": ["max_energy", "first_attack", "cost_reduction", "start_combat_block"] },
+        "stat": { "enum": ["max_energy", "first_attack", "cost_reduction", "start_combat_block", "attack_base", "max_hp"] },
         "amount": { "type": "integer", "not": { "const": 0 } }
-      }
+      },
+      "allOf": [
+        { "if": { "properties": { "stat": { "const": "max_hp" } } }, "then": { "properties": { "amount": { "minimum": -30, "maximum": 30 } } }, "else": { "properties": { "amount": { "minimum": 1 } } } },
+        { "if": { "properties": { "stat": { "const": "attack_base" } } }, "then": { "properties": { "amount": { "maximum": 5 } } } }
+      ]
     }
   }
 }

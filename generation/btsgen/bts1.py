@@ -25,7 +25,12 @@ import sys
 import zlib
 from pathlib import Path
 
-VOCAB_VERSION = 47  # must be <= ForgedCards.VocabVersion (47: Phase AQ — STATUS-POOL HOOKS: class `status_pool` gains
+VOCAB_VERSION = 48  # must be <= ForgedCards.VocabVersion (48: Phase AS — RELIC VOCABULARY: relic hooks gain `card_type`
+                    # (on_card_played only: attack/skill/power) and an `every_n` per-combat counter (2..9); modifiers gain
+                    # `attack_base` (+N every card attack, 1..3) and the SIGNED `max_hp` (±N once on obtain — the negative
+                    # form is the price of a flat energy stat); relic drawback op `discard` (1..2 random) and a self-target
+                    # debuff now lands on the owner. No card-level change.
+                    # 47: Phase AQ — STATUS-POOL HOOKS: class `status_pool` gains
                     # `damage_over_time` (debuff, must decay — the afflicted enemy loses HP = stacks at its turn start,
                     # Poison-shaped) and `hit_count` (buff, must decay — your card attacks hit +stacks extra times); `mode:
                     # multiplicative` opens on damage_dealt / damage_taken (x(1 + 0.1*stacks), capped x2). No card-level change.

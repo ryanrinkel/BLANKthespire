@@ -1058,7 +1058,7 @@ public static class EffectRunner
     /// no-card paths of <see cref="TriggerRunner"/> (self) and <see cref="SummonRunner"/> (targeted). Called by
     /// <see cref="RelicRunner"/>.</summary>
     public static async Task RunRelicEffects(EffectSpec[] effects, PlayerChoiceContext ctx, Player player,
-                                             List<Creature> targets, int relicClass)
+                                             List<Creature> targets, int relicClass, string hookTarget = "self")
     {
         foreach (var e in effects)
         {
@@ -1076,7 +1076,13 @@ public static class EffectRunner
                         await CreatureCmd.Damage(ctx, targets, amt, ValueProp.Move, player.Creature);
                     break;
                 case "apply_status":
-                    await ApplyRelicStatus(e.Status, ctx, player, targets, amt);
+                    await ApplyRelicStatus(e.Status, ctx, player, targets, amt, hookTarget);
+                    break;
+                case "discard":
+                    // Phase AS (v48): the relic DRAWBACK op — discard N random cards from hand (the Phase R random path, so
+                    // on_discard payoffs still fire). Random only; a relic never opens a picker. No-op on an empty hand.
+                    MainFile.Logger.Info($"[AS] discard x{amt} (relic drawback).");
+                    await DiscardRandom(amt, player, ctx);
                     break;
                 case "forge":
                     // Phase M (gap #36): relic-side Forge income — the "smoldering heirloom" keystone.
@@ -1199,10 +1205,18 @@ public static class EffectRunner
     /// <summary>A self-buff lands on the player; a debuff lands on each resolved enemy target, attributed to the
     /// player. Mirrors the buff/debuff split in <see cref="SummonRunner"/>.</summary>
     private static async Task ApplyRelicStatus(string? status, PlayerChoiceContext ctx, Player player,
-                                               List<Creature> targets, int amount)
+                                               List<Creature> targets, int amount, string hookTarget = "self")
     {
         if (SelfBuffStatuses.Contains(status ?? ""))
         {
+            await RelicApply(status, ctx, player.Creature, player.Creature, amount);
+            return;
+        }
+        // Phase AS (v48): a debuff on a SELF-target hook lands on the owner (the "you gain 1 Weak" drawback). Keyed on the
+        // hook's declared target, never on an empty target list — an enemy-target debuff with no live enemy stays a no-op.
+        if (hookTarget == "self")
+        {
+            MainFile.Logger.Info($"[AS] self-debuff {status} {amount} (relic drawback).");
             await RelicApply(status, ctx, player.Creature, player.Creature, amount);
             return;
         }

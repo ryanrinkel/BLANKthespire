@@ -519,23 +519,29 @@ function relicLines(relic) {
 const RELIC_MOD_LABELS = {
   max_energy: "max energy", first_attack: "first-attack damage",
   cost_reduction: "card cost reduction", start_combat_block: "block at combat start",
+  attack_base: "damage on every attack", max_hp: "max HP", // Phase AS (v48); max_hp may be negative (the price)
 };
 function fmtMod(m) {
-  return `+${m.amount} ${RELIC_MOD_LABELS[m.stat] || m.stat}`;
+  return `${m.amount > 0 ? "+" : ""}${m.amount} ${RELIC_MOD_LABELS[m.stat] || m.stat}`;
 }
+function ordinal(n) { return n + ({ 1: "st", 2: "nd", 3: "rd" }[n % 100 > 10 && n % 100 < 14 ? 0 : n % 10] || "th"); }
 
 const RELIC_TRIGGER_LABELS = {
   turn_start: "Turn start", turn_end: "Turn end", attacked: "When attacked",
   on_exhaust: "On exhaust", on_card_played: "On card played", combat_end: "Combat end",
   on_card_drawn: "On card drawn", on_damage_dealt: "On damage dealt", on_block_gained: "On block gained",
+  on_hp_lost: "On HP lost",
 };
 function fmtHook(h) {
-  const trig = RELIC_TRIGGER_LABELS[h.trigger] || h.trigger;
+  let trig = RELIC_TRIGGER_LABELS[h.trigger] || h.trigger;
+  // Phase AS (v48): a typed on_card_played reads "On Attack played"; every_n reads "every 3rd".
+  if (h.trigger === "on_card_played" && h.card_type) trig = `On ${h.card_type[0].toUpperCase()}${h.card_type.slice(1)} played`;
+  const every = h.every_n ? ` (every ${ordinal(h.every_n)})` : "";
   const eff = (h.effects || []).map(fmtEffect).join(", ");
   const tgt = h.target && h.target !== "self" ? ` → ${h.target}` : "";
   const cond = h.when?.kind ? ` (if ${String(h.when.kind).replace(/_/g, " ")})` : "";
   const once = h.once_per_combat ? " · once/combat" : "";
-  return `${trig}${tgt}: ${eff}${cond}${once}`;
+  return `${trig}${every}${tgt}: ${eff}${cond}${once}`;
 }
 
 // --- forged class mechanics (custom orbs / statuses / summons) -----------------------------------

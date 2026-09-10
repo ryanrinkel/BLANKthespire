@@ -102,7 +102,7 @@ def test_relic_schema_matches_validate_relic() -> None:
         ({**good, "hooks": [{"trigger": "combat_end", "effects": [{"op": "block", "amount": 3}]}]}, "combat_end non-heal"),
         ({**good, "hooks": [{"trigger": "turn_end", "target": "attacker", "effects": [{"op": "damage", "amount": 2}]}]}, "attacker off attacked"),
         ({**good, "hooks": [{"trigger": "turn_start", "effects": [{"op": "scry", "amount": 2}]}]}, "op not in relic subset"),
-        ({**good, "modifiers": [{"stat": "max_hp", "amount": 5}], "hooks": []}, "unknown modifier stat"),
+        ({**good, "modifiers": [{"stat": "gold_income", "amount": 5}], "hooks": []}, "unknown modifier stat"),  # max_hp became legal in v48 (Phase AS)
         ({**good, "hooks": [{"trigger": "turn_start", "when": {"kind": "orbs_match"}, "effects": [{"op": "block", "amount": 2}]}]}, "orb condition on a relic"),
     ]
     for r, label in shapes:

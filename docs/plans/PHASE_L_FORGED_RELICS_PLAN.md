@@ -4,8 +4,10 @@ Status: **✅ LARGELY SHIPPED (L-1…L-4 + compose) — reconciled 2026-06-27.**
 L-2 generation + L-3 reactive hooks (`attacked`/`on_exhaust`/`first_attack`/`on_card_played`/`cost_reduction`) + L-4
 relic vocab batch (`combat_end`, conditions, `start_combat_block`) + compose ops (relic `channel_orb`/`summon`) are all
 committed (`b5a14b6`, `476caae`, `2362a0b`, `4cbc132`, `56d6eca`, `adb3adf`, `6835f37`) and folded into the AutoSlay
-smoke gate (`cd3f784`). STILL OPEN: a RELIC-side `on_hp_lost` hook for a true bleed keystone relic (VOCABULARY_GAPS #9 —
-cards done, relic side open). Original status preserved below.
+smoke gate (`cd3f784`). The RELIC-side `on_hp_lost` hook LANDED in Phase P (2026-07-08, vocab v21 — VOCABULARY_GAPS #9
+fully closed). The L-3 deferrals below (card-type filter on `on_card_played`, `attack_base`, per-relic counters) LANDED in
+Phase AS (2026-09-10, vocab v48 — see VOCAB_GAP_REMEDIATION_PLAN.md). Nothing in this plan is still open. Original status
+preserved below.
 
 ORIGINAL STATUS: **PROPOSED 2026-06-19, not started.** The 5th "invent your own X" axis after orbs (Phase I), statuses
 (Phase J), summons (Phase K). Motivated by the creative-harness rework: the staged front-end's stage-5 output
@@ -368,6 +370,10 @@ sentinel). So a `reduce_cost` *effect op* (first attempt) silently did nothing. 
   cost reduction (true "Padawan's Patience: first card costs 0") — the cost hook is a pure per-card query, so
   per-play gating needs extra state; flat reduction ships now. Also still deferred from L-3: `attack_base` flat
   modifier, per-relic counters/periods. Logged for the human gate.
+  **LANDED (Phase AS, vocab v48, 2026-09-10):** the card-type filter (`card_type` on `on_card_played` — `CardModel.Type`
+  IS a public accessor; the "no clean accessor" note was stale, the cost_shift power had been keying on it since v45),
+  `attack_base` (+N every card attack), and per-relic counters (`every_n`, per combat, shown on the relic icon). The
+  first-card-only cost reduction landed earlier as the v45 relic `cost_shift` hook (`turn_start` + `count:1`).
 
 ---
 

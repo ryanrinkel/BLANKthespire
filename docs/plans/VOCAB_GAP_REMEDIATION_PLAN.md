@@ -411,6 +411,52 @@ ERROR lines are BaseLib's startup pair + AutoSlay's post-run "Options NButton no
 multiplicative tag fires ~3× per attack because the game runs `Hook.ModifyDamage` for card-text previews too — idempotent, expected.
 Tag evidence: `generation/scratch/gaptest-aq/godot_AQ_tags_GAPTESTAQ{1,2}.txt`.
 
+**STATUS (2026-09-10): Phase AS EXECUTED (vocab v48 — AR is not yet built, so AS took the next number per rule 0.8)** — every item
+landed in lockstep; the verify-first item PASSED and the combat_start spike was RESOLVED without a new spelling. **(1) `card_type`
+on `on_card_played`** — verify-first PASSED: `CardModel.Type` is a public accessor (the `PHASE_L…:366` "no clean accessor" note
+was stale — `ForgedCostShiftPower` has keyed on it since v45, base and forged cards alike). `ForgedRelic.AfterCardPlayed` maps
+`cardPlay.Card.Type` → `"attack"/"skill"/"power"` into `RelicRunner.Fire(cardType:)`; a hook with `card_type` fires only on a
+match (any other trigger rejects it, both importers + the schema). **(2) `every_n`** (2..9, not on `combat_end`) — a per-combat
+counter on the relic instance (`ForgedRelic._counters`, hook-index keyed, reset in `BeforeCombatStart`): an occurrence that passes
+the trigger + card-type filter advances it, the hook fires on the Nth/2Nth… — counted BEFORE `when` (the count is "things that
+happened"; the condition is "is now a good time"). The relic icon shows the running count (`ShowCounter` / `DisplayAmount` = count
+mod N, `InvokeDisplayAmountChanged` after every fire — the BookOfFiveRings convention). **(3) `attack_base`** (1..3 generator-side,
+1..5 import-side) — rides `ModifyDamageAdditive` next to `first_attack` (a bonus delta, never consumed); priced 7.0/pt in
+`_MODIFIER_VALUE` (Vajra: 1 fits, 2 is the edge, 3 rejects). **(4) The reprice** — `max_energy` (18) and `cost_reduction` (24) stay
+above the 13×1.15 budget ALONE, but `_relic_balance_errors` now splits value into boons and DRAWBACKS: `lose_hp` (−0.75/HP),
+the new relic op `discard` (−1.5/card, 1..2, random only), a debuff on a SELF-target hook (weak/frail/vulnerable land on the
+owner — now legal in both importers; poison never), and the new SIGNED `max_hp` modifier (0.4/pt, −30..30; applied ONCE in
+`ForgedRelic.AfterObtained` via `CreatureCmd.GainMaxHp` / `LoseMaxHp(new ThrowingPlayerChoiceContext(), …)` — the
+DistinguishedCape recipe; `RunManager.FinalizeStartingRelics` calls `AfterObtained` on starter relics, verified in the decompile
+and live). Drawback credit is capped at 10, so `max_energy 1` needs `max_hp −8` (or `discard 1` / `lose_hp 2` / self `weak 1`
+per turn) and `cost_reduction 1` needs the full price (`max_hp −15` + a per-turn cost); `max_energy 1 + cost_reduction 1` can
+never fit. The reject message names the fix. A `card_type` filter narrows `on_card_played`'s 9 payouts (attack ×0.5, skill ×0.4,
+power ×0.1) and `every_n` divides the rate. **(5) combat_start spike — RESOLVED, not shipped:** `RelicModel.Owner` IS the Player
+inside `BeforeCombatStart()` (base-game Anchor uses `base.Owner.Creature` there) and the ctx-needing effects could use a
+`ThrowingPlayerChoiceContext` as the base game does in `AfterObtained` — so it is buildable, but `turn_start + once_per_combat`
+already has identical observable semantics and is documented as the ONLY spelling; a second spelling would only cost prompt budget.
+Left as is. **(6)** `DESIGN_HEURISTICS.md` relic forms gained **Counter relic** and **Boon with a price** (and the passive-modifier
+form lost the energy stats, which now exist only as a Boon with a price); `RELIC_VOCABULARY.md` gained the `card_type` / `every_n`
+sections, the `discard` row, the self-debuff sentence, the `attack_base` / `max_hp` rows and the drawback rule. Lockstep:
+`RelicSpec.cs` (CardType / EveryN), `ForgedCharacters.cs` (RelicEffectOps + discard, RelicCardTypes, Min/MaxEveryN,
+RelicModifierStats + attack_base / max_hp, bounds, self-debuff + discard rules), `RelicRunner.cs` (filter + counter, `[AS]` logs),
+`ForgedRelic.cs` (counters, AfterObtained max_hp, AfterCardPlayed type, ShowCounter/DisplayAmount, attack_base), `EffectRunner.cs`
+(relic `discard` → `DiscardRandom`; `ApplyRelicStatus(hookTarget)` self-debuff), `ForgedCards.cs` VocabVersion 48, `bts1.py` 48,
+`relic.schema.json`, `class_forge.py` (`_validate_relic` + `_RELIC_MODIFIER_RANGE` + `_relic_effect_value` / `_relic_hook_freq` +
+the capped drawback credit + one relic-prompt sentence + `_fake_relic`), `smoke_relic.py` (+ every v48 shape), `relic_validator.py`,
+`web/static/app.js` (labels, signed modifiers, "On Attack played (every 3rd)", the missing `on_hp_lost` label), PHASE_L plan
+(deferrals marked LANDED); `tests/test_phase_as.py` (130 checks), `test_phase_ajb` probe repointed (max_hp is legal now); suite 396.
+Prompt budget: the BLUEPRINT prompt is unchanged (91,949 — the relic vocab is not embedded there); the RELIC prompt grew ~3.3k
+(vocab +2,016, forms +952, one sentence) to 17,480 chars. **AutoSlay GAPTESTAS1** (`generation/scratch/gaptest-as/` — a
+"Counter Dripper" kitchen-sink relic: `max_energy +1 / max_hp −6 / attack_base +1`, every 3rd Attack → Block 3, turn_start →
+discard 1, every other turn → self Weak 1, on a Power → draw 1; the keystone gate prices it over budget on purpose, printed not
+enforced): 43 rooms, **6,799 `[AS]` tags** — `max_hp` ×1 (`Max HP 80 -> 74` at run start), typed counter ×113 fires / ×246 waits
+(3-6-9…, reset to 1 each combat, Skills never advance it), turn-start every_n 2 ×69 fires / ×80 waits, Power-only filter ×60,
+discard ×149, self-Weak ×69, attack_base ×6,012 (previews included) · 0 mod-attributable exception frames (the 3 ERROR lines are
+BaseLib's startup pair + the dependency-version notice). Verdict "HANG — wall-clock timeout" = the Phase-AO harness limit (the
+log was still mid-combat at 600 s, two 5 s watchdog blips over the run), not a mod hang. Tag evidence:
+`generation/scratch/gaptest-as/godot_AS_tags_GAPTESTAS1.txt`.
+
 ---
 
 ## 0. Ground rules

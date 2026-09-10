@@ -458,7 +458,12 @@ public static class ForgedCharacters
     private static readonly HashSet<string> RelicEffectOps =
         ["damage", "block", "draw", "gain_energy", "heal", "lose_hp", "apply_status", "channel_orb", "summon",
          "forge", // Phase M (gap #36): relic-side Forge income (the "smoldering heirloom" keystone)
-         "cost_shift"]; // Phase AO (v45): a this-turn card-type discount ("at turn start, your first card costs 1 less")
+         "cost_shift", // Phase AO (v45): a this-turn card-type discount ("at turn start, your first card costs 1 less")
+         "discard"]; // Phase AS (v48): discard N random cards from hand (1..2) — a DRAWBACK op (the price of a boon)
+    /// <summary>Phase AS (v48): the <c>card_type</c> filter values an <c>on_card_played</c> hook may carry.</summary>
+    private static readonly HashSet<string> RelicCardTypes = ["attack", "skill", "power"];
+    /// <summary>Phase AS (v48): <c>every_n</c> bounds (a counter relic fires on every Nth occurrence).</summary>
+    public const int MinEveryN = 2, MaxEveryN = 9;
     /// <summary><c>attacker</c> (the creature that just hit you) is valid only on the <c>attacked</c> trigger.</summary>
     private static readonly HashSet<string> RelicTargets = ["self", "enemy", "all_enemies", "attacker"];
     /// <summary>Fire-time condition kinds valid with NO target (target_has_status / orb conditions forbidden here).
@@ -466,7 +471,8 @@ public static class ForgedCharacters
     private static readonly HashSet<string> RelicConditionKinds =
         ["hp_below_half", "no_block", "has_block", "enemy_count_ge", "turn_at_least", "hand_size_ge"];
     private static readonly HashSet<string> RelicModifierStats =
-        ["max_energy", "first_attack", "cost_reduction", "start_combat_block"];
+        ["max_energy", "first_attack", "cost_reduction", "start_combat_block",
+         "attack_base", "max_hp"]; // Phase AS (v48): +N every card attack; ±N Max HP once on obtain (negative = the drawback)
 
     /// <summary>The forged <see cref="RelicSpec"/> for class <paramref name="k"/>, or null if it has no relic.</summary>
     public static RelicSpec? RelicSpecFor(int k) => SpecForClass(k).Relic;
@@ -509,6 +515,14 @@ public static class ForgedCharacters
                 { error = $"relic modifier stat '{stat}' is not supported (v1: {string.Join("/", RelicModifierStats)})."; return false; }
                 int mamt = Int(m, "amount");
                 if (mamt == 0) { error = $"relic modifier '{stat}' needs a non-zero amount."; return false; }
+                // Phase AS (v48): max_hp is the ONLY signed modifier (a negative Max HP is the sanctioned drawback); every
+                // other stat is a bonus. Bounds keep an import from bricking a run (a -80 max_hp starter dies on floor 1).
+                if (stat != "max_hp" && mamt < 0)
+                { error = $"relic modifier '{stat}' must be positive (only max_hp may be negative)."; return false; }
+                if (stat == "max_hp" && System.Math.Abs(mamt) > 30)
+                { error = "relic modifier 'max_hp' must be within -30..30."; return false; }
+                if (stat == "attack_base" && mamt > 5)
+                { error = "relic modifier 'attack_base' must be 1..5 (it is always-on Strength)."; return false; }
                 mods.Add(new RelicModifier(stat, mamt));
             }
         }
@@ -536,6 +550,22 @@ public static class ForgedCharacters
         if (target == "attacker" && trigger != "attacked")
         { error = "relic hook target 'attacker' is only valid on the 'attacked' trigger."; return false; }
 
+        // Phase AS (v48): the card-type filter (on_card_played only) + the every_n counter (any trigger but combat_end).
+        string? cardType = null;
+        if (d.ContainsKey("card_type"))
+        {
+            cardType = Str(d, "card_type").Trim().ToLowerInvariant();
+            if (!RelicCardTypes.Contains(cardType))
+            { error = $"relic hook card_type '{cardType}' must be attack/skill/power."; return false; }
+            if (trigger != "on_card_played")
+            { error = "relic hook 'card_type' is only valid on the 'on_card_played' trigger."; return false; }
+        }
+        int everyN = d.ContainsKey("every_n") ? Int(d, "every_n") : 0;
+        if (everyN != 0 && (everyN < MinEveryN || everyN > MaxEveryN))
+        { error = $"relic hook 'every_n' must be {MinEveryN}..{MaxEveryN} (a counter relic fires on every Nth occurrence)."; return false; }
+        if (everyN != 0 && trigger == "combat_end")
+        { error = "relic hook 'every_n' is meaningless on 'combat_end' (it fires once per combat)."; return false; }
+
         var effects = new List<EffectSpec>();
         foreach (var item in d["effects"].AsGodotArray())
         {
@@ -553,7 +583,7 @@ public static class ForgedCharacters
         if (d.ContainsKey("when") && d["when"].VariantType == Godot.Variant.Type.Dictionary)
             if (!TryParseRelicCondition(d["when"].AsGodotDictionary(), out when, out error)) return false;
 
-        hook = new RelicHook(trigger, effects.ToArray(), when, target, Bool(d, "once_per_combat", false));
+        hook = new RelicHook(trigger, effects.ToArray(), when, target, Bool(d, "once_per_combat", false), cardType, everyN);
         error = "";
         return true;
     }
@@ -574,8 +604,17 @@ public static class ForgedCharacters
             bool isBuff = EffectRunner.SelfBuffStatuses.Contains(status);
             bool isDebuff = SummonEnemyStatuses.Contains(status);
             if (!isBuff && !isDebuff) { error = $"relic apply_status: unsupported status '{status}'."; return false; }
-            if (isDebuff && hookTarget == "self")
-            { error = $"relic apply_status debuff '{status}' needs an enemy target (set the hook 'target' to enemy/all_enemies)."; return false; }
+            // Phase AS (v48): a debuff on a SELF-target hook is now legal — it lands on YOU (the "you gain 1 Weak" price of a
+            // boon). poison on yourself is not (no self-poison fantasy; it would also fight the DoT status path).
+            if (isDebuff && hookTarget == "self" && status == "poison")
+            { error = "relic apply_status 'poison' needs an enemy target (a relic never poisons its owner)."; return false; }
+        }
+        else if (op == "discard")
+        {
+            // Phase AS (v48): a random hand discard (the drawback op). 1..2, random only (a relic never opens a picker).
+            if (amount < 1 || amount > 2) { error = "relic 'discard' amount must be 1..2."; return false; }
+            string cards = d.ContainsKey("cards") ? Str(d, "cards").Trim().ToLowerInvariant() : "random";
+            if (cards != "random") { error = "relic 'discard' must be random ('cards':'choose' is card-only)."; return false; }
         }
         else if (op == "channel_orb")
         {

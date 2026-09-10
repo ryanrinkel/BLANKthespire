@@ -31,7 +31,7 @@ One single emoji that best pictures the relic (its object/theme, not its mechani
 into the in-game relic icon. Prefer a concrete THING (🗡️ 🛡️ 🕯️ 💀 🧪 ⚙️ 🔮 🌩️) over an abstract symbol.
 
 ## `hooks[]` — triggered behaviour
-Each hook: `{ trigger, effects, target?, when?, once_per_combat? }`.
+Each hook: `{ trigger, effects, target?, when?, once_per_combat?, card_type?, every_n? }`.
 
 ### Triggers (closed set — v1)
 | `trigger`     | fires | the effects get |
@@ -68,6 +68,7 @@ Each hook: `{ trigger, effects, target?, when?, once_per_combat? }`.
 | `channel_orb` | `orb`, `amount`     | **ORB CLASSES ONLY.** Channel `amount` orbs (`orb`: `"random"` or one of your class's orb names). A **Cracked-Core**-style relic: pair with `turn_start` + `once_per_combat` to channel at the start of combat. No-op if your class has no orbs. |
 | `summon`      | `summon_name`, `amount` (HP) | **SUMMON CLASSES ONLY.** Summon your class's ONE minion named `summon_name` onto your side at `amount` HP — or, if it is already out, raise its Max HP by `amount` (the base-game Osty Summon keyword: one passive bodyguard on board at a time, never a swarm). A **companion** relic: pair with `turn_start` + `once_per_combat` for the minion each combat. No-op unless `summon_name` is in your class's minions. |
 | `cost_shift`  | `card_type` (attack/skill/power/all), `amount` (1–2), `scope` (`this_turn` ONLY), optional `count` (1–3) | **A this-turn discount** (v45): your cards of that type cost `amount` less this turn. `turn_start` + `count:1` + `card_type:"all"` = "your first card each turn costs 1 less" (the patient-apprentice keystone); `attacked` + `card_type:"attack"` = a riposte discount. `scope` must be `this_turn` (the whole-combat relic discount is the `cost_reduction` modifier). |
+| `discard`     | `amount` (1–2)      | **A DRAWBACK** (v48): discard `amount` random cards from your hand (fuels `on_discard` cards). The classic price of a boon: `turn_start` + `discard 1`. Random only. |
 
 No multi-hit, no X-scaling, no custom-statuses, no `add_trigger` in a relic. Orbs/summons are allowed ONLY via the
 class-conditional `channel_orb` / `summon` ops above (and only if your class has them).
@@ -76,8 +77,9 @@ class-conditional `channel_orb` / `summon` ops above (and only if your class has
 - **Buffs (land on you):** `strength`, `dexterity`, `thorns`, `regen`, `metallicize`, `artifact`, `buffer`,
   `intangible`, `ritual`, `blur`, `temp_strength`, `temp_dexterity`, `temp_thorns`, `barricade` (`focus` / `temp_focus`
   are orb-only — don't use them on a relic). Numbers fire **every turn** the hook runs, so keep them **small** (1–2).
-- **Debuffs (land on the enemy target):** `vulnerable`, `weak`, `frail`, `poison`. The hook needs `target`
-  `enemy`/`all_enemies`.
+- **Debuffs:** `vulnerable`, `weak`, `frail`, `poison`. On an enemy `target` (`enemy`/`all_enemies`/`attacker`) they land
+  on the enemy. On a `self` hook (v48) `weak`/`frail`/`vulnerable` land on **YOU** — a **drawback** (`turn_start` +
+  `apply_status weak 1` = "you start each turn Weak"). `poison` always needs an enemy target.
 
 ### `target` (optional, default `self`)
 `self` (no enemy — for block/draw/heal/buff/lose_hp), `enemy` (first alive enemy), `all_enemies` (every alive
@@ -101,6 +103,16 @@ enemy), `attacker` (the enemy that just hit you — **`attacked` hooks only**). 
 ### `once_per_combat` (optional, default false)
 `true` = the hook fires at most once per combat (resets each combat). This is how you do a "combat start" effect.
 
+### `card_type` (optional — `on_card_played` hooks only; v48)
+`"card_type": "attack" | "skill" | "power"` — the hook fires only when the played card is that type ("whenever you
+play an Attack…", the Ornamental-Fan / Watering-Can pattern). Omit it to fire on every card.
+
+### `every_n` (optional — a COUNTER relic; v48)
+`"every_n": N` (2–9) — the hook fires on the Nth, 2Nth… matching occurrence, counted per combat (the relic icon shows
+the running count). `on_card_played` + `"card_type": "attack"` + `"every_n": 3` = "every 3rd Attack you play"
+(Shuriken / Nunchaku); `turn_start` + `"every_n": 2` = "every other turn". Because it fires 1/N as often, the payoff
+can be medium (Block 3–5, draw 1, a 1-stack buff). Not on `combat_end`.
+
 ## `modifiers[]` — passive stat bonuses
 | `stat`         | effect                         |
 |----------------|--------------------------------|
@@ -108,8 +120,12 @@ enemy), `attacker` (the enemy that just hit you — **`attacked` hooks only**). 
 | `first_attack` | +`amount` damage to your FIRST attack card each combat (an Akabeko-style relic). One-shot per combat. |
 | `cost_reduction` | your cards cost `amount` less **energy** in combat (floored at 0). Always-on, so keep `amount` to **1** — a Mummified-Hand / Sundial-style tempo relic. |
 | `start_combat_block` | begin each combat with `amount` Block (granted on turn 1) — an Orichalcum / Anchor-style defensive relic. |
+| `attack_base` | +`amount` damage to EVERY card attack you play (1–3; v48). Always-on Strength that never decays — a Vajra-style relic. `attack_base 1` is a whole starter relic by itself. |
+| `max_hp` | ±`amount` Max HP, granted once when the run starts (−30..30; v48). **Negative is the standard PRICE of a boon:** `max_energy 1` and `cost_reduction 1` are boss-relic power and are REJECTED alone — pair them with `max_hp` **−8 or lower** (or a per-turn cost hook: `lose_hp` 2 / `discard` 1 / a self `weak` 1) for a Coffee-Dripper-with-a-cost. Positive `max_hp` is a small Strawberry-style boon (≤ +10). |
 
 A relic may have hooks, modifiers, or both — but at least one of the two (a relic that does nothing is rejected).
+A **drawback** (a `lose_hp` / `discard` / self-`weak` hook, or a negative `max_hp`) SUBTRACTS from the relic's power
+price, so it is the only way a flat energy stat fits a starter.
 
 ## Design guidance (it's a STARTER relic)
 Forged relics are always the class's **starting relic** (`tier: "starter"`, never rolled into rewards). They are
@@ -117,5 +133,5 @@ Forged relics are always the class's **starting relic** (`tier: "starter"`, neve
 hook (or a single modifier, no hook)**. A second hook only if it is a genuine drawback/cost; never add a hook
 just to nod at the second archetype. Lead with the class's **dominant** archetype (the other is flavor in the
 name, not an extra mechanic). Write the `description` to match the mechanics exactly, in trigger order. Design
-it to reward the class's core loop. (For the menu of single-hook keystone shapes, see the RELIC FORMS section
-of the design heuristics.)
+it to reward the class's core loop. (For the menu of single-hook keystone shapes — including the v48 "Counter relic"
+and "Boon with a price" — see the RELIC FORMS section of the design heuristics.)

@@ -10,7 +10,10 @@ What the smoke relic covers (all PROVEN clean across Phase L AutoSlay runs):
   - the load-bearing RE-ENTRANCY GUARD: an on_block_gained -> block hook that re-raises its own event
     (this is the hang regression we most want the standing gate to catch)
   - a gated condition: turn_start when enemy_count_ge 2 -> Weak all enemies
-  - modifiers:  max_energy, first_attack (Akabeko), cost_reduction, start_combat_block
+  - modifiers:  max_energy, first_attack (Akabeko), cost_reduction, start_combat_block,
+                attack_base + a negative max_hp (Phase AS, v48 — proven on GAPTESTAS1)
+  - Phase AS (v48): a typed every_n counter (every 3rd Attack -> Block), a discard drawback every other turn, a
+                self-weak drawback every 3rd turn (the "boon with a price" shapes)
 
 Deliberately EXCLUDED: the compose ops (channel_orb / summon). They are class-conditional (no-op unless the
 class declares orbs / a summon pool) and would need per-class names, so they don't belong on a generic relic.
@@ -39,6 +42,8 @@ SMOKE_RELIC = {
         {"stat": "first_attack", "amount": 5},        # Akabeko: +5 to the first card attack each combat
         {"stat": "cost_reduction", "amount": 1},      # your cards cost 1 less energy in combat
         {"stat": "start_combat_block", "amount": 4},  # Orichalcum / Anchor
+        {"stat": "attack_base", "amount": 1},         # Phase AS (v48): Vajra — +1 to every card attack
+        {"stat": "max_hp", "amount": -2},             # Phase AS (v48): the signed modifier (a small price, once on obtain)
     ],
     "hooks": [
         {"trigger": "turn_start", "effects": [{"op": "block", "amount": 3}]},
@@ -60,6 +65,10 @@ SMOKE_RELIC = {
         # Gated-condition sample: only when 2+ enemies are alive, weaken them all.
         {"trigger": "turn_start", "when": {"kind": "enemy_count_ge", "value": 2}, "target": "all_enemies",
          "effects": [{"op": "apply_status", "status": "weak", "amount": 1}]},
+        # Phase AS (v48): the counter relic (typed on_card_played + every_n), the discard drawback, the self-debuff drawback.
+        {"trigger": "on_card_played", "card_type": "attack", "every_n": 3, "effects": [{"op": "block", "amount": 2}]},
+        {"trigger": "turn_start", "every_n": 2, "effects": [{"op": "discard", "amount": 1}]},
+        {"trigger": "turn_start", "every_n": 3, "effects": [{"op": "apply_status", "status": "weak", "amount": 1}]},
     ],
 }
 

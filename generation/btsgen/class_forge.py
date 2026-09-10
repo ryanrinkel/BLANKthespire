@@ -1054,12 +1054,19 @@ _RELIC_TRIGGERS = {"turn_start", "turn_end", "attacked", "on_exhaust", "on_card_
 _RELIC_EFFECT_OPS = {"damage", "block", "draw", "gain_energy", "heal", "lose_hp", "apply_status",
                      "channel_orb", "summon",  # Phase L compose: channel_orb/summon — CLASS-CONDITIONAL (gated on bp below)
                      "forge",  # Phase M (gap #36): relic-side Forge income (the smoldering-heirloom keystone)
-                     "cost_shift"}  # Phase AO (v45): a this-turn typed discount ("your first card each turn costs 1 less")
+                     "cost_shift",  # Phase AO (v45): a this-turn typed discount ("your first card each turn costs 1 less")
+                     "discard"}  # Phase AS (v48): the DRAWBACK op — discard 1..2 random cards (the price of a boon)
+_RELIC_CARD_TYPES = {"attack", "skill", "power"}  # Phase AS (v48): the on_card_played `card_type` filter
+_RELIC_EVERY_N = (2, 9)  # Phase AS (v48): `every_n` counter bounds (mirrors ForgedCharacters.MinEveryN/MaxEveryN)
 _RELIC_TARGETS = {"self", "enemy", "all_enemies", "attacker"}  # "attacker" valid only on the "attacked" trigger
 _RELIC_CONDITION_KINDS = {"hp_below_half", "no_block",
                           "has_block", "enemy_count_ge", "turn_at_least", "hand_size_ge"}  # L-4 player-state reads
 _RELIC_COND_NEEDS_VALUE = {"enemy_count_ge", "turn_at_least", "hand_size_ge"}
-_RELIC_MODIFIER_STATS = {"max_energy", "first_attack", "cost_reduction", "start_combat_block"}  # L-4 adds start_combat_block
+_RELIC_MODIFIER_STATS = {"max_energy", "first_attack", "cost_reduction", "start_combat_block",  # L-4 adds start_combat_block
+                         "attack_base", "max_hp"}  # Phase AS (v48): +N every card attack; ±N Max HP once (negative = the drawback)
+# Phase AS (v48): generator-side modifier ranges (tighter than the C# import bounds of attack_base 1..5 / |max_hp| <= 30,
+# which only stop a bricked run). attack_base 1 is a whole starter relic; max_hp -8.. is the price of a flat energy stat.
+_RELIC_MODIFIER_RANGE = {"attack_base": (1, 3), "max_hp": (-30, 30)}
 
 
 def _validate_relic(relic, bp=None) -> list[str]:
@@ -1093,6 +1100,22 @@ def _validate_relic(relic, bp=None) -> list[str]:
             errs.append(f"hook[{i}] target '{target}' must be self/enemy/all_enemies/attacker")
         if target == "attacker" and trigger != "attacked":
             errs.append(f"hook[{i}] target 'attacker' is only valid on the 'attacked' trigger")
+        # Phase AS (v48): the card-type filter (on_card_played only) + the every_n counter (any trigger but combat_end).
+        if h.get("card_type") is not None:
+            ctype = str(h.get("card_type", "")).strip().lower()
+            if ctype not in _RELIC_CARD_TYPES:
+                errs.append(f"hook[{i}] card_type '{ctype}' must be attack/skill/power")
+            if trigger != "on_card_played":
+                errs.append(f"hook[{i}] 'card_type' is only valid on the 'on_card_played' trigger")
+        if h.get("every_n") is not None:
+            try:
+                every = int(h.get("every_n"))
+            except (TypeError, ValueError):
+                every = -1
+            if not (_RELIC_EVERY_N[0] <= every <= _RELIC_EVERY_N[1]):
+                errs.append(f"hook[{i}] 'every_n' must be {_RELIC_EVERY_N[0]}..{_RELIC_EVERY_N[1]} (a counter relic fires on every Nth occurrence)")
+            if trigger == "combat_end":
+                errs.append(f"hook[{i}] 'every_n' is meaningless on 'combat_end' (it fires once per combat)")
         effs = h.get("effects") or []
         if not isinstance(effs, list) or not effs:
             errs.append(f"hook[{i}] needs a non-empty 'effects' list"); effs = []
@@ -1108,8 +1131,15 @@ def _validate_relic(relic, bp=None) -> list[str]:
                 st = str(e.get("status", "")).strip().lower()
                 if st not in _RELIC_SELF_BUFFS and st not in _RELIC_DEBUFFS:
                     errs.append(f"hook[{i}].effects[{j}] unsupported status '{st}'")
-                elif st in _RELIC_DEBUFFS and target == "self":
-                    errs.append(f"hook[{i}] debuff '{st}' needs an enemy target")
+                elif st == "poison" and target == "self":
+                    # Phase AS (v48): weak/frail/vulnerable on a self hook land on YOU (a drawback); poison never does.
+                    errs.append(f"hook[{i}] 'poison' needs an enemy target (a relic never poisons its owner)")
+            elif op == "discard":
+                # Phase AS (v48): mirrors ForgedCharacters.TryParseRelicEffect — 1..2, random only.
+                if not 1 <= int(e.get("amount", 0) or 0) <= 2:
+                    errs.append(f"hook[{i}].effects[{j}] discard 'amount' must be 1..2")
+                if e.get("cards") is not None and str(e.get("cards", "")).strip().lower() != "random":
+                    errs.append(f"hook[{i}].effects[{j}] a relic discard must be random ('cards':'choose' is card-only)")
             elif op == "channel_orb":
                 if not str(e.get("orb", "")).strip():
                     errs.append(f"hook[{i}].effects[{j}] channel_orb needs an 'orb' (\"random\" or a pool orb name)")
@@ -1148,10 +1178,21 @@ def _validate_relic(relic, bp=None) -> list[str]:
     for i, m in enumerate(mods):
         if not isinstance(m, dict):
             errs.append(f"modifier[{i}] must be an object"); continue
-        if str(m.get("stat", "")).strip().lower() not in _RELIC_MODIFIER_STATS:
+        stat = str(m.get("stat", "")).strip().lower()
+        if stat not in _RELIC_MODIFIER_STATS:
             errs.append(f"modifier[{i}] stat must be one of {sorted(_RELIC_MODIFIER_STATS)}")
-        if int(m.get("amount", 0) or 0) == 0:
+        try:
+            mamt = int(m.get("amount", 0) or 0)
+        except (TypeError, ValueError):
+            mamt = 0
+        if mamt == 0:
             errs.append(f"modifier[{i}] needs a non-zero amount")
+        elif stat in _RELIC_MODIFIER_RANGE:
+            lo, hi = _RELIC_MODIFIER_RANGE[stat]
+            if not lo <= mamt <= hi:
+                errs.append(f"modifier[{i}] '{stat}' amount must be {lo}..{hi}")
+        elif stat in _RELIC_MODIFIER_STATS and mamt < 0:
+            errs.append(f"modifier[{i}] '{stat}' must be positive (only max_hp may be negative)")
     return errs
 
 
@@ -1178,7 +1219,56 @@ _HOOK_FREQ = {"turn_start": 3.0, "turn_end": 3.0, "attacked": 2.0, "on_hp_lost":
 # on every card is stronger still — the base game never ships either without a downside, so a forged
 # starter doesn't get to either.
 _MODIFIER_VALUE = {"max_energy": 18.0, "cost_reduction": 24.0,
-                   "first_attack": 1.0, "start_combat_block": 0.8}
+                   "first_attack": 1.0, "start_combat_block": 0.8,
+                   # Phase AS (v48): attack_base is Vajra (+1 Str, a common relic) — 1 fits, 2 is the edge, 3 is out.
+                   # max_hp is SIGNED: +10 (Strawberry) ~4; -8 is the smallest price that lets max_energy 1 through.
+                   "attack_base": 7.0, "max_hp": 0.4}
+# Phase AS (v48): a relic's DRAWBACKS subtract from its price — the "boon with a price" form (Coffee Dripper with a cost).
+# Relic costs bite every fight without a choice, so they price a notch above the same op on a card (lose_hp 0.5/HP).
+_RELIC_DRAWBACK_LOSE_HP = 0.75    # per HP a relic bleeds
+_RELIC_DRAWBACK_DISCARD = 1.5     # per random card a relic discards
+_KEYSTONE_DRAWBACK_CAP = 10.0     # the most credit drawbacks can earn: enough for cost_reduction 1 (24) at a heavy price, no more
+# on_card_played fires ~9x a fight; a card_type filter sees a share of that (attack-heavy decks; Powers are rare).
+_RELIC_CARD_TYPE_SHARE = {"attack": 0.5, "skill": 0.4, "power": 0.1}
+
+
+def _relic_effect_value(e: dict, target: str, card_validator) -> float:
+    """One relic effect's contribution: negative for the drawback shapes (lose_hp, discard, a self-target debuff),
+    else the card validator's effect weight."""
+    op = str(e.get("op", "")).strip().lower()
+    try:
+        amt = float(e.get("amount", 0) or 0)
+    except (TypeError, ValueError):
+        amt = 0.0
+    if op == "lose_hp":
+        return -amt * _RELIC_DRAWBACK_LOSE_HP
+    if op == "discard":
+        return -max(1.0, amt) * _RELIC_DRAWBACK_DISCARD
+    if op == "apply_status" and target == "self":
+        st = str(e.get("status", "")).strip().lower()
+        if st in _RELIC_DEBUFFS:
+            from .validator import _STATUS_WEIGHT
+            return -amt * float(_STATUS_WEIGHT.get(st, 1.5))
+    return float(card_validator._score_effect(e))
+
+
+def _relic_hook_freq(h: dict) -> float:
+    """Payouts per fight for a hook: the trigger's base rate, collapsed by once_per_combat, narrowed by a card_type
+    filter, divided by an every_n counter (Phase AS)."""
+    trigger = str(h.get("trigger", "")).strip().lower()
+    if h.get("once_per_combat"):
+        return 1.0
+    freq = _HOOK_FREQ.get(trigger, 3.0)
+    ctype = str(h.get("card_type", "") or "").strip().lower()
+    if trigger == "on_card_played" and ctype in _RELIC_CARD_TYPE_SHARE:
+        freq *= _RELIC_CARD_TYPE_SHARE[ctype]
+    try:
+        every = int(h.get("every_n") or 0)
+    except (TypeError, ValueError):
+        every = 0
+    if every >= 2:
+        freq /= every
+    return freq
 
 
 def _card_has_flag_op(card: dict, flag: str) -> bool:
@@ -1252,21 +1342,28 @@ def _relic_balance_errors(relic: dict, made: list[dict], card_validator) -> list
     try:
         stats = _keystone_deck_stats(made)
         total = 0.0
+        drawback = 0.0  # Phase AS (v48): the negative side, credited against the price (capped)
         parts: list[tuple[float, str]] = []  # (value, human reason) — the top one names the fix
         dead: list[str] = []
         for i, h in enumerate(relic.get("hooks") or []):
             if not isinstance(h, dict):
                 continue
             trigger = str(h.get("trigger", "")).strip().lower()
-            value = sum(card_validator._score_effect(e) for e in h.get("effects") or []
+            target = str(h.get("target", "self") or "self").strip().lower()
+            value = sum(_relic_effect_value(e, target, card_validator) for e in h.get("effects") or []
                         if isinstance(e, dict))
             once = bool(h.get("once_per_combat"))
-            freq = 1.0 if once else _HOOK_FREQ.get(trigger, 3.0)
+            freq = _relic_hook_freq(h)
             when = h.get("when") if isinstance(h.get("when"), dict) else None
             uptime = _cond_uptime(when, stats, trigger)
-            total += value * freq * uptime
+            if value < 0:
+                drawback += value * freq * uptime
+            else:
+                total += value * freq * uptime
             ops = "+".join(str(e.get("op")) for e in h.get("effects") or [] if isinstance(e, dict))
-            reason = f"hook[{i}] ({trigger}{', once_per_combat' if once else ''}: {ops}) ~{value * freq * uptime:.0f}"
+            shape = trigger + (f" {h.get('card_type')}" if h.get("card_type") else "") \
+                + (f" every_n {h.get('every_n')}" if h.get("every_n") else "") + (", once_per_combat" if once else "")
+            reason = (f"{'drawback ' if value < 0 else ''}hook[{i}] ({shape}: {ops}) ~{value * freq * uptime:.0f}")
             if when and str(when.get("kind")) == "hand_size_ge" and uptime >= 0.9:
                 reason += (f" — its 'hand_size_ge {when.get('value')}' condition is ~always true for this"
                            f" deck (retain on {stats['start']}, {stats['pool']}), so it is no discount")
@@ -1296,18 +1393,25 @@ def _relic_balance_errors(relic: dict, made: list[dict], card_validator) -> list
             amt = float(amt) if isinstance(amt, (int, float)) and not isinstance(amt, bool) else 0.0
             stat = str(m.get("stat", "")).strip().lower()
             v = _MODIFIER_VALUE.get(stat, 0.0) * amt
-            total += v
-            reason = f"modifier ({stat} {int(amt)}) ~{v:.0f}"
+            if v < 0:
+                drawback += v  # Phase AS: a negative max_hp is the standard price
+            else:
+                total += v
+            reason = f"{'drawback ' if v < 0 else ''}modifier ({stat} {int(amt)}) ~{v:.0f}"
             if stat in ("max_energy", "cost_reduction"):
-                reason += " — a flat energy stat is boss-relic power, never a starter's"
+                reason += (" — a flat energy stat is boss-relic power, never a starter's on its own: pair it with a "
+                           "real price (max_hp -8 or lower, or a per-turn lose_hp 2 / discard 1 / self weak 1 hook)")
             parts.append((v, reason))
-        if total <= _KEYSTONE_BUDGET * _KEYSTONE_GRACE:
+        credit = max(drawback, -_KEYSTONE_DRAWBACK_CAP)
+        net = total + credit
+        if net <= _KEYSTONE_BUDGET * _KEYSTONE_GRACE:
             return []
         top = max(parts, key=lambda p: p[0])[1] if parts else "?"
-        return [f"keystone too strong for an always-on STARTER: power proxy ~{total:.0f} exceeds the "
+        priced = f" (drawbacks credited ~{-credit:.0f})" if credit < 0 else ""
+        return [f"keystone too strong for an always-on STARTER: power proxy ~{net:.0f}{priced} exceeds the "
                 f"~{_KEYSTONE_BUDGET:.0f} budget. Biggest piece: {top}. Weaken the payout, gate the hook "
-                "once_per_combat, slow its trigger, or use a condition this class does NOT trivially "
-                "satisfy — keep the same theme."]
+                "once_per_combat, slow its trigger (every_n), add a real drawback, or use a condition this class "
+                "does NOT trivially satisfy — keep the same theme."]
     except Exception:  # noqa: BLE001 — advisory gate: scoring bug must never block a forge
         return []
 
@@ -1352,7 +1456,9 @@ THE HARD CONSTRAINT — the engine runs a CLOSED, SMALL relic vocabulary. Compos
 
 It is a STARTER relic: ALWAYS-ON, so keep numbers MODEST and keep it SIMPLE — ONE keystone idea, a single hook \
 (or a single modifier, no hook). A second hook ONLY if it is a genuine drawback/cost; never add a hook just to \
-nod at the second archetype. Lead with the class's DOMINANT archetype; the other is flavor in the name, not an \
+nod at the second archetype. A flat energy stat (`max_energy` / `cost_reduction`) is boss-relic power and is \
+REJECTED on its own — it ships only as a Boon with a price: `max_hp` -8 or lower, or a per-turn cost hook \
+(`lose_hp` 2 / `discard` 1 / a self `weak` 1). A counter relic (`every_n`) may pay a MEDIUM payoff on the Nth hit. Lead with the class's DOMINANT archetype; the other is flavor in the name, not an \
 extra mechanic. Make it express THIS class — read the class name, description, and archetypes in the brief and \
 design the relic that names their build.
 
@@ -3247,7 +3353,8 @@ def _fake_blueprint_variant(brief: ClassBrief) -> dict:
 def _fake_relic(bp: dict) -> dict:
     """Offline keyless keystone relic — a modest always-on starter that exercises every v1 path: a once_per_combat
     buff, a per-turn block, a per-turn enemy tick, an hp_below_half conditional heal, a reactive attacked/attacker
-    retaliation + on_exhaust/on_card_played blocks + a combat_end heal (L-3/L-4), and
+    retaliation + on_exhaust/on_card_played blocks + a combat_end heal (L-3/L-4), the Phase AS (v48) shapes (a typed
+    every_n counter hook, a discard drawback, a self-weak drawback, attack_base + a negative max_hp), and
     max_energy/first_attack/cost_reduction/start_combat_block modifiers."""
     name = str(bp.get("name", "Forged"))
     slug = "".join(c if c.isalnum() else "_" for c in name.lower()).strip("_") or "forged"
@@ -3257,7 +3364,8 @@ def _fake_relic(bp: dict) -> dict:
         "description": "Offline fake keystone relic.",
         "tier": "starter",
         "modifiers": [{"stat": "max_energy", "amount": 1}, {"stat": "first_attack", "amount": 3},
-                      {"stat": "cost_reduction", "amount": 1}, {"stat": "start_combat_block", "amount": 4}],
+                      {"stat": "cost_reduction", "amount": 1}, {"stat": "start_combat_block", "amount": 4},
+                      {"stat": "attack_base", "amount": 1}, {"stat": "max_hp", "amount": -4}],  # Phase AS (v48)
         "hooks": [
             {"trigger": "turn_start", "once_per_combat": True,
              "effects": [{"op": "apply_status", "status": "strength", "amount": 1}]},
@@ -3269,6 +3377,10 @@ def _fake_relic(bp: dict) -> dict:
             {"trigger": "on_exhaust", "effects": [{"op": "block", "amount": 1}]},
             {"trigger": "on_card_played", "once_per_combat": True, "effects": [{"op": "block", "amount": 2}]},
             {"trigger": "combat_end", "effects": [{"op": "heal", "amount": 4}]},  # Burning Blood
+            # Phase AS (v48): a typed counter (every 3rd Attack), a discard drawback every other turn, a self-weak price.
+            {"trigger": "on_card_played", "card_type": "attack", "every_n": 3, "effects": [{"op": "block", "amount": 3}]},
+            {"trigger": "turn_start", "every_n": 2, "effects": [{"op": "discard", "amount": 1}]},
+            {"trigger": "turn_start", "every_n": 3, "effects": [{"op": "apply_status", "status": "weak", "amount": 1}]},
         ],
         "source": "llm",
     }

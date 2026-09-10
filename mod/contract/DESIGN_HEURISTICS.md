@@ -107,9 +107,18 @@ directly. Fits combo / tempo / exhaust / block-engine classes.
 - **Victory heal** — `combat_end` -> `heal` only. Cf. Burning Blood. Fits attrition / sacrifice / \
 lifesteal-flavored classes (and respects the HP economy rule: the heal is the payoff for surviving, not a \
 same-turn refund of a cost).
-- **Passive modifier** — NO hook; a single `modifiers[]` entry (`max_energy` / `first_attack` / \
-`cost_reduction` / `start_combat_block`). Cf. Energy Core, Akabeko. The simplest form; fits tempo / aggro \
-/ any class that just wants a clean always-on edge.
+- **Passive modifier** — NO hook; a single `modifiers[]` entry (`first_attack` / `start_combat_block` / \
+`attack_base`). Cf. Akabeko, Anchor, Vajra. The simplest form; fits tempo / aggro / any class that just wants a \
+clean always-on edge. (`max_energy` / `cost_reduction` are NOT in this form -- they are boss power and only ship \
+as a Boon with a price, below.)
+- **Counter relic** — `on_card_played` (+ `card_type` attack/skill/power) or `turn_start`, with `every_n` 2-5 -> \
+a MEDIUM payoff on the Nth occurrence (Block 3-5, draw 1, a 1-stack buff, or 3-5 damage to `enemy`). Cf. \
+Shuriken, Nunchaku, Ink Bottle. Fits attack-spam / skill-spam / tempo classes; the running count on the relic \
+icon makes the loop legible. Keep N >= 3 on `on_card_played` (it fires per card).
+- **Boon with a price** — ONE flat modifier that is boss power alone (`max_energy 1` or `cost_reduction 1`) PAID \
+FOR by a drawback: `max_hp` -8 to -15, or a per-turn cost hook (`turn_start` -> `lose_hp` 2 / `discard` 1 / a \
+self `weak` 1). Cf. Coffee Dripper, Ectoplasm, Cursed Key. The one form where a second hook is expected; the \
+price must be felt every fight and never refunded by the deck (see the HP economy rule).
 - **Bleed payoff** — `on_hp_lost` (fires on your OWN-turn, self/card-caused HP loss: `lose_hp` costs and \
 self-damage; enemy hits fire `attacked` instead) -> ONE small buff or Block (1-2). Cf. Rupture. Fits bleed / \
 sacrifice / berserker classes. Respect the HP economy rule: the payoff is Strength / Block / draw, NEVER a heal \

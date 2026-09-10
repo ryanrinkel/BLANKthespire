@@ -115,6 +115,12 @@ class RelicValidator:
                 continue
             hook_value = sum(self._cards._score_effect(e) for e in hook.get("effects", []) or [])
             freq = 1.0 if hook.get("once_per_combat") else _TRIGGER_FREQ.get(hook.get("trigger"), 1.0)
+            try:
+                every = int(hook.get("every_n") or 0)  # Phase AS (v48): a counter hook pays 1/N as often
+            except (TypeError, ValueError):
+                every = 0
+            if every >= 2:
+                freq /= every
             total += hook_value * freq
         for m in relic.get("modifiers", []) or []:
             total += self._modifier_value(m)
@@ -131,6 +137,8 @@ class RelicValidator:
             return 20.0 * amt        # an extra energy/turn is run-defining (boss-tier)
         if stat == "attack_base":
             return amt * (1.0 if m.get("when") == "first_attack" else 3.0)
+        if stat == "max_hp":
+            return 0.4 * amt         # Phase AS (v48): signed — a negative Max HP is a price, not power
         return 0.0
 
     def balance_warnings(self, relic: dict, score: float | None = None) -> list[str]:

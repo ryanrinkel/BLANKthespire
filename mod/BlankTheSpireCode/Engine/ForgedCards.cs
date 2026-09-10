@@ -42,7 +42,16 @@ public static class ForgedCards
     /// v10 (forged statuses, Phase J): + CharacterSpec.StatusPool (a class's ≤4 custom modifier-family statuses
     /// read from `status_pool`; see ForgedCharacters / ForgedStatusPower). Class cards may apply a custom status
     /// by pool name via the `apply_status_custom` op (class-only, like custom-orb channels).</summary>
-    public const int VocabVersion = 47; // 47: Phase AQ (VOCAB_GAP_REMEDIATION Wave 3) — STATUS-POOL HOOKS. Two new class
+    public const int VocabVersion = 48; // 48: Phase AS (VOCAB_GAP_REMEDIATION Wave 3) — RELIC VOCABULARY. Relic hooks gain a
+                                        //     `card_type` filter (on_card_played only: attack/skill/power — CardModel.Type) and an
+                                        //     `every_n` per-combat counter (2..9: fires on the Nth, 2Nth… matching occurrence; the
+                                        //     icon shows the running count). Modifiers gain `attack_base` (+N to every card attack,
+                                        //     1..5) and `max_hp` (±N Max HP once on obtain, |N| <= 30 — the negative form is the
+                                        //     sanctioned price of a flat energy stat). New relic drawback op `discard` (1..2 random)
+                                        //     and a debuff on a self-target hook now lands on the owner ("you gain 1 Weak"). No
+                                        //     card-level change. Engine: RelicSpec / ForgedCharacters.TryParseRelic* / RelicRunner /
+                                        //     ForgedRelic (AfterObtained max_hp, AfterCardPlayed type, ShowCounter) / EffectRunner.
+                                        // 47: Phase AQ (VOCAB_GAP_REMEDIATION Wave 3) — STATUS-POOL HOOKS. Two new class
                                         //     `status_pool` hooks: `damage_over_time` (DEBUFF, must decay — at the start of the
                                         //     afflicted enemy's turn it loses HP equal to its stacks, unblockable + unpowered like
                                         //     Poison; ForgedStatusPower.AfterSideTurnStart + CreatureCmd.Damage) and `hit_count`

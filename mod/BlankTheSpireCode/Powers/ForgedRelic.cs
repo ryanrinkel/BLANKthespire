@@ -39,6 +39,10 @@ public abstract class ForgedRelic : BlankTheSpireRelic
     /// <summary>Hook indices whose <c>once_per_combat</c> has already fired THIS combat (reset at combat start).</summary>
     private readonly HashSet<int> _firedOnce = [];
 
+    /// <summary>Phase AS (v48): per-combat occurrence counts for <c>every_n</c> hooks (hook index → count; reset at combat
+    /// start). Advanced by <see cref="RelicRunner.Fire"/>; surfaced on the relic icon via <see cref="DisplayAmount"/>.</summary>
+    private readonly Dictionary<int, int> _counters = [];
+
     /// <summary>L-3 <c>first_attack</c> (Akabeko): whether this combat's first card attack has already taken the
     /// bonus (reset at combat start).</summary>
     private bool _firstAttackUsed;
@@ -89,6 +93,8 @@ public abstract class ForgedRelic : BlankTheSpireRelic
     public override Task BeforeCombatStart()
     {
         _firedOnce.Clear();
+        _counters.Clear();
+        if (HasCounter) InvokeDisplayAmountChanged();
         _firstAttackUsed = false;
         _startBlockDone = false;
         _combatPlayer = null;
@@ -99,12 +105,51 @@ public abstract class ForgedRelic : BlankTheSpireRelic
 
     /// <summary>Fire a trigger's hooks, guarded against re-entrancy (a hook whose effect re-raises the same event).
     /// Captures the latest real ctx/player so the ctx-less hooks can reuse them.</summary>
-    private async Task FireGuarded(string trigger, PlayerChoiceContext? ctx, Player player, Creature? attacker = null)
+    private async Task FireGuarded(string trigger, PlayerChoiceContext? ctx, Player player, Creature? attacker = null,
+                                   string? cardType = null)
     {
         if (Source is null || ctx is null || !_firing.Add(trigger)) return;
         _combatCtx = ctx; _combatPlayer = player;
-        try { await RelicRunner.Fire(Source, trigger, ctx, player, _firedOnce, attacker, RelicClass); }
-        finally { _firing.Remove(trigger); }
+        try { await RelicRunner.Fire(Source, trigger, ctx, player, _firedOnce, attacker, RelicClass, cardType, _counters); }
+        finally
+        {
+            _firing.Remove(trigger);
+            if (HasCounter) InvokeDisplayAmountChanged(); // Phase AS: the icon shows the every_n running count
+        }
+    }
+
+    // --- Phase AS (v48): the counter relic's on-icon number (BookOfFiveRings / Nunchaku convention) ---------------
+    // Shown only when the spec has an every_n hook; the number is the FIRST such hook's progress toward its N
+    // (count mod N — reads "2" on a 3-counter = one more to go), reset each combat.
+    private bool HasCounter => Source?.Hooks.Any(h => h.EveryN > 1) ?? false;
+    public override bool ShowCounter => HasCounter;
+    public override int DisplayAmount
+    {
+        get
+        {
+            var hooks = Source?.Hooks;
+            if (hooks == null) return 0;
+            for (int i = 0; i < hooks.Length; i++)
+                if (hooks[i].EveryN > 1)
+                    return _counters.TryGetValue(i, out var c) ? c % hooks[i].EveryN : 0;
+            return 0;
+        }
+    }
+
+    // Phase AS (v48) modifier: max_hp — ±N Max HP granted ONCE when the relic is obtained (the DistinguishedCape recipe:
+    // GainMaxHp / LoseMaxHp in AfterObtained). A starter relic's AfterObtained runs from RunManager.FinalizeStartingRelics
+    // right after the run's players are populated, so the class starts the run at (class max_hp + N). Negative is the
+    // sanctioned price of a flat energy stat ("Coffee Dripper with a cost"); LoseMaxHp floors at 1 and never kills.
+    public override bool HasUponPickupEffect => Source?.Modifiers.Any(m => m.Stat == "max_hp") ?? false;
+    public override async Task AfterObtained()
+    {
+        await base.AfterObtained();
+        int delta = Source?.Modifiers.Where(m => m.Stat == "max_hp").Sum(m => m.Amount) ?? 0;
+        if (delta == 0 || Owner?.Creature is null) return;
+        int before = Owner.Creature.MaxHp;
+        if (delta > 0) await CreatureCmd.GainMaxHp(Owner.Creature, delta);
+        else await CreatureCmd.LoseMaxHp(new ThrowingPlayerChoiceContext(), Owner.Creature, -delta, isFromCard: false);
+        MainFile.Logger.Info($"[AS] max_hp {(delta > 0 ? "+" : "")}{delta} (relic obtained): Max HP {before} -> {Owner.Creature.MaxHp}.");
     }
 
     public override async Task AfterPlayerTurnStart(PlayerChoiceContext ctx, Player player)
@@ -157,11 +202,20 @@ public abstract class ForgedRelic : BlankTheSpireRelic
 
     // on_card_played (L-3): reactive — fires after you play a card (the Watering-Can / tempo pattern). The played
     // card's Owner is the Player. Effects never play a card, so no AfterCardPlayed recursion. (v1 fires on ANY card.)
+    // Phase AS (v48): the played card's type rides along so a `card_type` hook can filter ("whenever you play an Attack").
+    // CardModel.Type is the public accessor the cost_shift power already keys on (base and forged cards alike).
     public override async Task AfterCardPlayed(PlayerChoiceContext ctx, CardPlay cardPlay)
     {
         var player = cardPlay?.Card?.Owner;
         if (player is null) return;
-        await FireGuarded("on_card_played", ctx, player);
+        string? cardType = cardPlay!.Card.Type switch
+        {
+            CardType.Attack => "attack",
+            CardType.Skill => "skill",
+            CardType.Power => "power",
+            _ => null,
+        };
+        await FireGuarded("on_card_played", ctx, player, cardType: cardType);
     }
 
     // on_card_drawn (L-4): reactive — fires each time you draw a card. Guarded against the draw→draw loop.
@@ -223,6 +277,7 @@ public abstract class ForgedRelic : BlankTheSpireRelic
     // modifier: first_attack (Akabeko) — +N to the FIRST card attack you deal each combat. ModifyDamageAdditive
     // fires on every damage instance, so gate to a player card attack (dealer is the player, cardSource != null —
     // excludes thorns/poison/orb passives) and one-shot it via _firstAttackUsed (reset at combat start).
+    // Phase AS (v48): attack_base rides the same hook, ungated by the one-shot.
     public override decimal ModifyDamageAdditive(Creature target, decimal amount, ValueProp props, Creature dealer, CardModel cardSource)
     {
         // Return the BONUS DELTA the game ADDS to the hit (0 = unchanged), NOT the new total — the contract every
@@ -231,9 +286,14 @@ public abstract class ForgedRelic : BlankTheSpireRelic
         // Strike→12 bug). Also READ-ONLY: the engine runs this for the tooltip preview too, so the first_attack
         // one-shot must be consumed in AfterDamageGiven (on real damage), never here.
         var mods = Source?.Modifiers;
-        if (mods == null || _firstAttackUsed) return 0m;
+        if (mods == null) return 0m;
         if (dealer?.Player == null || cardSource == null) return 0m;
-        return mods.Where(m => m.Stat == "first_attack").Sum(m => m.Amount);  // 0 unless this relic grants first_attack
+        // Phase AS (v48): attack_base — +N to EVERY card attack (always-on, never consumed); first_attack stacks on top of
+        // it for the first hit of the combat. Both are additive bonus deltas (see the contract note above).
+        int bonus = mods.Where(m => m.Stat == "attack_base").Sum(m => m.Amount);
+        if (bonus > 0) MainFile.Logger.Info($"[AS] attack_base +{bonus} on '{cardSource.Id}' ({amount} base). (fires for previews too)");
+        if (!_firstAttackUsed) bonus += mods.Where(m => m.Stat == "first_attack").Sum(m => m.Amount);
+        return bonus;  // 0 unless this relic grants first_attack / attack_base
     }
 
     // modifier: cost_reduction (the L-3 cost primitive, done right) — every card's ENERGY cost is reduced by N in
