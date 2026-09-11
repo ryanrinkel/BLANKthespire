@@ -43,7 +43,7 @@ Each hook: `{ trigger, effects, target?, when?, once_per_combat?, card_type?, ev
 | `on_card_played` | each time you play a card (reactive; fires per card played — gate with `once_per_combat` for a "first card" effect) | the player + (for damage/debuffs) the enemy target (no `attacker`) |
 | `combat_end` | when you WIN a combat (a Burning Blood / Meat-on-the-Bone payoff) | **`heal` only** — combat is over, so no other effect is allowed |
 | `on_card_drawn` | each time you draw a card (reactive; fires per card drawn) | the player + (for damage/debuffs) the enemy target |
-| `on_damage_dealt` | each time you deal damage with a CARD attack (reactive; per hit) | the player + (for damage/debuffs) the enemy target |
+| `on_damage_dealt` | each time you deal damage with a CARD attack or THROUGH YOUR SUMMON (every `summon_attack` hit; reactive; per hit) | the player + (for damage/debuffs) the enemy target |
 | `on_block_gained` | each time you gain Block (reactive) | the player + (for damage/debuffs) the enemy target |
 | `on_hp_lost` | each time YOU lose HP on your OWN turn from a self/card-caused source (a `lose_hp` card, a self-damage cost — NOT enemy attacks, which fire `attacked`) | the player + (for damage/debuffs) the enemy target — the bleed/sacrifice payoff (Rupture-style) |
 

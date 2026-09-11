@@ -89,9 +89,10 @@ def _when(kind, value=None, negate=None, status=None) -> dict:
 
 def test_version() -> None:
     print("vocab v49 stamps:")
-    check(bts1.VOCAB_VERSION == 49, f"bts1.VOCAB_VERSION == 49 (got {bts1.VOCAB_VERSION})")
+    check(bts1.VOCAB_VERSION >= 49, f"bts1.VOCAB_VERSION >= 49 (got {bts1.VOCAB_VERSION})")  # Phase AT bumped it to 50
     fc = (MOD_CODE / "Engine" / "ForgedCards.cs").read_text(encoding="utf-8")
-    check("public const int VocabVersion = 49;" in fc, "ForgedCards.VocabVersion == 49")
+    m = re.search(r"public const int VocabVersion = (\d+);", fc)
+    check(m is not None and int(m.group(1)) >= 49, "ForgedCards.VocabVersion >= 49")
     check("49: Phase AR" in fc, "the v49 comment names Phase AR")
 
 

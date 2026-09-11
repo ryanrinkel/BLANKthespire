@@ -25,7 +25,10 @@ import sys
 import zlib
 from pathlib import Path
 
-VOCAB_VERSION = 49  # must be <= ForgedCards.VocabVersion (49: Phase AR — CONDITIONS INSIDE CUSTOM ORB EFFECTS: an
+VOCAB_VERSION = 50  # must be <= ForgedCards.VocabVersion (50: Phase AT — SUMMON DAMAGE COUNTS AS "YOU DEAL DAMAGE":
+                    # on_damage_dealt (card trigger + relic hook) fires on the owner's pet's summon_attack hits too, the
+                    # base game's ReaperForm / HandDrill idiom. No new token; the contract wording drops "card".
+                    # 49: Phase AR — CONDITIONS INSIDE CUSTOM ORB EFFECTS: an
                     # orb_pool custom orb's passive/evoke effect may carry a `when` gate (every card condition except
                     # the chosen-target / retained reads — the trigger rule); a custom orb gains `passive_timing`
                     # (turn_end default / turn_start = the Plasma hook) and an energy/draw passive MUST be turn_start.

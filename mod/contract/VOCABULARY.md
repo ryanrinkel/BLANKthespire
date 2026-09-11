@@ -237,7 +237,8 @@ draw/energy engine at turn start, an orb auto-channeler, etc.
   Or one of the **reactive** kinds, which fire whenever an event happens (possibly **many times a turn** — see
   `once_per_turn`): `on_hp_lost` (you lose HP on your own turn — the bleed/sacrifice payoff, à la Rupture),
   `on_exhaust` (a card of yours is Exhausted — Feel No Pain / Dark Embrace), `on_card_played` (you play a card —
-  Rage), `on_card_drawn` (you draw a card), `on_damage_dealt` (you deal card damage), `on_block_gained` (you gain
+  Rage), `on_card_drawn` (you draw a card), `on_damage_dealt` (you deal damage with a card OR through your summon —
+  every `summon_attack` hit counts, per hit), `on_block_gained` (you gain
   Block — Juggernaut), `attacked` (an enemy deals you damage — reactive Thorns), `on_blade_played` (you play your
   signature blade — the Parry pattern; **FORGE-CLASS ONLY**). E.g.
   `{ "op": "add_trigger", "trigger": "on_exhaust", "effects": [ { "op": "block", "amount": 3 } ] }` = "Whenever a card

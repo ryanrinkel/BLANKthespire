@@ -385,7 +385,9 @@ a conditions pack. Compose ops (relic `channel_orb`/`summon`) deliberately defer
 - `combat_end` — fires on `AfterCombatVictory`; **heal-only** (no ctx/live enemies at victory; validator-enforced).
   Unlocks **Burning Blood** (heal after combat) — the very relic we hardcode as the fallback.
 - `on_card_drawn` (`AfterCardDrawn`), `on_damage_dealt` (`AfterDamageGiven`; only YOUR card attacks — gated to
-  `dealer.Player != null && cardSource != null`, which also breaks the loop), `on_block_gained` (`AfterBlockGained`).
+  `dealer.Player != null && cardSource != null`, which also breaks the loop — **Phase AT (v50) WIDENED this**: a hit
+  dealt by YOUR PET (`dealer.PetOwner == Owner`, the HandDrill idiom) also fires it, so summon_attack feeds the hook),
+  `on_block_gained` (`AfterBlockGained`).
 
 **New conditions** (player-state reads in `Conditions.Eval`): `has_block`, `enemy_count_ge` (value),
 `turn_at_least` (value, via `ICombatState.RoundNumber`), `hand_size_ge` (value, via `PlayerCombatState.Hand.Cards`).

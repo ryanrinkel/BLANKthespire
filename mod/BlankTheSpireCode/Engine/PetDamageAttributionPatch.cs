@@ -21,6 +21,11 @@ namespace BlankTheSpire.BlankTheSpireCode.Engine;
 /// <c>PetOwner</c>) that the engine wouldn't itself remap, swap it for the owner's creature BEFORE the hook runs —
 /// exactly the substitution the game already does for Osty, so <c>dealer.Player</c> resolves. Inert for the player
 /// and for Osty (which the engine handles itself). Auto-discovered by the existing <c>harmony.PatchAll()</c>.
+///
+/// Phase AT (v50) note: the forged <c>on_damage_dealt</c> hooks (<see cref="Powers.ForgedTriggerPower"/> /
+/// <see cref="Powers.ForgedRelic"/>) do NOT route through this patch — they attribute pet damage the way the base
+/// game's own ReaperFormPower / HandDrill do (<c>dealer.PetOwner?.Creature == Owner</c>) inside their
+/// <c>AfterDamageGiven</c>. This patch stays scoped to the one enemy power that needs a real Player.
 /// </summary>
 [HarmonyPatch(typeof(PersonalHivePower), "AfterDamageReceived")]
 internal static class PetDamageAttributionPatch

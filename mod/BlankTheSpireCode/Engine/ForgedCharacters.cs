@@ -445,7 +445,8 @@ public static class ForgedCharacters
     /// L-3 adds the reactive <c>attacked</c> (enemy damages you; AfterDamageReceived), <c>on_exhaust</c> (one of your
     /// cards is Exhausted; AfterCardExhausted), and <c>on_card_played</c> (you play a card; AfterCardPlayed). L-4 adds
     /// <c>combat_end</c> (AfterCombatVictory — heal-only), <c>on_card_drawn</c> (AfterCardDrawn),
-    /// <c>on_damage_dealt</c> (AfterDamageGiven; your card attacks), <c>on_block_gained</c> (AfterBlockGained).
+    /// <c>on_damage_dealt</c> (AfterDamageGiven; your card attacks — and, Phase AT (v50), your pet's summon_attack hits),
+    /// <c>on_block_gained</c> (AfterBlockGained).
     /// Phase P adds <c>on_hp_lost</c> (AfterDamageReceived; your own unblocked, self/card-caused HP loss — the
     /// relic twin of the v17 card-side trigger).</summary>
     private static readonly HashSet<string> RelicTriggers =

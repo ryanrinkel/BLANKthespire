@@ -167,11 +167,22 @@ public abstract class ForgedTriggerPower : BlankTheSpirePower
 
     // on_damage_dealt: when the owner deals CARD damage (dealer is us + cardSource != null → excludes our own
     // orb/thorns/payload damage, so no loop). Per-hit, like base-game on-attack effects.
+    // Phase AT (v50): damage dealt THROUGH the owner's pet counts too — the base game's own "you deal damage" idiom
+    // (ReaperFormPower: `dealer == Owner || dealer.PetOwner?.Creature == Owner`; HandDrill likewise). A summon_attack
+    // deals with the pet as dealer and no card, so the card-only gate silently excluded every summon class. A pet
+    // hit needs no cardSource (the pet never deals thorns/orb/payload damage of ITS own — the only way it hits is a
+    // summon_attack, card- or payload-driven); a payload summon_attack re-raising this hook is stopped by _firing.
     public override async Task AfterDamageGiven(PlayerChoiceContext ctx, Creature dealer, DamageResult result,
         ValueProp props, Creature target, CardModel cardSource)
     {
         _combatCtx = ctx;
-        if (Trigger?.Trigger != "on_damage_dealt" || dealer != Owner || cardSource == null) return;
+        if (Trigger?.Trigger != "on_damage_dealt") return;
+        bool byCard = dealer == Owner && cardSource != null;
+        bool byPet = dealer != null && dealer != Owner && dealer.PetOwner?.Creature == Owner;
+        if (!byCard && !byPet) return;
+        if (byPet)
+            MainFile.Logger.Info($"[AT] on_damage_dealt: pet '{(dealer.Monster as ForgedSummon)?.Source?.Name ?? dealer.Monster?.GetType().Name ?? "pet"}' " +
+                                 $"dealt {result.TotalDamage} to '{target?.Monster?.GetType().Name ?? "target"}' — attributed to the owner.");
         await FireReactive("on_damage_dealt", ctx);
     }
 

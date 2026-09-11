@@ -228,14 +228,28 @@ public abstract class ForgedRelic : BlankTheSpireRelic
 
     // on_damage_dealt (L-4): reactive — fires when YOU deal CARD damage (dealer is the player + cardSource != null,
     // which excludes our own relic/thorns/orb damage → no loop). Per-hit, like the base game's on-attack effects.
+    // Phase AT (v50): damage dealt THROUGH your pet counts too (the HandDrill idiom: `dealer?.PetOwner == Owner`) —
+    // a summon_attack deals with the pet as dealer and no card, so summon classes could never fire this hook. The
+    // pet path does NOT consume first_attack (that bonus rides ModifyDamageAdditive, which is gated to card hits).
     public override async Task AfterDamageGiven(PlayerChoiceContext ctx, Creature dealer, DamageResult result,
                                                 ValueProp props, Creature target, CardModel cardSource)
     {
-        if (dealer?.Player is not Player player || cardSource is null) return;
-        // Consume the first_attack (Akabeko) one-shot on the FIRST real card hit — here, on actual damage, NOT in
-        // ModifyDamageAdditive (which the engine also runs for the tooltip preview). Per-hit, so a multi-hit first
-        // attack only buffs its first hit, matching the prior intent — but previews no longer burn the bonus.
-        _firstAttackUsed = true;
+        Player player;
+        if (dealer?.Player is Player cardPlayer && cardSource is not null)
+        {
+            player = cardPlayer;
+            // Consume the first_attack (Akabeko) one-shot on the FIRST real card hit — here, on actual damage, NOT in
+            // ModifyDamageAdditive (which the engine also runs for the tooltip preview). Per-hit, so a multi-hit first
+            // attack only buffs its first hit, matching the prior intent — but previews no longer burn the bonus.
+            _firstAttackUsed = true;
+        }
+        else if (dealer?.Player is null && dealer?.PetOwner is Player petOwner && petOwner == Owner)
+        {
+            player = petOwner;
+            MainFile.Logger.Info($"[AT] relic on_damage_dealt: pet '{(dealer.Monster as ForgedSummon)?.Source?.Name ?? dealer.Monster?.GetType().Name ?? "pet"}' " +
+                                 $"dealt {result.TotalDamage} — attributed to the owner.");
+        }
+        else return;
         await FireGuarded("on_damage_dealt", ctx, player);
     }
 

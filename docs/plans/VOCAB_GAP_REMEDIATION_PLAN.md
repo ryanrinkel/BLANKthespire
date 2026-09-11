@@ -492,6 +492,38 @@ never flip — harness, not mod; both kinds are card-proven since Phase H/L-4) �
 "FAIL — Watchdog timeout … Navigating map" = the documented random-bot map stall, not a mod hang. Tag evidence:
 `generation/scratch/gaptest-ar/godot_AR_tags_GAPTESTAR1.txt`.
 
+**STATUS (2026-09-10): Phase AT EXECUTED (vocab v50)** — the item landed in lockstep, by a different mechanism than the plan
+named. **(1) Pet damage fires `on_damage_dealt`** — both the card trigger (`ForgedTriggerPower.AfterDamageGiven`) and the relic
+twin (`ForgedRelic.AfterDamageGiven`) now accept a dealer whose `PetOwner` is the hook's owner. **The plan said "use
+`PetDamageAttributionPatch`"; that is NOT what shipped** — the decompile shows the base game's own idiom for exactly this
+(`ReaperFormPower`: `dealer == Owner || dealer.PetOwner?.Creature == Owner`; `HandDrill`: `dealer?.PetOwner == Owner`), and
+`Hook.AfterDamageGiven` is dispatched to EVERY listener regardless of dealer, so no Harmony patch is needed; the patch stays
+scoped to `PersonalHivePower` (its doc comment says why). The card path is unchanged (`dealer == Owner && cardSource != null`);
+the pet path needs no cardSource (a pet only ever hits via summon_attack — card- or payload-driven — never thorns/orb/payload
+damage of its own), and a payload `summon_attack` re-raising the hook is stopped by the existing `_firing` / `FireGuarded`
+re-entrancy sets. The relic's `first_attack` (Akabeko) one-shot is consumed on the CARD path only; `ModifyDamageAdditive`
+(`first_attack` / `attack_base`) stays card-gated — a pet hit is not a card attack. **(2) No new token, no describe change:**
+"Whenever you deal damage" was already the sentence, so the byte-match contract is untouched; the contract wording drops
+"card" (`VOCABULARY.md` Triggers, `card.schema.json` trigger description, `RELIC_VOCABULARY.md` row), `DESIGN_HEURISTICS.md`'s
+summon_swarm archetype-note names the pack-tactics engine (`on_damage_dealt` + summon_attack, once_per_turn), and the exemplar
+pool gains `ex_blood_scent` (summon_swarm, needs summon: on_damage_dealt → buff_summon 1, once per turn; pool 112 → 113).
+Lockstep: `ForgedTriggerPower.cs` / `ForgedRelic.cs` (`[AT]` tags), `ForgedCards.cs` VocabVersion 50, `ForgedCharacters.cs`
+hook doc, `PetDamageAttributionPatch.cs` note, `bts1.py` 50, the three contract files, `DESIGN_HEURISTICS.md`,
+`exemplar_pool.json`, PHASE_L plan (`:387` deferral marked WIDENED); `tests/test_phase_at.py` (39 checks: both stamps, the C#
+mirror incl. the card-only first_attack consume and the un-widened patch, describe unchanged, summon-context validation, the
+contract wording, the exemplar under `exemplar_validator`); `test_phase_ar.test_version` relaxed from `== 49` to `>= 49`;
+suite **398 passed**; C# build 0 errors. Prompt budget: blueprint 93,674 → 93,750 (+76: the one Triggers clause; the heuristics
+note is archetype-scoped). **AutoSlay GAPTESTAT1** (`generation/scratch/gaptest-at/` — a summon class whose only player
+attack is Strike: Sic 'Em (summon_attack 5 ×2), Thrall's Hour (turn_end summon_attack 3 ×2), Blood Scent (on_damage_dealt →
+draw 1, once/turn), Pack Hunger (on_damage_dealt → buff_summon 1, once/turn), Hound Ward (ungated on_damage_dealt → Block 1),
+plus a starter relic "Hunter's Bell" (on_damage_dealt → Block 1)): 39 rooms into Act 3, **1,408 `[AT]` tags** — card-trigger
+attribution ×1,017 (pet hits of 3–10+ on 32 distinct enemy kinds), relic attribution ×391, `[H4]` on_damage_dealt payload
+fires ×615 (fewer than the tags because two of the three powers are once_per_turn — the gate holds), feeders: card
+summon_attack ×2 ×101, payload summon_attack ×104, buff_summon ×91 · **0 mod-attributable exception frames** (the 3 ERROR lines
+are BaseLib's startup pair + the dependency-version notice). Verdict "HANG — wall-clock timeout" = the Phase-AO harness limit
+(the AutoSlay log was mid-combat on Act 3 Floor 6 at 600 s), not a mod hang. Tag evidence:
+`generation/scratch/gaptest-at/godot_AT_tags_GAPTESTAT1.txt`.
+
 ---
 
 ## 0. Ground rules

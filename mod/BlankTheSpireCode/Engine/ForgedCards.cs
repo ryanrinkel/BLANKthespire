@@ -42,7 +42,13 @@ public static class ForgedCards
     /// v10 (forged statuses, Phase J): + CharacterSpec.StatusPool (a class's ≤4 custom modifier-family statuses
     /// read from `status_pool`; see ForgedCharacters / ForgedStatusPower). Class cards may apply a custom status
     /// by pool name via the `apply_status_custom` op (class-only, like custom-orb channels).</summary>
-    public const int VocabVersion = 49; // 49: Phase AR (VOCAB_GAP_REMEDIATION Wave 3) — CONDITIONS INSIDE CUSTOM ORB EFFECTS. An
+    public const int VocabVersion = 50; // 50: Phase AT (VOCAB_GAP_REMEDIATION Wave 3) — SUMMON DAMAGE COUNTS AS "YOU DEAL DAMAGE".
+                                        //     on_damage_dealt (the add_trigger kind AND the relic hook) now fires when the owner's PET
+                                        //     deals damage (summon_attack: pet is the dealer, no card) — the base game's own idiom
+                                        //     (ReaperFormPower / HandDrill: `dealer.PetOwner?.Creature == Owner`). No new token, no
+                                        //     describe change ("Whenever you deal damage" was already the sentence); the contract
+                                        //     wording drops "card". Engine: ForgedTriggerPower / ForgedRelic AfterDamageGiven, [AT] tag.
+                                        // 49: Phase AR (VOCAB_GAP_REMEDIATION Wave 3) — CONDITIONS INSIDE CUSTOM ORB EFFECTS. An
                                         //     orb_pool custom orb's passive/evoke effect may carry a `when` gate (any Conditions.Kinds
                                         //     entry except the chosen-target / retained reads — an orb fires with no card/target, the
                                         //     trigger rule; OrbRunner evaluates it at fire time, the tooltip prints "… if …"). A custom
