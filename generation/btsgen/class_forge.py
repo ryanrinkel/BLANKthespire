@@ -677,9 +677,12 @@ up to 3 custom orb objects (see THE ORB POOL). Channel-card briefs must referenc
 statuses (see THE STATUS POOL) and have cards apply them by name (apply_status_custom). Only a class with a \
 status_pool may use apply_status_custom. Buff statuses ride self-target cards; the damage_taken debuff rides \
 enemy-target cards.
-- "summon_pool": [] unless the class's identity is fighting THROUGH its OWN minion; then declare EXACTLY ONE custom \
-summon (see THE SUMMON POOL) and drive it with summon / summon_attack / buff_summon. Only a class with a \
-summon_pool may use those ops; summon / buff_summon ride self-target skills, summon_attack rides attack cards."""
+- "summon_pool": [] unless the class's identity is fighting THROUGH its OWN minion; then declare ONE or TWO custom \
+summons (see THE SUMMON POOL) and drive them with summon / summon_attack / buff_summon. Only a class with a \
+summon_pool may use those ops; summon / buff_summon ride self-target skills, summon_attack rides attack cards.
+- HYBRID (rare — only when the theme truly needs two subsystems): ONE full engine plus ONE SPLASH pool (splash orb = \
+2-3 orb_slots + at most 1 custom orb; splash status = at most 2 statuses; splash summon = ONE passive minion). Never \
+all three; a splash owns 3-5 cards and two bridge cards touch both engines."""
 
     _POOL_ASK = (f"Give it a base-class-sized reward pool: about {TARGET_COMMONS} commons, "
                  f"{TARGET_UNCOMMONS} uncommons, and {TARGET_RARES} rares (~{TARGET_POOL} pool cards), split "
@@ -847,6 +850,14 @@ for a second signature under the card cap)."""
             "normal": ('This is a NORMAL class: "orb_slots": 0, OMIT orb_pool/status_pool/summon_pool, and do not use '
                        'their class-only ops.'),
         }.get(c.class_kind, "")
+        # Phase AW: a HYBRID candidate (two special kinds fused — catalog.candidate_kinds) declares a pool for EACH:
+        # the primary's guidance above LEADS and the splash pool gets its budget sentence (class_forge enforces it
+        # in _validate_hybrid). An orb splash beside a status/summon primary must not inherit '"orb_slots": 0'.
+        _kinds = list(getattr(c, "class_kinds", None) or [])
+        if len(_kinds) >= 2:
+            if "orb" in _kinds[1:]:
+                kind_guidance = kind_guidance.replace(' "orb_slots": 0.', '')
+            kind_guidance += _hybrid_guidance(_kinds[0], _kinds[1])
         archs = "\n".join(f'- {aid}: {_s(desc)}' for aid, desc in zip(c.archetype_ids, c.archetype_descs))
         relic = ""
         if brief.relic_intent:
@@ -933,6 +944,11 @@ for a second signature under the card cap)."""
         while len(descs) < len(ids):
             descs.append("")
         bp["archetypes"] = [{"id": ids[k], "name": ids[k], "description": descs[k]} for k in range(len(ids))]
+        # Phase AW: a hybrid candidate's fake gets the SPLASH pool grafted on (splash-sized, plus two briefs that use
+        # it) so the offline path exercises a two-pool blueprint through _validate_hybrid and the drop nets.
+        _kinds = list(getattr(c, "class_kinds", None) or [])
+        if len(_kinds) >= 2:
+            _fake_splash(bp, _kinds[1], ids[1] if len(ids) > 1 else ids[0])
         if getattr(brief, "relic_intent", None):
             bp["relic_intent"] = brief.relic_intent
         # Phase 2 (triad): the seed _fake_blueprint tagged BOOLEAN bridges (2-archetype shape); a triad bp needs
@@ -1011,6 +1027,8 @@ def _prune_archetype_sections(prompt: str, selected_ops, class_kind: str | None,
     subsystem exists and may use its ops in a brief."""
     ops = {str(o) for o in (selected_ops or [])}
     keep_keys = {str(k) for k in (nominated_sections or [])}
+    # Phase AW: `class_kind` is one kind string or a hybrid's kind list — a hybrid keeps BOTH pool sections.
+    kinds = {class_kind} if isinstance(class_kind, str) else {str(k) for k in (class_kind or ())}
     out: list[str] = []
     pruned_pitches: list[str] = []
     for para in prompt.split("\n\n"):
@@ -1020,7 +1038,7 @@ def _prune_archetype_sections(prompt: str, selected_ops, class_kind: str | None,
             out.append(para)
             continue
         _, tokens, kind, key, pitch = rule
-        if (ops & tokens) or (kind is not None and class_kind == kind) or key in keep_keys:
+        if (ops & tokens) or (kind is not None and kind in kinds) or key in keep_keys:
             out.append(para)
         else:
             if pitch and pitch not in pruned_pitches:
@@ -1619,6 +1637,80 @@ def parse_color(value) -> dict:
     return {"h": round((hue % 360.0) / 360.0, 4), "s": round(s, 4), "v": round(v, 4)}
 
 
+# --- Phase AW: hybrid class kinds (VOCAB_GAP_REMEDIATION_PLAN Wave 4; no engine change — the C# importer parses
+# orb_pool / status_pool / summon_pool independently, AutoSlay GAPTESTAW1 drove an orb+status hybrid through combat).
+# A blueprint may declare TWO pool kinds: one FULL engine plus one SPLASH-sized pool. Never all three. The splash
+# budget is the generation-side gate (the engine accepts any mix); it keeps a hybrid a seasoning, not two half-classes,
+# and keeps the prompt/HUD load bounded. Primary vs splash is read off the blueprint itself (sizes), so the same rule
+# serves the concept path (the model chose the kinds) and the dossier path (the candidate declared them).
+_SPLASH_ORB_SLOTS_MAX = 3      # a splash orb engine: 2-3 slots ...
+_SPLASH_ORB_CUSTOM_MAX = 1     # ... and at most one custom orb (base orbs are free)
+_SPLASH_STATUS_MAX = 2         # a splash status pool: at most two custom statuses
+_SPLASH_SUMMON_MAX = 1         # a splash summon pool: ONE passive minion (never the autonomous model)
+_SPLASH_BUDGET = {
+    "orb": f"2-{_SPLASH_ORB_SLOTS_MAX} orb_slots and at most {_SPLASH_ORB_CUSTOM_MAX} custom orb",
+    "status": f"at most {_SPLASH_STATUS_MAX} custom statuses",
+    "summon": "ONE passive minion (no moves/actions)",
+}
+_SPLASH_GUIDANCE = {
+    "orb": ('also set "orb_slots" to 2 or 3 and declare a SMALL "orb_pool" (base orbs and/or ONE custom orb) '
+            'that channel / evoke cards use'),
+    "status": 'also declare a SMALL "status_pool" (1-2 custom statuses) that cards apply with apply_status_custom',
+    "summon": 'also declare a "summon_pool" with ONE passive minion (no moves) that a few cards summon / summon_attack',
+}
+_KIND_PRIORITY_BP = {"orb": 3, "summon": 2, "status": 1}   # mirrors frontend.catalog._KIND_PRIORITY
+
+
+def _splash_sized(bp: dict, kind: str) -> bool:
+    """Is this blueprint's `kind` pool within the SPLASH budget? (A plain single-kind class may be splash-sized too —
+    the budget only matters when two kinds are declared.)"""
+    if kind == "orb":
+        custom = sum(1 for e in (bp.get("orb_pool") or []) if isinstance(e, dict))
+        return int(bp.get("orb_slots", 0) or 0) <= _SPLASH_ORB_SLOTS_MAX and custom <= _SPLASH_ORB_CUSTOM_MAX
+    if kind == "status":
+        return len(bp.get("status_pool") or []) <= _SPLASH_STATUS_MAX
+    if kind == "summon":
+        pool = [s for s in (bp.get("summon_pool") or []) if isinstance(s, dict)]
+        return len(pool) <= _SPLASH_SUMMON_MAX and not any(_summon_is_autonomous(s) for s in pool)
+    return False
+
+
+def _declared_kinds(bp: dict) -> list[str]:
+    """The pool kinds a blueprint DECLARES, primary first: a full-sized pool outranks a splash-sized one, ties break
+    orb > summon > status (the catalog's priority). [] for a normal class; ["orb"] for a plain orb class;
+    ["orb", "status"] for an orb engine with a status splash."""
+    kinds: list[str] = []
+    if int(bp.get("orb_slots", 0) or 0) > 0 or bp.get("orb_pool"):
+        kinds.append("orb")
+    if bp.get("status_pool"):
+        kinds.append("status")
+    if bp.get("summon_pool"):
+        kinds.append("summon")
+    return sorted(kinds, key=lambda k: (_splash_sized(bp, k), -_KIND_PRIORITY_BP[k]))
+
+
+def _validate_hybrid(bp: dict) -> list[str]:
+    """Phase AW: at most TWO pool kinds, and when there are two, at least one must be splash-sized."""
+    kinds = _declared_kinds(bp)
+    if len(kinds) <= 1:
+        return []
+    if len(kinds) >= 3:
+        return ["a class declares at most TWO pool kinds (one full engine plus one SPLASH-sized pool) — drop the "
+                "orb_pool/orb_slots, status_pool or summon_pool least central to the identity"]
+    if not any(_splash_sized(bp, k) for k in kinds):
+        a, b = kinds
+        return [f"hybrid class ({a} + {b}): one of the two pools must be SPLASH-sized — {a}: {_SPLASH_BUDGET[a]}; "
+                f"{b}: {_SPLASH_BUDGET[b]}. Keep one engine full-sized and shrink the other"]
+    return []
+
+
+def _hybrid_guidance(primary: str, splash: str) -> str:
+    """The dossier brief's HYBRID sentence (appended to the primary kind's guidance)."""
+    return (f' HYBRID: the {primary} engine LEADS; {splash} is a SPLASH — {_SPLASH_GUIDANCE[splash]}. Give the splash '
+            f'3-5 pool cards owned by its archetype, and make at least two bridge cards touch BOTH engines on one '
+            f'card. Never a third pool.')
+
+
 def _validate_blueprint(bp: dict) -> list[str]:
     errs: list[str] = []
     if not isinstance(bp, dict):
@@ -1717,6 +1809,7 @@ def _validate_blueprint(bp: dict) -> list[str]:
         errs += _validate_status_pool(bp.get("status_pool"))
     if "summon_pool" in bp and bp.get("summon_pool"):
         errs += _validate_summon_pool(bp.get("summon_pool"))
+    errs += _validate_hybrid(bp)   # Phase AW: <=2 pool kinds, one of them splash-sized
     return errs
 
 
@@ -2828,9 +2921,13 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
     made: list[dict] = []  # {plan, card} in slot order
     _v2_triples: set = set()  # exemplar id-sets already dealt in this class (never the same three twice)
     _v2_arch_ids = _archetype_ids(bp)
-    _v2_kind = ("orb" if int(bp.get("orb_slots", 0) or 0) > 0 else "status" if bp.get("status_pool")
-                else "summon" if bp.get("summon_pool") else "normal")
-    # W2.2/W2.3: the class's KIND SET (blueprint kind UNION the selected archetypes' mechanic_kind) unlocks the
+    # Phase AW: the blueprint's DECLARED kinds, primary first — [] normal, ["orb"], or a hybrid's ["orb", "status"].
+    # Everything kind-aware below takes the whole list, so a hybrid is dealt BOTH kinds' exemplars and menus.
+    _v2_kinds = _declared_kinds(bp)
+    _v2_kind = _v2_kinds if _v2_kinds else "normal"
+    if len(_v2_kinds) >= 2:
+        note(f"hybrid class: {_v2_kinds[0]} engine + {_v2_kinds[1]} splash (both pools declared)")
+    # W2.2/W2.3: the class's KIND SET (blueprint kind(s) UNION the selected archetypes' mechanic_kind) unlocks the
     # class-kind-gated coverage menus and deals the class-kind featured roulette. Dealt on BOTH the legacy and
     # the triad path: unlike the base roulette's wild slot (OFF under triad since 2026-08-15 for landing
     # off-theme subsystems), these entries are on-theme by construction — they only exist for the class's own kind.
@@ -3514,6 +3611,32 @@ def _fake_blueprint_variant(brief: ClassBrief) -> dict:
             {"role": "pool", "name_hint": "Iron Will", "type": "power", "rarity": "rare", "cost": 1, "deck_count": 0, "archetype": "bulwark", "theme": "power: at the end of your turn, gain Block (a per-turn trigger engine)"},
         ],
     }
+
+
+def _fake_splash(bp: dict, kind: str, archetype_id: str) -> None:
+    """Phase AW: graft a SPLASH-sized second pool onto a fake blueprint of another kind, plus two pool briefs owned
+    by `archetype_id` that use it (the hybrid's splash cards). No-op if the blueprint already has that pool."""
+    if kind == "orb" and not bp.get("orb_pool") and int(bp.get("orb_slots", 0) or 0) == 0:
+        bp["orb_slots"] = 2
+        bp["orb_pool"] = ["lightning"]
+        cards = [("Spark", "skill", "common", "channel a lightning orb"),
+                 ("Discharge", "skill", "uncommon", "evoke your next orb")]
+    elif kind == "status" and not bp.get("status_pool"):
+        bp["status_pool"] = [{"name": "Brittle", "emoji": "\U0001F494", "type": "debuff", "hook": "damage_taken",
+                              "decay": "none", "description": "This enemy takes bonus damage equal to its stacks."}]
+        cards = [("Lacerate", "attack", "common", "deal damage and apply brittle to the enemy"),
+                 ("Expose", "skill", "uncommon", "apply brittle to all enemies")]
+    elif kind == "summon" and not bp.get("summon_pool"):
+        bp["summon_pool"] = [{"name": "Bone Thrall", "max_hp": 12,
+                              "description": "A raised servant that guards you and strikes at your command."}]
+        cards = [("Raise Thrall", "skill", "common", "summon your Bone Thrall (12 HP)"),
+                 ("Command Strike", "attack", "uncommon", "your summon strikes for 8")]
+    else:
+        return
+    for name, ctype, rarity, theme in cards:
+        bp.setdefault("cards", []).append({"role": "pool", "name_hint": name, "type": ctype, "rarity": rarity,
+                                           "cost": 1, "deck_count": 0, "archetype": archetype_id,
+                                           "strategy": None, "theme": theme})
 
 
 def _fake_relic(bp: dict) -> dict:

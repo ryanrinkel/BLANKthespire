@@ -26,13 +26,36 @@ class Candidate:
     # for the three pairs of a triad; empty on a 2-archetype candidate. The reframed blueprint stage maps these
     # onto the top-level `pair_lines` the triad validator (_validate_pair_lines) enforces.
     pair_lines: list[dict] = field(default_factory=list)
-    class_kind: str = "normal"           # normal | orb | status | summon (drives which pool the blueprint declares)
+    class_kind: str = "normal"           # normal | orb | status | summon — the PRIMARY pool kind (which pool leads)
+    # Phase AW (hybrid class kinds): the class's ORDERED pool kinds, primary first — [] for a normal class,
+    # ["orb"] for a plain orb class, ["orb", "status"] for a HYBRID (the orb engine leads, the status pool is a
+    # splash). Derived by catalog.candidate_kinds from the fused archetypes' class_kinds (capped at
+    # catalog.MAX_CLASS_KINDS = 2); the blueprint declares a pool for EACH kind. Left empty by a caller that only
+    # sets class_kind (every pre-AW call site / test), __post_init__ fills it from class_kind.
+    class_kinds: list[str] = field(default_factory=list)
     suggested_max_hp: int = 72
     buildable: bool = True               # all referenced archetypes expressible in the live vocabulary
     gap_refs: list[str] = field(default_factory=list)
     block_reasons: list[str] = field(default_factory=list)
     spine_archetype: str | None = None   # set by the collision check when >=2 clusters map the same archetype
     relic_intent: dict | None = None     # filled by the relic-intent stage
+
+    def __post_init__(self) -> None:
+        # Phase AW: keep class_kind and class_kinds consistent whichever one the caller set.
+        self.class_kinds = [str(k) for k in (self.class_kinds or []) if k and str(k) != "normal"]
+        if not self.class_kinds and self.class_kind and self.class_kind != "normal":
+            self.class_kinds = [self.class_kind]
+        elif self.class_kinds and (not self.class_kind or self.class_kind == "normal"):
+            self.class_kind = self.class_kinds[0]
+
+    @property
+    def is_hybrid(self) -> bool:
+        """Phase AW: two pool kinds fused (a primary engine + a splash pool)."""
+        return len(self.class_kinds) >= 2
+
+    def kind_label(self) -> str:
+        """'normal', 'orb', or a hybrid's 'orb+status' (primary first)."""
+        return "+".join(self.class_kinds) or "normal"
 
     def preview(self) -> str:
         tag = "buildable-now" if self.buildable else f"needs-vocab ({'; '.join(self.block_reasons) or 'gap'})"

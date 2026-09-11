@@ -385,6 +385,12 @@ lands, it also does this).
 > bodyguard + `buff_summon` / `summon_attack`), **Swarm** (a cheap autonomous minion whose `on_summon` /
 > `on_death` payoffs are the real card), **Ethereal striker**. (Summons are per-class — never global.)
 
+## Hybrid classes (two pool kinds)
+The importer parses `orb_pool` / `status_pool` / `summon_pool` independently, so a character may declare TWO of them
+(AutoSlay-verified: an orb HUD and custom status icons coexist and both engines fire). Generation keeps a hybrid a
+SEASONING, not two half-classes: ONE full engine plus ONE **splash** pool — splash orb = 2–3 `orb_slots` + ≤1 custom
+orb; splash status = ≤2 custom statuses; splash summon = ONE passive minion — and never all three.
+
 ## Card shape
 - `id` (snake_case, unique), `name` (short human title), `type` (attack/skill/power),
   `rarity` (basic/common/uncommon/rare), `cost` (0–3 energy, or `"X"`), `target`, `effects` (1+),

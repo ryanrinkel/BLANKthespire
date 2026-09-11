@@ -98,14 +98,12 @@ def _archetype_ids(blueprint) -> list[str]:
 
 
 def _class_kind(blueprint) -> str:
+    """'normal', one kind, or — Phase AW — a hybrid's 'orb+status' (primary first, class_forge._declared_kinds order)."""
     bp = blueprint or {}
-    if int(bp.get("orb_slots", 0) or 0) > 0:
-        return "orb"
-    if bp.get("status_pool"):
-        return "status"
-    if bp.get("summon_pool"):
-        return "summon"
-    return "normal"
+    if not isinstance(bp, dict):
+        return "normal"
+    from .class_forge import _declared_kinds  # lazy: class_forge imports this module inside functions
+    return "+".join(_declared_kinds(bp)) or "normal"
 
 
 _DESIGNS_PER_ARCH = 8   # ledger-growth cap: at most this many pool-design lines per archetype per forge

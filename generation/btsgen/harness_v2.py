@@ -191,13 +191,25 @@ def _mechanic_kinds() -> dict[str, str]:
         return {}
 
 
-def _pool_kind(bp_kind: str, archetype_ids) -> set[str]:
-    """Which `needs` tags this class satisfies: the blueprint's class_kind (orb/status/summon) UNIONED with every
-    selected archetype's `mechanic_kind` (forge / balance / ...), resolved through the catalog by id — so
-    `needs:"forge"` deals to a forge_ramp class and `needs:"balance"` to a balance_gauge class (W0.9)."""
+def kind_set(kind) -> set[str]:
+    """Phase AW: a class kind given as ONE string ("orb", the pre-AW shape) or as a kind LIST/SET (["orb", "status"],
+    a hybrid's primary + splash) -> the set of kind strings. None / "normal" contribute nothing."""
+    if kind is None:
+        return set()
+    if isinstance(kind, str):
+        return {kind}
+    return {str(k) for k in kind}
+
+
+def _pool_kind(bp_kind, archetype_ids) -> set[str]:
+    """Which `needs` tags this class satisfies: the blueprint's class_kind(s) (orb/status/summon — Phase AW: a hybrid
+    passes BOTH, so `needs:"orb"` AND `needs:"status"` exemplars are dealt) UNIONED with every selected archetype's
+    `mechanic_kind` (forge / balance / ...), resolved through the catalog by id — so `needs:"forge"` deals to a
+    forge_ramp class and `needs:"balance"` to a balance_gauge class (W0.9)."""
     ok = {""}
-    if bp_kind in ("orb", "status", "summon"):
-        ok.add(bp_kind)
+    for k in kind_set(bp_kind):
+        if k in ("orb", "status", "summon"):
+            ok.add(k)
     kinds = _mechanic_kinds()
     for a in (archetype_ids or []):
         aid = str(a)
@@ -209,17 +221,19 @@ def _pool_kind(bp_kind: str, archetype_ids) -> set[str]:
     return ok
 
 
-def pool_kind(bp_kind: str, archetype_ids) -> set[str]:
-    """W2.2/W2.3: the PUBLIC name for _pool_kind — the class's kind set (blueprint kind UNION selected archetypes'
-    mechanic_kind) that coverage.py's class-kind-gated menus and featured.roll_class_kind key off."""
+def pool_kind(bp_kind, archetype_ids) -> set[str]:
+    """W2.2/W2.3: the PUBLIC name for _pool_kind — the class's kind set (blueprint kind(s) UNION selected archetypes'
+    mechanic_kind) that coverage.py's class-kind-gated menus and featured.roll_class_kind key off. `bp_kind` is a
+    kind string or, for a Phase AW hybrid, the blueprint's kind list."""
     return _pool_kind(bp_kind, archetype_ids)
 
 
-def pick_exemplars(archetype_ids, rarity: str, seed: int, *, class_kind: str = "normal", salt: str = "",
+def pick_exemplars(archetype_ids, rarity: str, seed: int, *, class_kind="normal", salt: str = "",
                    avoid_triples=None, n: int = 3) -> list[dict]:
     """Pick `n` exemplar cards for a card brief: class-appropriate (archetype match first, then rarity match),
     seeded, and — when `avoid_triples` (a set of frozenset(ids)) is given — never a set already dealt in this
-    class. Returns bare card dicts (the pool wrapper stripped)."""
+    class. Returns bare card dicts (the pool wrapper stripped). `class_kind`: a kind string or (Phase AW) a
+    hybrid's kind list — both kinds' `needs`-tagged exemplars are then in scope."""
     pool = load_exemplar_pool()
     if not pool:
         return []

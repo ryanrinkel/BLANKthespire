@@ -678,6 +678,54 @@ base game's per-monster loss counter includes them) — cosmetic bookkeeping, pr
 `generation/scratch/gaptest-av/godot_AV_tags_GAPTESTAV2.txt` (172 lines) and `..._GAPTESTAV1.txt` (72 lines).
 Slot 04 unstaged afterwards (no `04.json.smokebak` left behind).
 
+**STATUS (2026-09-11): Phase AW EXECUTED (vocab stays v52 — NO engine change)** — hybrid class kinds are LIVE in
+generation. **(1) The AutoSlay gate ran FIRST and PASSED.** `generation/scratch/gaptest-aw/build_tester.py` hand-builds
+an orb+status hybrid ("AW Gap Tester": 3 orb slots, the AR Plasma/Cinder gated orbs beside the AQ Scorch/Kindle/Ashen
+statuses, 12 cards incl. 'Ember Surge' — damage + channel + Scorch on ONE card) and stages it to slot 04; seed
+`GAPTESTAW1` imported (`class 04 <- 'AW Gap Tester' (HP 78, deck 12 entries)`), embarked and ran **37 rooms into Act 3**
+with **377 `[AR]` tags** (all six orb shapes: Plasma turn_start passive ×44, orb_count_ge OPEN ×48 / closed ×5,
+turn_at_least OPEN ×50 / closed ×24, no_block closed ×74, has_block-negated closed ×66, energy_ge OPEN ×66) and
+**1,246 `[AQ]` tags** (Kindle damage_dealt ×956, Ashen damage_taken ×239, Scorch DoT ×51) in the SAME run — the orb HUD
+and the custom status icons coexist and both engines fire, which is exactly what Phase N's O-2a could not prove.
+**0 mod-attributable exception frames** (the 27 Exception lines are BaseLib's two startup HarmonyExceptions, a
+base-game "There is no item to purchase" under AutoSlay, and the watchdog); verdict "FAIL — Watchdog timeout ...
+Navigating map" is the usual map-nav harness stall. Evidence: `generation/scratch/gaptest-aw/godot_AW_tags_GAPTESTAW1.txt`
+(1,623 lines). Slot 04 unstaged. PHASE_N's O-2a / O-2b tracker rows now record this. **(2) Generation: the class kind
+is a SET, primary first.** `frontend/catalog.candidate_kinds()` keeps every distinct special kind among the fused
+archetypes (priority orb > summon > status; `MAX_CLASS_KINDS = 2` — a triad fusing all three keeps the two boldest and
+the third archetype's class-only cards fall to the drop nets exactly as before); `Candidate.class_kinds` rides beside
+the UNCHANGED `class_kind` (the primary — every pre-AW consumer and test keeps working), with `__post_init__` keeping
+the two consistent, plus `is_hybrid` / `kind_label()` ('orb+status'). The dossier brief keeps the primary's guidance and
+appends a HYBRID sentence naming the splash budget (an orb splash beside a status/summon primary drops that guidance's
+'"orb_slots": 0' clause). `_prune_archetype_sections` / `_BlueprintContract(class_kind=...)` accept the list (BOTH pool
+sections stay in the pruned prompt); `harness_v2.kind_set` / `pool_kind` / `pick_exemplars` accept it (a hybrid is
+dealt both kinds' `needs`-tagged exemplars and both class-kind coverage/featured menus); `forge_class` reads
+`_declared_kinds(bp)` and notes "hybrid class: orb engine + status splash". **(3) The splash budget is the
+GENERATION-side gate** (the engine accepts any mix): `_validate_hybrid`, wired into `_validate_blueprint` — at most TWO
+pool kinds, and with two, at least one must be SPLASH-sized: splash orb = ≤3 `orb_slots` + ≤1 custom orb; splash
+status = ≤2 custom statuses; splash summon = ONE passive minion (never the autonomous model). Primary vs splash is read
+off the blueprint's SIZES (`_declared_kinds`: full-sized first, ties orb > summon > status), so ONE rule serves the
+concept path (the model chose the kinds) and the dossier path (the candidate declared them); a both-splash-sized tie
+only affects labels. **(4) Also:** `builder._HYBRID_WEIGHT = 3.5` (a hybrid out-scores a plain orb class in
+`_distinctiveness`), narration "orb+status hybrid class", `ledger._class_kind` → 'orb+status', the dossier FAKE path
+grafts a splash pool + two splash briefs (`_fake_splash`) so a hybrid candidate's `fake_output` validates, the
+blueprint prompt's one-line HYBRID bullet (and the pre-AV "declare EXACTLY ONE custom summon" bullet corrected to ONE
+or TWO), VOCABULARY.md "## Hybrid classes (two pool kinds)". Nothing downstream needed a change — `identity_block`,
+the three drop nets, character emission, `coverage.py`, `featured.py`, `app.js`'s pool badges and
+`character_validator.py` were already per-pool. The O-2b sketch's `splash_kind` compose field was NOT built: the kind
+set falls out of the archetypes' own class_kinds. **Tests:** `tests/test_phase_aw.py` (**96 checks**: both v52 stamps
+unchanged + the three independent C# `ContainsKey` pool branches, `candidate_kinds` / hydrate / Candidate consistency,
+the brief's hybrid sentences, pruning keeps both sections under v2, kind-list dealing, `_declared_kinds` /
+`_splash_sized` / `_validate_hybrid` accept-reject cases, the fake path for orb+status / status+orb / orb+summon,
+builder weight + narration, ledger label, drop nets, the contract wording, the rule-0.9 budget, and an OFFLINE
+END-TO-END staged forge — the archetype checkpoint picks orb_channel + status_signature, the fake compose composes a
+hybrid, and the shipped character carries `orb_slots` 3 + `orb_pool` + a one-status `status_pool`).
+`test_phase_av`'s absolute prompt pin repointed to "AV's paragraph still present" (the AU→AV precedent). Suite
+**401 passed**; all 33 standalone `tests/test_phase_*.py` modules green; `--fake --staged` forge end to end (v2 on).
+C# untouched (rebuilt only to deploy for the smoke; 0 errors). Prompt budget: blueprint 95,153 → **95,949** (+796:
+the HYBRID bullet +312, VOCABULARY's four-line section +484 — the rule-0.9 "one-line pointer" form, stretched; the
+only offset was the summon-bullet fix); VOCABULARY.md 51,576 → 52,060.
+
 ---
 
 ## 0. Ground rules

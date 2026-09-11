@@ -335,8 +335,9 @@ def _t_contract() -> None:
     bp = cf._BlueprintContract(mode="dossier", triad=True, seed=1).system_prompt()
     print(f"  (rule 0.9) blueprint prompt: {len(bp):,} chars (AU left {BP_AU:,}; delta {len(bp) - BP_AU:+,})")
     print(f"  (rule 0.9) VOCABULARY.md:    {len(vocab):,} chars")
-    check(len(bp) <= BP_AU + BP_ALLOWANCE,
-          f"rule 0.9: the AV addition stays within ~+1,500 (got {len(bp) - BP_AU:+,})")
+    # Repointed by Phase AW (the AU->AV precedent): an absolute size pin breaks on every later phase, so this now
+    # asserts AV's paragraph is still IN the prompt; the running budget pin lives in the newest phase test.
+    check("ONE AUTONOMOUS MINION" in bp, "rule 0.9: AV's autonomous-minion opt-in paragraph is still in the prompt")
 
 
 def main() -> int:

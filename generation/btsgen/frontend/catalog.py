@@ -205,6 +205,20 @@ class ArchetypeEntry:
 # class_kind precedence when a candidate fuses two archetypes: a special pool dominates a normal one.
 _KIND_PRIORITY = {"orb": 3, "summon": 2, "status": 1, "normal": 0}
 
+# Phase AW (hybrid class kinds): a candidate that fuses archetypes of DIFFERENT special kinds (orb_channel +
+# status_signature, say) is a HYBRID — its blueprint declares a pool for EACH kind, the highest-priority kind
+# LEADS and the other is a SPLASH (class_forge enforces the splash budget). Capped: one primary + ONE splash;
+# a triad fusing all three subsystems keeps the two boldest and the third archetype's class-only cards fall
+# to the drop nets exactly as before AW.
+MAX_CLASS_KINDS = 2
+
+
+def candidate_kinds(kinds) -> list[str]:
+    """Phase AW: the ORDERED special pool kinds among `kinds` (the fused archetypes' class_kinds) — deduplicated,
+    'normal' dropped, primary first by _KIND_PRIORITY, capped at MAX_CLASS_KINDS. [] for a normal class."""
+    special = {str(k) for k in (kinds or []) if k and str(k) != "normal" and str(k) in _KIND_PRIORITY}
+    return sorted(special, key=lambda k: -_KIND_PRIORITY[k])[:MAX_CLASS_KINDS]
+
 # O-3: length cap for a strategic line's optional free-text "idiom" (texture tag). Free text, never
 # enum-validated — a few words is plenty; we cap rather than reject (7B-safe).
 IDIOM_MAXLEN = 32
@@ -310,10 +324,11 @@ class ArchetypeCatalog:
         known = [self.by_id[i] for i in ids if i in self.by_id]
         unknown = [i for i in ids if i not in self.by_id]
         descs = [self.by_id[i].description if i in self.by_id else "" for i in ids]
-        # class_kind = the dominant pool kind among the (known) archetypes
-        class_kind = "normal"
-        if known:
-            class_kind = max((e.class_kind for e in known), key=lambda k: _KIND_PRIORITY.get(k, 0))
+        # class_kind = the dominant pool kind among the (known) archetypes. Phase AW: EVERY distinct special kind
+        # is kept (primary first, capped at MAX_CLASS_KINDS) — two special kinds make the candidate a HYBRID whose
+        # blueprint declares BOTH pools; class_kind stays the primary for every pre-AW consumer.
+        class_kinds = candidate_kinds([e.class_kind for e in known])
+        class_kind = class_kinds[0] if class_kinds else "normal"
         # buildable = all referenced archetypes buildable AND no unknown ids
         all_buildable = bool(known) and all(e.buildable for e in known) and not unknown
         gap_refs: list[str] = []
@@ -369,6 +384,7 @@ class ArchetypeCatalog:
             strategic_lines=lines,
             pair_lines=pair_lines,
             class_kind=class_kind,
+            class_kinds=class_kinds,
             suggested_max_hp=max(60, min(95, max_hp)),
             buildable=all_buildable,
             gap_refs=gap_refs,

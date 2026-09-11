@@ -25,9 +25,19 @@ from .stage_relic import _RelicIntentContract, validate_relic_intent
 # class_kind distinctiveness weight — a special pool (orb/summon/status) is a bolder identity than a generic
 # normal class, so the "distinctive-among-buildable" picker leans toward it (when it's buildable).
 _KIND_WEIGHT = {"orb": 3.0, "summon": 2.0, "status": 1.5, "normal": 0.0}
+# Phase AW: a HYBRID (two pool kinds fused — a primary engine + a splash pool, AutoSlay-verified GAPTESTAW1) is the
+# boldest identity of all, above a plain orb class.
+_HYBRID_WEIGHT = 3.5
+
+
+def _kind_weight(c: "Candidate") -> float:
+    """The distinctiveness weight of a candidate's class kind(s): _HYBRID_WEIGHT for a hybrid, else the table."""
+    if len(getattr(c, "class_kinds", None) or []) >= 2:
+        return _HYBRID_WEIGHT
+    return _KIND_WEIGHT.get(c.class_kind, 0.0)
 
 # Fidelity (mechanics drawn from the theme's DRIVER subject) dominates the pick. Weighted above the
-# distinctiveness ceiling (~6.0: max _KIND_WEIGHT 3.0 + uniqueness ~2.0 + spine 1.0) so a fully-faithful
+# distinctiveness ceiling (~6.5: max kind weight 3.5 (hybrid) + uniqueness ~2.0 + spine 1.0) so a fully-faithful
 # candidate always outranks an off-theme one — distinctiveness only breaks ties among the equally faithful.
 _FIDELITY_WEIGHT = 10.0
 
@@ -196,7 +206,9 @@ class BlueprintBuilder:
 
     def _narrate_choice(self, c: Candidate) -> None:
         extra = []
-        if c.class_kind and c.class_kind != "normal":
+        if len(getattr(c, "class_kinds", None) or []) >= 2:
+            extra.append(f"{c.kind_label()} hybrid class")   # Phase AW: e.g. "orb+status hybrid class"
+        elif c.class_kind and c.class_kind != "normal":
             extra.append(f"{c.class_kind} class")
         if c.spine_archetype:
             extra.append(f"spine: {c.spine_archetype}")
@@ -367,7 +379,8 @@ class BlueprintBuilder:
             _sections = _coverage.sanitize_nominations(getattr(brief, "coverage_nominations", None)).get("sections")
             bp_contract = _BlueprintContract(mode="dossier", triad=self._triad,
                                              seed=harness_v2.seed_for(concept), selected_ops=selected_ops,
-                                             class_kind=chosen.class_kind, nominated_sections=_sections)
+                                             class_kind=(chosen.class_kinds or chosen.class_kind),
+                                             nominated_sections=_sections)
         bp = self._run_stage(self._make_gen(bp_contract, max_tokens=48000),
                              dbrief, validate_blueprint_for(declared), "blueprint")
         if harness_v2.enabled():
@@ -719,4 +732,4 @@ class BlueprintBuilder:
         share = Counter(aid for cand in all_cands for aid in cand.archetype_ids)
         uniqueness = sum(1.0 / share[aid] for aid in c.archetype_ids if share.get(aid))
         spine_bonus = 1.0 if c.spine_archetype else 0.0
-        return _KIND_WEIGHT.get(c.class_kind, 0.0) + uniqueness + spine_bonus
+        return _kind_weight(c) + uniqueness + spine_bonus
