@@ -148,6 +148,9 @@ public static class SummonRunner
             body += $" On summon: {ActionsPhrase(os)}.";
         if (spec.OnDeath is { Length: > 0 } od)
             body += $" On death: {ActionsPhrase(od)}.";
+        // Phase AV (v52): the every-Nth-hit payoff.
+        if (spec.OnNthAttack is { Actions.Length: > 0 } nth)
+            body += $" Every {nth.N}th hit: {ActionsPhrase(nth.Actions)}.";
         return body;
     }
 

@@ -370,7 +370,7 @@
     {
       "id": "summon_swarm",
       "name": "Commander / minions",
-      "description": "win through a loyal minion you raise, strike through, buff, and keep alive (heal/shield it)",
+      "description": "win through a loyal minion you raise, strike through, buff, keep alive (heal/shield it) - or spend outright (sacrifice_summon) for a burst",
       "metaphors": [
         "the pack",
         "loyalty",
@@ -394,6 +394,7 @@
           "buff_summon",
           "heal_summon",
           "shield_summon",
+          "sacrifice_summon",
           "add_trigger"
         ],
         "class_kind": "summon"

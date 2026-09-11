@@ -577,6 +577,107 @@ are BaseLib's two startup HarmonyExceptions + the dependency-version notice; no 
 last line is the bot still playing cards on turn 14 of the Act 1 boss fight at 600 s. Tag evidence:
 `generation/scratch/gaptest-au/godot_AU_tags_GAPTESTAU1.txt` (956 lines). Slot 04 unstaged afterwards.
 
+**STATUS (2026-09-10): Phase AV EXECUTED (vocab v52)** — the K-3 autonomous minion engine, dormant since the
+v15 true-Osty refit, is LIVE again and the generator emits it under gates. **(1) Two C# fixes made the dormant engine
+reachable.** `EffectRunner.SummonForged` now RUNS `spec.OnSummon` (parsed since K-3, never fired) — after
+`LayoutPets`, so the pet acts from a real board position, and ONLY on the fresh-summon path (the grow path returns
+first, so re-summoning to pump Max HP never re-triggers the battle cry). `FindLivingSummon(player, summonClass,
+string? name = null)` is name-keyed: the `summon` op passes the minion's name, so a second, differently-named pool
+entry now JOINS the board instead of silently growing the first (`MaxSummons = 2` is finally reachable, matching
+`slotgen.SUMMONS_PER_CLASS`). **Decision: `name == null` stays the default and every other caller keeps it** — for
+`summon_attack` / `buff_summon` / `heal_summon` / `shield_summon` / `sacrifice_summon` and their trigger-payload
+twins, "your summon" means the FRONT-most living minion of the class, exactly as `ForgedSummonShieldPower` picks
+the front-most attackable one to meat-shield; that rule is written into the `FindLivingSummon` doc comment,
+`VOCABULARY.md` and the blueprint prompt. **(2) New spec field `on_nth_attack`** `{"n": 2-5, "actions": [...]}`:
+every Nth instance of damage the minion DEALS (per HIT — its own `attack` move actions and any `summon_attack`
+routed through it) runs the payload, then the counter resets. **Hook chosen: `ForgedSummonPower.AfterDamageGiven`**
+(`dealer == Owner && result.TotalDamage > 0`) — the same idiom `ForgedTriggerPower` uses, and it reaches the pet
+because `CombatState.IterateHookListeners` walks every ally creature's Powers (verified in the decompile); the
+payoff's own attacks are excluded by a `_firingNth` try/finally guard, so an `n:2` payoff that attacks twice cannot
+re-arm itself. `SummonRunner.Describe` appends " Every {n}th hit: {actions}." after the On summon / On death
+clauses. **(3) New CARD op `sacrifice_summon`** (flag-op, no amount/target): kills the front-most living minion
+through the base game's own death path, **`CreatureCmd.Kill(pet, force: true)`** — the decompile
+(`CreatureCmd.KillWithoutCheckingWinCondition`) shows it runs `Hook.BeforeDeath` -> `InvokeDiedEvent` ->
+`Hook.AfterDeath` BEFORE `RemoveAllPowersAfterDeath`, so `ForgedSummonPower.AfterDeath` still sees its spec and
+fires the `on_death` rattle; `force: true` so a death-prevention effect cannot refuse the sacrifice. Guards
+(C# `ForgedCards.Validate` + `validator.py`, mirrored): class-only, card-only (not in `TriggerOps`, and the schema's
+`triggerEffect` op enum excludes it), never on a BASIC, at most one per effect list (base/upgrade counted
+independently), and **never a card's ONLY effect** — the sacrifice is the price, the rest of the card is the
+payoff. No summon out = a logged no-op and the rest of the card still resolves. Describe (byte-match both sides):
+**"Sacrifice your summon."** The scorer prices it at **-4.0** (a cost, like `lose_hp`) so the payoff half can be
+generous without tripping the power ceiling. **(4) Generation gating (the part the engine does NOT enforce):**
+`_MAX_SUMMONS` 1 -> 2; `_REMOVED_SUMMON_FIELDS` and its rejection are DELETED; `_validate_summon_pool` re-validates
+`moves`/`actions` (via the re-armed `_validate_summon_actions`), `attackable`, `on_summon`, `on_death`
+(enemy-facing) and `on_nth_attack`, and adds two rules: **at most ONE pool entry may be AUTONOMOUS** (declare
+`moves`/`actions`) and **`attackable: false` (ETHEREAL) only on that autonomous one** (a passive ethereal minion
+neither attacks nor shields — it would be a blank). **Caps (numbers chosen here):** per-ACTION `attack` ≤ 8,
+`block` ≤ 6, `heal_self` ≤ 4, `apply_status` ≤ 2, `hits` ≤ 2; a new per-LIST total (one move, or one
+on_summon / on_death / on_nth_attack payload) of the same numbers, with `attack` counted as amount × hits; an
+autonomous minion's `max_hp` ≤ 20 (a passive bodyguard keeps the 100 cap). **These are GENERATION-SIDE ONLY** —
+the C# parser only bounds-checks loosely (`amount >= 1`, `hits >= 1`, `max_hp` 1..999) so hand-authored / legacy
+characters still import; the only number mirrored in C# is the `on_nth_attack` band (`SummonNthMin/Max` = 2/5).
+That is the `attack_base` split Phase AS established. **(5) Lockstep:** `SummonSpec.cs` (`OnNthAttack` + the
+`SummonNthAttack` record), `ForgedCharacters.cs` (the `on_nth_attack` parser + band, the v15 dormancy comment
+rewritten), `SummonRunner.cs` (Describe), `ForgedSummonPower.cs` (the hit counter + guard + the `[AV] on_death
+rattle` tag), `EffectRunner.cs` (`SummonForged` battle cry + name-keyed lookup, `SacrificeSummon`, the op case),
+`ForgedCards.cs` (SupportedOps / Validate / Describe / `VocabVersion` 52), `DataCard.cs` (the flag-op declares no
+card var), `bts1.py` 52, `card.schema.json` (op enum + description), `VOCABULARY.md` (an Effect-ops row + the
+rewritten "Forged summons" section: one-or-two minions, the six-op table, the AUTONOMOUS subsection with a compact
+ethereal-striker JSON example, the "disabled for now" paragraph deleted), `class_forge.py` (`_MAX_SUMMONS`,
+`_validate_summon_pool` + `_summon_is_autonomous`, the caps, `_card_uses_summons`, the rewritten SUMMON POOL
+prompt section, the summon class-kind sentence, the prunable-section registry + its ALSO-AVAILABLE one-liner),
+`validator.py` (class-only / flag-op / basic / alone / twice / payload rules + the -4.0 score),
+`harness_v2.py` (`_CLASS_ONLY_TOKENS`), `census.py` (a summon-op-mix report line), `featured.py`
+(`summon_sacrifice`), `DESIGN_HEURISTICS.md` (pricing: an autonomous minion is a power that costs a card — 4-6
+damage/Block a turn, 10-20 HP, ethereal takes the low HP / high damage end; a sacrifice payoff is >= 10 Block /
+12 damage / 2 draws + energy and wants an `on_death` rattle), `archetypes.json` (summon_swarm ops + description),
+`exemplar_pool.json` (`ex_bone_offering`: sacrifice + draw 2 + energy; pool 113 -> 114, byte-spliced CRLF),
+`web/static/app.js` (the `sacrifice_summon` card label + a `summonLines` that renders Ethereal / the move cycle /
+On summon / On death / Every Nth hit), PHASE_K3 plan status (SHELVED -> REVIVED; the per-summon `kind` token did
+NOT ship — the three archetypes are prompt/heuristics guidance, not a declared field) and PHASE_K's K-3 list
+(on_summon/on_death + Sacrifice/consume marked LANDED). **No character/class schema needed a change** —
+`mod/contract/` has no character schema; `summon_pool` shape lives in `VOCABULARY.md` + `_validate_summon_pool`.
+`coverage.py` needed none either: its repair menus are class-kind-agnostic base mechanics and `SECTION_KEYS`
+already carried `summon`. **Tests:** `tests/test_phase_av.py` (**117 checks**: both stamps, the C# mirror — the
+battle cry after LayoutPets and off the grow path, the name-keyed lookup with its null default plus every
+name-less caller, the `on_nth_attack` parser/counter/guard/describe order, sacrifice in
+SupportedOps/AmountOps-absent/TriggerOps-absent/Validate/Execute/Kill and all five `[AV]` tags — the describe
+byte-match, ten validator accept/reject cases, twelve `_validate_summon_pool` gate/cap cases, the contract wording,
+the exemplar under `exemplar_validator`, the app.js labels and the rule-0.9 budget). Repointed, not deleted:
+`test_phase_au`'s absolute prompt-size assert became "AU's caveat removal is still absent" (an absolute pin breaks
+on every later phase) and its `== 51` C# pin relaxed to `>= 51`; `test_exemplars.CLASS_ONLY_TOKENS` and
+`harness_v2._CLASS_ONLY_TOKENS` gained `sacrifice_summon` (so the new exemplar's `needs: summon` tag is justified);
+`test_featured` gained a `summon_sacrifice` sample. Suite **400 passed** (the 399 AU baseline + this module's
+pytest-collected `test_version`); all 32 standalone `tests/test_phase_*.py` modules green; C# build **0 errors**.
+Prompt budget: blueprint 93,623 -> **95,153** (+1,530, rule 0.9's "~+1,500"); VOCABULARY.md 50,196 -> 51,576
+(+1,380) — the new autonomous paragraph was paid for by tightening the repetitive SUMMON POOL prose (that
+section grew only 3,836 -> 3,995 source chars (+159) while gaining the opt-in model, the sixth op and the three
+archetype one-liners) and by dropping VOCABULARY's duplicate card-example block (the prompt carries the same
+examples one section above). **AutoSlay GAPTESTAV2** (`generation/scratch/gaptest-av/` — a summon class whose
+pool is a PASSIVE 14 HP "Bone Thrall" (with an `on_death` attack 4) beside an AUTONOMOUS ETHEREAL 6 HP "Carrion
+Hawk" (`moves` rotation attack 4 / attack 3×2, `on_summon` Weak 1, `on_death` attack 6 to all enemies,
+`on_nth_attack` n=3 -> attack 5), with cards to summon each, two `summon_attack` shapes, `buff_summon`, and the two
+sacrifice payoffs (Block 12; draw 2 + 1 energy)): **33 rooms through Act 2 to the Act 2 boss**, **172 `[AV]` tags**
+ — `on_death rattle` ×34 (Thrall ×15 + Hawk ×19), `on_summon` ×32, `second summon '<b>' joins '<a>'` ×31,
+`on_nth_attack ... (hit #3)` ×30, `sacrifice_summon` ×34 (Thrall ×15 + Hawk ×19; HP 6 up to HP 70, the grow
+path working) and `sacrifice_summon: no summon (no-op)` ×11. **The 34:34 sacrifice-to-rattle match is the proof
+that `CreatureCmd.Kill` reaches `Hook.AfterDeath` with the pet's powers still attached** (every rattle in the run
+came from a sacrifice; the ethereal Hawk can die no other way). Feeders: `[AJ] summon_attack x2` ×47 and
+`[AT] relic on_damage_dealt: pet ...` ×207 (Hawk ×153, Thrall ×54) — the Hawk's share is the move cycle +
+on_nth_attack acting on its own, since card `summon_attack`s route through the FRONT-most minion (the Thrall).
+**0 mod-attributable exception frames** (no `BlankTheSpire.` frame within 20 lines of any Exception; the ERROR
+lines are BaseLib's two startup HarmonyExceptions, the dependency-version notice, and two base-game
+"selection screen with 0 options" softlock guards from a POWER_POTION with no power cards in the deck). Verdict
+"FAIL — Rewards screen did not appear after combat" is the harness: the bot LOST to THE_INSATIABLE on Act 2
+Floor 16, so the game showed game-over and `WaitForRewardsScreenAsync` timed out — **no in-combat stall**: the
+log runs continuously through 33 rooms with pets on the board, and the earlier GAPTESTAV1 run (72 `[AV]` tags, 18
+rooms) stalled in an EVENT room on a BaseLib `DustyTome.SetupForPlayer_Patch1` NRE inside the base game's Darv
+event — also not mod-attributable, and not combat. Benign observation: the run-history stat line credits
+`MONSTER.BLANKTHESPIRE-FORGED_CLASS04_SUMMON1/2` with the player's death (our pets are `MonsterModel`s, so the
+base game's per-monster loss counter includes them) — cosmetic bookkeeping, pre-dating AV. Tag evidence:
+`generation/scratch/gaptest-av/godot_AV_tags_GAPTESTAV2.txt` (172 lines) and `..._GAPTESTAV1.txt` (72 lines).
+Slot 04 unstaged afterwards (no `04.json.smokebak` left behind).
+
 ---
 
 ## 0. Ground rules

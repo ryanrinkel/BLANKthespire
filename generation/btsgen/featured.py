@@ -240,6 +240,13 @@ FEATURED_CLASS_KIND: dict[str, list[Featured]] = {
                  '"summon_attack" (amount 3-6, optional hits 2) or "buff_summon" (amount 1) - the minion strikes or '
                  'drills every turn on its own.',
                  lambda cc: "summon_attack" in cc.payload_ops or "buff_summon" in cc.payload_ops),
+        # Phase AV (v52): spend the minion for a burst - the sacrifice is the price, the rest of the card is the payoff
+        # (and the pool's on_death rattle cashes in on top).
+        Featured("summon_sacrifice", 'a summon-class card that CONSUMES the minion for a burst payoff (op "sacrifice_summon")',
+                 'REQUIRED: add a skill (never a basic) whose FIRST effect is op "sacrifice_summon" (no amount) and '
+                 'whose remaining effects are a real payoff - Block 10-14, or draw 2 + gain_energy 1. The minion dies '
+                 'and its on_death rattle fires; re-summon it afterwards.',
+                 lambda cc: "sacrifice_summon" in cc.ops),
     ],
     "forge": [
         Featured("blade_empower_burst", 'a forge-class BURST that multiplies the signature blade this turn (op "blade_empower")',

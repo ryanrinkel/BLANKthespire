@@ -25,7 +25,14 @@ import sys
 import zlib
 from pathlib import Path
 
-VOCAB_VERSION = 51  # must be <= ForgedCards.VocabVersion (51: Phase AU — on_discard FIRES ON BASE-GAME DISCARDS:
+VOCAB_VERSION = 52  # must be <= ForgedCards.VocabVersion (52: Phase AV — THE AUTONOMOUS MINION MODEL IS BACK:
+                    # a summon_pool may declare up to TWO minions and ONE of them may be AUTONOMOUS (`moves`/`actions` -
+                    # a per-turn action cycle it runs itself at the end of your turn), optionally ETHEREAL
+                    # (`attackable`: false). `on_summon` (battle cry) is now actually RUN, `on_death` (rattle) and
+                    # the new `on_nth_attack` {"n": 2-5, "actions": [...]} fire off the minion's own hits. New
+                    # CARD op `sacrifice_summon` (flag-op, summon-class + card-only, never on a BASIC, never a
+                    # card's only effect): consumes your front-most minion so its on_death rattle fires.
+                    # 51: Phase AU — on_discard FIRES ON BASE-GAME DISCARDS:
                     # DataCard overrides the game's own AfterCardDiscarded hook, so a Reflex payload fires for ANY effect
                     # discard - this class's discard/scry ops AND base-game sources (Gambling Chip, Gambler's Brew,
                     # other-class discard cards). Turn-end hand cleanup still never fires it. No new token, no describe

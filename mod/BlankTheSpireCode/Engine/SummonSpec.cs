@@ -24,12 +24,20 @@ namespace BlankTheSpire.BlankTheSpireCode.Engine;
 /// the minion is the actor, full sub-vocab). Empty = nothing on enter.</param>
 /// <param name="OnDeath">K-3b (swarm): actions performed ONCE when this minion dies (a "death rattle"). The minion
 /// is gone, so the PLAYER deals these — restricted to enemy-facing actions (attack / debuff). Empty = nothing.</param>
+/// <param name="OnNthAttack">Phase AV (v52): an every-Nth-HIT payoff. Every <c>N</c>th instance of damage this minion
+/// DEALS (its own <c>attack</c> move actions AND the class's <c>summon_attack</c> cards/payloads routed through it —
+/// counted per HIT, not per card) runs <c>Actions</c> with the minion as the actor, then the counter resets. Null =
+/// no payoff. Driven by <see cref="Powers.ForgedSummonPower"/>'s damage hook.</param>
 public sealed record SummonSpec(
     string Name, string Description, int MaxHp, SummonMove[] Moves, bool Attackable = true,
-    SummonAction[]? OnSummon = null, SummonAction[]? OnDeath = null);
+    SummonAction[]? OnSummon = null, SummonAction[]? OnDeath = null, SummonNthAttack? OnNthAttack = null);
 
 /// <summary>One entry in a summon's move cycle: the ordered actions it performs on a single turn.</summary>
 public sealed record SummonMove(SummonAction[] Actions);
+
+/// <summary>Phase AV (v52): the <c>on_nth_attack</c> payoff — <paramref name="N"/> (2..5) hits of this minion's own
+/// damage, then <paramref name="Actions"/> run (full minion sub-vocabulary; the minion is the actor).</summary>
+public sealed record SummonNthAttack(int N, SummonAction[] Actions);
 
 /// <summary>
 /// One action a summon performs on its turn, from the restricted minion sub-vocabulary (see

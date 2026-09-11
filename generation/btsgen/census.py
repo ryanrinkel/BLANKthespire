@@ -26,7 +26,8 @@ aggregate table — run it over the codes dir above to reproduce these numbers (
 
 W2.1 (vocab-gap remediation, 2026-09-09) widened what the census COUNTS so coverage.py / featured.py have a
 detector for the whole vocabulary, not a slice: multi-hit (`hits` >= 2, now NON-plain), the four card
-keywords (exhaust / retain / innate / ethereal), `apply_status_custom` statuses and `buff_summon` statuses,
+keywords (exhaust / retain / innate / ethereal), `apply_status_custom` statuses, `buff_summon` statuses and the
+summon op mix (summon / summon_attack / medic / sacrifice_summon - Phase AV, v52),
 the specialty statuses (poison / frail / focus — neither generic nor exotic), `tags`, `upgrade.cost`,
 `once_per_turn` triggers, `ripen` amounts, and targeted trigger payloads. `format_report` prints EVERY counter.
 """
@@ -407,7 +408,10 @@ def format_report(named: list[tuple[str, Census]]) -> str:
     out.append(f"  statuses: {_order(agg.statuses, _STATUS_HEAD)}  | all: {_all(agg.statuses)}")
     out.append(f"  specialty statuses: {_order(agg.statuses, sorted(SPECIALTY_STATUSES))}")
     out.append(f"  custom statuses (apply_status_custom): {_all(agg.custom_statuses)}")
-    out.append(f"  summon buffs (buff_summon): {_all(agg.summon_buffs)}")
+    out.append(f"  summon buffs (buff_summon): {_all(agg.summon_buffs)}"
+               f"  | summon ops: summon={agg.ops.get('summon', 0)} attack={agg.ops.get('summon_attack', 0)}"
+               f" medic={agg.ops.get('heal_summon', 0) + agg.ops.get('shield_summon', 0)}"
+               f" sacrifice={agg.ops.get('sacrifice_summon', 0)}")  # Phase AV (v52)
     out.append(f"  triggers: turn_end+turn_start={agg.triggers.get('turn_end',0)+agg.triggers.get('turn_start',0)}  "
                f"reactive[{'/'.join(_REACTIVE_HEAD)}]={'/'.join(str(agg.triggers.get(k,0)) for k in _REACTIVE_HEAD)}"
                f"  | all: {_all(agg.triggers)}")

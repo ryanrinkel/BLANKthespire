@@ -33,7 +33,8 @@ CLASS_ONLY_TOKENS = {
     "orb": {"channel_orb", "evoke", "gain_orb_slot", "focus", "orbs_match", "orb_count_ge",
             "temp_focus"},  # Phase AN (v44): the one-turn Focus is orb-class-only like focus
     "status": {"apply_status_custom"},
-    "summon": {"summon", "summon_attack", "buff_summon", "heal_summon", "shield_summon"},
+    "summon": {"summon", "summon_attack", "buff_summon", "heal_summon", "shield_summon",
+               "sacrifice_summon"},  # Phase AV (v52)
     "forge": {"forge", "forged", "forged_ge", "blade_empower", "summon_blade", "on_blade_played"},
     "balance": {"balance_step", "light_ge", "dark_ge", "centered"},
 }

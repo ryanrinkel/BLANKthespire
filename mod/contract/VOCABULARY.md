@@ -32,6 +32,7 @@ validator. (The vocabulary grows as the interpreter grows — more ops/statuses 
 | `buff_summon`  | `amount`, optional `status` (self-buff, default `strength`) | Buff your living summon (e.g. Strength so its `summon_attack`s hit harder); no-op if the summon isn't out. Also legal inside `add_trigger` payloads (v42 — "At the start of your turn, your summon gains 1 Strength"). **SUMMON-CLASS ONLY** — see Forged Summons below. |
 | `heal_summon`  | `amount` (int 1–9) | Heal your living summon `amount` HP (the selfless "medic" op — spend a card to keep your bodyguard alive); no-op if the summon isn't out. Also legal inside `add_trigger` payloads (a per-turn medic engine: "At the start of your turn, heal your summon 3"). **SUMMON-CLASS ONLY** — see Forged Summons below. |
 | `shield_summon`| `amount` (int 1–12) | Grant your living summon `amount` Block; no-op if the summon isn't out. Also legal inside `add_trigger` payloads. **SUMMON-CLASS ONLY** — see Forged Summons below. |
+| `sacrifice_summon` | *(none)* | **Sacrifice your summon** (v52) — consume your front-most living minion: it dies, so its pool `on_death` rattle fires. A **price**: the rest of the card is the payoff (10+ Block, 12+ damage, or 2 draws + energy). Never a card's only effect, never on a BASIC, one per card, card-only. No summon out = no-op. **SUMMON-CLASS ONLY**. |
 | `add_card`     | `card_id` (a card in THIS class's own set), `pile` (hand/discard/draw), optional `amount` (copies, 1–3, default 1) | Generate `amount` **combat-transient copies** of one of your class's OWN cards into a pile (the base-game "add a card to combat" — the copies vanish at combat end, never enter your deck). May reference itself (Anger). The referenced card must NOT itself `add_card` (depth-1 loop discipline). Also legal inside `add_trigger` payloads — the compost loop ("Whenever a card is Exhausted, add a copy of X to your discard pile"). **CLASS-ONLY.** |
 | `discard`      | `amount` (int ≥1), optional `cards` (random/choose) | Discard `amount` cards from your hand — `random` (default; choiceless churn) or **`choose`** (v46: YOU pick which to pitch — "Discard 1 card of your choice."; pitch the Reflex card on purpose). Pairs with the `on_discard` trigger and works inside `add_trigger` payloads ("At the start of your turn, discard 1" — **payloads are `random` only**). Discarding is an EFFECT: it triggers `on_discard` cards; end-of-turn cleanup does NOT. |
 | `retrieve_card`| `pile` (discard/exhaust), `cards` (random/choose), optional `amount` (1–2) | **Return a card from your discard or exhaust pile to your hand** (v46 — Headbutt / Exhume): `choose` opens the pile and you pick ("Return a card of your choice from your discard pile to your hand."), `random` pulls blind; `pile:"exhaust"` brings back a SPENT card (price it higher; pair with a strong `exhaust` one-shot). Status/Curse cards never return; empty pile = no-op. Card-only; one per card; 1–2 per class. |
@@ -342,39 +343,47 @@ Each `status_pool` entry is an object:
 > statuses with normal cards. (Custom statuses are STRICTLY per-class — never global.)
 
 ## Forged summons (a CLASS IDENTITY — summon-class cards only)
-A class can invent its **own minion** — a base-game **Osty**-style bodyguard — by declaring a **`summon_pool`** on the
-character (NOT on a card) with **exactly one** custom summon. The minion works *exactly* like Osty:
-- **One on board at a time**, with its own HP and an HP bar.
-- **Passive** — it does **nothing** on its own turn (no autonomous attacks).
-- A **meat-shield**: it soaks the powered hits aimed at you, until it falls.
-- **Per-combat** (cleared at combat end).
-
-Its `summon_pool` entry is just a `name`, `max_hp` (1–60, its starting HP), and an optional `description`:
+A class can invent its **own minion(s)** — base-game **Osty**-style allies — by declaring a **`summon_pool`** on the
+character (NOT on a card) with **one or two** custom summons. The default shape is **PASSIVE**, exactly like Osty:
+one of each name on board at a time, its own HP bar, a **meat-shield** soaking the powered hits aimed at you,
+**per-combat**, and it does **nothing on its own turn** — your cards are its offense. Such an entry is just a
+`name`, `max_hp` (1–100, its starting HP) and an optional `description`:
 ```json
 { "name": "Bone Thrall", "max_hp": 12, "description": "A raised servant that guards you and strikes at your command." }
 ```
-The class's whole identity is **three card ops** that drive that minion (all SUMMON-CLASS ONLY — a class with a
-`summon_pool`):
+Six card ops drive the minions (all SUMMON-CLASS ONLY). Only `summon` names one; every other op — including
+`heal_summon` / `shield_summon` above — acts on your **FRONT-most living** minion ("your summon"):
 | card `op`      | params | what the card does |
 |----------------|--------|--------------------|
-| `summon`       | `summon_name` (the minion), optional `amount` (HP) | the base-game **Summon keyword**: if the minion is NOT out, summon it with `amount` HP (omit `amount` to use its `max_hp`); if it IS already out, instead **raise its Max HP by `amount`** (grow it). Usually a self-target skill. |
-| `summon_attack`| `amount` (per-hit), optional `hits` (≥2) | deal damage **through the minion** — the *minion* is the attacker, so it scales with the minion's Strength (an "Osty attack"). Does nothing if the minion isn't out. Put it on attack cards (single-target, or all-enemies if the card is AoE). |
-| `buff_summon`  | `amount`, optional `status` (a self-buff, default `strength`) | buff the living minion (e.g. **Strength** so its `summon_attack`s hit harder, or a defensive buff to make it tankier). Does nothing if the minion isn't out. |
+| `summon`       | `summon_name`, optional `amount` (HP) | the base-game **Summon keyword**: if THAT minion is NOT out, summon it with `amount` HP (omit `amount` to use its `max_hp`); if it IS out, instead **raise its Max HP by `amount`**. A second, differently-named minion joins the board beside the first. Usually a self-target skill. |
+| `summon_attack`| `amount` (per-hit), optional `hits` (≥2) | deal damage **through the minion** — the *minion* is the attacker, so it scales with its Strength. Does nothing if no minion is out. Put it on attack cards. |
+| `buff_summon`  | `amount`, optional `status` (self-buff, default `strength`) | buff the living minion (e.g. **Strength** so its `summon_attack`s hit harder). Does nothing if no minion is out. |
+| `sacrifice_summon` | *(none)* | **consume** your front-most minion — it dies and its `on_death` rattle fires. The **price** half of a card: pair it with a real payoff on the same card. |
 
-The loop is: **summon** the minion (and grow its HP), **buff_summon** it (Strength), then strike through it with
-**summon_attack** — its Strength scales those hits while it body-blocks for you. Example cards:
+The passive loop: **summon** the minion (and grow its HP), **buff_summon** it, then strike through it with
+**summon_attack** — its Strength scales those hits while it body-blocks.
+
+**The AUTONOMOUS minion** (opt-in, v52 — at most ONE pool entry): give that entry **`moves`**, a per-turn action
+cycle it performs BY ITSELF at the end of your turn (one move repeats; several rotate). Each move is
+`{ "actions": [...] }` over the minion sub-vocabulary `attack` (`amount`, optional `hits`) / `block` / `heal_self` /
+`apply_status`; a top-level `actions` is the one-move shorthand. It is a free engine, so keep it small: **≤8 total
+damage** (amount x hits) or **≤6 Block** per move, `hits` ≤2, `max_hp` ≤20. Optional extras: **`"attackable": false`**
+= **ETHEREAL** (an untargetable striker — no HP bar, never body-blocks, so it may hit harder; autonomous entries
+only), **`on_summon`** (a battle cry, run once when it lands), **`on_death`** (a death rattle, **enemy-facing only**
+— what `sacrifice_summon` cashes in), **`on_nth_attack`** `{ "n": 2–5, "actions": [...] }` (every `n`th hit it
+lands, it also does this).
 ```json
-{ "op": "summon", "summon_name": "Bone Thrall", "amount": 12 }   // a skill: summon your Thrall (12 HP)
-{ "op": "summon_attack", "amount": 9 }                            // an attack: your summon strikes for 9
-{ "op": "buff_summon", "amount": 3, "status": "strength" }        // a skill: your summon gains 3 Strength
+{ "name": "Carrion Hawk", "max_hp": 6, "attackable": false,
+  "moves": [ { "actions": [ {"op":"attack","amount":4} ] }, { "actions": [ {"op":"attack","amount":3,"hits":2} ] } ],
+  "on_summon": [ {"op":"apply_status","status":"weak","amount":1} ],
+  "on_death":  [ {"op":"attack","amount":6,"target":"all_enemies"} ],
+  "on_nth_attack": { "n": 3, "actions": [ {"op":"attack","amount":5} ] } }
 ```
 
-> Reach for a `summon_pool` when the class fantasy is a **necromancer / beastmaster / conjurer** who fights through
-> one loyal minion rather than orbs, statuses, or raw cards. A class can be all-summons or mix summon cards with
-> normal cards. (Summons are STRICTLY per-class — never global.)
->
-> *(The earlier autonomous-minion model — per-turn move cycles, ethereal minions, on-summon/on-death triggers, and
-> multiple pets — is disabled for now; the runtime keeps it dormant for possible re-introduction.)*
+> Reach for a `summon_pool` when the class fantasy is a **necromancer / beastmaster / conjurer / commander** who
+> fights through a minion rather than orbs, statuses, or raw cards. Three shapes: **Commander** (passive
+> bodyguard + `buff_summon` / `summon_attack`), **Swarm** (a cheap autonomous minion whose `on_summon` /
+> `on_death` payoffs are the real card), **Ethereal striker**. (Summons are per-class — never global.)
 
 ## Card shape
 - `id` (snake_case, unique), `name` (short human title), `type` (attack/skill/power),

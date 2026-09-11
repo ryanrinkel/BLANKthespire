@@ -110,11 +110,21 @@ in-game verify; then **website redeploy** (scp `generation/btsgen`+`mod/contract
 > summon"; "At the start of your turn, your summon gains 1 Strength"), resolved off the player's class at fire time
 > (`TriggerRunner`). The autonomous minion model itself stays shelved (Phase AV). See `VOCAB_GAP_REMEDIATION_PLAN.md`.
 
+> **2026-09-10 (Phase AV, vocab v52): the autonomous model is LIVE again.** Up to TWO minions per class, ONE of
+> which may declare a `moves` cycle (optionally `attackable: false` = ethereal). `on_summon` / `on_death` /
+> `sacrifice_summon` LANDED (see below); the new `on_nth_attack` { n: 2-5, actions } pays off every Nth hit the
+> minion lands. `FindLivingSummon` is name-keyed so `MaxSummons = 2` is finally reachable.
+
 Each a separate smaller phase, gated on prior in-game verify:
-- **`on_summon`/`on_death` payloads** (death via `MinionPower` hooks or `Creature.Died`).
+- **`on_summon`/`on_death` payloads** (death via `MinionPower` hooks or `Creature.Died`). — **LANDED (Phase AV,
+  v52):** parsed since K-3; `on_summon` now actually runs in `EffectRunner.SummonForged` (after `LayoutPets`,
+  fresh summons only) and `on_death` fires from `ForgedSummonPower.AfterDeath` (the player is the dealer).
 - **Apply the class's FORGED status** — minion `apply_status` reaches the class `status_pool` (Phase J): cross-axis composition.
 - **Orb/status synergy & scaling** — minion numbers scaling with Focus/orb count/a forged status; a minion that channels an orb.
 - **Sacrifice/consume** — cards that consume a summon for a payoff (the slot-machine-style composition vision).
+  — **LANDED (Phase AV, v52):** the `sacrifice_summon` card op kills the front-most living minion through the
+  game's own `CreatureCmd.Kill` (force), so the `on_death` rattle fires; class-only, card-only, never on a BASIC,
+  at most one per card, and never a card's only effect (the rest of the card is the payoff).
 
 ---
 

@@ -42,7 +42,20 @@ public static class ForgedCards
     /// v10 (forged statuses, Phase J): + CharacterSpec.StatusPool (a class's ≤4 custom modifier-family statuses
     /// read from `status_pool`; see ForgedCharacters / ForgedStatusPower). Class cards may apply a custom status
     /// by pool name via the `apply_status_custom` op (class-only, like custom-orb channels).</summary>
-    public const int VocabVersion = 51; // 51: Phase AU (VOCAB_GAP_REMEDIATION W0.2-B) — on_discard FIRES ON BASE-GAME DISCARDS.
+    public const int VocabVersion = 52; // 52: Phase AV (VOCAB_GAP_REMEDIATION Wave 4) — THE AUTONOMOUS MINION MODEL IS BACK.
+                                        //     The K-3 summon_pool fields are live again (dormant since the v15 true-Osty refit):
+                                        //     `moves`/`actions` (a per-turn action cycle the minion runs at the end of your turn),
+                                        //     `attackable:false` (ETHEREAL — no HP bar, never meat-shields), `on_summon` (battle cry,
+                                        //     now actually RUN by EffectRunner.SummonForged) and `on_death` (enemy-facing rattle).
+                                        //     New spec field `on_nth_attack` { n: 2..5, actions: [...] } — every Nth hit the minion
+                                        //     DEALS runs the payload (ForgedSummonPower.AfterDamageGiven, re-entrancy-guarded).
+                                        //     FindLivingSummon is name-keyed so MaxSummons = 2 is reachable (two differently named
+                                        //     minions coexist); every other op still means the FRONT-most living one ("your summon").
+                                        //     New CARD op `sacrifice_summon` (flag-op, class-only, card-only, never on a BASIC, at most
+                                        //     one per card, never a card's only effect): kills your front-most minion via the game's
+                                        //     CreatureCmd.Kill so its on_death rattle fires; the rest of the card is the payoff.
+                                        //     Describe: "Sacrifice your summon." [AV] tags on every new path.
+                                        // 51: Phase AU (VOCAB_GAP_REMEDIATION W0.2-B) — on_discard FIRES ON BASE-GAME DISCARDS.
                                         //     DataCard overrides the game's own CardModel hook AfterCardDiscarded (CardCmd.Discard →
                                         //     Hook.AfterCardDiscarded reaches every card in every pile, the just-discarded one included),
                                         //     so a Reflex payload now fires for ANY effect discard — our discard/scry ops AND base-game
@@ -340,6 +353,7 @@ public static class ForgedCards
          "buff_summon", // Phase K (true-Osty): buff the class's living summon (e.g. Strength)
          "heal_summon", // Phase AC (gap #2): heal your living summon (class-only; no summon out → no-op)
          "shield_summon", // Phase AC (gap #2): grant Block to your living summon (class-only; no summon out → no-op)
+         "sacrifice_summon", // Phase AV (v52): flag-op — consume your living summon (its on_death rattle fires). Class-only, card-only.
          "add_card", // Phase Q (gap #16): generate copies of a same-class card into a combat pile (class-only)
          "discard", // Phase R (gap #17): discard N random cards from hand. Phase AP (v46): + `cards:"choose"` (the player picks; card-only)
          "retrieve_card", // Phase AP (v46): return card(s) from your discard/exhaust pile to your hand (random / choose). Card-only.
@@ -1149,6 +1163,18 @@ public static class ForgedCards
             }
             else if (e.Cards != null && e.Op != "retrieve_card") // retrieve_card's pick mode is validated above
                 return $"'cards' only applies to upgrade_card/discard/retrieve_card (op '{e.Op}').";
+            // Phase AV (v52): sacrifice_summon is a flag-op that consumes the class's living minion so its on_death
+            // rattle fires. Class-only (like `summon` — it needs a summon_pool to have anything to kill), carries no
+            // amount/target/status, and card-only (it is not in TriggerOps, so ValidateTrigger rejects a payload one).
+            if (e.Op == "sacrifice_summon")
+            {
+                if (!allowCustomOrbs)
+                    return "sacrifice_summon is only valid on a class card (a summon class — it consumes that class's minion).";
+                if (e.Amount != 0)
+                    return "sacrifice_summon carries no amount (it's a flag-op that consumes your summon).";
+                if (e.Status != null)
+                    return $"'status' does not apply to sacrifice_summon (op '{e.Op}').";
+            }
             // Phase AB (gap #20): corruption is a binary flag-op (grants the Corruption power). It carries no amount
             // (like exhaust/purge). Card-type legality (power/skill only, card-only) is enforced generation-side +
             // the payload rejection is automatic (corruption is not in TriggerOps → ValidateTrigger rejects it).
@@ -1215,6 +1241,15 @@ public static class ForgedCards
         // Phase AB (gap #20): at most one corruption per card (Corruption is a binary power — a second grant is noise).
         if (effects.Count(e => e.Op == "corruption") > 1)
             return "at most one 'corruption' effect per card (Corruption is a binary power — one grant is enough).";
+        // Phase AV (v52): at most one sacrifice_summon per EFFECT LIST (you only have one front-most minion to spend;
+        // base + upgrade counted independently, like graft_card / cost_shift — an upgrade repeating it is the normal
+        // replace-on-upgrade pattern), and it may never be a card's ONLY effect: the sacrifice is the PRICE and the
+        // rest of the card is the payoff, so a lone sacrifice_summon would be a card that does nothing but kill your pet.
+        if (effects.Count(e => e.Op == "sacrifice_summon") > 1 || (upgrade ?? []).Count(e => e.Op == "sacrifice_summon") > 1)
+            return "at most one 'sacrifice_summon' effect per card (you have one summon to spend).";
+        foreach (var list in new[] { effects, upgrade })
+            if (list is { Length: > 0 } && list.All(e => e.Op == "sacrifice_summon"))
+                return "'sacrifice_summon' can't be a card's only effect (the sacrifice is the price — the rest of the card is the payoff).";
         // Phase AO (v45): at most one cost_shift per EFFECT LIST (one discount sentence per play; base + upgrade counted
         // independently, like graft_card — an upgrade repeating it is the normal replace-on-upgrade pattern).
         if (effects.Count(e => e.Op == "cost_shift") > 1 || (upgrade ?? []).Count(e => e.Op == "cost_shift") > 1)
@@ -1568,6 +1603,7 @@ public static class ForgedCards
                 case "ethereal":    parts.Add("Ethereal."); break;
                 case "purge":       parts.Add("Purge. (Removed from your deck for the rest of the run.)"); break; // Phase W (gap #19)
                 case "purge_card":  parts.Add("Choose a card in your hand and Purge it. (Removed from your deck for the rest of the run.)"); break; // Phase Z (gap #19 choose)
+                case "sacrifice_summon": parts.Add("Sacrifice your summon."); break; // Phase AV (v52): flag-op sentence (byte-lockstep with cardgen.py)
                 case "corruption":  parts.Add("Your Skills cost 0."); parts.Add("Your Skills Exhaust when played."); break; // Phase AB (gap #20)
                 case "cost_shift":  parts.Add(CostShiftSentence(e)); break; // Phase AO (v45): the discount sentence (literal, no var)
                 case "blade_empower": parts.Add($"Your blade deals {Math.Max(2, e.Amount)}x damage this turn."); break; // Phase AF (gap #41)

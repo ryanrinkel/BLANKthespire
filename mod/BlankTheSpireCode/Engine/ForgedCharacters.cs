@@ -667,6 +667,11 @@ public static class ForgedCharacters
     private static readonly HashSet<string> SummonTargets = ["self", "enemy", "all_enemies"];
     private static readonly HashSet<string> SummonEnemyStatuses = ["vulnerable", "weak", "frail", "poison"];
 
+    /// <summary>Phase AV (v52): the legal band for <c>on_nth_attack</c>'s <c>n</c> (1 would be "every hit" — that is
+    /// what a move is for; past 5 the payoff never lands in a real fight). Mirrors class_forge._SUMMON_NTH_RANGE.</summary>
+    private const int SummonNthMin = 2;
+    private const int SummonNthMax = 5;
+
     private static bool TryParseSummonPool(Godot.Collections.Array arr, out SummonSpec[] pool, out string error)
     {
         pool = [];
@@ -711,7 +716,21 @@ public static class ForgedCharacters
             if (!TryParseSummonActions(d["on_death"].AsGodotArray(), $"summon '{name}' on_death", out var od, out error, enemyFacingOnly: true)) return false;
             onDeath = od.Length > 0 ? od : null;
         }
-        spec = new SummonSpec(name, desc, maxHp, moves, attackable, onSummon, onDeath);
+        // Phase AV (v52): optional on_nth_attack — { "n": 2..5, "actions": [...] }: every Nth hit this minion DEALS
+        // runs the payload (full sub-vocab, the minion is the actor). Driven by ForgedSummonPower.AfterDamageGiven.
+        SummonNthAttack? onNth = null;
+        if (d.ContainsKey("on_nth_attack") && d["on_nth_attack"].VariantType == Godot.Variant.Type.Dictionary)
+        {
+            var nd = d["on_nth_attack"].AsGodotDictionary();
+            int n = Int(nd, "n", 0);
+            if (n < SummonNthMin || n > SummonNthMax)
+            { error = $"summon '{name}' on_nth_attack: 'n' {n} out of range ({SummonNthMin}..{SummonNthMax})."; return false; }
+            var nActs = nd.ContainsKey("actions") ? nd["actions"].AsGodotArray() : [];
+            if (!TryParseSummonActions(nActs, $"summon '{name}' on_nth_attack", out var na, out error)) return false;
+            if (na.Length == 0) { error = $"summon '{name}' on_nth_attack: needs at least one action."; return false; }
+            onNth = new SummonNthAttack(n, na);
+        }
+        spec = new SummonSpec(name, desc, maxHp, moves, attackable, onSummon, onDeath, onNth);
         error = "";
         return true;
     }
@@ -742,8 +761,9 @@ public static class ForgedCharacters
             list.Add(new SummonMove(acts));
         }
         // True-Osty (v15): a PASSIVE summon (no moves/actions) is allowed — it does nothing on its own turn; the
-        // class's summon_attack cards strike through it. (The K-3 autonomous move cycle stays supported but dormant —
-        // the generator no longer emits it.) Empty list ⇒ empty Moves ⇒ ForgedSummonPower.AfterSideTurnEnd no-ops.
+        // class's summon_attack cards strike through it. Empty list ⇒ empty Moves ⇒ ForgedSummonPower.AfterSideTurnEnd
+        // no-ops. Phase AV (v52): the K-3 autonomous move cycle is LIVE again — a class may opt ONE pool entry into
+        // `moves`/`actions` (the generator gates that; the engine happily runs either shape).
         moves = list.ToArray();
         error = "";
         return true;

@@ -35,6 +35,7 @@ _FAIL = 0
 MOD_CODE = paths.VOCABULARY.parents[1] / "BlankTheSpireCode"   # mod/contract/.. -> mod/BlankTheSpireCode
 CARD_SCHEMA = paths.VOCABULARY.parent / "card.schema.json"
 BP_AT = 93_750   # the blueprint prompt size Phase AT left behind (see the AT STATUS paragraph)
+BP_AU_SAVED = 127  # what AU's caveat removal took out of it (93,750 -> 93,623)
 
 
 def check(cond: bool, msg: str) -> None:
@@ -62,7 +63,7 @@ def test_version() -> None:
     check(bts1.VOCAB_VERSION >= 51, f"bts1.VOCAB_VERSION >= 51 (got {bts1.VOCAB_VERSION})")
     fc = (MOD_CODE / "Engine" / "ForgedCards.cs").read_text(encoding="utf-8")
     m = re.search(r"public const int VocabVersion = (\d+);", fc)
-    check(m is not None and int(m.group(1)) == 51, f"ForgedCards.VocabVersion == 51 (got {m and m.group(1)})")
+    check(m is not None and int(m.group(1)) >= 51, f"ForgedCards.VocabVersion >= 51 (got {m and m.group(1)})")
     check(m is not None and bts1.VOCAB_VERSION <= int(m.group(1)), "bts1.VOCAB_VERSION <= ForgedCards.VocabVersion")
     check("Phase AU" in fc and "AfterCardDiscarded" in fc,
           "ForgedCards.cs VocabVersion comment names Phase AU + the AfterCardDiscarded hook")
@@ -174,8 +175,11 @@ def _t_contract() -> None:
     check("DISCARDED BY AN EFFECT (not when played, not at end-of-turn cleanup)" in churn,
           "... and still states the two things that DON'T fire it")
     bp = cf._BlueprintContract(mode="dossier", triad=True, seed=1).system_prompt()
-    print(f"  (rule 0.9) blueprint prompt: {len(bp):,} chars (AT left {BP_AT:,}; AU removes the caveat)")
-    check(len(bp) <= BP_AT, f"rule 0.9: AU shrinks the prompt (got {len(bp):,}, AT was {BP_AT:,})")
+    print(f"  (rule 0.9) blueprint prompt: {len(bp):,} chars (AT left {BP_AT:,}; AU removed {BP_AU_SAVED} chars)")
+    # AU's rule-0.9 contribution is a REMOVAL, so the assertion is that the removed text is still gone (an absolute
+    # size pin would break on every later phase; Phase AV's own budget is asserted in tests/test_phase_av.py).
+    check("fires ONLY from THIS class's own" not in bp and "do NOT fire it" not in bp,
+          "rule 0.9: AU's caveat removal is still absent from the blueprint prompt")
 
 
 def main() -> int:

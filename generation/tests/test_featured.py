@@ -279,6 +279,8 @@ def test_class_kind_detectors_and_presence() -> None:
         "knife_edge": _card([{"op": "damage", "amount": 12, "when": {"kind": "centered", "value": 1}}]),
         "discard_loop": _card([{"op": "scry", "amount": 2}]),
         "transform_graft": _card([{"op": "graft_card", "card_id": "ember"}]),
+        # Phase AV (v52): spend the minion for a payoff
+        "summon_sacrifice": _card([{"op": "sacrifice_summon"}, {"op": "block", "amount": 12}]),
     }
     check(set(samples) == {f.id for f in featured.CLASS_KIND_MENU}, "a sample exists for every class-kind entry")
     plain = census.walk_card(_card([{"op": "damage", "amount": 6}]))

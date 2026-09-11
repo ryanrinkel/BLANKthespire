@@ -182,6 +182,7 @@ public abstract class DataCard : ConstructedCardModel
                 case "buff_summon":           // Phase K (true-Osty): buffs the summon in OnPlay (literal, no var)
                 case "heal_summon":           // Phase AC (gap #2): heals the summon in OnPlay (literal, no var)
                 case "shield_summon":         // Phase AC (gap #2): shields the summon in OnPlay (literal, no var)
+                case "sacrifice_summon":      // Phase AV (v52): consumes the summon in OnPlay (flag-op, no card var); text via Describe
                 case "add_card":              // Phase Q (gap #16): generates card copies in OnPlay (no card var)
                 case "retrieve_card":         // Phase AP (v46): returns pile card(s) to hand in OnPlay (literal, no var); text via Describe
                 case "add_status_card":       // Phase AP (v46): generates Status cards in OnPlay (literal, no var); text via Describe

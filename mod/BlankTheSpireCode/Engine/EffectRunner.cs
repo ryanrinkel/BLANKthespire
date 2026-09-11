@@ -393,6 +393,15 @@ public static class EffectRunner
                             await SummonRunner.ApplyBuff(ctx, buffPet, e.Status ?? "strength", amt);
                     }
                     break;
+                case "sacrifice_summon":
+                    // Phase AV (v52): consume your summon — the front-most living minion dies through the game's own
+                    // death path, so its on_death rattle fires. Class-only (like summon); no summon out → logged no-op
+                    // and the rest of the card still resolves (the payoff is the REST of this card).
+                    if (card is IForgedSummonHost sacHost && ForgedCharacters.IsSummonClass(sacHost.SummonClass))
+                        await SacrificeSummon(card.Owner, sacHost.SummonClass);
+                    else
+                        MainFile.Logger.Info("[AV] sacrifice_summon: not a summon class (no-op).");
+                    break;
                 case "heal_summon":
                     // Phase AC (gap #2): heal the class's living summon (the selfless "medic" op). No summon out → a
                     // logged no-op (never throws). Amount is upgrade-aware (amt); heal via the same path summon
@@ -1124,27 +1133,35 @@ public static class EffectRunner
         }
     }
 
-    /// <summary>The base-game Osty Summon keyword for a forged class: ONE minion per class. If the class's minion
-    /// is already alive, raise its Max HP by <paramref name="amount"/> (Osty's "Summon while alive" — the user's
-    /// "increase XP"); otherwise summon a fresh one with that HP, heal it, and apply the meat-shield. The minion is
-    /// PASSIVE — it does nothing on its own turn (its move list is empty); the class's <c>summon_attack</c> cards
-    /// strike through it. Shared by the card summon op and the relic summon op. <paramref name="amount"/> = HP (0 /
-    /// omitted ⇒ the summon's spec MaxHp). Mirrors the decompiled <c>OstyCmd.Summon</c> (fresh-summon-when-none-alive
-    /// instead of reviving a kept corpse — functionally identical, no keep-corpse power needed).</summary>
+    /// <summary>The base-game Osty Summon keyword for a forged class. If THIS NAMED minion is already alive, raise
+    /// its Max HP by <paramref name="amount"/> (Osty's "Summon while alive" — the user's "increase XP"); otherwise
+    /// summon a fresh one with that HP, heal it, and apply the meat-shield. Phase AV (v52): the lookup is keyed on the
+    /// NAME, so a class's two pool entries can coexist on board (<c>ForgedCharacters.MaxSummons</c> = 2) — before AV
+    /// the class-wide lookup meant a second named minion only ever grew the first. A minion is PASSIVE unless its spec
+    /// declares a move cycle (Phase AV re-enabled the autonomous model); the class's <c>summon_attack</c> cards strike
+    /// through whichever one is FRONT-most. Shared by the card summon op and the relic summon op.
+    /// <paramref name="amount"/> = HP (0 / omitted ⇒ the summon's spec MaxHp). Mirrors the decompiled
+    /// <c>OstyCmd.Summon</c> (fresh-summon-when-none-alive instead of reviving a kept corpse — functionally
+    /// identical, no keep-corpse power needed).</summary>
     internal static async Task SummonForged(int summonClass, string? name, int amount, Player player, PlayerChoiceContext ctx)
     {
         var type = ForgedCharacters.ResolveSummonType(summonClass, name);
         if (type == null) { MainFile.Logger.Warn($"[Forged] summon: class {summonClass} has no summon '{name}'."); return; }
         var model = (MonsterModel)ModelDb.Get(type);
-        int hp = amount >= 1 ? amount : Math.Max(1, (model as Powers.ForgedSummon)?.Source?.MaxHp ?? 10);
+        var spec = (model as Powers.ForgedSummon)?.Source;
+        int hp = amount >= 1 ? amount : Math.Max(1, spec?.MaxHp ?? 10);
 
-        // Already on board → just grow its Max HP (the Summon keyword while alive). No second pet.
-        var existing = FindLivingSummon(player, summonClass);
+        // THIS minion already on board → just grow its Max HP (the Summon keyword while alive). No second copy.
+        var existing = FindLivingSummon(player, summonClass, spec?.Name ?? name);
         if (existing != null)
         {
             await CreatureCmd.GainMaxHp(existing, hp);
             return;
         }
+        // Phase AV (v52): a DIFFERENT minion of the class may already be out — they coexist (MaxSummons = 2).
+        var other = FindLivingSummon(player, summonClass);
+        if (other != null)
+            MainFile.Logger.Info($"[AV] second summon '{spec?.Name ?? name}' joins '{(other.Monster as Powers.ForgedSummon)?.Source?.Name ?? "summon"}'.");
 
         // None alive → summon fresh at `hp`, heal to full, then meat-shield + layout.
         var pet = player.Creature.CombatState.CreateCreature(model.ToMutable(), player.Creature.Side, null);
@@ -1152,18 +1169,53 @@ public static class EffectRunner
         await CreatureCmd.Add(pet);
         await CreatureCmd.SetMaxHp(pet, hp);
         await CreatureCmd.Heal(pet, hp, true);
-        await Powers.ForgedSummonPower.Apply(ctx, pet);   // passive marker/host (empty move list ⇒ acts on no turn)
+        await Powers.ForgedSummonPower.Apply(ctx, pet);   // the move-cycle / on_nth_attack driver (no moves ⇒ passive)
         pet.Died += _ => Powers.ForgedSummon.LayoutPets(player);
         // Meat shield: redirect the player's incoming powered hits to the living minion (Osty's DieForYou).
         await Powers.ForgedSummonShieldPower.Apply(ctx, player.Creature);
         Powers.ForgedSummon.LayoutPets(player); // non-Osty pets spawn on top of the player → lay out to the right
+
+        // Phase AV (v52): the BATTLE CRY. Parsed since K-3 but never run — fire it once the pet is fully placed
+        // (after LayoutPets) so its attacks/debuffs resolve from a real board position. Fresh summons only: the
+        // grow path above returns before here, so re-summoning to pump Max HP never re-triggers the cry.
+        var petSpec = (pet.Monster as Powers.ForgedSummon)?.Source ?? spec;
+        if (petSpec?.OnSummon is { Length: > 0 } cry)
+        {
+            MainFile.Logger.Info($"[AV] on_summon '{petSpec.Name}': {cry.Length} action(s).");
+            await SummonRunner.RunActions(cry, pet, ctx);
+        }
     }
 
-    /// <summary>The player's currently-living forged summon for <paramref name="summonClass"/>, or null. True-Osty:
-    /// a class has at most one on board at a time. Sourced from the authoritative combat ally list (like OstyCmd).</summary>
-    internal static Creature? FindLivingSummon(Player player, int summonClass) =>
-        player.Creature.CombatState?.Allies.FirstOrDefault(
-            c => c.IsAlive && c.Monster is Powers.ForgedSummon fs && fs.OwnerClass == summonClass);
+    /// <summary>Phase AV (v52): kill the class's FRONT-most living summon so its <c>on_death</c> rattle fires — the
+    /// <c>sacrifice_summon</c> card op. Uses the base game's own death path (<c>CreatureCmd.Kill</c>, force: true —
+    /// the decompile shows it runs <c>Hook.BeforeDeath</c> → <c>InvokeDiedEvent</c> → <c>Hook.AfterDeath</c> BEFORE
+    /// stripping the creature's powers, so <see cref="Powers.ForgedSummonPower.AfterDeath"/> still sees its spec and
+    /// runs the rattle). force: true so the sacrifice can't be refused by a death-prevention effect. No summon out →
+    /// a logged no-op; the rest of the card still resolves.</summary>
+    internal static async Task SacrificeSummon(Player owner, int summonClass)
+    {
+        var pet = FindLivingSummon(owner, summonClass);
+        if (pet == null) { MainFile.Logger.Info("[AV] sacrifice_summon: no summon (no-op)."); return; }
+        string name = (pet.Monster as Powers.ForgedSummon)?.Source?.Name ?? "summon";
+        MainFile.Logger.Info($"[AV] sacrifice_summon '{name}' (HP {pet.CurrentHp}).");
+        await CreatureCmd.Kill(pet, true);
+        Powers.ForgedSummon.LayoutPets(owner);
+    }
+
+    /// <summary>The player's currently-living forged summon for <paramref name="summonClass"/>, or null. With
+    /// <paramref name="name"/> null this is "YOUR SUMMON" — the FRONT-most living minion of the class, which is what
+    /// every card op except <c>summon</c> means (summon_attack / buff_summon / heal_summon / shield_summon /
+    /// sacrifice_summon all act on the front-most one, exactly as the meat-shield redirect picks the front-most
+    /// attackable one). Phase AV (v52): pass a <paramref name="name"/> (case-insensitive, trimmed) to find ONE
+    /// specific pool entry — the <c>summon</c> op does that, so summoning a second, differently-named minion adds it
+    /// to the board instead of growing the first. Sourced from the authoritative combat ally list (like OstyCmd).</summary>
+    internal static Creature? FindLivingSummon(Player player, int summonClass, string? name = null)
+    {
+        string? want = string.IsNullOrWhiteSpace(name) ? null : name!.Trim().ToLowerInvariant();
+        return player.Creature.CombatState?.Allies.FirstOrDefault(
+            c => c.IsAlive && c.Monster is Powers.ForgedSummon fs && fs.OwnerClass == summonClass
+                 && (want == null || (fs.Source?.Name ?? "").Trim().ToLowerInvariant() == want));
+    }
 
     /// <summary>Phase AC (gap #2): heal / shield the class's living summon — CARD path. Resolves the class from the
     /// card's <see cref="IForgedSummonHost"/>; a non-summon-class card or no living summon is a logged no-op.</summary>

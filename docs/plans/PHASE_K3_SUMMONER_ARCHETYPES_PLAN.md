@@ -1,8 +1,12 @@
 # Phase K-3 — Summoner Archetypes (the creative harness for pet classes)
 
-Status: **⏸️ SHELVED — reconciled 2026-06-27.** K-3 custom summon mechanics were disabled when forged summons were
-refit to the base-game Osty (vocab v15); the K-3 engine is dormant. See [[summon-true-osty-refit]]. The archetype
-design below is retained for if/when custom summon mechanics are revived.
+Status: **REVIVED by Phase AV (vocab v52, 2026-09-10).** K-3's custom summon mechanics were disabled when forged
+summons were refit to the base-game Osty (vocab v15; see [[summon-true-osty-refit]]) and the engine went dormant.
+Phase AV turned it back on: a `summon_pool` may declare up to TWO minions and opt ONE of them into the AUTONOMOUS
+model (`moves` cycle, `attackable: false` = ethereal, `on_summon` / `on_death`, plus the new `on_nth_attack`), and
+the `sacrifice_summon` card op consumes a minion for a payoff. The per-summon `kind` token below did NOT ship —
+the three archetypes (commander / swarm / ethereal) are GUIDANCE in the blueprint prompt + DESIGN_HEURISTICS, not a
+declared field; the shape follows from the fields an entry declares. See `VOCAB_GAP_REMEDIATION_PLAN.md` Phase AV.
 
 Phase K shipped ONE shape of forged summon: a persistent, HP-bar'd, meat-shielding autonomous ally with a
 fixed stat line and a fixed per-turn move cycle (see `phase-k-summons` memory + `Engine/SummonSpec.cs`,

@@ -70,7 +70,9 @@ _PREFERRED_CONDITIONS = ["hp_below_half", "no_block", "has_block", "turn_at_leas
 _PREFERRED_TRIGGERS = ["on_exhaust", "on_card_played", "on_hp_lost", "on_block_gained", "on_card_drawn",
                        "on_damage_dealt", "attacked", "on_discard", "ripen"]
 _CLASS_ONLY_TOKENS = {"channel_orb", "evoke", "gain_orb_slot", "focus", "orbs_match", "orb_count_ge", "summon",
-                      "summon_attack", "buff_summon", "heal_summon", "shield_summon", "apply_status_custom",
+                      "summon_attack", "buff_summon", "heal_summon", "shield_summon",
+                      "sacrifice_summon",  # Phase AV (v52)
+                      "apply_status_custom",
                       "blade_empower", "summon_blade", "on_blade_played"}
 
 _OP_ROW_RE = re.compile(r"^\|\s*`([a-z][a-z0-9_]*)`\s*\|", re.MULTILINE)

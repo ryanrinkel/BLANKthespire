@@ -540,6 +540,9 @@ def describe(effects: list[dict], target: str) -> str:
         elif op == "purge_card":
             # Phase Z (gap #19 choose): the choose-a-card purge sentence. Lockstep with ForgedCards.Describe.
             parts.append("Choose a card in your hand and Purge it. (Removed from your deck for the rest of the run.)")
+        elif op == "sacrifice_summon":
+            # Phase AV (v52): the consume-your-minion flag-op sentence (literal). Lockstep with ForgedCards.Describe.
+            parts.append("Sacrifice your summon.")
         elif op == "corruption":
             # Phase AB (gap #20): two sentences (joined by the "\n" that separates parts). Lockstep with ForgedCards.Describe.
             parts.append("Your Skills cost 0.")

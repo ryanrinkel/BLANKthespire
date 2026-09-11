@@ -548,43 +548,45 @@ apply_status_custom status_name:"Razor Focus". Keep numbers SMALL (these fire ev
 a status_pool with normal cards (mixed) or build its whole identity on its statuses. apply_status_custom is \
 STATUS-CLASS ONLY (a class that declared a status_pool); never use it otherwise.
 
-THE SUMMON POOL (optional — this is how a class invents its OWN minion): a class may declare "summon_pool" with \
-EXACTLY ONE custom summon — an Osty-style bodyguard. Reach for this when the concept's fantasy is a \
-NECROMANCER / beastmaster / conjurer / commander who fights THROUGH a single loyal minion rather than orbs, \
-statuses, or raw cards. The minion works EXACTLY like the base game's Osty: ONE on board at a time; it is PASSIVE \
-(it does NOTHING on its own turn); it is a MEAT-SHIELD with an HP bar that soaks the enemy hits aimed at you; it \
-clears at combat end. The class's OFFENSE comes from cards that strike THROUGH the minion. The pool entry is just \
-{{ "name", "max_hp" (1-100, its starting HP), "description" }} — NO moves, NO attackable flag, NO on_summon / \
-on_death. Three card ops drive the minion (all SUMMON-CLASS ONLY):
-  • `summon` (summon_name:"<the minion>", amount = HP): the base-game Summon keyword. If the minion is NOT on \
-    board, summon it with `amount` HP (omit amount to use its max_hp). If it IS already on board, this instead \
-    RAISES its Max HP by `amount` (grow it — exactly like base-game Osty). Cards: "summon your Thrall (8 HP)" or, \
-    to scale it, "raise your Thrall's HP by 6". Usually a self-target skill.
-  • `summon_attack` (amount per-hit, optional "hits"): deal damage THROUGH the minion — the MINION is the \
-    attacker, so it scales with the minion's Strength (a base-game "Osty attack"). Does nothing if the minion \
-    isn't out. This is how a summon class deals its damage. Put it on attack cards (single-target, or all-enemies \
-    if the card is AoE). Card brief: "your summon strikes for 9" or "your summon hits all enemies for 5".
-  • `buff_summon` (amount, optional "status" — a self-buff, default strength): buff the living minion so its \
-    summon_attacks hit harder (or make it tankier with block-type buffs). Does nothing if the minion isn't out. \
-    Card brief: "your summon gains 3 Strength".
-  • `heal_summon` (amount 1-9) / `shield_summon` (amount 1-12): the SELFLESS medic ops — spend a card to heal your \
-    minion's HP or give it Block, keeping your bodyguard alive when enemies target it. Do nothing if the minion \
-    isn't out. Both also work inside `add_trigger` payloads (a per-turn medic engine: "at the start of your turn, \
-    heal your summon 3"). Optional support for a summon class — reach for them when the fantasy is a protected/ \
-    nurtured ally; a lone medic card with no `summon` to heal is dead (the pipeline warns).
-The loop is: summon the minion (and grow its HP), buff it (Strength), then strike through it with summon_attack — \
-its Strength makes those hits scale, while it body-blocks for you. Build attack cards around summon_attack and \
-skills around summon / buff_summon. \
-REQUIRED — the minion is PASSIVE and NEVER attacks on its own, so `summon_attack` is the ONLY way it deals damage \
-and the ONLY thing that makes `buff_summon` worth anything: a summon class MUST include SEVERAL summon_attack cards \
-(make them the bulk of its attacks — at minimum one per archetype), and must NEVER ship buff_summon (or Strength on \
-the minion) without summon_attack cards to spend it on (Strength with no summon_attack is dead weight). Roughly \
-balance the kit so summon_attack cards clearly outnumber buff_summon cards. \
-Example: "summon_pool": [ {{ "name": "Bone Thrall", "max_hp": 12, \
-"description": "A raised servant that guards you and strikes at your command." }} ], with cards like \
-{{"op":"summon","summon_name":"Bone Thrall","amount":12}} (a skill), \
-{{"op":"summon_attack","amount":9}} (an attack), and {{"op":"buff_summon","amount":3,"status":"strength"}} (a skill). \
-summon / summon_attack / buff_summon are SUMMON-CLASS ONLY (a class that declared a summon_pool); never use them otherwise.
+THE SUMMON POOL (optional — how a class invents its OWN minion): declare "summon_pool" with ONE or TWO custom \
+minions. Reach for it when the concept's fantasy is a NECROMANCER / beastmaster / conjurer / commander who fights \
+THROUGH a minion rather than orbs, statuses, or raw cards. DEFAULT SHAPE = the base game's Osty: a PASSIVE \
+bodyguard, {{ "name", "max_hp" (1-100, its starting HP), "description" }} — one of each name on board at a time, \
+with an HP bar, soaking the enemy hits aimed at you, cleared at combat end, and doing NOTHING on its own turn: \
+your CARDS are its offense. Six card ops drive the minions (all SUMMON-CLASS ONLY; every op but `summon` acts on \
+your FRONT-most living minion):
+  • `summon` (summon_name:"<the minion>", amount = HP): NOT on board -> summon it with `amount` HP (omit to use \
+    its max_hp); ALREADY on board -> RAISE its Max HP by `amount`. A differently-named minion joins beside the \
+    first. Usually a self-target skill: "summon your Thrall (8 HP)" / "raise your Thrall's HP by 6".
+  • `summon_attack` (amount per-hit, optional "hits"): damage THROUGH the minion — the MINION is the attacker, \
+    so it scales with its Strength; nothing if none is out. This is how a summon class deals its damage — put it \
+    on attack cards ("your summon strikes for 9" / "hits all enemies for 5").
+  • `buff_summon` (amount, optional "status" — a self-buff, default strength): pump the living minion so its \
+    summon_attacks hit harder ("your summon gains 3 Strength").
+  • `heal_summon` (1-9) / `shield_summon` (1-12): the medic ops — heal the minion or give it Block; both also \
+    work inside `add_trigger` payloads ("at the start of your turn, heal your summon 3"). A lone medic card with \
+    no `summon` to heal is dead.
+  • `sacrifice_summon` (no amount): CONSUME your front-most minion — it dies and its on_death rattle fires. A \
+    PRICE, so put a real payoff on the SAME card (Block 12, or draw 2 + 1 energy); never the card's only effect, \
+    never on a BASIC, at most one per card.
+A PASSIVE minion NEVER attacks on its own, so `summon_attack` is the ONLY way it deals damage and the ONLY thing \
+that makes `buff_summon` worth anything: a class with one MUST ship SEVERAL summon_attack cards (the bulk of its \
+attacks) and must never ship buff_summon (or Strength on the minion) without them.
+OPT IN — ONE AUTONOMOUS MINION (at most ONE pool entry; the passive model stays the default): give that entry \
+"moves", a per-turn ACTION CYCLE it performs BY ITSELF at the end of your turn. Each move is \
+{{ "actions": [...] }} over the minion sub-vocabulary attack (amount, optional hits) / block / heal_self / \
+apply_status; one move repeats every turn, several rotate. It is a free engine, so keep it SMALL: per move at \
+most 8 total damage (amount x hits) or 6 Block, hits <= 2, and max_hp <= 20. Optional extras: "attackable": \
+false = ETHEREAL (an untargetable striker — no HP bar, never body-blocks; AUTONOMOUS entries only); \
+"on_summon": [actions] (a battle cry when it lands); "on_death": [actions] (a rattle — enemy-facing only, and \
+what `sacrifice_summon` cashes in); "on_nth_attack": {{ "n": 2-5, "actions": [...] }} (every Nth hit IT lands). \
+Three shapes to draft toward: COMMANDER (passive bodyguard + buff_summon / summon_attack), SWARM (a cheap \
+autonomous minion whose on_summon / on_death payoffs are the real card — summon, sacrifice, re-summon), \
+ETHEREAL STRIKER (attackable:false, low HP, hits harder because it never shields you). Example: "summon_pool": \
+[ {{ "name": "Bone Thrall", "max_hp": 12, "description": "A raised servant that guards you." }} ], with \ncards like {{"op":"summon","summon_name":"Bone Thrall","amount":12}}, {{"op":"summon_attack","amount":9}}, \
+{{"op":"buff_summon","amount":3,"status":"strength"}} and {{"op":"sacrifice_summon"}} + \
+{{"op":"block","amount":12}}. All six ops are SUMMON-CLASS ONLY (a class that declared a summon_pool); never use \
+them otherwise.
 
 STRATEGIC LINES (REQUIRED — this is what makes a class DRAFTABLE, not just playable): a real class supports \
 MORE THAN ONE way to win, and the player picks a lane mid-run from the cards the Spire offers — base-game \
@@ -839,8 +841,9 @@ for a second signature under the card cap)."""
                     'to 3 custom orbs — see THE ORB POOL), and make ONE archetype the orb engine.'),
             "status": ('This is a STATUS CLASS: declare a "status_pool" (up to 4 custom statuses — see THE STATUS '
                        'POOL) and have cards apply them by name with apply_status_custom. "orb_slots": 0.'),
-            "summon": ('This is a SUMMON CLASS: declare a "summon_pool" with ONE passive Osty-style minion (see THE '
-                       'SUMMON POOL); cards summon / summon_attack / buff_summon it. "orb_slots": 0.'),
+            "summon": ('This is a SUMMON CLASS: declare a "summon_pool" with one or two minions — passive '
+                       'Osty-style bodyguards by default, at most ONE of them autonomous (see THE SUMMON POOL); '
+                       'cards summon / summon_attack / buff_summon / sacrifice_summon them. "orb_slots": 0.'),
             "normal": ('This is a NORMAL class: "orb_slots": 0, OMIT orb_pool/status_pool/summon_pool, and do not use '
                        'their class-only ops.'),
         }.get(c.class_kind, "")
@@ -979,8 +982,10 @@ _PRUNABLE_SECTIONS: list[tuple[str, frozenset, str | None, str, str]] = [
      "the balance gauge (balance_step light/dark, light_ge / dark_ge / centered payoffs)"),
     ("THE STATUS POOL", frozenset({"apply_status_custom"}), "status", "status",
      "a status_pool of custom signature statuses (apply_status_custom)"),
-    ("THE SUMMON POOL", frozenset({"summon", "summon_attack", "buff_summon", "heal_summon", "shield_summon"}),
-     "summon", "summon", "a summon_pool minion (summon / summon_attack / buff_summon / heal_summon / shield_summon)"),
+    ("THE SUMMON POOL", frozenset({"summon", "summon_attack", "buff_summon", "heal_summon", "shield_summon",
+                                   "sacrifice_summon"}),
+     "summon", "summon",
+     "a summon_pool minion (summon / summon_attack / buff / heal / shield / sacrifice_summon)"),
 ]
 SECTION_KEYS: frozenset = frozenset(r[3] for r in _PRUNABLE_SECTIONS)
 _ALSO_AVAILABLE_HEAD = "ALSO AVAILABLE (not pitched above, but fully legal in briefs — every op is in the vocabulary): "
@@ -2174,14 +2179,23 @@ def _card_uses_custom_status(card: dict) -> bool:
 _SUMMON_OPS = {"attack", "block", "apply_status", "heal_self"}
 _SUMMON_TARGETS = {"self", "enemy", "all_enemies"}
 _SUMMON_ENEMY_STATUSES = {"vulnerable", "weak", "frail", "poison"}
-# v15 true-Osty: a summon class declares EXACTLY ONE passive Osty-style minion (the engine still allows 2, kept
-# dormant). The K-3 custom-summon fields (moves/attackable/on_summon/on_death) are no longer emitted (see below).
-_MAX_SUMMONS = 1
-_SUMMON_MAX_HP = 100                # generation cap on the minion's starting HP (W2.4: 60 -> 100; the engine allows 1..999)
-# The K-3 autonomous-move caps below are now DORMANT (the generator no longer emits minion moves); kept for the
-# dormant engine path / possible re-add (see _validate_summon_actions, no longer called for pools).
-_SUMMON_ACTION_CAPS = {"attack": 20, "block": 12, "apply_status": 6, "heal_self": 12}
-_SUMMON_MAX_HITS = 4
+# Phase AV (v52): a summon class declares UP TO TWO minions (matches ForgedCharacters.MaxSummons / slotgen
+# SUMMONS_PER_CLASS). The PASSIVE Osty model is still the default; ONE pool entry may opt into the K-3 AUTONOMOUS
+# model (a `moves`/`actions` cycle it runs at the end of your turn) - see _validate_summon_pool's gating rules.
+_MAX_SUMMONS = 2
+_SUMMON_MAX_HP = 100                # generation cap on a PASSIVE minion's starting HP (W2.4: 60 -> 100; the engine allows 1..999)
+# Phase AV: an AUTONOMOUS minion is a free per-turn engine, so it is priced like a 1-cost power and kept small -
+# lower HP than a bodyguard (it is a threat, not a wall) and a tight per-move output budget. These caps are
+# GENERATION-SIDE ONLY: the C# parser (ForgedCharacters.TryParseSummonActions) only bounds-checks loosely
+# (amount >= 1, hits >= 1, max_hp 1..999) so hand-authored/legacy characters still import - the same split Phase AS
+# used for relic `attack_base`. Per-ACTION amount caps:
+_SUMMON_ACTION_CAPS = {"attack": 8, "block": 6, "apply_status": 2, "heal_self": 4}
+_SUMMON_MAX_HITS = 2
+# ... and per-LIST totals (one move, or one on_summon / on_death / on_nth_attack payload): a minion may not stack
+# three 8-damage actions into one turn. attack totals count amount * hits.
+_SUMMON_LIST_CAPS = {"attack": 8, "block": 6, "apply_status": 2, "heal_self": 4}
+_SUMMON_AUTONOMOUS_MAX_HP = 20      # an autonomous minion trades HP for acting on its own
+_SUMMON_NTH_RANGE = (2, 5)          # on_nth_attack `n` band (mirrors ForgedCharacters.SummonNthMin/Max)
 
 
 def _validate_summon_actions(arr, where: str, enemy_facing_only: bool = False) -> list[str]:
@@ -2235,22 +2249,46 @@ def _validate_summon_actions(arr, where: str, enemy_facing_only: bool = False) -
                 errs.append(f"{where}: debuff '{status}' can't target self")
         if op != "apply_status" and status is not None:
             errs.append(f"{where}: 'status' only applies to apply_status (op '{op}')")
+    # Phase AV (v52): per-LIST output budget - the whole move / payload, not just one action.
+    totals: dict[str, int] = {}
+    for a in arr:
+        if not isinstance(a, dict):
+            continue
+        op = str(a.get("op", "")).strip().lower()
+        if op not in _SUMMON_LIST_CAPS:
+            continue
+        try:
+            amount = int(a.get("amount", 0) or 0)
+            hits = int(a.get("hits", 1) or 1)
+        except (TypeError, ValueError):
+            continue
+        totals[op] = totals.get(op, 0) + amount * (hits if op == "attack" else 1)
+    for op, tot in totals.items():
+        if tot > _SUMMON_LIST_CAPS[op]:
+            errs.append(f"{where}: total '{op}' {tot} too high for one minion action list "
+                        f"(max {_SUMMON_LIST_CAPS[op]}; an autonomous minion is a free per-turn engine - price it "
+                        f"like a 1-cost power)")
     return errs
 
 
-# v15 true-Osty: the K-3 custom-summon fields are no longer emitted (the engine keeps them dormant). Reject them so
-# the model uses the passive-minion + summon_attack/buff_summon model instead of the old autonomous-move design.
-_REMOVED_SUMMON_FIELDS = ("moves", "actions", "attackable", "on_summon", "on_death")
+def _summon_is_autonomous(sm: dict) -> bool:
+    """Phase AV (v52): a pool entry OPTS IN to the autonomous model by declaring a move cycle - `moves` (a list of
+    {"actions": [...]}) or the single-move shorthand `actions`. Everything else is a passive Osty-style bodyguard."""
+    return bool(sm.get("moves")) or bool(sm.get("actions"))
 
 
 def _validate_summon_pool(pool) -> list[str]:
+    """Phase AV (v52): mirrors ForgedCharacters.TryParseSummonPool / TryParseSummon, plus the generation-side GATING
+    the engine does not enforce: at most ONE autonomous minion per class (the passive Osty model stays the default),
+    and `attackable: false` (ETHEREAL) only on that autonomous one - a passive ethereal minion would be pointless
+    (it neither attacks on its own nor soaks a hit)."""
     errs: list[str] = []
     if not isinstance(pool, list):
-        return ["summon_pool must be a list with a single custom-summon object"]
+        return ["summon_pool must be a list of custom-summon objects"]
     if len(pool) > _MAX_SUMMONS:
-        errs.append(f"a class may declare at most {_MAX_SUMMONS} summon (got {len(pool)}); a summon class fights "
-                    f"through ONE Osty-style minion")
+        errs.append(f"a class may declare at most {_MAX_SUMMONS} summons (got {len(pool)})")
     names: set[str] = set()
+    autonomous = 0
     for i, sm in enumerate(pool):
         if not isinstance(sm, dict):
             errs.append(f"summon_pool[{i}] must be an object")
@@ -2262,17 +2300,77 @@ def _validate_summon_pool(pool) -> list[str]:
         if key and key in names:
             errs.append(f"summon_pool has duplicate summon name '{key}'")
         names.add(key)
+        auto = _summon_is_autonomous(sm)
+        if auto:
+            autonomous += 1
         try:
             max_hp = int(sm.get("max_hp", 10) or 10)
         except (TypeError, ValueError):
             max_hp = 0
-        if not (1 <= max_hp <= _SUMMON_MAX_HP):
-            errs.append(f"summon '{nm or i}': max_hp must be 1..{_SUMMON_MAX_HP} (its starting HP)")
-        present = [k for k in _REMOVED_SUMMON_FIELDS if k in sm]
-        if present:
-            errs.append(f"summon '{nm or i}': {', '.join(present)} no longer supported — a forged summon is a "
-                        f"PASSIVE Osty-style minion (no moves/attackable/on_summon/on_death). Its offense comes from "
-                        f"summon_attack cards; buff it with buff_summon; grow/(re)summon it with the summon op")
+        hp_cap = _SUMMON_AUTONOMOUS_MAX_HP if auto else _SUMMON_MAX_HP
+        if not (1 <= max_hp <= hp_cap):
+            errs.append(f"summon '{nm or i}': max_hp must be 1..{hp_cap} (its starting HP"
+                        + ("; an AUTONOMOUS minion acts every turn, so it stays small)" if auto else ")"))
+        # --- the move cycle (autonomous only)
+        if "moves" in sm and "actions" in sm:
+            errs.append(f"summon '{nm or i}': use EITHER 'moves' (a rotation) OR 'actions' (one repeating move), not both")
+        if "moves" in sm:
+            mv = sm.get("moves")
+            if not isinstance(mv, list) or not mv:
+                errs.append(f"summon '{nm or i}': 'moves' must be a non-empty list of {{\"actions\": [...]}} objects")
+            else:
+                for j, m in enumerate(mv):
+                    if not isinstance(m, dict) or not isinstance(m.get("actions"), list) or not m["actions"]:
+                        errs.append(f"summon '{nm or i}' move {j + 1}: each move needs a non-empty 'actions' list")
+                        continue
+                    errs += _validate_summon_actions(m["actions"], f"summon '{nm or i}' move {j + 1}")
+        elif "actions" in sm:
+            acts = sm.get("actions")
+            if not isinstance(acts, list) or not acts:
+                errs.append(f"summon '{nm or i}': 'actions' must be a non-empty list")
+            else:
+                errs += _validate_summon_actions(acts, f"summon '{nm or i}' actions")
+        # --- ethereal (K-3a): only an autonomous minion may be untargetable
+        if "attackable" in sm:
+            if not isinstance(sm.get("attackable"), bool):
+                errs.append(f"summon '{nm or i}': 'attackable' must be true or false")
+            elif sm.get("attackable") is False and not auto:
+                errs.append(f"summon '{nm or i}': 'attackable': false (ETHEREAL) is only for an AUTONOMOUS minion "
+                            f"(one with 'moves'/'actions') - a passive ethereal minion neither attacks nor shields you")
+        # --- the K-3b triggers
+        if "on_summon" in sm:
+            os_ = sm.get("on_summon")
+            if not isinstance(os_, list) or not os_:
+                errs.append(f"summon '{nm or i}': 'on_summon' must be a non-empty action list (the battle cry)")
+            else:
+                errs += _validate_summon_actions(os_, f"summon '{nm or i}' on_summon")
+        if "on_death" in sm:
+            od = sm.get("on_death")
+            if not isinstance(od, list) or not od:
+                errs.append(f"summon '{nm or i}': 'on_death' must be a non-empty action list (the death rattle)")
+            else:
+                errs += _validate_summon_actions(od, f"summon '{nm or i}' on_death", enemy_facing_only=True)
+        # --- Phase AV: on_nth_attack { "n": 2..5, "actions": [...] } (legal on either model)
+        if "on_nth_attack" in sm:
+            nth = sm.get("on_nth_attack")
+            if not isinstance(nth, dict):
+                errs.append(f"summon '{nm or i}': 'on_nth_attack' must be an object {{\"n\": 2-5, \"actions\": [...]}}")
+            else:
+                try:
+                    n = int(nth.get("n", 0) or 0)
+                except (TypeError, ValueError):
+                    n = 0
+                lo, hi = _SUMMON_NTH_RANGE
+                if not (lo <= n <= hi):
+                    errs.append(f"summon '{nm or i}' on_nth_attack: 'n' must be {lo}..{hi} (got {nth.get('n')})")
+                acts = nth.get("actions")
+                if not isinstance(acts, list) or not acts:
+                    errs.append(f"summon '{nm or i}' on_nth_attack: needs a non-empty 'actions' list")
+                else:
+                    errs += _validate_summon_actions(acts, f"summon '{nm or i}' on_nth_attack")
+    if autonomous > 1:
+        errs.append(f"at most ONE summon may be AUTONOMOUS (declare 'moves'/'actions'); got {autonomous}. The passive "
+                    f"Osty-style minion is the default - a second self-acting minion is two free engines on one class")
     return errs
 
 
@@ -2287,11 +2385,12 @@ def _summon_pool_custom_names(bp: dict) -> set[str]:
 
 
 def _card_uses_summons(card: dict) -> bool:
-    """True if any (base/upgrade) effect uses a summon op (summon / summon_attack / buff_summon) — all class-only
-    mechanics that do nothing without a summon_pool (used to drop such a card off a non-summon class)."""
+    """True if any (base/upgrade) effect uses a summon op (summon / summon_attack / buff_summon / sacrifice_summon -
+    Phase AV) - all class-only mechanics that do nothing without a summon_pool (used to drop such a card off a
+    non-summon class)."""
     effs = list(card.get("effects") or [])
     effs += list((card.get("upgrade") or {}).get("effects") or [])
-    return any(e.get("op") in ("summon", "summon_attack", "buff_summon") for e in effs)
+    return any(e.get("op") in ("summon", "summon_attack", "buff_summon", "sacrifice_summon") for e in effs)
 
 
 _ORB_OPS = {"channel_orb", "evoke", "gain_orb_slot"}

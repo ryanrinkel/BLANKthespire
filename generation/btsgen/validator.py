@@ -59,6 +59,7 @@ _LEGACY_PROTOTYPE_OPS = {"multi", "conditional", "from_state", "fuse"}
 _BUILD_AROUND_OPS = {"add_trigger", "apply_status_custom",
                      "summon", "summon_attack", "buff_summon",
                      "heal_summon", "shield_summon",  # Phase AC (gap #2): summon support, not a flat stat line
+                     "sacrifice_summon",  # Phase AV (v52): spending the minion for a payoff is a build-around, not a stat line
 
                      "forge",  # Phase M (gap #36): Forge income/payoff is a build-around, not a stat line
                      "balance_step",  # Phase S (gap #1): a Balance-gauge step is build-around income, not a stat line
@@ -414,6 +415,15 @@ class CardValidator:
                         out.append(f"buff_summon 'status':'{st}' must be a self-buff (e.g. strength); it lands on the minion.")
             # Phase AC (gap #2): heal_summon / shield_summon heal / Block the class's one living summon — class-only
             # (need a summon_pool), like summon_attack/buff_summon; bounded caps. Mirrors ForgedCards.Validate.
+            # Phase AV (v52): sacrifice_summon consumes the class's living minion (its on_death rattle fires) -
+            # class-only like the rest of the summon family, and a flag-op (no amount/status/hits).
+            if e.get("op") == "sacrifice_summon":
+                if not self._allowed_custom_summons:
+                    out.append("sacrifice_summon is only valid on a summon class (one with a summon_pool).")
+                if int(e.get("amount", 0) or 0) != 0:
+                    out.append("sacrifice_summon carries no amount (it's a flag-op that consumes your summon).")
+                if e.get("status") is not None:
+                    out.append("'status' does not apply to sacrifice_summon.")
             if e.get("op") in ("heal_summon", "shield_summon"):
                 if not self._allowed_custom_summons:
                     out.append(f"{e.get('op')} is only valid on a summon class (one with a summon_pool).")
@@ -652,6 +662,20 @@ class CardValidator:
             if (sum(1 for e in effects if e.get("op") == "graft_card") > 1
                     or sum(1 for e in up_effects if e.get("op") == "graft_card") > 1):
                 out.append("at most one 'graft_card' effect per card (a graft transforms the picked card into one other card).")
+        # Phase AV (v52): sacrifice_summon consumes your minion so its on_death rattle fires. It is the PRICE half
+        # of a card, so it may never stand alone (a card whose only effect kills your own pet is a trap); never on a
+        # BASIC (the starting deck has no minion to spend); at most one per effect list (you have one front-most
+        # minion), base + upgrade counted independently (the replace-on-upgrade pattern). Mirrors ForgedCards.Validate.
+        if any(e.get("op") == "sacrifice_summon" for e in effects + up_effects):
+            if is_basic:
+                out.append("'sacrifice_summon' is not allowed on a BASIC card (the starting deck has no summon to spend).")
+            if sum(1 for e in effects if e.get("op") == "sacrifice_summon") > 1 \
+                    or sum(1 for e in up_effects if e.get("op") == "sacrifice_summon") > 1:
+                out.append("at most one 'sacrifice_summon' effect per card (you have one summon to spend).")
+            for lst in (effects, up_effects):
+                if lst and all(e.get("op") == "sacrifice_summon" for e in lst):
+                    out.append("'sacrifice_summon' can't be a card's only effect (the sacrifice is the price -- the "
+                               "rest of the card is the payoff).")
         # Phase AB (gap #20): corruption grants the Corruption power (your Skills cost 0 + Exhaust when played).
         # POWER/SKILL cards only (never an attack — the fantasy is "your Skills are free"); carries no amount; at
         # most one per card. Card-only (a payload corruption is rejected by the schema triggerEffect op enum).
@@ -838,6 +862,10 @@ class CardValidator:
                                    f"this class's status_pool (apply_status_custom is class-only).")
                 elif t.get("status_name") is not None:
                     out.append(f"'status_name' only applies to apply_status_custom (trigger effect '{op}').")
+                # Phase AV (v52): sacrifice_summon is CARD-ONLY - a repeating trigger that eats your minion every
+                # turn is a self-destroying engine (and the schema's triggerEffect op enum excludes it too).
+                if op == "sacrifice_summon":
+                    out.append("'sacrifice_summon' is card-only (never inside an add_trigger payload).")
                 if op in ("summon_attack", "buff_summon"):
                     if not self._allowed_custom_summons:
                         out.append(f"a trigger {op} is only valid on a summon class (one with a summon_pool).")
@@ -983,6 +1011,12 @@ class CardValidator:
             # Phase K (v15 true-Osty): damage dealt THROUGH the summon — scored like damage (it scales further with
             # the minion's Strength, but that's unseen at the card level). hits multiplies the per-hit amount.
             return self._amt(eff.get("amount", 0)) * max(1, int(eff.get("hits", 1) or 1))
+        if op == "sacrifice_summon":
+            # Phase AV (v52): spending your minion is a COST, not a benefit - it removes the bodyguard and the body
+            # every summon_attack rides on. Priced as a flat negative (like lose_hp) so the card's payoff half can be
+            # generous (the heuristics put it at >= 10 Block / 12 damage / 2 draws + energy) without tripping the
+            # power ceiling. The on_death rattle it cashes is priced on the SUMMON POOL, not here.
+            return -4.0
         if op == "buff_summon":
             # Phase K (v15 true-Osty): a self-buff on the minion (default Strength) — weight per stack like a buff.
             return self._amt(eff.get("amount", 0)) * float(_STATUS_WEIGHT.get(eff.get("status", "strength") or "strength", 3.0))

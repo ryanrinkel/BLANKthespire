@@ -630,10 +630,45 @@ function statusLines(st) {
   return out;
 }
 
+// Phase AV (v52): a pool entry is PASSIVE (an Osty-style bodyguard) unless it declares a move cycle; an
+// autonomous entry may also be ETHEREAL (attackable:false) and carry on_summon / on_death / on_nth_attack
+// payoffs. Mirrors SummonRunner.Describe on the C# side (same order: HP-or-Ethereal, the move cycle, on
+// summon, on death, every Nth hit).
+function summonMoves(sm) {
+  if (Array.isArray(sm.moves) && sm.moves.length) return sm.moves.map((m) => m && m.actions).filter(Array.isArray);
+  if (Array.isArray(sm.actions) && sm.actions.length) return [sm.actions];
+  return [];
+}
+
+// The minion sub-vocabulary is its own small op set (attack / block / heal_self / apply_status) — map it
+// onto the card-effect phraser so one formatter serves both.
+function summonActionAsEffect(x) {
+  const op = x.op === "attack" ? "damage" : x.op === "heal_self" ? "heal" : x.op;
+  return { ...x, op };
+}
+
+function summonActionPhrase(actions) {
+  return (actions || []).map((x) => fmtEffect(summonActionAsEffect(x), x.target || "enemy")).join(", ");
+}
+
 function summonLines(sm) {
   const out = [];
-  if (sm.max_hp != null) out.push(`Max HP: ${sm.max_hp}`);
-  out.push("A passive minion — summon it, then spend cards to make it attack.");
+  const moves = summonMoves(sm);
+  out.push(sm.attackable === false ? "Ethereal (cannot be attacked)"
+                                   : `Max HP: ${sm.max_hp != null ? sm.max_hp : "?"}`);
+  if (!moves.length) {
+    out.push("A passive minion — summon it, then spend cards to make it attack.");
+  } else if (moves.length === 1) {
+    out.push(`Each turn: ${summonActionPhrase(moves[0])}`);
+  } else {
+    moves.forEach((m, i) => out.push(`Turn ${i + 1}: ${summonActionPhrase(m)}`));
+  }
+  if (Array.isArray(sm.on_summon) && sm.on_summon.length) out.push(`On summon: ${summonActionPhrase(sm.on_summon)}`);
+  if (Array.isArray(sm.on_death) && sm.on_death.length) out.push(`On death: ${summonActionPhrase(sm.on_death)}`);
+  const nth = sm.on_nth_attack;
+  if (nth && Array.isArray(nth.actions) && nth.actions.length) {
+    out.push(`Every ${nth.n}th hit: ${summonActionPhrase(nth.actions)}`);
+  }
   return out;
 }
 
@@ -877,6 +912,7 @@ function effPhrase(e, target) {
     case "summon": return `Summon ${e.summon_name || "a minion"}${a ? ` (${a} HP)` : ""}`;
     case "summon_attack": return `Minion attacks for ${a ?? ""}${hits}`;
     case "buff_summon": return `Give your minion +${a ?? ""} ${statusName(e.status)}`;
+    case "sacrifice_summon": return "Sacrifice your minion"; // Phase AV (v52): consume it (its on_death rattle fires)
     case "add_trigger":
       return `${TRIGGER_PREFIX[e.trigger] || "Each turn"}: `
              + (e.effects || []).map((x) => effPhrase(x, "self")).join(", ");
