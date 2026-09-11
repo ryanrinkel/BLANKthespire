@@ -42,7 +42,15 @@ public static class ForgedCards
     /// v10 (forged statuses, Phase J): + CharacterSpec.StatusPool (a class's ≤4 custom modifier-family statuses
     /// read from `status_pool`; see ForgedCharacters / ForgedStatusPower). Class cards may apply a custom status
     /// by pool name via the `apply_status_custom` op (class-only, like custom-orb channels).</summary>
-    public const int VocabVersion = 50; // 50: Phase AT (VOCAB_GAP_REMEDIATION Wave 3) — SUMMON DAMAGE COUNTS AS "YOU DEAL DAMAGE".
+    public const int VocabVersion = 51; // 51: Phase AU (VOCAB_GAP_REMEDIATION W0.2-B) — on_discard FIRES ON BASE-GAME DISCARDS.
+                                        //     DataCard overrides the game's own CardModel hook AfterCardDiscarded (CardCmd.Discard →
+                                        //     Hook.AfterCardDiscarded reaches every card in every pile, the just-discarded one included),
+                                        //     so a Reflex payload now fires for ANY effect discard — our discard/scry ops AND base-game
+                                        //     sources (Gambling Chip, Gambler's Brew, other-class discard cards). No Harmony patch; the
+                                        //     mod ops stopped firing it themselves (double-fire). Turn-end cleanup still never fires it
+                                        //     (CombatManager flushes via CardPileCmd.Add + Hook.AfterFlush). No new token, no describe
+                                        //     change. [AU] tag carries source=mod-op|base-game (EffectRunner.ModDiscardDepth).
+                                        // 50: Phase AT (VOCAB_GAP_REMEDIATION Wave 3) — SUMMON DAMAGE COUNTS AS "YOU DEAL DAMAGE".
                                         //     on_damage_dealt (the add_trigger kind AND the relic hook) now fires when the owner's PET
                                         //     deals damage (summon_attack: pet is the dealer, no card) — the base game's own idiom
                                         //     (ReaperFormPower / HandDrill: `dealer.PetOwner?.Creature == Owner`). No new token, no
@@ -257,9 +265,11 @@ public static class ForgedCards
                                         //     discard N RANDOM cards from hand (choiceless; CardPileCmd.Discard).
                                         //     Legal on cards AND in add_trigger payloads (turn_start/turn_end forced
                                         //     churn). + trigger kind `on_discard` — CARD-LATENT (Reflex): fires THIS
-                                        //     card's payload when it is discarded BY AN EFFECT (the mod's discard op),
-                                        //     NOT at turn-end cleanup (structurally: only DiscardRandom fires it, and
-                                        //     turn-end is game-driven). Playing an on_discard card grants NO power.
+                                        //     card's payload when it is discarded BY AN EFFECT (v51: any effect — the
+                                        //     mod's discard/scry ops AND base-game relics/potions/cards, via the game's
+                                        //     AfterCardDiscarded hook), NOT at turn-end cleanup (that flushes the hand
+                                        //     through CardPileCmd.Add + Hook.AfterFlush, a different path).
+                                        //     Playing an on_discard card grants NO power.
                                         //     Multi-fire (once_per_turn eligible, tracked by RoundNumber); a re-entrancy
                                         //     suppress-flag stops a discard-in-payload from cascading on_discard.
                                         // 22: Phase Q (gap #16) — op `add_card` {card_id, pile: hand/discard/draw,
@@ -351,7 +361,7 @@ public static class ForgedCards
     private static readonly HashSet<string> SupportedTriggers =
         ["turn_end", "turn_start", "ripen", "on_hp_lost",
          "on_exhaust", "on_card_played", "on_card_drawn", "on_damage_dealt", "on_block_gained", "attacked",
-         "on_discard", // Phase R (gap #17): CARD-LATENT Reflex — fires THIS card's payload when it's effect-discarded
+         "on_discard", // Phase R (gap #17): CARD-LATENT Reflex — fires THIS card's payload when ANY effect discards it (v51)
          "on_blade_played"]; // Phase T: Parry analogue — fires whenever you play your signature blade (a token card)
     // H4: the reactive kinds that can fire MULTIPLE times per turn → eligible for the `once_per_turn` gate.
     // (turn_start/turn_end/ripen already fire at most once per turn, so once_per_turn is rejected on them.)

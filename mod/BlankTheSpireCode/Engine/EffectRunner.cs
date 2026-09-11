@@ -301,13 +301,15 @@ public static class EffectRunner
                     // behaviour is bound to a compiled type per card slot, so the slot leaf (which knows that
                     // type) does the apply. Baked/non-forged cards can't host triggers (validator-gated).
                     // Phase R (gap #17): on_discard is CARD-LATENT (Reflex) — it grants NO power on play; its
-                    // payload fires only when the card is effect-discarded (DataCard.FireOnDiscard).
+                    // payload fires when the card is discarded by ANY effect, through the game's own
+                    // Hook.AfterCardDiscarded (Phase AU, v51 — DataCard.AfterCardDiscarded → FireOnDiscard).
                     if (e.Trigger != "on_discard" && card is IForgedTriggerHost host)
                         await host.ApplyTrigger(ctx, card.Owner);
                     break;
                 case "discard":
-                    // Phase R (gap #17): discard `amt` RANDOM cards from hand, then fire each discarded card's
-                    // on_discard payload (effect-driven — turn-end cleanup never routes through here).
+                    // Phase R (gap #17): discard `amt` RANDOM cards from hand; each discarded card's on_discard
+                    // payload fires off the game's AfterCardDiscarded hook (AU) — effect-driven, so turn-end
+                    // cleanup (CardPileCmd.Add + Hook.AfterFlush) still never triggers it.
                     // Phase AP (v46): `cards:"choose"` opens the base-game hand picker instead (the player picks which
                     // cards to pitch — the true discard-fuel feel); under AutoSlay the selector auto-picks (no hang).
                     if (e.Cards == "choose")
@@ -486,17 +488,21 @@ public static class EffectRunner
         else MainFile.Logger.Warn($"[Q] add_card '{e.CardId}': nothing added (class {k}).");
     }
 
-    // Phase R (gap #17): re-entrancy guard — a discard INSIDE an on_discard payload must not cascade on_discard
-    // (the cards still discard; their on_discard payoffs just don't fire recursively). Static: one discard
-    // resolves fully before the next, so a single flag is enough.
-    private static bool _firingOnDiscard;
+    // Phase AU (v51): how deep we are inside one of the MOD's OWN discard ops (discard / scry). Purely for the
+    // `source=` attribution on DataCard's [AU] tag — the fire itself is the game's Hook.AfterCardDiscarded, which
+    // reaches the card whatever discarded it. An int (not a bool) because a payload discard can nest; try/finally
+    // keeps it balanced even if the discard throws. The no-cascade guard lives in DataCard, not here.
+    internal static int ModDiscardDepth;
 
     /// <summary>Phase R (gap #17): discard <paramref name="n"/> RANDOM cards from <paramref name="owner"/>'s hand
-    /// (choiceless — the player-choice variant needs the un-dumped CardSelectCmd UI), then fire each discarded
-    /// card's <c>on_discard</c> payload. Shared by the card path (Execute) and the trigger path (TriggerRunner).
-    /// on_discard is EFFECT-DRIVEN: it fires ONLY from here, so turn-end hand cleanup (game-driven, never routed
-    /// through this) never triggers it. A discard nested inside an on_discard payload is suppressed (no cascade).
-    /// Random picks use the run's card-selection RNG stream (seed-correct; no desync with card/other RNG).</summary>
+    /// (choiceless — the player-choice variant needs the un-dumped CardSelectCmd UI). Shared by the card path
+    /// (Execute) and the trigger path (TriggerRunner). Phase AU (v51): the <c>on_discard</c> payoffs fire from the
+    /// game's own <c>Hook.AfterCardDiscarded</c> (which <c>CardCmd.Discard</c> raises per card) via
+    /// <see cref="DataCard.AfterCardDiscarded"/> — this method no longer fires them itself (that would double-fire).
+    /// on_discard stays EFFECT-DRIVEN: turn-end hand cleanup flushes the hand through CardPileCmd.Add +
+    /// Hook.AfterFlush, which is not that hook. A discard nested inside an on_discard payload is suppressed (no
+    /// cascade — DataCard's guard). Random picks use the run's card-selection RNG stream (seed-correct; no desync
+    /// with card/other RNG).</summary>
     internal static async Task DiscardRandom(int n, Player owner, PlayerChoiceContext ctx)
     {
         var hand = owner.PlayerCombatState.Hand.Cards;
@@ -511,9 +517,10 @@ public static class EffectRunner
             chosen.Add(pool[idx]);
             pool.RemoveAt(idx);
         }
-        await CardCmd.Discard(ctx, chosen);
+        ModDiscardDepth++;                                  // AU: tag attribution only (source=mod-op)
+        try { await CardCmd.Discard(ctx, chosen); }         // → Hook.AfterCardDiscarded → each card's on_discard
+        finally { ModDiscardDepth--; }
         MainFile.Logger.Info($"[R] discard x{chosen.Count} (random from hand).");
-        await FireOnDiscardFor(chosen, ctx);
     }
 
     /// <summary>Phase AP (v46): the CHOOSE form of <c>discard</c> — the player picks <paramref name="n"/> cards in hand
@@ -531,9 +538,10 @@ public static class EffectRunner
         var chosen = (await CardSelectCmd.FromHandForDiscard(ctx, owner,
             new CardSelectorPrefs(CardSelectorPrefs.DiscardSelectionPrompt, take), filter: null, source)).ToList();
         if (chosen.Count == 0) { MainFile.Logger.Info("[AP] discard choose: no selection (no-op)."); return; }
-        await CardCmd.Discard(ctx, chosen);
+        ModDiscardDepth++;                                  // AU: tag attribution only (source=mod-op)
+        try { await CardCmd.Discard(ctx, chosen); }         // → Hook.AfterCardDiscarded → each card's on_discard
+        finally { ModDiscardDepth--; }
         MainFile.Logger.Info($"[AP] discard choose x{chosen.Count} ({string.Join(", ", chosen.Select(c => $"'{c.Title}'"))}).");
-        await FireOnDiscardFor(chosen, ctx);
     }
 
     /// <summary>Phase AP (v46): is this pile card RETRIEVABLE — i.e. not a base-game Status / Curse card (a random
@@ -609,27 +617,12 @@ public static class EffectRunner
         MainFile.Logger.Info($"[AP] add_status_card {ForgedCards.StatusCardName(e.StatusCard)} x{made} -> {pile}.");
     }
 
-    /// <summary>Phase R (gap #17): fire the on_discard (Reflex) payoff for each just-EFFECT-discarded card — but
-    /// NOT for discards nested inside an on_discard payload (no cascade; the <c>_firingOnDiscard</c> guard). Shared
-    /// by <see cref="DiscardRandom"/> (Phase R) and <see cref="Scry"/> (Phase AA — a scry-discard is an effect
-    /// discard too). Turn-end hand cleanup is game-driven and never routes through here, so it never fires.</summary>
-    private static async Task FireOnDiscardFor(IReadOnlyList<CardModel> discarded, PlayerChoiceContext ctx)
-    {
-        if (_firingOnDiscard) return;
-        _firingOnDiscard = true;
-        try
-        {
-            foreach (var c in discarded)
-                if (c is DataCard dc) await dc.FireOnDiscard(ctx);
-        }
-        finally { _firingOnDiscard = false; }
-    }
-
     /// <summary>Phase AA (gap #17 R-2): SCRY — look at the top <paramref name="n"/> cards of the DRAW pile and
     /// discard any subset the player picks. Slices the top N (<c>DrawPile.Cards[0]</c> is the top —
     /// <c>CardPilePosition.Top =&gt; 0</c>), shows them in a grid via <c>CardSelectCmd.FromSimpleGrid</c> with
     /// min 0 / max N (so "discard none" is a legal choice), then discards the picked subset
-    /// (<c>CardCmd.Discard</c> → moves draw→discard) and fires their <c>on_discard</c> payoffs. Empty draw pile is
+    /// (<c>CardCmd.Discard</c> → moves draw→discard, raising the game's AfterCardDiscarded hook so each discarded
+    /// card's <c>on_discard</c> payoff fires — Phase AU (v51); we no longer fire them by hand). Empty draw pile is
     /// a harmless no-op. Under AutoSlay the <c>AutoSlayCardSelector</c> auto-picks (it takes maxSelect → discards
     /// all N, exercising the discard path fully); it never blocks the bot.</summary>
     internal static async Task Scry(int n, PlayerChoiceContext ctx, Player owner)
@@ -641,9 +634,10 @@ public static class EffectRunner
         var prefs = new CardSelectorPrefs(CardSelectorPrefs.DiscardSelectionPrompt, 0, take);
         var toDiscard = (await CardSelectCmd.FromSimpleGrid(ctx, topN, owner, prefs)).ToList();
         if (toDiscard.Count == 0) { MainFile.Logger.Info($"[AA] scry {take} -> kept all (0 discarded)."); return; }
-        await CardCmd.Discard(ctx, toDiscard);
+        ModDiscardDepth++;                                  // AU: tag attribution only (source=mod-op)
+        try { await CardCmd.Discard(ctx, toDiscard); }      // → Hook.AfterCardDiscarded → each card's on_discard
+        finally { ModDiscardDepth--; }
         MainFile.Logger.Info($"[AA] scry {take} -> discarded {toDiscard.Count} of the top {take}.");
-        await FireOnDiscardFor(toDiscard, ctx);
     }
 
     /// <summary>Phase V (gap #18): upgrade the UPGRADABLE cards in <paramref name="owner"/>'s hand (choiceless —

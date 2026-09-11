@@ -269,11 +269,10 @@ draw/energy engine at turn start, an orb auto-channeler, etc.
   `damage` / `summon_attack` may carry `hits` (multi-hit each fire, v42); no other payload op may.
 - **`on_discard` is CARD-LATENT (Reflex) — the exception to the whole model.** A card with
   `{ "op": "add_trigger", "trigger": "on_discard", "effects": [...] }` grants NO power when played; instead, its
-  payload fires when THIS card is **discarded by an effect** (a `discard` op — yours or a `turn_start`→`discard`
-  churn power). It does **NOT** fire when the card is played, nor at end-of-turn hand cleanup — only effect-driven
-  discards count (base-StS Reflex behavior). **Caveat:** it fires ONLY from THIS class's own `discard` / `scry`
-  ops — the mod routes those through its own discard path; base-game relic/enemy-forced discards (and any other
-  base-game discard source) do NOT fire it. Design these as discard FUEL: cards you keep in hand and throw away for
+  payload fires when THIS card is **discarded by an effect** — this class's `discard` / `scry` ops (a card's, or a
+  `turn_start`→`discard` churn power's) AND base-game discard sources (relics, potions, other-class cards). It does
+  **NOT** fire when the card is played, nor at end-of-turn hand cleanup — only effect-driven discards count
+  (base-StS Reflex behavior). Design these as discard FUEL: cards you keep in hand and throw away for
   value — e.g. "Whenever this card is discarded, gain 6 Block." `once_per_turn` caps it to one fire per turn (a card
   can be discarded, redrawn, and discarded again). The payload is the same SELF/orb-only (or targeted) sub-vocabulary.
 - **Targeted payload effects** (the per-turn threat family — Noxious Fumes, Combust, Choke): a payload effect may

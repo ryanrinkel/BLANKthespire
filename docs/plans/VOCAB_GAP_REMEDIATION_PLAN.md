@@ -318,7 +318,8 @@ shows "Turn 5: playing cards" at the cut; no mod frame) · the 63 Curse/Status l
 **STATUS (2026-09-10): Phase AP EXECUTED (vocab v46)** — all three items landed in lockstep. **(1) `discard` gains `cards:
 random|choose`** — `choose` opens the base-game hand picker (`EffectRunner.DiscardChoose` → `CardSelectCmd.FromHandForDiscard`
 with a fixed-count `DiscardSelectionPrompt`; the discard-styled `FromHand`, so it auto-returns the whole hand at ≤ N cards and no-ops
-the empty hand), then discards through the SAME effect-discard path as the random form (`CardCmd.Discard` → `FireOnDiscardFor`), so a
+the empty hand), then discards through the SAME effect-discard path as the random form (`CardCmd.Discard` → the on_discard payoffs; since
+Phase AU that is the game's own `Hook.AfterCardDiscarded`), so a
 chosen discard fuels Reflex cards exactly like a random one. Card-only: a payload `discard` must be `random`/absent (both
 `ValidateTrigger` and `validator.py` reject `choose` in a payload — the repeating-pick-UI footgun; `TriggerRunner` still calls
 `DiscardRandom`). Describe: "Discard {Discard} card(s) of your choice." (the Phase-R random text is byte-unchanged; `VOCABULARY.md:37`
@@ -524,6 +525,58 @@ are BaseLib's startup pair + the dependency-version notice). Verdict "HANG — w
 (the AutoSlay log was mid-combat on Act 3 Floor 6 at 600 s), not a mod hang. Tag evidence:
 `generation/scratch/gaptest-at/godot_AT_tags_GAPTESTAT1.txt`.
 
+**STATUS (2026-09-10): Phase AU EXECUTED (vocab v51)** — W0.2 Issue B closed at the ENGINE, not in the prose. **(1) The
+mechanism is the game's own hook, not a Harmony patch:** `DataCard` (a `ConstructedCardModel`, i.e. a `CardModel`) now
+overrides `AbstractModel.AfterCardDiscarded(PlayerChoiceContext, CardModel)` — `if (card != this) return;` then the existing
+`FireOnDiscard`. Decompile facts that make this exact: `CardCmd.DiscardAndDraw` (`CardCmd.cs:172`, what `CardCmd.Discard`
+wraps) does, per card, `CardPileCmd.Add(card, discardPile)` → `History.CardDiscarded` → `await
+Hook.AfterCardDiscarded(...)`; `Hook.cs:330` dispatches to every `IterateCombatHookListeners` model, and
+`CombatState.IterateHookListeners` yields creature Powers, player Relics, OrbQueue orbs AND every card in
+`player.PlayerCombatState.AllPiles` — so the just-discarded card (already in the discard pile when the hook fires) gets
+its own callback. Base-game idiom confirmed by `Relics/Tingsha.cs` + `Relics/ToughBandages.cs` (we deliberately do NOT
+copy their `CurrentSide` gate: we stay side-agnostic, so an enemy-side forced discard would fire too — no base-game
+source does that today). **(2) End-of-turn cleanup still never fires it:** `CombatManager.cs:1343` flushes the hand with
+`CardPileCmd.Add(cardsToFlush, PileType.Discard)` + `Hook.AfterFlush`, never through `CardCmd.Discard`, so the contract
+rule holds structurally rather than by convention. **(3) The base-game sources that now fuel Reflex cards:** cards
+Acrobatics, CalculatedGamble, DaggerThrow, HiddenDaggers, Prepared, Scrape, ShadowStep, StormOfSteel, Survivor; potion
+Gambler's Brew; power ToolsOfTheTrade; relic Gambling Chip. (No monster calls `CardCmd.Discard` in this build — the docs
+say "relics, potions, other-class cards", never "enemy".) STS2's native `Sly` keyword (`CardModel.IsSlyThisTurn`,
+auto-played from `DiscardAndDraw`) is a separate thing and out of scope. **(4) Our own ops stopped firing it by hand:**
+`EffectRunner.FireOnDiscardFor` is DELETED and `DiscardRandom` / `DiscardChoose` / `Scry` no longer call it (their
+`CardCmd.Discard` already reaches the hook — keeping both would double-fire). The no-cascade guard moved with the fire
+point: `DataCard._firingOnDiscard` now wraps the `TriggerRunner.Run` payload, so a `discard` INSIDE an on_discard payload
+still discards but fires no further payoffs, while siblings in one batch each fire (the game calls the hook per card,
+after the previous payload finished) — Phase-R semantics, unchanged. `EffectRunner.ModDiscardDepth` (int, try/finally
+around each `CardCmd.Discard`) exists ONLY for tag attribution. **(5) No new token, no describe change:** "Whenever this
+card is discarded" was already the byte-match sentence on both sides (`cardgen.py:436` / `ForgedCards.Describe`).
+New log line `[AU] on_discard via Hook.AfterCardDiscarded ('<title>', source=mod-op|base-game)`, emitted before the
+retained `[R] on_discard fired` line. Lockstep: `DataCard.cs` (hook override + guard + `[AU]` tag), `EffectRunner.cs`
+(FireOnDiscardFor deleted, three call sites, `ModDiscardDepth`, four doc comments), `ForgedCards.cs` VocabVersion 51 +
+the on_discard comments, `bts1.py` 51, `mod/contract/VOCABULARY.md` (caveat removed), `mod/contract/card.schema.json`
+(trigger description), `tests/test_wave0_docs.py` (caveat assertion FLIPPED to "must be gone"), this plan (W0.2-B marked
+resolved). `class_forge.py`'s DISCARD/HAND-CHURN block and `archetypes.json` needed no change (neither said "only this
+class"); `web/static/app.js` renders relic hook labels only, so it has no on_discard text. `tests/test_phase_au.py`
+(55 checks: both stamps, the C# mirror — the override, `card != this`, the guard in DataCard wrapping the payload,
+`FireOnDiscardFor` gone from EffectRunner, `ModDiscardDepth` bracketing all three ops, the `[AU]` tag and the retained
+`[R]` line — describe byte-match, validator accept/reject, and the contract wording). Suite **399 passed (the 398 AT baseline + this module's pytest-collected `test_version`); every standalone `tests/test_phase_*.py` module green, and no older phase test asserted the deleted `FireOnDiscardFor` mechanism (`test_phase_as` only pins the unchanged `DiscardRandom(amt, player, ctx)` relic call). `test_phase_at`'s stamp asserts were already `>= 50`, so nothing needed relaxing**; C# build 0
+errors. Prompt budget: VOCABULARY.md 50,323 -> 50,196 chars (-127), blueprint prompt 93,750 -> 93,623 chars (-127) (rule 0.9 satisfied — AU removes text).
+**AutoSlay GAPTESTAU1** (`generation/scratch/gaptest-au/` — a discard class: four on_discard FUEL cards (Ember Reflex
+Block 5 ungated · Cinder Lash targeted damage 6 · Second Wind draw 1 `once_per_turn` · Last Gasp Block 7 gated
+`when turn_at_least 2`), three enablers (Cull the Hand `discard cards:"choose"` · Purge the Weak `discard 2` random ·
+Sift `scry 3`), a `turn_start → discard 1` churn power (Ash Wind) and a starter relic that also discards each turn):
+17 rooms through the Act 1 boss, **247 `[AU]` tags** — Second Wind ×93, Last Gasp ×72, Ember Reflex ×45, Cinder Lash
+×37 — all `source=mod-op` and **247 `[R] on_discard fired`**, i.e. exactly 1:1 with the `[AU]` tags, which is the
+double-fire regression proof (pre-AU the mod op fired the payload AND, post-AU, the hook would have fired it again).
+Feeders: `[R] discard xN` ×336, `[AP] discard choose` ×49, `[AA] scry` ×77, `[H4]` turn_start churn ×37,
+`Auto-selected` ×117 (rule 0.5 — the pick UIs never blocked the bot). `source=base-game` is 0 by construction: the
+character format carries only a FORGED relic dict (`ForgedCharacters` parses no base-game relic id), so the run
+exercises the hook through the mod ops — the identical single code path, since after AU nothing but
+`Hook.AfterCardDiscarded` can fire an on_discard payload. **0 mod-attributable exception frames** (the 3 ERROR lines
+are BaseLib's two startup HarmonyExceptions + the dependency-version notice; no `BlankTheSpire.` frame appears within
+20 lines of any Exception). Verdict "FAIL — HANG, wall-clock timeout" is the Phase-AO harness limit: the AutoSlay log's
+last line is the bot still playing cards on turn 14 of the Act 1 boss fight at 600 s. Tag evidence:
+`generation/scratch/gaptest-au/godot_AU_tags_GAPTESTAU1.txt` (956 lines). Slot 04 unstaged afterwards.
+
 ---
 
 ## 0. Ground rules
@@ -595,6 +648,10 @@ told that features it can use do not exist.
   the mod's own `discard`/`scry` ops (`EffectRunner.cs:439-441, 462-476`).
   **Fix:** add the caveat "(only THIS class's `discard`/`scry` — base-game relic/enemy discards do not fire it)"
   until Phase AU below lands, then remove.
+  **RESOLVED (2026-09-10) by Phase AU (v51):** the caveat is REMOVED — `DataCard` now overrides the game's own
+  `AfterCardDiscarded` hook, so every effect discard (base-game relics/potions/other-class cards included) fires the
+  Reflex payload; `VOCABULARY.md` and `card.schema.json` say so, and `tests/test_wave0_docs.py` asserts the caveat is
+  gone. Turn-end hand cleanup still does not fire it (it flushes via `CardPileCmd.Add` + `Hook.AfterFlush`).
 - **Issue C:** `metallicize` (`:72`) is implemented as `PlatingPower` (`EffectRunner.cs:832`). Verify STS2 Plating
   semantics (does it decay when hit?). If it decays, reword the row; if not, add a comment in EffectRunner so the
   next reader doesn't re-audit it.

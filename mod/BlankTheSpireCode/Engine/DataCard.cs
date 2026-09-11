@@ -268,13 +268,40 @@ public abstract class DataCard : ConstructedCardModel
     // gate. Per-instance state (the CardModel persists across pile moves within a combat); -1 = never fired.
     private int _onDiscardLastRound = -1;
 
-    /// <summary>Phase R (gap #17): if this card carries an <c>on_discard</c> trigger, run its payload NOW —
-    /// it was just discarded BY AN EFFECT (the mod's discard op; see <see cref="EffectRunner.DiscardRandom"/>).
-    /// This is CARD-LATENT (Reflex): the payload never fires on play (the add_trigger grants no power) nor at
-    /// turn-end cleanup (that never routes through DiscardRandom). Honors the fire-time <c>When</c> and
-    /// <c>once_per_turn</c> (tracked by combat round, so a discard→redraw→discard within one turn fires once).</summary>
+    // Phase R (gap #17) / Phase AU (v51): re-entrancy guard — a discard INSIDE an on_discard payload must not
+    // cascade on_discard (the cards still discard; their on_discard payoffs just don't fire recursively). Static:
+    // one discard resolves fully before the next, so a single flag is enough, and siblings discarded in the SAME
+    // batch still each fire (the game calls the hook per card, after the previous payload has finished).
+    // AU moved it here from EffectRunner, because the fire point is now this card's own hook override.
+    private static bool _firingOnDiscard;
+
+    /// <summary>Phase AU (v51): the GAME's own discard hook. <c>CardCmd.Discard</c> → <c>CardCmd.DiscardAndDraw</c>
+    /// pushes each discarded card to the discard pile and then awaits <c>Hook.AfterCardDiscarded</c>, which
+    /// dispatches to every combat hook listener — creature powers, relics, orbs AND every card in the player's
+    /// piles, the just-discarded card included (it is already in the discard pile when the hook fires). So
+    /// overriding this makes an <c>on_discard</c> (Reflex) payload fire for EVERY effect discard: our own
+    /// <c>discard</c> / <c>scry</c> ops AND base-game sources (relics like Gambling Chip, potions like Gambler's
+    /// Brew, other-class discard cards). No Harmony patch is needed — this is the game's designed extension point.
+    /// End-of-turn hand cleanup still never fires it: <c>CombatManager</c> flushes the hand with
+    /// <c>CardPileCmd.Add(cardsToFlush, Discard)</c> + <c>Hook.AfterFlush</c>, never through <c>CardCmd.Discard</c>.
+    /// We stay SIDE-AGNOSTIC (unlike Tingsha / ToughBandages, which gate on <c>CurrentSide</c>): a discard forced on
+    /// the enemy's side would also fire — no base-game source does that today, and the Reflex fantasy is
+    /// "whenever this is discarded", full stop. <c>card != this</c> is the only filter: the hook reaches every card
+    /// in every pile, and only the discarded one should react.</summary>
+    public override Task AfterCardDiscarded(PlayerChoiceContext choiceContext, CardModel card)
+        => card == this && Owner != null ? FireOnDiscard(choiceContext) : Task.CompletedTask;
+
+    /// <summary>Phase R (gap #17): if this card carries an <c>on_discard</c> trigger, run its payload NOW — it was
+    /// just discarded BY AN EFFECT. Phase AU (v51): the call site is <see cref="AfterCardDiscarded"/>, the game's
+    /// own hook, so ANY effect discard fuels it (mod ops and base-game relics/potions/cards alike); the mod's
+    /// discard ops no longer fire it themselves (that would double-fire). This is CARD-LATENT (Reflex): the payload
+    /// never fires on play (the add_trigger grants no power) nor at turn-end cleanup (that flushes the hand through
+    /// CardPileCmd.Add + Hook.AfterFlush, which is not this hook). Honors the fire-time <c>When</c> and
+    /// <c>once_per_turn</c> (tracked by combat round, so a discard→redraw→discard within one turn fires once), and
+    /// the no-cascade guard (a discard inside the payload discards, but fires no further on_discard payoffs).</summary>
     internal async Task FireOnDiscard(PlayerChoiceContext ctx)
     {
+        if (_firingOnDiscard) return;                      // no cascade: a discard inside an on_discard payload
         var t = Spec.Effects.FirstOrDefault(e => e.Op == "add_trigger" && e.Trigger == "on_discard");
         if (t == null || Owner == null) return;
         if (t.When != null && !Conditions.Evaluate(t.When, Owner, null)) return;
@@ -284,8 +311,12 @@ public abstract class DataCard : ConstructedCardModel
             if (_onDiscardLastRound == round) return; // already fired this turn
             _onDiscardLastRound = round;
         }
+        MainFile.Logger.Info($"[AU] on_discard via Hook.AfterCardDiscarded ('{Spec.Title ?? Spec.Id}', source="
+                             + (EffectRunner.ModDiscardDepth > 0 ? "mod-op" : "base-game") + ").");
         MainFile.Logger.Info($"[R] on_discard fired ('{Spec.Title ?? Spec.Id}').");
-        await TriggerRunner.Run(t, Owner, ctx);
+        _firingOnDiscard = true;
+        try { await TriggerRunner.Run(t, Owner, ctx); }
+        finally { _firingOnDiscard = false; }
     }
 
     // Placeholder art per card TYPE (attack/skill/power doodles from mod/tools/gen_placeholder_card_art.py),

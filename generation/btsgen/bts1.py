@@ -25,7 +25,12 @@ import sys
 import zlib
 from pathlib import Path
 
-VOCAB_VERSION = 50  # must be <= ForgedCards.VocabVersion (50: Phase AT — SUMMON DAMAGE COUNTS AS "YOU DEAL DAMAGE":
+VOCAB_VERSION = 51  # must be <= ForgedCards.VocabVersion (51: Phase AU — on_discard FIRES ON BASE-GAME DISCARDS:
+                    # DataCard overrides the game's own AfterCardDiscarded hook, so a Reflex payload fires for ANY effect
+                    # discard - this class's discard/scry ops AND base-game sources (Gambling Chip, Gambler's Brew,
+                    # other-class discard cards). Turn-end hand cleanup still never fires it. No new token, no describe
+                    # change; the contract drops the "only this class" caveat.
+                    # 50: Phase AT — SUMMON DAMAGE COUNTS AS "YOU DEAL DAMAGE":
                     # on_damage_dealt (card trigger + relic hook) fires on the owner's pet's summon_attack hits too, the
                     # base game's ReaperForm / HandDrill idiom. No new token; the contract wording drops "card".
                     # 49: Phase AR — CONDITIONS INSIDE CUSTOM ORB EFFECTS: an

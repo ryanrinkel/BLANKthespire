@@ -8,8 +8,9 @@ harness injects into its prompts:
 - DESIGN_HEURISTICS.md: no heuristic block names the prototype ops (`from_state` / `multi` / `fuse`) or the
   stale "no whenever-you-lose-HP trigger" note (the `on_hp_lost` hook has existed since gap #9 / Phase P), and
   every archetype id in archetypes.json has a non-empty `archetype-note` (the MAP stage's `balance:` line).
-- VOCABULARY.md: the stale "rares need ops not yet supported" line is gone, and the `on_discard` row carries the
-  base-game caveat (it fires only from this class's own `discard`/`scry` ops — EffectRunner.FireOnDiscardFor).
+- VOCABULARY.md: the stale "rares need ops not yet supported" line is gone, and the `on_discard` row's base-game
+  CAVEAT is gone (Phase AU / v51: DataCard.AfterCardDiscarded makes ANY effect discard fire it, base-game sources
+  included), while still saying play / turn-end cleanup do not fire it.
 - RELIC_VOCABULARY.md: no truncated "There is no" sentence.
 """
 from __future__ import annotations
@@ -119,13 +120,17 @@ def test_vocabulary_rare_line() -> None:
 
 
 def test_vocabulary_on_discard_caveat() -> None:
-    print("VOCABULARY.md on_discard carries the base-game caveat:")
+    # Phase AU (v51) flipped this: the caveat W0.2-B added ("only THIS class's discard/scry") is now FALSE, because
+    # DataCard overrides the game's AfterCardDiscarded hook — every effect discard fires the Reflex payload.
+    print("VOCABULARY.md on_discard no longer carries the base-game caveat (Phase AU, v51):")
     text = paths.VOCABULARY.read_text(encoding="utf-8")
     trig = text[text.index("## Triggers"):]
     check("base-game" in trig and "on_discard" in trig, "Triggers section must mention on_discard + base-game")
     caveat = re.search(r"fires ONLY from THIS class's own `discard` / `scry`", trig)
-    check(caveat is not None, "on_discard caveat: fires only from THIS class's own `discard` / `scry` ops")
-    check("do NOT fire it" in trig, "on_discard caveat must say base-game relic/enemy discards do NOT fire it")
+    check(caveat is None, "the W0.2-B caveat must be GONE (Phase AU made base-game discards fire on_discard)")
+    check("do NOT fire it" not in trig, "no 'base-game discards do NOT fire it' sentence survives")
+    check("base-game discard sources" in trig, "the Triggers row must say base-game discard sources DO fire on_discard")
+    check("end-of-turn hand cleanup" in trig, "... while play / end-of-turn cleanup still do not")
 
 
 def test_vocabulary_metallicize_plating() -> None:
