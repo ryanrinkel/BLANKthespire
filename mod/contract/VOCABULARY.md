@@ -22,6 +22,8 @@ validator. (The vocabulary grows as the interpreter grows — more ops/statuses 
 | `purge`        | *(none)*          | **Purge** — when this card is played, it is removed from your **run deck for the rest of the run** (permanent deck-thinning; a stronger `exhaust` that never comes back). A card property. **Mutually exclusive with `exhaust`** (a card can't do both). **Never on a BASIC card.** Put it on a strong one-shot skill/attack you're happy to spend once to thin toward a lean engine (1–3 per class). A generated copy of a purge card (from `add_card`) just vanishes for the combat — it isn't in your run deck to remove. |
 | `purge_card`   | *(none)*          | **Choose-a-card Purge** — when this card is played, **YOU pick a card in your hand and purge THAT card** (removed from your run deck for the rest of the run). The player-choice form of `purge`: instead of the played card removing itself, it lets you thin a *chosen* target — great for cutting a Basic/Curse/dead card you drew. Carries no amount/target. Empty hand = harmless no-op. Put it on a skill/attack (1–2 per class). A chosen generated copy (no run-deck original) just vanishes for the combat. |
 | `forge`        | `amount` (int ≥1) | **Forge N** — stoke your per-combat **Forge** counter by `amount` (shown as a stacking power; resets each combat). The payoff is a damage/block effect with `scale:"forged"`, which ADDS your Forge to its printed amount. Income also works inside `add_trigger` payloads ("At the start of your turn, Forge 2") — see Triggers. A card set that Forges MUST also contain a `scale:"forged"` payoff, and vice versa. |
+| `spend_forge`  | `amount` (int 1–10) | **Spend N Forge** (v53) — CONSUME that much of your per-combat Forge counter as this card's **price**; the rest of the card is what the Forge buys. The cash-out half of the ramp: `forge` is the income, `scale:"forged"` is the slow payoff, `spend_forge` is the burst that empties the counter for something big right now. Put the `forged_ge`-gated payoff FIRST and the `spend_forge` LAST (effects resolve top-to-bottom, so a gate placed after the spend would read the counter this card just emptied — the validator rejects that order). Gate it with `when` `forged_ge` so it never fires on an empty counter (spending more than you hold just empties it — weak, never broken). Never a card's only effect, never on a BASIC, one per card, card-only. **FORGE-CLASS ONLY.** |
+| `spread_debuffs`| *(none)* | **Contagion** (v53) — copy EVERY debuff on the struck target (Vulnerable / Weak / Frail / Poison, at their current stack counts) onto **all other living enemies**. Needs a chosen target, so **single-enemy cards only** (`target: "enemy"`). The payoff of a debuff deck against a crowd: stack the debuffs on one enemy, then spread them. Pair it with a debuff EARLIER on the same card so it is never dead; an undebuffed target / a lone enemy is a harmless no-op. Never on a BASIC, one per card, card-only; uncommon/rare. |
 | `channel_orb`  | `orb` (lightning/frost/dark/**random**), optional `amount` (count) | Channel an orb into your next open slot. `orb:"random"` rolls one of lightning/frost/dark — **independently per orb** when `amount > 1`, so a multi-channel "pull" can come up all-matching (the slot-machine jackpot). **ORB-CLASS ONLY** — see Orbs below. |
 | `evoke`        | optional `amount` (count) | Evoke (trigger + consume) your oldest orb(s) now. **ORB-CLASS ONLY.** |
 | `gain_orb_slot`| `amount` (int ≥1) | Gain `amount` orb slots this combat. **ORB-CLASS ONLY.** |
@@ -90,6 +92,11 @@ ride any card (e.g. an attack that also grants you Block-over-time).
 > buff filler — but prefer a card whose identity is a distinct shape (poison, thorns, metallicize/block-engine,
 > intangible/ritual payoff, etc.). `intangible`, `ritual`, and `barricade` are powerful build-defining buffs:
 > reserve them for `power`-type cards and the `rare` tier, with small numbers.
+
+**Two of the same status on one card** (v53): a card normally declares each value once (one damage, one block, one
+Weak…). The one exception is `apply_status`: you may apply the SAME status TWICE when the **second one is
+`when`-gated** — the printed amount, then a conditional bonus ("Apply 2 Weak. Apply 2 Weak if the target has Block.").
+An ungated pair is rejected (that should just be one bigger number), and a third copy is always rejected.
 
 ## Targeting (`target` field)
 | target        | meaning |
@@ -393,9 +400,17 @@ orb; splash status = ≤2 custom statuses; splash summon = ONE passive minion �
 
 ## Card shape
 - `id` (snake_case, unique), `name` (short human title), `type` (attack/skill/power),
-  `rarity` (basic/common/uncommon/rare), `cost` (0–3 energy, or `"X"`), `target`, `effects` (1+),
+  `rarity` (basic/common/uncommon/rare), `cost` (0–4 energy, or `"X"`), `target`, `effects` (1+),
   optional `upgrade.effects` (the improved version), optional `flavor`.
 - Set `"source": "llm"`.
+- **Cost 4 is the heavyweight slot and is RARE-ONLY** (v53). Costs 0–3 stay the normal band; reach for 4 only when the
+  card carries a *headline* effect — an `add_trigger` engine, a `when`-gated bomb, a `scale` amount, or the class-kind
+  engine — never for a bigger Strike. A 4-cost common/uncommon is a dead draw and is rejected.
+- **`upgrade.effects` normally lists the SAME effects in the SAME order** (only the numbers change). Two exceptions
+  (v53): the upgrade may **APPEND exactly one keyword** the base card lacks (`exhaust` / `retain` / `innate` /
+  `ethereal` — "Rampage+ also Retains"), or **DROP a trailing `exhaust`** (the upgrade sheds the drawback). Any other
+  change in length or keywords is rejected.
+- `tags`: 1–3 slugs (v53 raised the cap from 2).
 
 ## Rarity guidance (using only the ops above)
 - **basic** — Strike/Defend tier; one plain effect.

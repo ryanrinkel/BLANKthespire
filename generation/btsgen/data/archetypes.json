@@ -64,7 +64,8 @@
           "scale",
           "forged_ge",
           "add_trigger",
-          "blade_empower"
+          "blade_empower",
+          "spend_forge"
         ],
         "class_kind": "normal"
       },
@@ -528,7 +529,8 @@
           "apply_status",
           "target_has_status",
           "damage",
-          "target_debuff_count"
+          "target_debuff_count",
+          "spread_debuffs"
         ],
         "class_kind": "normal"
       },

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -34,6 +35,32 @@ public sealed class ForgedForgePower : BlankTheSpirePower
     public static Task Apply(PlayerChoiceContext ctx, Player owner, int amount)
         => BetaMainCompatibility.PowerCmd_.Apply.InvokeGeneric<Task<ForgedForgePower?>, ForgedForgePower>(
                null, ctx, owner.Creature, (decimal)amount, owner.Creature, (CardModel?)null, false)!;
+
+    /// <summary>Phase AX (v53, gap #44): SPEND Forge — the cash-out half of the ramp. Reduces the counter by
+    /// <paramref name="amount"/> and returns how much was ACTUALLY spent (0 with no Forge power; the whole
+    /// remainder when the card asks for more than you hold — an over-ask empties the counter rather than
+    /// failing, so an ungated <c>spend_forge</c> is weak, never broken). At 0 the power is removed, exactly like
+    /// the Balance gauge at centre, so the next <see cref="Stoke"/> counts as a fresh first Forge and re-summons
+    /// the blade if it is gone. Live-stack mutation (<c>Amount = …; InvokePowerModified(…)</c>) — the same path
+    /// <see cref="ForgedBalancePower"/> and the Phase J status decay use, because PowerCmd.Apply only ADDS.</summary>
+    public static int Spend(Player owner, int amount)
+    {
+        int want = Math.Max(1, amount);
+        var creature = owner.Creature;
+        var power = creature.HasPower<ForgedForgePower>() ? creature.GetPower<ForgedForgePower>() : null;
+        if (power == null) return 0;
+        int have = (int)power.Amount;
+        if (have <= 0) { creature.RemovePowerInternal(power); return 0; }
+        int spent = Math.Min(want, have);
+        int left = have - spent;
+        if (left <= 0) creature.RemovePowerInternal(power);
+        else
+        {
+            power.Amount = left;
+            creature.InvokePowerModified(power, -spent, false);
+        }
+        return spent;
+    }
 
     /// <summary>Phase T (Sovereign Blade — base-game Forge): stoke the counter AND, on the FIRST Forge income of
     /// combat, summon the class's signature blade to hand. The base game's blade is NOT in the deck — playing a

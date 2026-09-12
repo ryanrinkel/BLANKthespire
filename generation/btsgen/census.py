@@ -76,6 +76,7 @@ class CardCensus:
     scales: Counter = field(default_factory=Counter)       # scale sources (cards_in_hand, x, forged, ...)
     grow: int = 0                                          # Phase U (gap #23): count of `grow` (Rampage) damage effects
     x_cost: bool = False
+    cost4: bool = False                                    # Phase AX (v53): the heavyweight (rare-only) cost slot
     plain: bool = False
     # --- W2.1 counters -------------------------------------------------------------------------------
     multi_hit: int = 0                                     # damage/summon_attack effects with hits >= 2
@@ -193,6 +194,8 @@ def walk_card(card: dict) -> CardCensus:
     if not isinstance(card, dict):
         return cc
     cc.x_cost = str(card.get("cost", "")).strip().lower() == "x"
+    _c = card.get("cost")
+    cc.cost4 = isinstance(_c, int) and not isinstance(_c, bool) and _c >= 4  # Phase AX (v53)
     tags = card.get("tags")
     cc.tagged = isinstance(tags, list) and any(isinstance(t, str) and t for t in tags)
     _walk_effects(card.get("effects"), cc)
@@ -222,6 +225,7 @@ class Census:
     total: int = 0
     plain: int = 0
     x_cost: int = 0
+    cost4: int = 0  # Phase AX (v53): cards in the heavyweight cost-4 slot (rare-only)
     ops: Counter = field(default_factory=Counter)
     statuses: Counter = field(default_factory=Counter)
     triggers: Counter = field(default_factory=Counter)
@@ -278,6 +282,8 @@ class Census:
             self.plain += 1
         if cc.x_cost:
             self.x_cost += 1
+        if cc.cost4:  # Phase AX (v53)
+            self.cost4 += 1
         self.ops.update(cc.ops)
         self.statuses.update(cc.statuses)
         self.triggers.update(cc.triggers)
@@ -307,6 +313,7 @@ class Census:
         self.total += other.total
         self.plain += other.plain
         self.x_cost += other.x_cost
+        self.cost4 += other.cost4  # Phase AX (v53)
         for name in ("ops", "statuses", "triggers", "whens", "scales", "keywords", "custom_statuses",
                      "summon_buffs", "ripen_amounts", "payload_ops"):
             getattr(self, name).update(getattr(other, name))
@@ -412,6 +419,10 @@ def format_report(named: list[tuple[str, Census]]) -> str:
                f"  | summon ops: summon={agg.ops.get('summon', 0)} attack={agg.ops.get('summon_attack', 0)}"
                f" medic={agg.ops.get('heal_summon', 0) + agg.ops.get('shield_summon', 0)}"
                f" sacrifice={agg.ops.get('sacrifice_summon', 0)}")  # Phase AV (v52)
+    # Phase AX (v53): the two new ops + the heavyweight cost slot (cost 4 is rare-only, so a non-zero count here
+    # should always be matched by rares in the per-class lines above).
+    out.append(f"  AX (v53): spend_forge={agg.ops.get('spend_forge', 0)}  spread_debuffs={agg.ops.get('spread_debuffs', 0)}"
+               f"  cost4={agg.cost4}")
     out.append(f"  triggers: turn_end+turn_start={agg.triggers.get('turn_end',0)+agg.triggers.get('turn_start',0)}  "
                f"reactive[{'/'.join(_REACTIVE_HEAD)}]={'/'.join(str(agg.triggers.get(k,0)) for k in _REACTIVE_HEAD)}"
                f"  | all: {_all(agg.triggers)}")

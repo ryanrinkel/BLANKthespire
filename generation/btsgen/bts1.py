@@ -25,7 +25,16 @@ import sys
 import zlib
 from pathlib import Path
 
-VOCAB_VERSION = 52  # must be <= ForgedCards.VocabVersion (52: Phase AV — THE AUTONOMOUS MINION MODEL IS BACK:
+VOCAB_VERSION = 53  # must be <= ForgedCards.VocabVersion (53: Phase AX — STRUCTURAL CAPS + THE #44/#45 OPS:
+                    # card `cost` ceiling 3 -> 4 (the heavyweight slot: RARE-only, and the upgrade `cost` band widens
+                    # with it); `tags` maxItems 2 -> 3; an UPGRADE MAY CHANGE ONE KEYWORD (append exactly one of
+                    # exhaust/retain/innate/ethereal, or drop a trailing exhaust) instead of matching the base effect
+                    # count exactly; a card may declare the SAME apply_status TWICE when the second is `when`-gated
+                    # (it takes a suffixed var, "Weak2"). New CARD ops `spend_forge` (amount 1..10 — consume that much
+                    # of your Forge counter as the card's price; pairs with when:forged_ge) and `spread_debuffs`
+                    # (flag-op — copy the struck target's Vulnerable/Weak/Frail/Poison onto every OTHER living enemy;
+                    # single-enemy cards only). Both card-only, never on a BASIC, one per card.
+                    # 52: Phase AV — THE AUTONOMOUS MINION MODEL IS BACK:
                     # a summon_pool may declare up to TWO minions and ONE of them may be AUTONOMOUS (`moves`/`actions` -
                     # a per-turn action cycle it runs itself at the end of your turn), optionally ETHEREAL
                     # (`attackable`: false). `on_summon` (battle cry) is now actually RUN, `on_death` (rattle) and

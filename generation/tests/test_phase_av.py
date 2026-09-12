@@ -84,7 +84,7 @@ def test_version() -> None:
     check(bts1.VOCAB_VERSION >= 52, f"bts1.VOCAB_VERSION >= 52 (got {bts1.VOCAB_VERSION})")
     fc = (MOD_CODE / "Engine" / "ForgedCards.cs").read_text(encoding="utf-8")
     m = re.search(r"public const int VocabVersion = (\d+);", fc)
-    check(m is not None and int(m.group(1)) == 52, f"ForgedCards.VocabVersion == 52 (got {m and m.group(1)})")
+    check(m is not None and int(m.group(1)) >= 52, f"ForgedCards.VocabVersion >= 52 (got {m and m.group(1)})")  # Phase AX bumped it to 53
     check(m is not None and bts1.VOCAB_VERSION <= int(m.group(1)), "bts1.VOCAB_VERSION <= ForgedCards.VocabVersion")
     check("Phase AV" in fc and "sacrifice_summon" in fc,
           "ForgedCards.cs VocabVersion comment names Phase AV + the new op")

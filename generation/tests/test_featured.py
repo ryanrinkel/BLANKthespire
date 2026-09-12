@@ -157,6 +157,8 @@ def test_detectors_round_trip() -> None:
         # Phase AP (v46)
         "grave_recall": _card([{"op": "retrieve_card", "pile": "discard", "cards": "choose", "amount": 1}]),
         "tainted_power": _card([{"op": "damage", "amount": 12}, {"op": "add_status_card", "card": "wound", "pile": "discard"}]),
+        # Phase AX (v53): copy the struck target's debuffs to the rest of the room
+        "contagion": _card([{"op": "apply_status", "status": "vulnerable", "amount": 2}, {"op": "spread_debuffs"}]),
     }
     plain = census.walk_card(_card([{"op": "damage", "amount": 6}]))
     check(set(samples) == {f.id for f in featured.FEATURED_MENU}, "a sample exists for every menu entry")
@@ -281,6 +283,9 @@ def test_class_kind_detectors_and_presence() -> None:
         "transform_graft": _card([{"op": "graft_card", "card_id": "ember"}]),
         # Phase AV (v52): spend the minion for a payoff
         "summon_sacrifice": _card([{"op": "sacrifice_summon"}, {"op": "block", "amount": 12}]),
+        # Phase AX (v53): cash the Forge counter out for a burst (gated payoff FIRST, spend LAST)
+        "forge_cashout": _card([{"op": "damage", "amount": 18, "when": {"kind": "forged_ge", "value": 4}},
+                                {"op": "spend_forge", "amount": 4}]),
     }
     check(set(samples) == {f.id for f in featured.CLASS_KIND_MENU}, "a sample exists for every class-kind entry")
     plain = census.walk_card(_card([{"op": "damage", "amount": 6}]))

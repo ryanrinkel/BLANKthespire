@@ -899,6 +899,8 @@ function effPhrase(e, target) {
     }
     case "gain_orb_slot": return `Gain ${a ?? 1} orb slot${(a ?? 1) == 1 ? "" : "s"}`;
     case "forge": return `Forge ${a ?? 1}`; // Phase M (gap #36): stoke the Forge counter
+    case "spend_forge": return `Spend ${a ?? 1} Forge`; // Phase AX (v53, gap #44): the ramp cash-out (the card's price)
+    case "spread_debuffs": return "Copy the target's debuffs to all other enemies"; // Phase AX (v53, gaps #45-#47)
     case "exhaust": return "Exhaust";
     case "innate": return "Innate";
     case "retain": return "Retain";

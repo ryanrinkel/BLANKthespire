@@ -35,7 +35,8 @@ CLASS_ONLY_TOKENS = {
     "status": {"apply_status_custom"},
     "summon": {"summon", "summon_attack", "buff_summon", "heal_summon", "shield_summon",
                "sacrifice_summon"},  # Phase AV (v52)
-    "forge": {"forge", "forged", "forged_ge", "blade_empower", "summon_blade", "on_blade_played"},
+    "forge": {"forge", "forged", "forged_ge", "blade_empower", "summon_blade", "on_blade_played",
+              "spend_forge"},  # Phase AX (v53): the cash-out needs forge income to spend
     "balance": {"balance_step", "light_ge", "dark_ge", "centered"},
 }
 

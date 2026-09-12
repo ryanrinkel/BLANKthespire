@@ -1155,6 +1155,56 @@ Each phase uses an API already called nearby, so the verify-first step is a grep
   target's powers the way `target_debuff_count` does).
 - **Test:** `tests/test_phase_ax.py`.
 
+**STATUS (2026-09-11): Phase AX EXECUTED (vocab v53)** — the four structural caps and both gap #44/#45 ops are LIVE,
+engine + generation in lockstep. **(1) Structural caps.** Card `cost` ceiling 3 → 4, with the heavyweight slot
+**RARE-only** on both sides (`ForgedCards.MaxCardCost` / `validator._MAX_COST`; the upgrade `cost` band widens with it,
+upgrades still only cheapen); `tags` maxItems 2 → 3. **(2) An upgrade may change ONE keyword.** The old flat rule
+("upgrade effect count must match base effect count") becomes `ValidateUpgradeShape` / `_upgrade_shape_errors`, mirrored
+line for line: an upgrade may **append exactly one** of `exhaust`/`retain`/`innate`/`ethereal` the base lacks, or **drop
+a trailing `exhaust`**; equal-length upgrades must now carry the SAME keyword set (verified safe — 0 of the 92 existing
+cards with upgrades had a mismatch). Runtime rides BaseLib's designed `UpgradeKeywords` path: `DataCard` declares
+`WithKeyword(kw, UpgradeType.Add/Remove)` from the base-vs-upgrade diff, so `ConstructedUpgrade` does the add/remove and
+indices 0..n-1 still overlay positionally. **(3) Two of a kind.** A card may declare the SAME `apply_status` twice when
+the SECOND is `when`-gated: `VarKey` is occurrence-numbered (`status:weak:2`), `DataCard` gives it a suffixed PowerVar
+(`Weak2`) via BaseLib's named `WithPower<T>(name, …)`, and `EffectRunner` applies that one with its literal
+upgrade-aware amount (the apply_status_custom card path) — so the DynamicVarSet ctor never sees a duplicate key. An
+ungated pair and a third copy both reject. **(4) `spend_forge`** (gap #44 re-sketch, amount 1..10): consumes the
+per-combat Forge counter as the card's PRICE, the cash-out half of the ramp `forge` builds.
+`ForgedForgePower.Spend` mutates the live stack and removes the power at 0 (the Balance-gauge pattern — `PowerCmd.Apply`
+only adds); over-asking just empties the counter, so an ungated card is weak, never broken. Card-only, never on a BASIC,
+never a card's only effect, one per card. **A new ORDERING rule** (both sides) keeps it honest: a `when:forged_ge`
+effect may not come AFTER the `spend_forge` in the same list — effects resolve top-to-bottom, so the gate would read the
+counter this card just emptied. **(5) `spread_debuffs`** (gaps #45–#47 re-sketch): a flag-op that copies the struck
+target's Vulnerable/Weak/Frail/Poison — at their live stack counts — onto every OTHER living hittable enemy. Needs a
+chosen target, so single-enemy cards only; card-only, never on a BASIC, one per card.
+
+**(6) The AutoSlay gate PASSED — a full RunCompleted, not the usual map-nav stall.**
+`generation/scratch/gaptest-ax/build_tester.py` stages a FORGE class into slot 04 ("AX Gap Tester": full ramp — Strike
+with `forge` income, a turn_start income power, a cost-4 rare `scale:"forged"` AoE carrying three tags — plus the
+cash-out, the contagion card, the two-of-a-kind Weak card, an upgrade that appends `retain` and one that drops
+`exhaust`, and an in-combat `upgrade_card cards:"all"` so BaseLib's `ConstructedUpgrade` fires every fight instead of
+waiting on a random campfire). Seed `GAPTESTAX2`, **181 rooms, verdict PASS (RunCompleted), 0 mod-attributable
+exception frames**, and every one of the seven new paths fired: `spend_forge` ×56 (including the clamp — "had 0, spent
+0" — and partial spends), `spread_debuffs` ×29 real copies (+61 honest no-ops when the target was clean or alone),
+`upgrade keyword ADD 'retain'` ×89 across two cards, `upgrade keyword REMOVE 'exhaust'` ×50, and the gated second Weak
+(`Weak2`) ×4. Evidence: `generation/scratch/gaptest-ax/godot_AX_tags_GAPTESTAX2.txt`. Slot 04 unstaged.
+
+**(7) The first smoke run found a real bug — in the harness, not the contract.** Seed `GAPTESTAX1` rejected slot-04
+card 05 with "the base card already has 'ethereal'": `smoke_relic` injects `ethereal` into a starting-deck card by
+APPENDING it to both the base and upgrade lists, which under the new rule puts `ethereal` last in the upgrade and so
+claims to be the appended keyword. `smoke_relic._inject_ethereal` now inserts in front of a trailing `exhaust` (base)
+and in front of an upgrade's appended keyword, keeping all four shapes importable; `tests/test_phase_ax.py` pins that.
+
+**Lockstep:** `ForgedCards` (VocabVersion 53, SupportedOps, AmountOps, the caps, `ValidateUpgradeShape`,
+`StatusOccurrence`/`StatusVarName`/`StatusDisplay`, the occurrence-aware `VarKey`, the cost band + rare gate, two
+Describe sentences), `EffectRunner` (both op cases, `SpreadDebuffs`, the gated-status branch), `DataCard` (named
+PowerVars, `KeywordUpgrade`/`DeclareUpgradeKeywords`, the `[AX]` upgrade tag), `ForgedForgePower.Spend`;
+`card.schema.json` (cost 0..4 ×2, tags maxItems 3, the op enum + two clauses), `VOCABULARY.md` (two op rows, the card
+shape, the two-of-a-kind paragraph), `validator.py`, `cardgen.py`, `bts1.py` (VOCAB_VERSION 53), `census.py` (a `cost4`
+counter + an AX line), `featured.py` (contagion + forge_cashout), `harness_v2.py`, `class_forge.py` (the cash-out beat +
+the pool-card cost band), `archetypes.json` + 3 exemplars (pool 117), `smoke_relic.py`, `web/static/app.js`;
+`tests/test_phase_ax.py` (118 checks), suite 402 passed, C# build 0 errors.
+
 ### Phase AY — Run-persistent Forge (spike, then v54 if green)
 - `PHASE_M_FORGE_PLAN.md:45-46`, `SOVEREIGN_BLADE_SCOPE.md:167`: needs run-persistent state. Spike: does the mod
   already persist anything per run (`user://forged/...` is per-install, not per-run)? If STS2 exposes a run-save

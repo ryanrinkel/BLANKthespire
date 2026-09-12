@@ -106,6 +106,7 @@ public abstract class DataCard : ConstructedCardModel
         if (spec.CostsX) MockSetEnergyCost(new CardEnergyCost(this, 0, costsX: true));
         // Phase AG (gap #39): an upgrade that LOWERS the card's energy cost is applied in OnUpgrade (below), NOT here.
         DeclareEffects();
+        DeclareUpgradeKeywords(); // Phase AX (v53): the one keyword an upgrade may ADD (base keywords are declared above)
         // Tag the synthesized basic Strike/Defend with CardTag.Strike/Defend so base-game systems that look up a
         // character's basics by tag work for forged classes too. Without this, relics/events that do
         // CardPool.AllCards.First(c => c.Rarity == Basic && c.Tags.Contains(CardTag.Strike)) — e.g. LargeCapsule,
@@ -166,10 +167,12 @@ public abstract class DataCard : ConstructedCardModel
                 case "gain_max_hp": WithVar(new MaxHpVar(e.Amount).WithUpgrade(up)); break; // Phase AN (v44): the base-game MaxHpVar ({MaxHp})
                 case "discard":     WithVar("Discard", e.Amount, up); break; // Phase R (gap #17): random-discard count
                 case "scry":        WithVar("Scry", e.Amount, up); break;    // Phase AA (gap #17 R-2): top-of-draw look count
-                case "exhaust":     WithKeyword(CardKeyword.Exhaust); break;   // keyword: game exhausts on play
-                case "innate":      WithKeyword(CardKeyword.Innate); break;    // keyword: starts in opening hand
-                case "retain":      WithKeyword(CardKeyword.Retain); break;    // keyword: not discarded at end of turn
-                case "ethereal":    WithKeyword(CardKeyword.Ethereal); break;  // keyword: exhausts if still in hand
+                // Phase AX (v53): a keyword the UPGRADE drops (only a trailing `exhaust`, validator-gated) is
+                // declared with UpgradeType.Remove so BaseLib strips it on upgrade; everything else is unchanged.
+                case "exhaust":     WithKeyword(CardKeyword.Exhaust, KeywordUpgrade("exhaust")); break;   // keyword: game exhausts on play
+                case "innate":      WithKeyword(CardKeyword.Innate, KeywordUpgrade("innate")); break;    // keyword: starts in opening hand
+                case "retain":      WithKeyword(CardKeyword.Retain, KeywordUpgrade("retain")); break;    // keyword: not discarded at end of turn
+                case "ethereal":    WithKeyword(CardKeyword.Ethereal, KeywordUpgrade("ethereal")); break;  // keyword: exhausts if still in hand
                 case "gain_orb_slot":         // Phase G orbs: executed in OnPlay; counts shown via Describe (no var)
                 case "channel_orb":
                 case "evoke":
@@ -183,6 +186,8 @@ public abstract class DataCard : ConstructedCardModel
                 case "heal_summon":           // Phase AC (gap #2): heals the summon in OnPlay (literal, no var)
                 case "shield_summon":         // Phase AC (gap #2): shields the summon in OnPlay (literal, no var)
                 case "sacrifice_summon":      // Phase AV (v52): consumes the summon in OnPlay (flag-op, no card var); text via Describe
+                case "spend_forge":           // Phase AX (v53, gap #44): spends the Forge counter in OnPlay (literal, no var); text via Describe
+                case "spread_debuffs":        // Phase AX (v53, gaps #45-#47): copies the target's debuffs in OnPlay (flag-op, no var); text via Describe
                 case "add_card":              // Phase Q (gap #16): generates card copies in OnPlay (no card var)
                 case "retrieve_card":         // Phase AP (v46): returns pile card(s) to hand in OnPlay (literal, no var); text via Describe
                 case "add_status_card":       // Phase AP (v46): generates Status cards in OnPlay (literal, no var); text via Describe
@@ -198,34 +203,78 @@ public abstract class DataCard : ConstructedCardModel
                 case "summon_spike":          // PHASE K SPIKE: summons a pet in OnPlay (literal amount, no var)
                 case "apply_custom":  break;   // EXPLORE SPIKE: applies a custom power in OnPlay (literal amount, no var)
                 case "apply_status":
+                {
+                    // Phase AX (v53): a card may declare the SAME status TWICE when the second one is `when`-gated.
+                    // The first keeps the canonical PowerVar (CommonActions finds it by power type); the second
+                    // takes a SUFFIXED name ("Weak2") so the DynamicVarSet ctor never sees a duplicate key — and
+                    // EffectRunner applies that one with its literal, upgrade-aware amount instead.
+                    string? vname = ForgedCards.StatusOccurrence(Spec.Effects, i) > 0
+                                    ? ForgedCards.StatusVarName(Spec.Effects, i) : null;
                     switch (e.Status)
                     {
-                        case "vulnerable":     WithPower<VulnerablePower>(e.Amount, up); break;
-                        case "weak":           WithPower<WeakPower>(e.Amount, up); break;
-                        case "frail":          WithPower<FrailPower>(e.Amount, up); break;
-                        case "poison":         WithPower<PoisonPower>(e.Amount, up); break;
-                        case "strength":       WithPower<StrengthPower>(e.Amount, up); break;
-                        case "dexterity":      WithPower<DexterityPower>(e.Amount, up); break;
-                        case "thorns":         WithPower<ThornsPower>(e.Amount, up); break;
-                        case "regen":          WithPower<RegenPower>(e.Amount, up); break;
-                        case "metallicize":    WithPower<PlatingPower>(e.Amount, up); break;
-                        case "artifact":       WithPower<ArtifactPower>(e.Amount, up); break;
-                        case "buffer":         WithPower<BufferPower>(e.Amount, up); break;
-                        case "intangible":     WithPower<IntangiblePower>(e.Amount, up); break;
-                        case "ritual":         WithPower<RitualPower>(e.Amount, up); break;
-                        case "blur":           WithPower<BlurPower>(e.Amount, up); break;
-                        case "temp_strength":  WithPower<ForgedTempStrengthPower>(e.Amount, up); break;
-                        case "temp_dexterity": WithPower<ForgedTempDexterityPower>(e.Amount, up); break;
-                        case "barricade":      WithPower<BarricadePower>(e.Amount, up); break;
-                        case "focus":          WithPower<FocusPower>(e.Amount, up); break;
-                        case "temp_thorns":    WithPower<ForgedTempThornsPower>(e.Amount, up); break; // Phase AN (v44)
-                        case "temp_focus":     WithPower<ForgedTempFocusPower>(e.Amount, up); break;  // Phase AN (v44)
+                        case "vulnerable":     Power<VulnerablePower>(vname, e.Amount, up); break;
+                        case "weak":           Power<WeakPower>(vname, e.Amount, up); break;
+                        case "frail":          Power<FrailPower>(vname, e.Amount, up); break;
+                        case "poison":         Power<PoisonPower>(vname, e.Amount, up); break;
+                        case "strength":       Power<StrengthPower>(vname, e.Amount, up); break;
+                        case "dexterity":      Power<DexterityPower>(vname, e.Amount, up); break;
+                        case "thorns":         Power<ThornsPower>(vname, e.Amount, up); break;
+                        case "regen":          Power<RegenPower>(vname, e.Amount, up); break;
+                        case "metallicize":    Power<PlatingPower>(vname, e.Amount, up); break;
+                        case "artifact":       Power<ArtifactPower>(vname, e.Amount, up); break;
+                        case "buffer":         Power<BufferPower>(vname, e.Amount, up); break;
+                        case "intangible":     Power<IntangiblePower>(vname, e.Amount, up); break;
+                        case "ritual":         Power<RitualPower>(vname, e.Amount, up); break;
+                        case "blur":           Power<BlurPower>(vname, e.Amount, up); break;
+                        case "temp_strength":  Power<ForgedTempStrengthPower>(vname, e.Amount, up); break;
+                        case "temp_dexterity": Power<ForgedTempDexterityPower>(vname, e.Amount, up); break;
+                        case "barricade":      Power<BarricadePower>(vname, e.Amount, up); break;
+                        case "focus":          Power<FocusPower>(vname, e.Amount, up); break;
+                        case "temp_thorns":    Power<ForgedTempThornsPower>(vname, e.Amount, up); break; // Phase AN (v44)
+                        case "temp_focus":     Power<ForgedTempFocusPower>(vname, e.Amount, up); break;  // Phase AN (v44)
                         default:
                             throw new NotSupportedException($"DataCard: unsupported status '{e.Status}'");
                     }
                     break;
+                }
                 default:
                     throw new NotSupportedException($"DataCard: unsupported op '{e.Op}'");
+            }
+        }
+    }
+
+    /// <summary>Phase AX (v53): declare a status PowerVar — the canonical unnamed one, or a NAMED one
+    /// (<paramref name="varName"/> = "Weak2") for a card's second, `when`-gated copy of the same status.</summary>
+    private void Power<T>(string? varName, int amount, int up) where T : PowerModel
+    {
+        if (varName == null) WithPower<T>(amount, up);
+        else WithPower<T>(varName, amount, up);
+    }
+
+    /// <summary>Phase AX (v53): the BaseLib UpgradeType for a keyword flag-op present in the BASE effect list —
+    /// <c>Remove</c> when the upgrade list drops it (the only legal drop is a trailing <c>exhaust</c>; see
+    /// ForgedCards.ValidateUpgradeShape), else <c>None</c> (always on). The ADD direction is handled by
+    /// <see cref="DeclareUpgradeKeywords"/>, since an added keyword appears only in the upgrade list.</summary>
+    private UpgradeType KeywordUpgrade(string op)
+        => Spec.Upgrade != null && !Spec.Upgrade.Any(u => u.Op == op) ? UpgradeType.Remove : UpgradeType.None;
+
+    /// <summary>Phase AX (v53): declare the keyword an UPGRADE ADDS — the one flag-op present in the upgrade
+    /// effect list and absent from the base list (validator-gated to at most one of exhaust/retain/innate/ethereal).
+    /// BaseLib's ConstructedUpgrade applies UpgradeKeywords when the card is upgraded, so the base card shows and
+    /// behaves exactly as before while the "+" version gains the keyword.</summary>
+    private void DeclareUpgradeKeywords()
+    {
+        if (Spec.Upgrade == null) return;
+        foreach (var u in Spec.Upgrade)
+        {
+            if (!ForgedCards.KeywordOps.Contains(u.Op)) continue;
+            if (Spec.Effects.Any(b => b.Op == u.Op)) continue; // already on the base card (declared above)
+            switch (u.Op)
+            {
+                case "exhaust":  WithKeyword(CardKeyword.Exhaust, UpgradeType.Add); break;
+                case "innate":   WithKeyword(CardKeyword.Innate, UpgradeType.Add); break;
+                case "retain":   WithKeyword(CardKeyword.Retain, UpgradeType.Add); break;
+                case "ethereal": WithKeyword(CardKeyword.Ethereal, UpgradeType.Add); break;
             }
         }
     }
@@ -254,6 +303,18 @@ public abstract class DataCard : ConstructedCardModel
         {
             EnergyCost.UpgradeBy(uc - Spec.Cost); // delta ≤ 0; UpgradeBy clamps the result at 0
             MainFile.Logger.Info($"[AG] upgrade cost: '{Spec.Id}' {Spec.Cost} -> {uc}.");
+        }
+        // Phase AX (v53): the smoke tag for an upgrade that CHANGES A KEYWORD. BaseLib's ConstructedUpgrade does the
+        // actual add/remove off UpgradeKeywords (declared in DeclareEffects / DeclareUpgradeKeywords); this just
+        // records that it happened, so an AutoSlay run can prove the path fired.
+        if (IsUpgraded && Spec.Upgrade != null)
+        {
+            var baseKw = Spec.Effects.Where(e => ForgedCards.KeywordOps.Contains(e.Op)).Select(e => e.Op).ToHashSet();
+            var upKw = Spec.Upgrade.Where(e => ForgedCards.KeywordOps.Contains(e.Op)).Select(e => e.Op).ToHashSet();
+            foreach (var added in upKw.Except(baseKw))
+                MainFile.Logger.Info($"[AX] upgrade keyword ADD '{added}' on '{Spec.Id}'.");
+            foreach (var removed in baseKw.Except(upKw))
+                MainFile.Logger.Info($"[AX] upgrade keyword REMOVE '{removed}' on '{Spec.Id}'.");
         }
     }
 

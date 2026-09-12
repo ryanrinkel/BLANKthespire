@@ -155,14 +155,7 @@ def ensure_relic(slot: int, force: bool = False) -> Callable[[], None] | None:
         if not any(e.get("op") == "ethereal" for e in effs):
             cardfile.with_suffix(cardfile.suffix + _BACKUP_SUFFIX).write_text(
                 json.dumps(card), encoding="utf-8")
-            effs.append({"op": "ethereal"})
-            # The mod rejects a card whose upgrade effect count differs from its base (ForgedCards.Validate).
-            # If the target has an upgrade, mirror the injected ethereal into it too, so the card still imports
-            # (otherwise the ethereal target silently drops from the smoke deck — the slot-05 rejection).
-            up = card.get("upgrade")
-            if isinstance(up, dict) and isinstance(up.get("effects"), list) \
-                    and not any(e.get("op") == "ethereal" for e in up["effects"]):
-                up["effects"].append({"op": "ethereal"})
+            _inject_ethereal(card)
             cardfile.write_text(json.dumps(card), encoding="utf-8")
             edited.append(cardfile)
 
@@ -171,6 +164,41 @@ def ensure_relic(slot: int, force: bool = False) -> Callable[[], None] | None:
             _restore_one(p)
 
     return restore
+
+
+def _inject_ethereal(card: dict) -> None:
+    """Add `ethereal` to a card's base effects (and mirror it into the upgrade) WITHOUT breaking the mod's
+    base-vs-upgrade shape rule (ForgedCards.ValidateUpgradeShape / validator._upgrade_shape_errors).
+
+    Phase AX (v53) made that rule keyword-aware, so a naive append to both lists can produce an illegal card and the
+    ethereal target silently drops out of the smoke deck (the slot-05 rejection this function exists to avoid). The
+    two positions that matter:
+      * a TRAILING `exhaust` in the BASE list must stay trailing — it is what licenses an upgrade that drops it;
+      * the LAST effect of a one-longer UPGRADE list must stay the keyword that upgrade appends.
+    So the injection goes in front of either, and the three legal shapes (equal length / upgrade appends one keyword /
+    upgrade drops a trailing exhaust) all survive it."""
+    effs = card.setdefault("effects", [])
+    base_len = len(effs)
+    if effs and effs[-1].get("op") == "exhaust":
+        effs.insert(base_len - 1, {"op": "ethereal"})   # keep the trailing exhaust trailing
+    else:
+        effs.append({"op": "ethereal"})
+
+    up = card.get("upgrade")
+    if not (isinstance(up, dict) and isinstance(up.get("effects"), list)):
+        return
+    up_effs = up["effects"]
+    if any(e.get("op") == "ethereal" for e in up_effs):
+        return
+    up_len = len(up_effs)
+    if up_len == base_len + 1:
+        up_effs.insert(up_len - 1, {"op": "ethereal"})  # keep the upgrade's appended keyword last
+    elif up_len == base_len - 1:
+        up_effs.append({"op": "ethereal"})              # the base kept its trailing exhaust; this stays one shorter
+    elif up_effs and up_effs[-1].get("op") == "exhaust":
+        up_effs.insert(up_len - 1, {"op": "ethereal"})
+    else:
+        up_effs.append({"op": "ethereal"})
 
 
 def _ethereal_target(slot: int, char_dict: dict) -> Path | None:

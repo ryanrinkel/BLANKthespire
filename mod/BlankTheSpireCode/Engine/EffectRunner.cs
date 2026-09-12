@@ -154,7 +154,21 @@ public static class EffectRunner
                         MainFile.Logger.Info($"[AJ] random_enemy debuff '{e.Status}' from '{card.Id}' (BaseLib GetTargets rolls one enemy).");
                     if (e.Status is "temp_thorns" or "temp_focus") // Phase AN (v44) smoke: the one-turn shells apply (expiry logs from the power)
                         MainFile.Logger.Info($"[AN] {e.Status} +{amt} (this turn only) from '{card.Id}'.");
-                    await ApplyStatus(e.Status, card, ctx, play);
+                    // Phase AX (v53): a card may declare the SAME status twice when the second one is `when`-gated.
+                    // The first copy keeps the canonical PowerVar path (CommonActions reads the card's var); the
+                    // second declares a SUFFIXED var ("Weak2", see DataCard) that CommonActions can't find, so it
+                    // applies with the literal upgrade-aware amount instead — the apply_status_custom card path.
+                    if (ForgedCards.StatusOccurrence(spec.Effects, i) > 0)
+                    {
+                        MainFile.Logger.Info($"[AX] second '{e.Status}' ({ForgedCards.StatusVarName(spec.Effects, i)}) " +
+                                             $"+{Math.Max(1, amt)} from '{card.Id}' (gated copy, literal amount).");
+                        if (SelfBuffStatuses.Contains(e.Status ?? ""))
+                            await RelicApply(e.Status, ctx, card.Owner.Creature, card.Owner.Creature, Math.Max(1, amt));
+                        else
+                            foreach (var t in CustomStatusTargets(card, play))
+                                await RelicApply(e.Status, ctx, t, card.Owner.Creature, Math.Max(1, amt));
+                    }
+                    else await ApplyStatus(e.Status, card, ctx, play);
                     break;
                 case "gain_energy":
                     await PlayerCmd.GainEnergy(amt, card.Owner);
@@ -188,6 +202,26 @@ public static class EffectRunner
                     await ForgedForgePower.Stoke(ctx, card.Owner, Math.Max(1, amt));
                     MainFile.Logger.Info($"[M] forge +{Math.Max(1, amt)} (card) -> Forge {ForgeStacks(card.Owner)}.");
                     break;
+                case "spend_forge":
+                {
+                    // Phase AX (v53, gap #44): CONSUME the per-combat Forge counter as this card's price (the
+                    // cash-out half of the ramp `forge` builds). Spending more than you hold just empties it — a
+                    // harmless no-op at 0, so an ungated card is weak rather than broken (gate it with
+                    // when:forged_ge to make it honest). The payoff is the rest of the effect list.
+                    int have = ForgeStacks(card.Owner);
+                    int spent = ForgedForgePower.Spend(card.Owner, Math.Max(1, amt));
+                    MainFile.Logger.Info($"[AX] spend_forge {Math.Max(1, amt)} (had {have}, spent {spent}) -> Forge {ForgeStacks(card.Owner)} ('{card.Id}').");
+                    break;
+                }
+                case "spread_debuffs":
+                {
+                    // Phase AX (v53, gaps #45-#47): the CONTAGION payoff — copy every debuff on the struck target
+                    // (Vulnerable / Weak / Frail / Poison, at their live stack counts) onto every OTHER living
+                    // enemy. Single-enemy cards only (validator-gated), so play.Target is the source; no other
+                    // enemy / an undebuffed target is a harmless no-op.
+                    await SpreadDebuffs(card, ctx, play);
+                    break;
+                }
                 case "balance_step":
                     // Phase S (gap #1): move the signed Balance gauge toward a pole (light/dark). Shared executor
                     // owns the arithmetic + display; the light_ge/dark_ge/centered conditions read it, and the gauge
@@ -936,6 +970,46 @@ public static class EffectRunner
     /// it never routes through <see cref="ScaleValue"/> (which has no target). Counts the game's four debuff
     /// powers (the closed debuff vocabulary this mod applies — mirrors EnemyDebuffStatuses / Conditions'
     /// target_has_status checks) via the same HasPower&lt;T&gt; path, each present debuff = 1 (not its stacks).</summary>
+    /// <summary>Phase AX (v53, gaps #45-#47): the <c>spread_debuffs</c> executor — COPY every debuff the struck
+    /// target carries onto every OTHER living hittable enemy, at the source's current stack counts. Reads the same
+    /// four-power closed debuff vocabulary <see cref="DebuffCount"/> does (the debuffs this mod can apply), each at
+    /// its live amount, and lands them through the literal-amount <see cref="RelicApply"/> path (no card var — the
+    /// numbers come from the target, not the card). The source enemy is skipped (it already has them); a target
+    /// with no debuffs, or a fight with no second enemy, is a silent no-op.</summary>
+    private static async Task SpreadDebuffs(ConstructedCardModel card, PlayerChoiceContext ctx, CardPlay play)
+    {
+        var source = play?.Target;
+        if (source == null)
+        {
+            MainFile.Logger.Info($"[AX] spread_debuffs: no chosen target ('{card.Id}') — no-op.");
+            return;
+        }
+        var stacks = new List<(string Status, int Amount)>();
+        void Take<T>(string name) where T : PowerModel
+        {
+            if (source.HasPower<T>())
+            {
+                int n = source.GetPowerAmount<T>();
+                if (n > 0) stacks.Add((name, n));
+            }
+        }
+        Take<VulnerablePower>("vulnerable");
+        Take<WeakPower>("weak");
+        Take<FrailPower>("frail");
+        Take<PoisonPower>("poison");
+        var others = source.CombatState.HittableEnemies.Where(c => c.IsAlive && c != source).ToList();
+        if (stacks.Count == 0 || others.Count == 0)
+        {
+            MainFile.Logger.Info($"[AX] spread_debuffs: {stacks.Count} debuff(s) on the target, {others.Count} other enemy(ies) — no-op ('{card.Id}').");
+            return;
+        }
+        foreach (var (status, amount) in stacks)
+            foreach (var other in others)
+                await RelicApply(status, ctx, other, card.Owner.Creature, amount);
+        MainFile.Logger.Info($"[AX] spread_debuffs: copied {string.Join(", ", stacks.Select(t => $"{t.Status} {t.Amount}"))} " +
+                             $"to {others.Count} other enemy(ies) ('{card.Id}').");
+    }
+
     internal static int DebuffCount(Creature? target)
     {
         if (target == null) return 0;

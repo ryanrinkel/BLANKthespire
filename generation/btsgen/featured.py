@@ -182,6 +182,12 @@ FEATURED_MENU: list[Featured] = [
              'a MODE-SWAP (two cards that each transform_card into the other — a stance/weapon-mode toggle A↔B). '
              'Never on a basic; never chain A→B→C; 1-3 per class.',
              lambda cc: "transform_card" in cc.ops),
+    # Phase AX (v53, gaps #45-#47): the contagion payoff - stack debuffs on one enemy, then spread them.
+    Featured("contagion", 'a card that COPIES the struck enemy\'s debuffs onto every other enemy (op "spread_debuffs")',
+             'REQUIRED: add an uncommon/rare single-enemy card (target "enemy") that applies a debuff FIRST '
+             '(vulnerable / weak / frail / poison) and THEN carries op "spread_debuffs" (no amount) - the debuffs on '
+             'the struck enemy are copied onto every other living enemy. Never on a basic; one per card.',
+             lambda cc: "spread_debuffs" in cc.ops),
     Featured("graft", 'a card that lets you PICK a card in hand and permanently reforge it into another (op "graft_card")',
              'REQUIRED: add a card with op "graft_card" naming a STRONG card in this class ("card_id") — when played, '
              'the player picks a card in HAND and THAT picked card permanently becomes card_id for the rest of the run '
@@ -257,6 +263,13 @@ FEATURED_CLASS_KIND: dict[str, list[Featured]] = {
                  'REQUIRED: add a cheap skill with op "summon_blade" (no amount) that retrieves the signature blade '
                  'from any pile into your hand.',
                  lambda cc: "summon_blade" in cc.ops),
+        Featured("forge_cashout", 'a forge-class CASH-OUT that spends the Forge counter for a burst (op "spend_forge")',
+                 'REQUIRED: add an uncommon/rare card that lists a BIG payoff first (heavy damage / block / draw + '
+                 'energy) gated with `when` forged_ge, and then op "spend_forge" (amount 3-8) LAST - the counter '
+                 'empties to buy the burst. The gate must come BEFORE the spend (effects resolve top-to-bottom, so a '
+                 'gate after the spend would read the counter this card just emptied). Never on a basic; never the '
+                 'card\'s only effect; one per card.',
+                 lambda cc: "spend_forge" in cc.ops),
         Featured("blade_rider", 'a forge-class POWER that fires whenever you play the signature blade (add_trigger "on_blade_played")',
                  'REQUIRED: add a POWER with op "add_trigger", trigger "on_blade_played" whose payload rewards each '
                  'swing of the signature blade (block, draw, or forge income).',

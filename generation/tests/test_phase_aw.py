@@ -71,10 +71,10 @@ def _fake_bp(c: Candidate) -> dict:
 # --------------------------------------------------------------------------- 1. no engine change
 def test_version() -> None:
     print("no engine change (v52 on both sides):")
-    check(bts1.VOCAB_VERSION == 52, f"bts1.VOCAB_VERSION stays 52 (Phase AW is generation-only), got {bts1.VOCAB_VERSION}")
+    check(bts1.VOCAB_VERSION >= 52, f"bts1.VOCAB_VERSION >= 52 (Phase AW added no bump of its own; AX moved it to 53), got {bts1.VOCAB_VERSION}")
     cs = (MOD_CODE / "Engine" / "ForgedCards.cs").read_text(encoding="utf-8", errors="replace")
     m = re.search(r"VocabVersion\s*=\s*(\d+)", cs)
-    check(m is not None and int(m.group(1)) == 52, f"ForgedCards.VocabVersion stays 52, got {m.group(1) if m else None}")
+    check(m is not None and int(m.group(1)) >= 52, f"ForgedCards.VocabVersion >= 52 (Phase AW added no bump of its own; AX moved it to 53), got {m.group(1) if m else None}")
     chars = (MOD_CODE / "Engine" / "ForgedCharacters.cs").read_text(encoding="utf-8", errors="replace")
     for key in ("orb_pool", "status_pool", "summon_pool"):
         check(f'd.ContainsKey("{key}")' in chars, f"ForgedCharacters parses {key} on its own ContainsKey branch (O-2a)")

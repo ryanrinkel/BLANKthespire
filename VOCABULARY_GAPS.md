@@ -447,8 +447,9 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Fantasy it serves:** the storm-peddler who literally SELLS bottled thunder for a spendable in-combat currency
 - **Mechanic sketch:** an in-combat gold/coin resource earned by 'selling' (exhausting) charged cards, then spent to buy effects or bank on a persistent run-long ledger — no catalog archetype models a currency you accrue and spend.
 - **Buildable today?** No — surfaced as off-vocabulary by the map stage.
-- **Priority:** Medium (Phase AX).
-- **Status:** **planned (2026-09-09, W0.11 triage → Phase AX)**
+- **Priority:** Medium (Phase AX — DONE).
+- **Status:** **done (2026-09-11, Phase AX — vocab v53)**
+- **Closed by (2026-09-11, Phase AX):** op `spend_forge` `{amount: 1..10}` — CONSUME that much of the per-combat Forge counter as a card's price; the rest of the card is the payoff. The "earn coin by selling" half was already `forge` income, so the currency you accrue AND spend is one op. Gate the payoff with `when` `forged_ge` and put it BEFORE the spend (effects resolve top-to-bottom; the validator rejects the other order). Forge-class only, card-only, never on a BASIC, never a card's only effect, one per card. The run-long ledger half stays out of scope (see Phase AY — run-persistent Forge is still a spike). AutoSlay GAPTESTAX2: 56 `[AX] spend_forge` fires including the empty-counter clamp, 0 mod exceptions.
 - **Triage (2026-09-09, W0.11):** re-sketched as Forge-with-spend: ONE new op `spend_forge` `{amount:N, effects:[...]}` — consume N of the existing per-combat Forge counter (`ForgedForgePower`) to run a payoff; no-op if the counter is short. Forge income already models the "earn coin by selling" half (`forge` on cards / in `add_trigger` payloads), so a currency you accrue AND spend is one op, not a new resource. The run-long ledger half stays out of scope (no persistent counter across combats).
 
 ### 45. Contagion Transfer
@@ -456,8 +457,9 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Fantasy it serves:** Patient zero — one infected enemy passing its sickness to the rest of the room.
 - **Mechanic sketch:** A mechanic that propagates a status (Poison) from an afflicted enemy onto adjacent/other enemies each turn, rather than the player applying it to each directly.
 - **Buildable today?** No — surfaced as off-vocabulary by the map stage.
-- **Priority:** Medium (Phase AX).
-- **Status:** **planned (2026-09-09, W0.11 triage → Phase AX)**
+- **Priority:** Medium (Phase AX — DONE).
+- **Status:** **done (2026-09-11, Phase AX — vocab v53)**
+- **Closed by (2026-09-11, Phase AX):** flag-op `spread_debuffs` — copy EVERY debuff on the struck target (Vulnerable / Weak / Frail / Poison, at their live stack counts) onto ALL OTHER living enemies. Single-enemy cards only (it reads the chosen target), card-only, never on a BASIC, one per card. Patient zero is a targeted skill that applies the debuff first and then spreads it; adjacency stays rejected per #34, and the spread is to ALL other enemies rather than a per-turn propagation rule. AutoSlay GAPTESTAX2: 29 real copies (+61 honest no-ops), 0 mod exceptions.
 - **Triage (2026-09-09, W0.11):** re-sketched with #46/#47 as ONE op `spread_debuffs` — copy the target's debuffs (Poison/Vulnerable/Weak/Frail) onto every OTHER alive enemy. Adjacency stays rejected per #34 (no positional API); "patient zero" becomes a targeted skill or an `add_trigger` turn_start payload with `target: enemy`, not a per-turn propagation rule.
 
 ### 46. Transmission
@@ -465,8 +467,9 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Fantasy it serves:** Contagion that jumps from one enemy to another, spreading infection across the battlefield
 - **Mechanic sketch:** A mechanic where poison or debuffs on one enemy spread to adjacent enemies at turn start — chain-infection that rewards hitting multiple targets with a single seed
 - **Buildable today?** No — surfaced as off-vocabulary by the map stage.
-- **Priority:** Medium (Phase AX).
-- **Status:** **planned (2026-09-09, W0.11 triage → Phase AX)**
+- **Priority:** Medium (Phase AX — DONE).
+- **Status:** **done (2026-09-11, Phase AX — vocab v53)**
+- **Closed by (2026-09-11, Phase AX):** flag-op `spread_debuffs` — copy EVERY debuff on the struck target (Vulnerable / Weak / Frail / Poison, at their live stack counts) onto ALL OTHER living enemies. Single-enemy cards only (it reads the chosen target), card-only, never on a BASIC, one per card. Folded into the single op with #45/#47 as triaged. The "at turn start" half is not available as a payload (spread_debuffs is card-only — a repeating spread needs a struck target), so chain-infection is a card you replay; adjacency stays rejected per #34. AutoSlay GAPTESTAX2: 29 real copies (+61 honest no-ops), 0 mod exceptions.
 - **Triage (2026-09-09, W0.11):** duplicate demand for #45 — folded into the single `spread_debuffs` op (copy the target's debuffs to all other enemies). The "at turn start" half is just that op inside an `add_trigger` turn_start payload. Adjacency stays rejected per #34.
 
 ### 47. Contagion Spread
@@ -474,8 +477,9 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Fantasy it serves:** The disease leaping from one enemy to another — airborne spores, contagious touch
 - **Mechanic sketch:** A mechanic where a status on one enemy spreads to adjacent or all enemies when it reaches a threshold, modeling epidemic transmission
 - **Buildable today?** No — surfaced as off-vocabulary by the map stage.
-- **Priority:** Medium (Phase AX).
-- **Status:** **planned (2026-09-09, W0.11 triage → Phase AX)**
+- **Priority:** Medium (Phase AX — DONE).
+- **Status:** **done (2026-09-11, Phase AX — vocab v53)**
+- **Closed by (2026-09-11, Phase AX):** flag-op `spread_debuffs` — copy EVERY debuff on the struck target (Vulnerable / Weak / Frail / Poison, at their live stack counts) onto ALL OTHER living enemies. Single-enemy cards only (it reads the chosen target), card-only, never on a BASIC, one per card. Folded into the single op with #45/#46 as triaged. The "threshold" half is a `when` gate on the spreading card (e.g. `target_has_status` poison) rather than a new trigger kind; adjacency stays rejected per #34. AutoSlay GAPTESTAX2: 29 real copies (+61 honest no-ops), 0 mod exceptions.
 - **Triage (2026-09-09, W0.11):** duplicate demand for #45 — folded into the single `spread_debuffs` op. The "threshold" half is a `when` gate on the spreading card (e.g. `target_has_status` poison ≥ N) rather than a new trigger kind. Adjacency stays rejected per #34; spread is to ALL other enemies.
 
 ### 48. Penance Counter

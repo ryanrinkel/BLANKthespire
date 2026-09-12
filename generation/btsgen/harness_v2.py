@@ -59,7 +59,7 @@ def seeded_shuffle(items, seed: int, salt: str = "") -> list:
 # Ops worth naming as "compositional" alternatives to a flat stat line, in preference order. Class-only
 # ops (orbs / summons / custom statuses / blade) are deliberately absent — they're only legal on a class
 # that declared the matching pool. The clause keeps ONLY the entries the live VOCABULARY.md actually has.
-_PREFERRED_OPS = ["add_trigger", "transform_card", "graft_card", "scry", "balance_step", "purge", "purge_card",
+_PREFERRED_OPS = ["add_trigger", "transform_card", "graft_card", "spread_debuffs", "scry", "balance_step", "purge", "purge_card",
                   "forge", "upgrade_card", "discard", "add_card", "corruption", "retain", "exhaust",
                   "ethereal", "innate", "lose_hp"]
 _PREFERRED_SCALES = ["cards_in_hand", "cards_retained", "unspent_energy_last_turn", "forged",
@@ -73,7 +73,8 @@ _CLASS_ONLY_TOKENS = {"channel_orb", "evoke", "gain_orb_slot", "focus", "orbs_ma
                       "summon_attack", "buff_summon", "heal_summon", "shield_summon",
                       "sacrifice_summon",  # Phase AV (v52)
                       "apply_status_custom",
-                      "blade_empower", "summon_blade", "on_blade_played"}
+                      "blade_empower", "summon_blade", "on_blade_played",
+                      "spend_forge"}  # Phase AX (v53, gap #44): the Forge cash-out needs forge income to spend
 
 _OP_ROW_RE = re.compile(r"^\|\s*`([a-z][a-z0-9_]*)`\s*\|", re.MULTILINE)
 _TOKEN_RE = re.compile(r"`\"?([a-z][a-z0-9_]*)\"?`")

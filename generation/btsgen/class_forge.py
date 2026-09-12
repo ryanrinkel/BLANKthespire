@@ -495,7 +495,13 @@ builds a Forge class — design AROUND these four beats, don't just sprinkle the
     `when:{{"kind":"forged_ge","value":N}}` ("if your Forge is 10+, …") as the archetype's rare finisher. \
     OPTIONAL BURST: one `{{"op":"blade_empower","amount":2}}` (or 3) skill/power — "Your blade deals 2x damage \
     this turn" — a spike distinct from the slow ramp (cash a big Forge in one swing). Forge-class only (it needs \
-    the blade); card-only; 1 per class.
+    the blade); card-only; 1 per class. \
+    OPTIONAL CASH-OUT (v53): one uncommon/rare card that lists a BIG payoff gated with \
+    `when:{{"kind":"forged_ge","value":N}}` FIRST and `{{"op":"spend_forge","amount":3-8}}` LAST \
+    ("Deal 20 damage if your Forge is 5+. Spend 5 Forge.") — the counter EMPTIES to buy the burst, so it is a real \
+    decision against the slow blade ramp. The gate MUST come before the spend (effects resolve top-to-bottom, so a \
+    gate placed after would read the counter this card just emptied). Forge-class only; card-only; never a card's \
+    only effect; never on a basic; 1 per class.
 The counter resets each combat. A forge class MUST ship its ONE signature_blade, real Forge income, AND ≥1 \
 blade-manipulation card; NEVER sprinkle `forge` onto a class whose identity is elsewhere, and non-forge classes \
 ship NO signature_blade / summon_blade / on_blade_played.
@@ -621,7 +627,7 @@ a deep class from a pile of synergies.
     {{ "role": "basic_skill",  "name_hint": "Defend", "type": "skill",  "rarity": "basic", "cost": 1, "deck_count": 4, "archetype": null, "theme": "the literal Defend" }},
     {{ "role": "signature", "name_hint": "...", "type": "attack|skill|power", "rarity": "basic", "cost": 0-3, "deck_count": 1, "archetype": "<id>", "theme": "the class-defining starter card, concrete and vocabulary-only" }},
     {{ "role": "signature_blade", "name_hint": "...", "type": "attack", "rarity": "token", "cost": 2, "deck_count": 0, "archetype": "<id>", "theme": "FORGE CLASSES ONLY — name/theme this class's growing signature weapon; the harness builds its effects (summoned to hand on your first Forge, retained, damage + your Forge). NOT in the starting deck." }},
-    {{ "role": "pool", "name_hint": "...", "type": "...", "rarity": "common|uncommon|rare", "cost": 0-3, "deck_count": 0, "archetype": "<id>", "strategy": "aggro|control|combo|null", "bridge": false, "theme": "a concrete one-line design using ONLY the vocabulary" }}
+    {{ "role": "pool", "name_hint": "...", "type": "...", "rarity": "common|uncommon|rare", "cost": 0-4, "deck_count": 0, "archetype": "<id>", "strategy": "aggro|control|combo|null", "bridge": false, "theme": "a concrete one-line design using ONLY the vocabulary (cost 4 is RARE-only and needs a headline effect)" }}
   ]
 }}
 
@@ -992,7 +998,8 @@ _PRUNABLE_SECTIONS: list[tuple[str, frozenset, str | None, str, str]] = [
     ("METAMORPH", frozenset({"transform_card", "graft_card"}), None, "transform",
      "metamorph (transform_card / graft_card: a card that permanently becomes another)"),
     ("THE FORGE / SIGNATURE-BLADE ARCHETYPE",
-     frozenset({"forge", "forged_ge", "blade_empower", "summon_blade", "on_blade_played"}), None, "forge",
+     frozenset({"forge", "forged_ge", "blade_empower", "summon_blade", "on_blade_played",
+                "spend_forge"}), None, "forge",  # Phase AX (v53): the cash-out is forge-class vocabulary too
      "forge + a signature blade (forge income, scale forged payoffs, blade_empower, summon_blade)"),
     ("THE BALANCE ARCHETYPE", frozenset({"balance_step"}), None, "balance",
      "the balance gauge (balance_step light/dark, light_ge / dark_ge / centered payoffs)"),

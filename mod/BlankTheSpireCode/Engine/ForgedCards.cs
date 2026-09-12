@@ -42,7 +42,22 @@ public static class ForgedCards
     /// v10 (forged statuses, Phase J): + CharacterSpec.StatusPool (a class's ≤4 custom modifier-family statuses
     /// read from `status_pool`; see ForgedCharacters / ForgedStatusPower). Class cards may apply a custom status
     /// by pool name via the `apply_status_custom` op (class-only, like custom-orb channels).</summary>
-    public const int VocabVersion = 52; // 52: Phase AV (VOCAB_GAP_REMEDIATION Wave 4) — THE AUTONOMOUS MINION MODEL IS BACK.
+    public const int VocabVersion = 53; // 53: Phase AX (VOCAB_GAP_REMEDIATION Wave 4) — STRUCTURAL CAPS + THE #44/#45 OPS.
+                                        //     Card `cost` ceiling 3 -> 4 (the heavyweight slot: RARE-ONLY, and the upgrade
+                                        //     `cost` band widens with it); `tags` maxItems 2 -> 3.
+                                        //     An UPGRADE MAY CHANGE ONE KEYWORD: the upgrade effect list may append exactly one
+                                        //     of exhaust/retain/innate/ethereal, or drop a trailing exhaust (BaseLib
+                                        //     UpgradeKeywords via WithKeyword(kw, UpgradeType.Add/Remove)); every other shape
+                                        //     still requires an exact count match.
+                                        //     TWO-OF-A-KIND STATUSES: a card may declare the SAME apply_status twice when the
+                                        //     SECOND one is `when`-gated — it takes a suffixed var ("Weak2") and applies with a
+                                        //     literal amount, so the DynamicVarSet never sees a duplicate key.
+                                        //     New CARD ops: `spend_forge` (amount 1..10 — consume that much of your Forge counter
+                                        //     as the card's PRICE; gap #44 re-sketch, pairs with when:forged_ge) and
+                                        //     `spread_debuffs` (flag-op — copy the struck target's Vulnerable/Weak/Frail/Poison
+                                        //     onto every OTHER living enemy; gaps #45–#47 re-sketch, single-enemy cards only).
+                                        //     Both are card-only, never on a BASIC, at most one per card. [AX] tags on every path.
+                                        // 52: Phase AV (VOCAB_GAP_REMEDIATION Wave 4) — THE AUTONOMOUS MINION MODEL IS BACK.
                                         //     The K-3 summon_pool fields are live again (dormant since the v15 true-Osty refit):
                                         //     `moves`/`actions` (a per-turn action cycle the minion runs at the end of your turn),
                                         //     `attackable:false` (ETHEREAL — no HP bar, never meat-shields), `on_summon` (battle cry,
@@ -367,6 +382,8 @@ public static class ForgedCards
          "corruption", // Phase AB (gap #20): flag-op — grant Corruption (your Skills cost 0 + Exhaust). Card-only, power/skill.
          "blade_empower", // Phase AF (gap #41): one-turn ×N multiplier on the forged blade token. Forge-class only, card-only.
          "transform_card", // Phase AH (gaps #35/#38): played card PERMANENTLY becomes the named same-class card for the rest of the run (self-rewrite / mode-swap). Card-only.
+         "spend_forge", // Phase AX (v53, gap #44): SPEND Forge as a card's price (the cash-out half of the ramp). Forge-class, card-only.
+         "spread_debuffs", // Phase AX (v53, gaps #45-#47): copy the struck target's debuffs to every OTHER living enemy. Card-only.
          "graft_card", // Phase AI (gap #7): CHOOSE form of transform_card — pick a card in hand, IT permanently becomes the named same-class card for the rest of the run. Card-only.
          "apply_custom", // EXPLORE SPIKE: apply a hardcoded modifier-family custom status (not in LLM contract)
          "summon_spike"]; // PHASE K SPIKE: summon a hardcoded player pet (not in LLM contract)
@@ -469,6 +486,24 @@ public static class ForgedCards
     // Lockstep with validator._HEAL_SUMMON_MAX / _SHIELD_SUMMON_MAX.
     private const int HealSummonMaxAmount = 9;
     private const int ShieldSummonMaxAmount = 12;
+    // Phase AX (v53, gap #44): the spend_forge cap. A ramp cash-out should be a real commitment but never a
+    // whole-combat counter wipe in one line; 10 is the ceiling (a card asking for more Forge than any realistic
+    // ramp reaches is a dead card). Lockstep with validator._SPEND_FORGE_MAX + the schema clause.
+    private const int SpendForgeMaxAmount = 10;
+    // Phase AX (v53): the card energy-cost ceiling, raised 3 -> 4. Cost 4 is the HEAVYWEIGHT slot and is RARE-ONLY
+    // (a 4-cost common is a dead draw); the upgrade `cost` band widens with it. Lockstep with validator._MAX_COST +
+    // card.schema.json's cost clauses.
+    internal const int MaxCardCost = 4;
+    // Phase AX (v53): the keyword flag-ops an UPGRADE may ADD (exactly one, appended to the end of the upgrade
+    // effect list). Removal is exhaust-only (an upgrade that drops a drawback), so it has no set of its own.
+    private static readonly HashSet<string> UpgradeAddableKeywords = ["exhaust", "retain", "innate", "ethereal"];
+    // Phase AX (v53): the keyword flag-ops whose presence differs between the base and upgrade lists — the set
+    // DataCard diffs to pick each keyword's BaseLib UpgradeType (None / Add / Remove). `purge` is deliberately
+    // absent: it is not a CardKeyword (it rides Spec.HasPurge + GetResultPileTypeForCardPlay).
+    internal static readonly HashSet<string> KeywordOps = ["exhaust", "retain", "innate", "ethereal"];
+    // Phase AX (v53): how many times one card may declare the SAME apply_status. The second one must be
+    // `when`-gated and takes a suffixed var ("Weak2"); a third is always a reject.
+    private const int MaxSameStatusPerCard = 2;
     // Phase V (gap #18): the hand-scopes upgrade_card may use. `random` (one random upgradable hand card) is legal
     // on cards AND in trigger payloads; `all` (every upgradable hand card) and `choose` (Phase X — the player picks
     // one upgradable hand card) are card-only (rejected in payloads — ValidateTrigger; a repeating pick spams the
@@ -515,6 +550,7 @@ public static class ForgedCards
          "heal_summon", // Phase AC (gap #2): HP to heal the summon (needs amount>=1; capped 1..9 in Validate)
          "shield_summon", // Phase AC (gap #2): Block to grant the summon (needs amount>=1; capped 1..12 in Validate)
          "blade_empower", // Phase AF (gap #41): the blade multiplier (needs amount>=2; capped 2..3 in Validate)
+         "spend_forge", // Phase AX (v53, gap #44): the Forge consumed (needs amount>=1; capped 1..10 in Validate)
          // NOTE: `summon` is intentionally NOT here. Its `amount` is the HP to grant and is OPTIONAL — a missing/0
          // amount means "use the summon's spec MaxHp" (EffectRunner falls back), matching the generator validator
          // (which never enforces summon amount>=1) and the relic path (ForgedCharacters special-cases summon before
@@ -683,11 +719,21 @@ public static class ForgedCards
         var invalid = Validate(effects, upgrade, allowCustomOrbs, target, orbNames);
         if (invalid != null) { error = invalid; return false; }
 
-        // Cost is an int (0–3) OR the string "X" (an X-cost card: X = all energy, resolved at play time).
+        // Cost is an int (0–4, Phase AX) OR the string "X" (an X-cost card: X = all energy, resolved at play time).
         bool costsX = card.ContainsKey("cost")
                       && card["cost"].VariantType == Godot.Variant.Type.String
                       && card["cost"].AsString().Trim().Equals("X", StringComparison.OrdinalIgnoreCase);
         int cost = costsX ? 0 : Int(card, "cost");
+        // Phase AX (v53): the band, raised 0..3 -> 0..4. Cost 4 is the HEAVYWEIGHT slot and is RARE-ONLY — a
+        // 4-cost common/uncommon is a dead draw at every point in a run. (The "headline effect" half of the rule
+        // is a generation-side warning; the rarity gate is hard on both sides.)
+        if (!costsX)
+        {
+            if (cost < 0 || cost > MaxCardCost)
+            { error = $"card 'cost' must be 0..{MaxCardCost} (or \"X\"); got {cost}."; return false; }
+            if (cost == MaxCardCost && rarity != CardRarity.Rare)
+            { error = $"cost {MaxCardCost} is RARE-only (got '{rarity}') — the heavyweight slot needs a headline effect."; return false; }
+        }
 
         // X-cost coupling is specific to scale:"x" (the OTHER F5 scalars are not tied to the card cost).
         bool anyX = effects.Any(e => e.ScaleX);
@@ -702,15 +748,15 @@ public static class ForgedCards
         if (effects.Concat(upgrade ?? []).Any(e => e.Scale == "energy") && (costsX || cost != 0))
         { error = "'scale:energy' requires a cost-0 card (the cost is paid before the card resolves, so a paid card would preview one number and deal another)."; return false; }
 
-        // Phase AG (gap #39): an upgrade may LOWER the card's energy cost (absolute, 0..3). House rules: never on an
+        // Phase AG (gap #39): an upgrade may LOWER the card's energy cost (absolute, 0..4 since Phase AX). House rules: never on an
         // X-cost card (X has no fixed cost to change); the upgraded cost must be <= the base cost (upgrades cheapen,
         // never tax). Applied at runtime by DataCard (MockSetEnergyCost on the Upgraded event).
         if (upgradedCost is { } ucost)
         {
             if (costsX)
             { error = "upgrade 'cost' is not allowed on an X-cost card."; return false; }
-            if (ucost < 0 || ucost > 3)
-            { error = $"upgrade 'cost' must be 0..3; got {ucost}."; return false; }
+            if (ucost < 0 || ucost > MaxCardCost) // Phase AX (v53): the band widens with the base cost ceiling
+            { error = $"upgrade 'cost' must be 0..{MaxCardCost}; got {ucost}."; return false; }
             if (ucost > cost)
             { error = $"upgrade 'cost' ({ucost}) may not exceed the base cost ({cost}) — upgrades cheapen, never tax."; return false; }
         }
@@ -1185,6 +1231,26 @@ public static class ForgedCards
             // card-only are enforced generation-side (validator + character_validator) / by not being in TriggerOps.
             if (e.Op == "blade_empower" && (e.Amount < 2 || e.Amount > 3))
                 return $"blade_empower 'amount' (the multiplier) must be 2 or 3; got {e.Amount}.";
+            // Phase AX (v53, gap #44): spend_forge CONSUMES the per-combat Forge counter as this card's price (the
+            // cash-out half of the ramp `forge` builds). amount>=1 is enforced by AmountOps above; here we cap the
+            // band. Forge-class-only + card-only are enforced generation-side (validator + character_validator) /
+            // by not being in TriggerOps — exactly like blade_empower.
+            if (e.Op == "spend_forge" && e.Amount > SpendForgeMaxAmount)
+                return $"spend_forge 'amount' (the Forge consumed) may be at most {SpendForgeMaxAmount}; got {e.Amount}.";
+            // Phase AX (v53, gaps #45-#47): spread_debuffs is a flag-op — it copies the STRUCK target's debuffs onto
+            // every OTHER living enemy, so it reads the chosen target (single-enemy cards only, like the AM target
+            // conditions) and carries no amount/status/hits/scale of its own.
+            if (e.Op == "spread_debuffs")
+            {
+                if (e.Amount != 0)
+                    return "spread_debuffs carries no amount (it copies the debuffs already on the target).";
+                if (e.Status != null)
+                    return $"'status' does not apply to spread_debuffs (it copies whatever debuffs the target has).";
+                if (e.IsScaled)
+                    return "'scale' does not apply to spread_debuffs (it copies the target's live debuff stacks).";
+                if (target != null && target != TargetType.AnyEnemy)
+                    return "spread_debuffs needs a single-enemy card (target \"enemy\") — it copies the CHOSEN target's debuffs to the others.";
+            }
             if (e.When != null)
             {
                 var cerr = Conditions.Validate(e.When);
@@ -1207,11 +1273,37 @@ public static class ForgedCards
         // The game builds one DynamicVarSet per card and THROWS on a duplicate key, so a card may declare each
         // canonical value only ONCE (one damage, one block, one of each status, …). This is a hard safety
         // boundary: an authored/LLM card with two same-type effects would otherwise crash the game on play.
-        var varKeys = effects.Select(VarKey).Where(k => k != null).ToList();
+        // Phase AX (v53): apply_status is the ONE exception — a card may declare the same status TWICE when the
+        // SECOND one is `when`-gated (the "Weak now, Weak2 if the gate opens" shape). The second takes a SUFFIXED
+        // var ("Weak2", see StatusVarName) so the DynamicVarSet still sees unique keys, and it applies with a
+        // literal amount at execution (EffectRunner) instead of through the card's PowerVar.
+        for (int i = 0; i < effects.Length; i++)
+        {
+            if (effects[i].Op != "apply_status") continue;
+            int occ = StatusOccurrence(effects, i);
+            if (occ >= MaxSameStatusPerCard)
+                return $"a card may declare '{effects[i].Status}' at most {MaxSameStatusPerCard} times " +
+                       "(one plain + one `when`-gated); a third is never readable on the card.";
+            if (occ > 0 && effects[i].When == null)
+                return $"a second '{effects[i].Status}' effect must be `when`-gated (the first is the printed " +
+                       "amount; the second is the conditional bonus) — an ungated pair should just be one bigger number.";
+        }
+        var varKeys = Enumerable.Range(0, effects.Length).Select(i => VarKey(effects, i)).Where(k => k != null).ToList();
         var dup = varKeys.GroupBy(k => k).FirstOrDefault(g => g.Count() > 1);
         if (dup != null)
             return $"two effects both declare '{dup.Key}' — a card may use each value only once " +
                    "(one damage, one block, one of each status, etc.); combine them or use different ops.";
+        // Phase AX (v53): the two new ops are one-per-effect-list (base + upgrade counted independently, like
+        // graft_card / cost_shift — an upgrade repeating one is the normal replace-on-upgrade pattern).
+        if (effects.Count(e => e.Op == "spend_forge") > 1 || (upgrade ?? []).Count(e => e.Op == "spend_forge") > 1)
+            return "at most one 'spend_forge' effect per card (one cash-out per play).";
+        if (effects.Count(e => e.Op == "spread_debuffs") > 1 || (upgrade ?? []).Count(e => e.Op == "spread_debuffs") > 1)
+            return "at most one 'spread_debuffs' effect per card (the debuffs only need copying once).";
+        // Phase AX (v53): spend_forge is the PRICE half of a card, so it may never be the whole card — the rest of
+        // the effect list is what the Forge buys (mirrors the sacrifice_summon rule).
+        foreach (var list in new[] { effects, upgrade })
+            if (list is { Length: > 0 } && list.All(e => e.Op == "spend_forge"))
+                return "'spend_forge' can't be a card's only effect (the spend is the price — the rest of the card is the payoff).";
         // One add_trigger per card: a card grants a single trigger power, which reads only the first add_trigger.
         if (effects.Count(e => e.Op == "add_trigger") > 1)
             return "at most one add_trigger per card (a card grants a single trigger power).";
@@ -1265,9 +1357,87 @@ public static class ForgedCards
                     && !list.Take(i).Any(p => p.Op == "damage"))
                     return "a 'scale:damage_dealt_unblocked' heal needs a 'damage' op earlier in the same card (you heal the damage you dealt).";
         }
-        if (upgrade != null && upgrade.Length != effects.Length)
-            return "upgrade effect count must match base effect count.";
+        // Phase AX (v53, gap #44): a `when:forged_ge` gate reads the LIVE Forge counter at execution time, and
+        // effects resolve top-to-bottom — so a gated payoff placed AFTER the spend_forge that empties the counter
+        // would test a number the same card just spent (the gate reads 0 and the payoff never fires). Order the
+        // card "gated payoff first, spend last". Base and upgrade checked independently, like the lifesteal rule.
+        foreach (var list in new[] { effects, upgrade })
+        {
+            if (list == null) continue;
+            for (int i = 0; i < list.Length; i++)
+                if (list[i].When?.Kind == "forged_ge" && list.Take(i).Any(q => q.Op == "spend_forge"))
+                    return "a 'when:forged_ge' effect can't come after a 'spend_forge' in the same card " +
+                           "(the spend empties the counter the gate reads) — put the gated payoff FIRST and spend last.";
+        }
+        // Phase AX (v53): the upgrade list is a POSITIONAL overlay (EffectRunner.UpgradeDelta reads it by index), so
+        // it normally has to match the base list's length exactly. The one relaxation: an upgrade may CHANGE ONE
+        // KEYWORD — append exactly one of exhaust/retain/innate/ethereal that the base doesn't have (the upgrade
+        // gains Exhaust/Retain/…), or drop a TRAILING exhaust (the upgrade sheds the drawback). Both keep indices
+        // 0..n-1 aligned, so the overlay still works; DataCard turns the base-vs-upgrade keyword diff into BaseLib
+        // UpgradeType.Add / UpgradeType.Remove. Anything else is still a reject.
+        if (upgrade != null)
+        {
+            var kerr = ValidateUpgradeShape(effects, upgrade);
+            if (kerr != null) return kerr;
+        }
         return null;
+    }
+
+    /// <summary>Phase AX (v53): the base-vs-upgrade effect-list shape rule (see the call site). Returns null when the
+    /// pair is legal. Shared by nothing else — kept separate so the rule reads in one piece and mirrors
+    /// validator.py's <c>_upgrade_shape_errors</c> line for line.</summary>
+    private static string? ValidateUpgradeShape(EffectSpec[] effects, EffectSpec[] upgrade)
+    {
+        int delta = upgrade.Length - effects.Length;
+        var baseKw = effects.Where(e => KeywordOps.Contains(e.Op)).Select(e => e.Op).ToHashSet();
+        var upKw = upgrade.Where(e => KeywordOps.Contains(e.Op)).Select(e => e.Op).ToHashSet();
+        if (delta == 0)
+        {
+            // Equal length: the keyword set must be identical too (the positional overlay carries amounts, not
+            // keywords — a silently different keyword at the same index would never reach the card).
+            if (!baseKw.SetEquals(upKw))
+                return "an equal-length upgrade must carry the same keywords as the base card " +
+                       "(to ADD a keyword, APPEND it as one extra upgrade effect; to remove one, drop the trailing 'exhaust').";
+            return null;
+        }
+        if (delta == 1)
+        {
+            var extra = upgrade[^1];
+            if (!UpgradeAddableKeywords.Contains(extra.Op))
+                return $"an upgrade with one extra effect may only APPEND a keyword " +
+                       $"({string.Join("/", UpgradeAddableKeywords)}); got '{extra.Op}'.";
+            if (baseKw.Contains(extra.Op))
+                return $"the base card already has '{extra.Op}' — an upgrade can't add it twice.";
+            // The first N upgrade effects still overlay the base positionally, so only the appended keyword is new.
+            if (!upKw.SetEquals(baseKw.Append(extra.Op).ToHashSet()))
+                return "an upgrade may change at most ONE keyword (append one, or drop the trailing 'exhaust').";
+            return null;
+        }
+        if (delta == -1)
+        {
+            if (effects[^1].Op != "exhaust")
+                return "an upgrade with one FEWER effect may only drop a TRAILING 'exhaust' " +
+                       $"(the base card's last effect is '{effects[^1].Op}').";
+            if (upKw.Contains("exhaust"))
+                return "the upgrade still carries 'exhaust' — drop it from the upgrade list to remove it.";
+            if (!upKw.SetEquals(baseKw.Where(k => k != "exhaust").ToHashSet()))
+                return "an upgrade may change at most ONE keyword (append one, or drop the trailing 'exhaust').";
+            return null;
+        }
+        return "upgrade effect count must match base effect count " +
+               "(or append exactly one keyword / drop a trailing 'exhaust').";
+    }
+
+    /// <summary>Phase AX (v53): how many EARLIER effects apply the SAME status as <paramref name="i"/> (0 = this is
+    /// the first / not an apply_status). Occurrence 1 is the `when`-gated second copy, which takes the suffixed var
+    /// name and applies with a literal amount. Mirrors validator._status_occurrence.</summary>
+    internal static int StatusOccurrence(EffectSpec[] effects, int i)
+    {
+        if (effects[i].Op != "apply_status") return 0;
+        int n = 0;
+        for (int j = 0; j < i; j++)
+            if (effects[j].Op == "apply_status" && effects[j].Status == effects[i].Status) n++;
+        return n;
     }
 
     /// <summary>Validate a Phase H3 <c>add_trigger</c>: a known trigger kind, a non-empty payload drawn only
@@ -1513,6 +1683,16 @@ public static class ForgedCards
         return $"Your {plural} cost {amt} less {life}.";
     }
 
+    /// <summary>Phase AX (v53): the var key of the i-th effect. apply_status is occurrence-numbered, so a card's
+    /// SECOND (gated) Weak declares 'status:weak:2' instead of colliding with the first.</summary>
+    private static string? VarKey(EffectSpec[] effects, int i)
+    {
+        var e = effects[i];
+        if (e.Op != "apply_status") return VarKey(e);
+        int occ = StatusOccurrence(effects, i);
+        return "status:" + e.Status + (occ > 0 ? ":" + (occ + 1) : "");
+    }
+
     private static string? VarKey(EffectSpec e) => e.Op switch
     {
         "damage"       => "Damage",
@@ -1527,6 +1707,29 @@ public static class ForgedCards
         "apply_status" => "status:" + e.Status,
         _ => null, // channel_orb / evoke / gain_orb_slot / exhaust / innate / retain / ethereal declare no var
     };
+
+    /// <summary>Phase AX (v53): the DISPLAY name of a base status — the word the card text prints and the stem the
+    /// second (gated) copy's suffixed var is built from ("Weak" -> "Weak2"). Shared by <see cref="Describe"/> and
+    /// <see cref="DataCard"/>; lockstep with cardgen.STATUS_NAME.</summary>
+    internal static string StatusDisplay(string? status) => status switch
+    {
+        "vulnerable" => "Vulnerable", "weak" => "Weak", "frail" => "Frail", "poison" => "Poison",
+        "strength" => "Strength", "dexterity" => "Dexterity", "thorns" => "Thorns",
+        "regen" => "Regen", "metallicize" => "Metallicize", "artifact" => "Artifact",
+        "buffer" => "Buffer", "intangible" => "Intangible", "ritual" => "Ritual", "blur" => "Blur",
+        "temp_strength" => "Strength", "temp_dexterity" => "Dexterity", "barricade" => "Barricade",
+        "focus" => "Focus",
+        "temp_thorns" => "Thorns", "temp_focus" => "Focus", // Phase AN (v44): worded like the temp stats
+        _ => status ?? "",
+    };
+
+    /// <summary>Phase AX (v53): the DynamicVar name the i-th apply_status declares — the status's display name, plus
+    /// an occurrence suffix for the gated second copy ("Weak2"). Mirrors validator._status_var_name.</summary>
+    internal static string StatusVarName(EffectSpec[] effects, int i)
+    {
+        int occ = StatusOccurrence(effects, i);
+        return StatusDisplay(effects[i].Status) + (occ > 0 ? (occ + 1).ToString() : "");
+    }
 
     /// <summary>The human phrase for a non-X scalar (F5), e.g. "the cards you retained". Lockstep with cardgen.py.</summary>
     private static string ScalePhrase(string? scale) => scale switch
@@ -1604,6 +1807,8 @@ public static class ForgedCards
                 case "purge":       parts.Add("Purge. (Removed from your deck for the rest of the run.)"); break; // Phase W (gap #19)
                 case "purge_card":  parts.Add("Choose a card in your hand and Purge it. (Removed from your deck for the rest of the run.)"); break; // Phase Z (gap #19 choose)
                 case "sacrifice_summon": parts.Add("Sacrifice your summon."); break; // Phase AV (v52): flag-op sentence (byte-lockstep with cardgen.py)
+                case "spend_forge": parts.Add($"Spend {Math.Max(1, e.Amount)} Forge."); break; // Phase AX (v53, gap #44): literal (no var), byte-lockstep with cardgen.py
+                case "spread_debuffs": parts.Add("Copy the target's debuffs to all other enemies."); break; // Phase AX (v53, gaps #45-#47)
                 case "corruption":  parts.Add("Your Skills cost 0."); parts.Add("Your Skills Exhaust when played."); break; // Phase AB (gap #20)
                 case "cost_shift":  parts.Add(CostShiftSentence(e)); break; // Phase AO (v45): the discount sentence (literal, no var)
                 case "blade_empower": parts.Add($"Your blade deals {Math.Max(2, e.Amount)}x damage this turn."); break; // Phase AF (gap #41)
@@ -1672,17 +1877,7 @@ public static class ForgedCards
                     parts.Add(UpgradeSentence(e, capitalize: true));
                     break;
                 case "apply_status":
-                    string name = e.Status switch
-                    {
-                        "vulnerable" => "Vulnerable", "weak" => "Weak", "frail" => "Frail", "poison" => "Poison",
-                        "strength" => "Strength", "dexterity" => "Dexterity", "thorns" => "Thorns",
-                        "regen" => "Regen", "metallicize" => "Metallicize", "artifact" => "Artifact",
-                        "buffer" => "Buffer", "intangible" => "Intangible", "ritual" => "Ritual", "blur" => "Blur",
-                        "temp_strength" => "Strength", "temp_dexterity" => "Dexterity", "barricade" => "Barricade",
-                        "focus" => "Focus",
-                        "temp_thorns" => "Thorns", "temp_focus" => "Focus", // Phase AN (v44): worded like the temp stats
-                        _ => e.Status ?? "",
-                    };
+                    string name = StatusDisplay(e.Status); // Phase AX (v53): shared with the suffixed-var stem
                     // Self-buffs are worded "Gain"; debuffs are "Apply"-ed to the target. SelfBuffStatuses is the
                     // single source of truth (shared with EffectRunner) so wording matches actual targeting.
                     bool buff = EffectRunner.SelfBuffStatuses.Contains(e.Status ?? "");

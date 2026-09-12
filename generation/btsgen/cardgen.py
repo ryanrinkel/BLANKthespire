@@ -543,6 +543,12 @@ def describe(effects: list[dict], target: str) -> str:
         elif op == "sacrifice_summon":
             # Phase AV (v52): the consume-your-minion flag-op sentence (literal). Lockstep with ForgedCards.Describe.
             parts.append("Sacrifice your summon.")
+        elif op == "spend_forge":
+            # Phase AX (v53, gap #44): the Forge cash-out sentence (literal, no var). Lockstep with ForgedCards.Describe.
+            parts.append(f"Spend {max(1, e.get('amount', 0) or 0)} Forge.")
+        elif op == "spread_debuffs":
+            # Phase AX (v53, gaps #45-#47): the contagion sentence (flag-op, no var). Lockstep with ForgedCards.Describe.
+            parts.append("Copy the target's debuffs to all other enemies.")
         elif op == "corruption":
             # Phase AB (gap #20): two sentences (joined by the "\n" that separates parts). Lockstep with ForgedCards.Describe.
             parts.append("Your Skills cost 0.")

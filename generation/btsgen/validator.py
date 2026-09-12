@@ -70,7 +70,9 @@ _BUILD_AROUND_OPS = {"add_trigger", "apply_status_custom",
                      "graft_card",  # Phase AI (gap #7): a choose-a-card run-permanent transform is a build-around, not a stat line
                      "scry",  # Phase AA (gap #17 R-2): a draw-filter / on_discard fuel is a build-around, not a flat stat line
                      "cost_shift",  # Phase AO (v45): a typed energy discount is a tempo utility, not a flat stat line
-                     "retrieve_card"}  # Phase AP (v46): pile recursion (Headbutt / Exhume) is a build-around, not a stat line
+                     "retrieve_card",  # Phase AP (v46): pile recursion (Headbutt / Exhume) is a build-around, not a stat line
+                     "spend_forge",  # Phase AX (v53, gap #44): cashing out the Forge ramp is a build-around, not a stat line
+                     "spread_debuffs"}  # Phase AX (v53, gaps #45-#47): contagion is a build-around payoff, not a stat line
 # F5: the live state scalars an effect's amount may scale to (mirrors ForgedCards.SupportedScales). "x" stays
 # the X-cost scalar; the rest are hand/energy state reads. Only "cards_retained" is allowed inside a trigger.
 # Phase M: "forged" is the ADDITIVE exception (printed amount + the Forge counter) and is damage/block-only.
@@ -149,6 +151,19 @@ _COST_SHIFT_MAX_COUNT = 3
 # (a repeating whole-hand upgrade / a repeating pick-UI every turn is degenerate — rejected in a trigger by both this
 # validator and ForgedCards.ValidateTrigger).
 _UPGRADE_SCOPES = {"random", "all", "choose"}
+# Phase AX (v53, gap #44): the spend_forge cap - a ramp cash-out is a real commitment but never a one-line
+# counter wipe. Lockstep with ForgedCards.SpendForgeMaxAmount + the schema clause.
+_SPEND_FORGE_MAX = 10
+# Phase AX (v53): the card energy-cost ceiling, raised 3 -> 4. Cost 4 is the HEAVYWEIGHT slot: RARE-ONLY (hard,
+# both sides) and expected to carry a headline effect (a warning, generation-side only). Lockstep with
+# ForgedCards.MaxCardCost + card.schema.json.
+_MAX_COST = 4
+# Phase AX (v53): the keyword flag-ops an UPGRADE may ADD (exactly one, appended to the end of the upgrade effect
+# list). Removal is exhaust-only. `purge` is deliberately absent - it is not a CardKeyword.
+_KEYWORD_OPS = {"exhaust", "retain", "innate", "ethereal"}
+# Phase AX (v53): how many times one card may declare the SAME apply_status. The second must be `when`-gated and
+# takes a suffixed var ("Weak2"); a third is always a reject. Lockstep with ForgedCards.MaxSameStatusPerCard.
+_MAX_SAME_STATUS = 2
 
 
 @dataclass
@@ -322,6 +337,27 @@ class CardValidator:
     # contract) so the website's repair loop fixes them instead of emitting a card the in-game importer
     # rejects. The in-game ForgedCards.Validate is the authoritative gate; this keeps the two in lockstep.
     @staticmethod
+    def _status_occurrence(effects: list, i: int) -> int:
+        """Phase AX (v53): how many EARLIER effects apply the SAME status as effects[i] (0 = the first / not an
+        apply_status). Occurrence 1 is the `when`-gated second copy, which takes the suffixed var name and applies
+        with a literal amount at runtime. Mirrors ForgedCards.StatusOccurrence."""
+        if effects[i].get("op") != "apply_status":
+            return 0
+        st = effects[i].get("status")
+        return sum(1 for j in range(i)
+                   if effects[j].get("op") == "apply_status" and effects[j].get("status") == st)
+
+    @classmethod
+    def _var_key_at(cls, effects: list, i: int):
+        """Phase AX (v53): the var key of the i-th effect. apply_status is occurrence-numbered, so a card's SECOND
+        (gated) Weak declares 'status:weak:2' instead of colliding with the first. Mirrors ForgedCards.VarKey."""
+        eff = effects[i]
+        if eff.get("op") != "apply_status":
+            return cls._var_key(eff)
+        occ = cls._status_occurrence(effects, i)
+        return "status:" + str(eff.get("status")) + (f":{occ + 1}" if occ else "")
+
+    @staticmethod
     def _var_key(eff: dict):
         """The DynamicVar key an effect declares in DataCard (None = none). Mirrors ForgedCards.VarKey:
         damage/block collapse to one key each; a scale:x draw declares no var."""
@@ -362,15 +398,15 @@ class CardValidator:
             _up = None
         up_effects = [e for e in ((_up or {}).get("effects") or []) if isinstance(e, dict)]
         # Phase AG (gap #39): an upgrade may LOWER the card's energy cost (absolute). Upgrades cheapen, never tax:
-        # cost 0..3, <= the base cost, and not on an X-cost card. Mirrors ForgedCards.TryParseCardJson.
+        # cost 0..4 (Phase AX), <= the base cost, and not on an X-cost card. Mirrors ForgedCards.TryParseCardJson.
         if isinstance(_up, dict) and _up.get("cost") is not None:
             ucost = _up.get("cost")
             base_cost = card.get("cost", 0)
             base_is_x = isinstance(base_cost, str) and base_cost.strip().upper() == "X"
             if base_is_x:
                 out.append("upgrade 'cost' is not allowed on an X-cost card.")
-            elif not (isinstance(ucost, int) and not isinstance(ucost, bool) and 0 <= ucost <= 3):
-                out.append(f"upgrade 'cost' must be an integer 0..3; got {ucost!r}.")
+            elif not (isinstance(ucost, int) and not isinstance(ucost, bool) and 0 <= ucost <= _MAX_COST):
+                out.append(f"upgrade 'cost' must be an integer 0..{_MAX_COST}; got {ucost!r}.")
             elif isinstance(base_cost, int) and ucost > base_cost:
                 out.append(f"upgrade 'cost' ({ucost}) may not exceed the base cost ({base_cost}) — upgrades cheapen, never tax.")
         # Phase AJ (v40): a random_enemy card has no chosen target (each hit / status effect rolls its own enemy), so
@@ -415,6 +451,27 @@ class CardValidator:
                         out.append(f"buff_summon 'status':'{st}' must be a self-buff (e.g. strength); it lands on the minion.")
             # Phase AC (gap #2): heal_summon / shield_summon heal / Block the class's one living summon — class-only
             # (need a summon_pool), like summon_attack/buff_summon; bounded caps. Mirrors ForgedCards.Validate.
+            # Phase AX (v53, gap #44): spend_forge CONSUMES the per-combat Forge counter as this card's price
+            # (the cash-out half of the ramp `forge` builds). The band is schema+engine capped; forge-class is
+            # class-level (character_validator.forge_pairing_warnings), card-only is the schema's triggerEffect
+            # op enum. Mirrors ForgedCards.Validate.
+            if e.get("op") == "spend_forge":
+                sfa = e.get("amount")
+                if not (isinstance(sfa, int) and not isinstance(sfa, bool) and 1 <= sfa <= _SPEND_FORGE_MAX):
+                    out.append(f"spend_forge 'amount' (the Forge consumed) must be 1..{_SPEND_FORGE_MAX}; got {sfa!r}.")
+            # Phase AX (v53, gaps #45-#47): spread_debuffs is a flag-op - it copies the STRUCK target's debuffs
+            # onto every OTHER living enemy, so it reads the chosen target (single-enemy cards only, like the AM
+            # target conditions) and carries no amount/status/scale of its own. Mirrors ForgedCards.Validate.
+            if e.get("op") == "spread_debuffs":
+                if e.get("amount") is not None:
+                    out.append("spread_debuffs carries no amount (it copies the debuffs already on the target).")
+                if e.get("status") is not None:
+                    out.append("'status' does not apply to spread_debuffs (it copies whatever debuffs the target has).")
+                if str(e.get("scale", "")).strip():
+                    out.append("'scale' does not apply to spread_debuffs (it copies the target's live debuff stacks).")
+                if str(card.get("target", "")).strip().lower() != "enemy":
+                    out.append('spread_debuffs needs a single-enemy card (target "enemy") -- it copies the CHOSEN '
+                               "target's debuffs to the others.")
             # Phase AV (v52): sacrifice_summon consumes the class's living minion (its on_death rattle fires) -
             # class-only like the rest of the summon family, and a flag-op (no amount/status/hits).
             if e.get("op") == "sacrifice_summon":
@@ -694,6 +751,48 @@ class CardValidator:
         if any(e.get("op") == "blade_empower" for e in effects + up_effects):
             if str(card.get("type", "")).strip().lower() == "attack":
                 out.append("'blade_empower' only applies to a skill or power card (not an attack — the empowered swing is the blade's).")
+        # Phase AX (v53, gap #44): spend_forge is the PRICE half of a card - never its only effect (the rest of
+        # the list is what the Forge buys), never on a BASIC (the starting deck has no ramp to spend), one per
+        # effect list (base + upgrade counted independently, like sacrifice_summon / graft_card). Pair it with a
+        # `when` forged_ge gate so it never fires on an empty counter. Mirrors ForgedCards.Validate.
+        if any(e.get("op") == "spend_forge" for e in effects + up_effects):
+            if is_basic:
+                out.append("'spend_forge' is not allowed on a BASIC card (the starting deck has no Forge to spend).")
+            if sum(1 for e in effects if e.get("op") == "spend_forge") > 1 \
+                    or sum(1 for e in up_effects if e.get("op") == "spend_forge") > 1:
+                out.append("at most one 'spend_forge' effect per card (one cash-out per play).")
+            for lst in (effects, up_effects):
+                if lst and all(e.get("op") == "spend_forge" for e in lst):
+                    out.append("'spend_forge' can't be a card's only effect (the spend is the price -- the rest of "
+                               "the card is the payoff).")
+        # Phase AX (v53, gap #44): a `when` forged_ge gate reads the LIVE Forge counter at execution time, and
+        # effects resolve top-to-bottom - so a gated payoff placed AFTER the spend_forge that empties the counter
+        # tests a number the same card just spent. Order the card "gated payoff first, spend last". Base and
+        # upgrade checked independently, like the lifesteal rule. Mirrors ForgedCards.Validate.
+        for lst in (effects, up_effects):
+            for i, ef in enumerate(lst):
+                w = ef.get("when")
+                if isinstance(w, dict) and w.get("kind") == "forged_ge" \
+                        and any(q.get("op") == "spend_forge" for q in lst[:i]):
+                    out.append("a 'when:forged_ge' effect can't come after a 'spend_forge' in the same card (the "
+                               "spend empties the counter the gate reads) -- put the gated payoff FIRST and spend last.")
+        # Phase AX (v53, gaps #45-#47): spread_debuffs copies the struck target's debuffs to the other enemies -
+        # a payoff, so never on a BASIC, and one per effect list (the debuffs only need copying once).
+        if any(e.get("op") == "spread_debuffs" for e in effects + up_effects):
+            if is_basic:
+                out.append("'spread_debuffs' is not allowed on a BASIC card (contagion is an uncommon/rare payoff).")
+            if sum(1 for e in effects if e.get("op") == "spread_debuffs") > 1 \
+                    or sum(1 for e in up_effects if e.get("op") == "spread_debuffs") > 1:
+                out.append("at most one 'spread_debuffs' effect per card (the debuffs only need copying once).")
+        # Phase AX (v53): the card energy-cost ceiling is 4, and cost 4 is the HEAVYWEIGHT slot - RARE-only (a
+        # 4-cost common/uncommon is a dead draw at every point in a run). Mirrors ForgedCards.TryParseCardJson.
+        _cost = card.get("cost")
+        if isinstance(_cost, int) and not isinstance(_cost, bool):
+            if not 0 <= _cost <= _MAX_COST:
+                out.append(f"card 'cost' must be 0..{_MAX_COST} (or \"X\"); got {_cost}.")
+            elif _cost == _MAX_COST and str(card.get("rarity", "")).strip().lower() != "rare":
+                out.append(f"cost {_MAX_COST} is RARE-only (got '{card.get('rarity')}') -- the heavyweight slot "
+                           "needs a headline effect.")
         # Phase AO (v45): cost_shift — at most one per EFFECT LIST (one discount sentence per play; base + upgrade
         # independent, like graft_card); a whole-combat discount is RARE-ONLY (a build-around power, loop discipline:
         # the per-class ≤1 rule is set-level, character_validator.cost_shift_warnings). Never on a BASIC card (a
@@ -744,9 +843,25 @@ class CardValidator:
                 w = e.get("when")
                 if isinstance(w, dict) and w.get("kind") in _TARGET_CONDITIONS:
                     out.append(f"'when:{w.get('kind')}' needs a single-enemy card (target \"enemy\") — it reads the chosen target.")
+        # Phase AX (v53): apply_status is the ONE exception to the dup-var guard - a card may declare the same
+        # status TWICE when the SECOND one is `when`-gated (the "Weak now, Weak2 if the gate opens" shape). The
+        # second takes a SUFFIXED var so the DynamicVarSet still sees unique keys. Mirrors ForgedCards.Validate.
+        for i in range(len(effects)):
+            if effects[i].get("op") != "apply_status":
+                continue
+            occ = self._status_occurrence(effects, i)
+            if occ >= _MAX_SAME_STATUS:
+                out.append(f"a card may declare '{effects[i].get('status')}' at most {_MAX_SAME_STATUS} times "
+                           "(one plain + one `when`-gated); a third is never readable on the card.")
+                break
+            if occ > 0 and not isinstance(effects[i].get("when"), dict):
+                out.append(f"a second '{effects[i].get('status')}' effect must be `when`-gated (the first is the "
+                           "printed amount; the second is the conditional bonus) -- an ungated pair should just be "
+                           "one bigger number.")
+                break
         # the dup-var crash guard: a card may declare each canonical value only once
         seen: set[str] = set()
-        for k in (self._var_key(e) for e in effects):
+        for k in (self._var_key_at(effects, i) for i in range(len(effects))):
             if k is None:
                 continue
             if k in seen:
@@ -866,6 +981,10 @@ class CardValidator:
                 # turn is a self-destroying engine (and the schema's triggerEffect op enum excludes it too).
                 if op == "sacrifice_summon":
                     out.append("'sacrifice_summon' is card-only (never inside an add_trigger payload).")
+                # Phase AX (v53): both new ops are CARD-ONLY (the schema's triggerEffect op enum omits them too) -
+                # a repeating cash-out drains the ramp every turn, and contagion needs a struck target.
+                if op in ("spend_forge", "spread_debuffs"):
+                    out.append(f"'{op}' is card-only (never inside an add_trigger payload).")
                 if op in ("summon_attack", "buff_summon"):
                     if not self._allowed_custom_summons:
                         out.append(f"a trigger {op} is only valid on a summon class (one with a summon_pool).")
@@ -898,8 +1017,47 @@ class CardValidator:
                 if t.get("card") is not None:
                     out.append(f"'card' only applies to the card-level add_status_card (trigger effect '{op}').")
         up = card.get("upgrade")
-        if isinstance(up, dict) and isinstance(up.get("effects"), list) and len(up["effects"]) != len(effects):
-            out.append("upgrade effect count must match base effect count.")
+        if isinstance(up, dict) and isinstance(up.get("effects"), list):
+            out += self._upgrade_shape_errors(effects, [e for e in up["effects"] if isinstance(e, dict)])
+        return out
+
+    @staticmethod
+    def _upgrade_shape_errors(effects: list, up_effects: list) -> list[str]:
+        """Phase AX (v53): the base-vs-upgrade effect-list shape rule. The upgrade list is a POSITIONAL overlay
+        (EffectRunner.UpgradeDelta reads it by index), so it normally has to match the base list's length exactly.
+        The one relaxation: an upgrade may CHANGE ONE KEYWORD -- append exactly one of exhaust/retain/innate/
+        ethereal that the base lacks, or drop a TRAILING exhaust. Both keep indices 0..n-1 aligned. Mirrors
+        ForgedCards.ValidateUpgradeShape line for line."""
+        out: list[str] = []
+        delta = len(up_effects) - len(effects)
+        base_kw = {e.get("op") for e in effects if e.get("op") in _KEYWORD_OPS}
+        up_kw = {e.get("op") for e in up_effects if e.get("op") in _KEYWORD_OPS}
+        if delta == 0:
+            if base_kw != up_kw:
+                out.append("an equal-length upgrade must carry the same keywords as the base card (to ADD a "
+                           "keyword, APPEND it as one extra upgrade effect; to remove one, drop the trailing "
+                           "'exhaust').")
+        elif delta == 1:
+            extra = up_effects[-1].get("op") if up_effects else None
+            if extra not in _KEYWORD_OPS:
+                out.append("an upgrade with one extra effect may only APPEND a keyword "
+                           f"({'/'.join(sorted(_KEYWORD_OPS))}); got '{extra}'.")
+            elif extra in base_kw:
+                out.append(f"the base card already has '{extra}' -- an upgrade can't add it twice.")
+            elif up_kw != base_kw | {extra}:
+                out.append("an upgrade may change at most ONE keyword (append one, or drop the trailing 'exhaust').")
+        elif delta == -1:
+            last = effects[-1].get("op") if effects else None
+            if last != "exhaust":
+                out.append("an upgrade with one FEWER effect may only drop a TRAILING 'exhaust' "
+                           f"(the base card's last effect is '{last}').")
+            elif "exhaust" in up_kw:
+                out.append("the upgrade still carries 'exhaust' -- drop it from the upgrade list to remove it.")
+            elif up_kw != base_kw - {"exhaust"}:
+                out.append("an upgrade may change at most ONE keyword (append one, or drop the trailing 'exhaust').")
+        else:
+            out.append("upgrade effect count must match base effect count (or append exactly one keyword / drop a "
+                       "trailing 'exhaust').")
         return out
 
     # -- 3. balance (port of ContentValidator.gd) -------------------------
@@ -972,6 +1130,17 @@ class CardValidator:
             # downside (the |8| extreme bites), so priced a touch under forge. Non-zero so a balance-income card
             # doesn't read as a blank stat line (keeps it off the rare/merchant floors via _BUILD_AROUND_OPS).
             return amt * 1.5
+        if op == "spend_forge":
+            # Phase AX (v53, gap #44): spending the ramp is a COST, not a benefit - it empties the counter every
+            # scale:"forged" payoff in the set reads from. Priced as a flat negative (like sacrifice_summon /
+            # lose_hp) so the payoff half of the card can be generous without tripping the power ceiling; the
+            # per-Forge value it cashes lives on the payoff effect, not here.
+            return -amt * 1.5
+        if op == "spread_debuffs":
+            # Phase AX (v53, gaps #45-#47): copy the struck target's debuffs to every OTHER enemy. The value is the
+            # debuffs already in play times the enemy count - both unseen at the card level - so price it as a
+            # strong build-around utility, above the transform/purge family and below a full AoE debuff line.
+            return 6.0
         if op == "blade_empower":
             # Phase AF (gap #41): a transient ×N burst on the signature blade — it can double/triple a fully-ramped
             # Forge in ONE swing, so it is priced ABOVE plain forge income (amt*2): the premium build-around spike it is.
