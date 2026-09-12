@@ -480,7 +480,7 @@ builds a Forge class — design AROUND these four beats, don't just sprinkle the
     hand (a 2-energy token attack that Retains and deals its printed base PLUS your Forge). Give a forge class \
     EXACTLY ONE `signature_blade` card (role "signature_blade", deck_count 1): NAME and THEME it as this class's \
     weapon (a war-hammer, a hexblade, a growing incantation). You do NOT spell out its effects — the harness \
-    builds the blade (summoned-on-first-Forge + Retain + damage + your Forge) as a never-drafted token.
+    builds it as a never-drafted token.
  2. INCOME IS THE CURVE. Numeric `forge` riders spread across CHEAP COMMONS ("Deal 5 damage. Forge 3." — small \
     numbers, Forge 1-3; it compounds) + AT LEAST ONE engine source (a power whose `add_trigger` turn_start \
     payload Forges each turn, e.g. "at the start of your turn, Forge 2" — that trigger income IS the engine, and \
@@ -502,7 +502,8 @@ builds a Forge class — design AROUND these four beats, don't just sprinkle the
     decision against the slow blade ramp. The gate MUST come before the spend (effects resolve top-to-bottom, so a \
     gate placed after would read the counter this card just emptied). Forge-class only; card-only; never a card's \
     only effect; never on a basic; 1 per class.
-The counter resets each combat. A forge class MUST ship its ONE signature_blade, real Forge income, AND ≥1 \
+The counter resets each combat, or CARRIES up to {_FORGE_PERSIST_CAP} into the next one if you set "forge_persist" (v54 \
+- an heirloom that remembers the run). A forge class MUST ship its ONE signature_blade, real Forge income, AND ≥1 \
 blade-manipulation card; NEVER sprinkle `forge` onto a class whose identity is elsewhere, and non-forge classes \
 ship NO signature_blade / summon_blade / on_blade_played.
 
@@ -618,6 +619,7 @@ a deep class from a pile of synergies.
   "orb_pool": [],
   "status_pool": [],
   "summon_pool": [],
+  "forge_persist": false,
   "archetypes": [
     {{ "id": "snake_case", "name": "Short Name", "description": "the engine, in vocabulary terms" }},
     {{ "id": "snake_case", "name": "Short Name", "description": "the engine, in vocabulary terms" }}
@@ -674,6 +676,7 @@ from the class's NON-basic pool, so every class MUST include at least one non-ba
 of EACH type: ≥1 Attack, ≥1 Skill, and ≥1 Power. A class with no non-basic Power card hangs the game at a \
 merchant. Powers are the build-around engines (use `add_trigger` per-turn effects, or a lasting self-buff like \
 Strength/Dexterity) — give every class one or two regardless of theme.
+- "forge_persist": true ONLY on a FORGE class whose weapon REMEMBERS across the run (it then carries up to {_FORGE_PERSIST_CAP} Forge into the next combat); false everywhere else.
 - "orb_slots": 0 for a normal class; 3-5 ONLY for an orb class (then one archetype must be the orb engine).
 - "max_energy": 3 normally; 4 ONLY with a smaller HP pool (max_hp <= 65); 2 ONLY for a big-energy / X-cost class \
 whose cards cost 0-1. "color": the class's hue 0-359 or a palette name ({_PALETTE_NAMES}) — its card-frame tint.
@@ -1590,6 +1593,9 @@ def _bridge_pair(card, arch_ids: list[str]):
 _MAX_HP_RANGE = (55, 100)           # was 60..95
 _MAX_ENERGY_RANGE = (2, 4)          # assembly default 3; the blueprint may now vary it
 _ORB_SLOTS_MAX = 5                  # was 4
+# Phase AY (v54): the Forge a `forge_persist` class carries OUT of a combat (mirror of
+# ForgedForgePower.PersistCap — a HEAD START, not a snowball; the engine caps it either way).
+_FORGE_PERSIST_CAP = 5
 # Named palette entries a blueprint may use for "color" (hue in degrees). A bare int/float 0-359, a numeric
 # string, or {"hue": 0-359} / {"h": 0..1[, "s", "v"]} are accepted too (see parse_color).
 _PALETTE = {"crimson": 0, "amber": 35, "gold": 55, "emerald": 130, "teal": 175, "azure": 215,
@@ -1810,6 +1816,7 @@ def _validate_blueprint(bp: dict) -> list[str]:
     else:
         if not (0 <= orb_slots <= _ORB_SLOTS_MAX):
             errs.append(f"orb_slots must be 0..{_ORB_SLOTS_MAX}")
+    errs += _validate_forge_persist(bp, cards)
     if "orb_pool" in bp and bp.get("orb_pool"):
         errs += _validate_orb_pool(bp.get("orb_pool"), orb_slots)
     if "status_pool" in bp and bp.get("status_pool"):
@@ -2098,6 +2105,30 @@ def _validate_orb_when(when, where: str) -> list[str]:
     if "negate" in when and not isinstance(when.get("negate"), bool):
         errs.append(f"{where}: condition 'negate' must be true/false")
     return errs
+
+
+def _validate_forge_persist(bp: dict, cards) -> list[str]:
+    """Phase AY (v54): the character-level `forge_persist` flag — a FORGE class may keep up to
+    _FORGE_PERSIST_CAP Forge between combats. Two rules, both hard (a dead flag on a non-forge class is
+    exactly the "the model reached for vocabulary it cannot use" failure the coverage work exists to stop):
+    it must be a bool, and the blueprint must actually be a FORGE class. At blueprint stage there are no card
+    effects yet — the briefs are prose — so the forge signal is the one structural marker the format demands
+    of a forge class and forbids everywhere else: its single `signature_blade` row. (The assembly stage
+    re-checks against real `forge` income and drops a flag that income never materialized for.) Absent /
+    false is always fine — that is the per-combat default every class had before v54."""
+    if "forge_persist" not in bp or bp.get("forge_persist") is None:
+        return []
+    val = bp.get("forge_persist")
+    if not isinstance(val, bool):
+        return ['forge_persist must be a boolean (true only for a forge class that keeps its Forge '
+                'between combats)']
+    if not val:
+        return []
+    if any(isinstance(c, dict) and c.get("role") == _BLADE_ROLE for c in cards or []):
+        return []
+    return ['forge_persist is true but this is not a forge class (no signature_blade card) — run-persistent '
+            'Forge needs a Forge counter to persist. Design the class as a forge class (see THE FORGE / '
+            'SIGNATURE-BLADE ARCHETYPE) or set "forge_persist": false.']
 
 
 def _validate_orb_pool(pool, orb_slots: int) -> list[str]:
@@ -3229,6 +3260,15 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
         note(f"blade-safety: forge class had Forge income but no signature blade; added '{blade['name']}' "
              "(cost 2, retain, damage + your Forge) as a token summoned on your first Forge (not in the deck)")
 
+    # Phase AY (v54): run-persistent Forge is FORGE-CLASS ONLY. The blueprint validator gates on the blade row;
+    # here we know the real answer (income in a card effect, a trigger payload, or the relic hook), so a flag
+    # whose income never materialized is DROPPED rather than shipped dead. Self-healing, like the blade net.
+    forge_persist = bool(bp.get("forge_persist"))
+    if forge_persist and not has_income:
+        forge_persist = False
+        note("forge_persist dropped: the assembled class has no `forge` income, so there is no counter to "
+             "carry between combats")
+
     # Self-healing discipline (Suck-U-Lator post-mortem, 2026-08-12): lifesteal rarity floor, sustain
     # density, and relic-stacking — runs AFTER stage 2.5 so the stacking check can see the keystone relic.
     # Advisory notes — the class still ships; the reaper_lifesteal / iron_regrowth archetype notes are the
@@ -3293,6 +3333,10 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
             character["color"] = parse_color(bp.get("color"))
         except ValueError as e:  # the validator already rejected a bad color on the LLM path; fakes/callers may skip it
             note(f"color: ignored ({e})")
+    # Phase AY (v54): carry the run-persistent-Forge flag (forge classes only; the C# importer defaults it to
+    # false, so it is emitted only when set — a pre-v54 bundle stays byte-identical).
+    if forge_persist:
+        character["forge_persist"] = True
     # Phase I: carry the forged orb pool (only meaningful on an orb class). The C# importer re-validates it.
     orb_pool = bp.get("orb_pool") or []
     if orb_slots > 0 and orb_pool:
@@ -3488,6 +3532,9 @@ def _fake_blueprint_variant(brief: ClassBrief) -> dict:
             "max_energy": 3,
             "color": "amber",
             "orb_slots": 0,
+            # Phase AY (v54): the offline forge fake also carries run-persistent Forge, so the flag's whole path
+            # (blueprint validation -> assembly carry -> bundle -> census) is exercised with no API key.
+            "forge_persist": True,
             "archetypes": [
                 {"id": "forge_ramp", "name": "Forge Ramp", "description": "stoke the Forge, swing the growing blade"},
                 {"id": "temper", "name": "Temper", "description": "Block and outlast while the blade sharpens"},

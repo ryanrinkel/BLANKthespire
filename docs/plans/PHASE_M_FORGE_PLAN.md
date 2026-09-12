@@ -43,7 +43,10 @@ No per-card-instance state (that's gap #23 Rampage — stays separate), no card-
   (`card.schema.json:35`). Side benefit: the static `upgrade` delta keeps working on the printed
   base (with replace-scales the upgrade delta lands on an ignored amount).
 - **Per-combat scope.** The counter is a power, powers die at combat end. Per-run persistence
-  (base-game blade flavor) needs run-persistent state — out of scope, note for later.
+  (base-game blade flavor) needs run-persistent state — out of scope here. **LANDED in Phase AY (v54):**
+  the opt-in class flag `forge_persist` banks `min(Forge, 5)` at combat end into a BaseLib
+  `SavedSpireField<Player,int>` (the run save) and pays it back at the next combat's first turn start.
+  Per-combat remains the default for every class that does not set it.
 - **Payload rules:** `forge` joins the self-payload op set (fixed amounts only); `scale:"forged"`
   is NOT allowed inside payloads (`TriggerScale` stays `cards_retained` — payoff reads belong on
   played cards). Relic-side forge income (via `RunRelicEffects`) is a cheap optional extra — decide

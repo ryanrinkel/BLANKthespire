@@ -39,6 +39,15 @@ public sealed record CharacterSpec(
     /// object initializer by <see cref="ForgedCharacters"/>; defaults to empty (incl. the empty-class spec).</summary>
     public SummonSpec[] SummonPool { get; init; } = [];
 
+    /// <summary>Phase AY (v54): RUN-PERSISTENT FORGE. When true, this forge class BANKS its Forge counter at the
+    /// end of each combat (capped at <see cref="Powers.ForgedForgePower.PersistCap"/>) and gets it back at the start
+    /// of its first turn of the next combat — the base-game "the blade remembers" flavour, opt-in per class instead
+    /// of the default per-combat reset. The bank rides the RUN SAVE (a BaseLib <c>SavedSpireField</c> on the Player;
+    /// see <see cref="ForgePersist"/>), so it survives save-and-quit. Meaningless without forge income (the generator
+    /// only sets it on a forge class); an inert flag on a non-forge class simply never banks anything. Defaults to
+    /// false — every pre-v54 class keeps the per-combat counter.</summary>
+    public bool ForgePersist { get; init; } = false;
+
     /// <summary>The class's forged relic (Phase L): a single custom starting relic, or null if the class uses the
     /// default (Burning Blood). Parsed from the class bundle's optional <c>relic</c> object by
     /// <see cref="ForgedCharacters"/>; fed to the compiled <c>ForgedClassKKRelic</c> shell via

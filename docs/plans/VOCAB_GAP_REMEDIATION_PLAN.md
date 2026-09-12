@@ -1210,6 +1210,70 @@ the pool-card cost band), `archetypes.json` + 3 exemplars (pool 117), `smoke_rel
   already persist anything per run (`user://forged/...` is per-install, not per-run)? If STS2 exposes a run-save
   hook, store `forge_persist` on the character and rehydrate `ForgedForgePower` at combat start. Otherwise STOP and
   keep per-combat.
+- **Test:** `tests/test_phase_ay.py`.
+
+**STATUS (2026-09-11): the AY-0 spike came back GREEN, and Phase AY EXECUTED on it (vocab v54)** — run-persistent
+Forge is LIVE as an opt-in CLASS flag, engine + generation in lockstep.
+
+**(0) The spike.** Two questions, both answered off the decompile + the pinned BaseLib 3.2.1 source in
+`_modref/`. *Does the mod persist anything per run?* **No** — nothing in `BlankTheSpireCode/` used a
+`[SavedProperty]` or a BaseLib spire field; `user://forged/...` is the per-install class library, not run state.
+*Does STS2 expose a run-save hook?* **Yes, two of them.** The base game carries a reflective
+`[SavedProperty]` system (`Saves.Runs/SavedProperties.cs`) whose values ride `SerializableCard.Props` /
+`SerializableRelic.Props`, with `SavedPropertiesTypeCache.InjectTypeIntoCache(Type)` as the public door for mod
+model types — but the PLAYER has no props bag, so a character-level counter has no home there. BaseLib 3.2.1
+fills exactly that gap: `SavedSpireField<TKey,TVal>` plus `ExtendedSaveTypes`/`ExtendedSaveHandlers`, which patch
+`SerializablePlayer`'s JSON *and* its packet round-trip (`ExtendedSavePatches.AddContext<Player,
+SerializablePlayer>`), so `SavedSpireField<Player,int>` is a run-scoped, save-backed int. Registration is
+automatic: BaseLib's post-mod-init scan force-initializes STATIC spire fields on mod types and sorts them into the
+save handlers. (Worth recording: base-game Forge is per-combat too — `ForgeCmd` creates the Sovereign Blade token
+inside the fight — so "the blade remembers across a run" is OUR design, not a base-game inference.)
+
+**(1) The flag.** Character-level `forge_persist` (bool, default false, **FORGE-CLASS ONLY**). Absent on every
+pre-v54 class, and the bundle only grows the key when it is set — so old codes are byte-identical.
+
+**(2) The rule.** At combat end the class banks `min(Forge, ForgedForgePower.PersistCap = 5)`; at the start of its
+first turn of the next combat the carry is paid back through `Stoke` — the same path a first Forge income takes, so
+**the signature blade is summoned too** — and the bank empties (re-banked from whatever the counter holds when
+THAT fight ends). The cap is the whole balance argument: a turn_start income engine banks ten-plus a fight across
+~50 fights, so an uncapped carry would print free damage by Act 2; five is one good income card and the threshold
+the contract's own example gate reads (`when forged_ge value:5`), so a ramping persist class opens the next fight
+already at its first payoff. Head start, not snowball — income and payoffs stay priced per combat.
+
+**(3) Where each half lives.** The BANK is on the power itself (`ForgedForgePower.AfterCombatEnd`): the hook still
+sees the live counter, because the game clears powers later, in `Player.AfterCombatEnd`. The RESTORE cannot be —
+the power does not exist yet — and no combat-start hook hands out a `(ctx, player)` (the same L-0 finding the
+relic's `start_combat_block` lives with), so it rides `AfterPlayerTurnStart`, guarded to once per combat. That
+needs a listener every forge class has, and not every class ships a relic: hence `Engine/ForgePersist.cs`, the
+mod's first BaseLib `CustomSingletonModel`, on **`HookType.Combat`** — `Hook.AfterPlayerTurnStart` iterates
+`combatState.IterateHookListeners()`, which run-state subscribers never reach.
+
+**(4) The AutoSlay gate PASSED.** `generation/scratch/gaptest-ay/build_tester.py` stages a persist FORGE class into
+slot 04 ("AY Gap Tester": Strike-with-`forge` income, a turn_start income power, a `scale:"forged"` payoff in the
+STARTING deck so the carry is visibly cashed on turn 1, a `summon_blade` retrieval, and the blade token — kept out
+of the starting deck, because a blade sitting in the deck makes the first-Forge summon a no-op and hides the very
+thing under test). Seed `GAPTESTAY2`: **5 banks / 4 restores, every bank CLAMPED (8→5, 9→5, 13→5, 17→5), 4×
+`[T] blade summoned … (first Forge of combat)`, 4 `[M] forged payoff` reads at exactly `Forge 5`, 0
+mod-attributable exception frames.** Seed `GAPTESTAY1` covers the other branch — a short first fight banks **2 and
+gets exactly 2 back**. Verdict on both is the usual map-nav watchdog stall, not mod-attributable (rule 0.3 gates on
+tags + exceptions). Evidence: `generation/scratch/gaptest-ay/godot_AY_tags_GAPTESTAY{1,2}.txt`. Slot 04 unstaged.
+
+**(5) Rule 0.9 paid in full.** The prompt additions are two one-liners (a `"forge_persist": false` row in the
+blueprint format block, one RULES line) plus one clause in the FORGE archetype paragraph — no new paragraph — and
+they are paid for by de-duplicating what the contract already said twice: the `forge` op row's restatement of the
+`forged` scale bullet (payoff shape + the pairing rule), `spend_forge`'s doubled ordering rule, and the forge
+beat-1 blade shape. Blueprint prompt **99,147 → 99,938** (ceiling 100,000).
+
+**Lockstep:** `ForgedCards` (VocabVersion 54), `CharacterSpec.ForgePersist`, `ForgedCharacters` (`forge_persist`
+parse + `IsForgePersistClass` / `IsForgePersistPlayer`), `ForgedForgePower` (`PersistCap`, `Bank`,
+`AfterCombatEnd`, a tooltip true in both regimes — loc is baked once at `ModelDb.Init`, so it cannot read the
+running class), new `Engine/ForgePersist.cs`; `VOCABULARY.md` (the Run-persistent Forge section + the `forge` op
+row), `bts1.py` (VOCAB_VERSION 54), `class_forge.py` (`_FORGE_PERSIST_CAP`, `_validate_forge_persist`, the
+assembly carry + the no-income self-heal, the offline forge fake), `census.py` (a class-level `forge_persist`
+counter + the AY line), `web/static/app.js` + `style.css` (the class-mechanics chip — no card text says it);
+`tests/test_phase_ay.py` (50 checks), suite 403 passed, C# build 0 errors. No card op, no schema change, no
+`describe` change. **Pre-existing red left as found:** `test_phase_at` / `test_phase_aw` pin stale prompt-size
+ceilings (98,357 and 96,153) that Phase AX already passed; both were failing at AX's commit and still are.
 
 ### Phase AZ — New content types (scoping only; each is its own plan)
 - **Forged potions** — a `potion_pool` on the character (1–2 potions), spec `{name, emoji, effects[]}` reusing the
@@ -1248,7 +1312,7 @@ the pool-card cost band), `archetypes.json` + 3 exemplars (pool 117), `smoke_rel
 | 1 | AJ, AJ-b | v40 | 2 days | Random-enemy, multi-hit summons, custom-orb engines, correct balance weights |
 | 2 | W2.1–W2.4 | — | 2 days | Coverage pushes the model across the whole vocabulary; classes can vary energy and color |
 | 3 | AK–AU | v41–v51 | ~1 day each | Attacker riposte, richer engines, five new scales, four new conditions, cost tricks, pile ops, status cards, DoT statuses, orb conditions, relic counters |
-| 4 | AV–AZ | v52+ | 1 week+ | Autonomous minions, hybrid classes, cost 4, upgrade-adds-keyword, Forge spend, contagion, potions |
+| 4 | AV–AZ | v52+ | 1 week+ | Autonomous minions, hybrid classes, cost 4, upgrade-adds-keyword, Forge spend, contagion, run-persistent Forge, potions |
 
 **Recommended order:** Wave 0 in one sitting → AJ + AJ-b → Wave 2 → AK, AL, AM (the three that most widen card
 design) → AQ (the most-requested fantasy, burn/DoT) → AS (relics) → the rest of Wave 3 by demand → Wave 4.

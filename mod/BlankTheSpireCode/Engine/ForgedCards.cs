@@ -42,7 +42,15 @@ public static class ForgedCards
     /// v10 (forged statuses, Phase J): + CharacterSpec.StatusPool (a class's ≤4 custom modifier-family statuses
     /// read from `status_pool`; see ForgedCharacters / ForgedStatusPower). Class cards may apply a custom status
     /// by pool name via the `apply_status_custom` op (class-only, like custom-orb channels).</summary>
-    public const int VocabVersion = 53; // 53: Phase AX (VOCAB_GAP_REMEDIATION Wave 4) — STRUCTURAL CAPS + THE #44/#45 OPS.
+    public const int VocabVersion = 54; // 54: Phase AY (VOCAB_GAP_REMEDIATION Wave 4) — RUN-PERSISTENT FORGE.
+                                        //     A new CHARACTER-level flag `forge_persist` (bool, default false,
+                                        //     FORGE-CLASS ONLY): the class BANKS min(Forge, ForgedForgePower.PersistCap)
+                                        //     at combat end and gets it back at the start of its first turn of the next
+                                        //     combat (through Stoke, so the blade is summoned too). The bank rides the
+                                        //     RUN SAVE — a BaseLib SavedSpireField<Player,int> on SerializablePlayer —
+                                        //     so it survives save-and-quit. No new card op, no card-text change; the
+                                        //     Forge tooltip now covers both regimes. See Engine/ForgePersist.cs.
+                                        // 53: Phase AX (VOCAB_GAP_REMEDIATION Wave 4) — STRUCTURAL CAPS + THE #44/#45 OPS.
                                         //     Card `cost` ceiling 3 -> 4 (the heavyweight slot: RARE-ONLY, and the upgrade
                                         //     `cost` band widens with it); `tags` maxItems 2 -> 3.
                                         //     An UPGRADE MAY CHANGE ONE KEYWORD: the upgrade effect list may append exactly one

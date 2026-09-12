@@ -2,7 +2,7 @@
 
 Run:  uv run python -m tests.test_phase_ax       (from generation/)
 Exits nonzero on any failure. Covers the v53 change in lockstep with the C#:
-  1. the vocab stamp is 53 on both sides (bts1.VOCAB_VERSION <= ForgedCards.VocabVersion);
+  1. the vocab stamp is >= 53 on both sides (bts1.VOCAB_VERSION <= ForgedCards.VocabVersion);
   2. COST 0..4 — the schema band, the upgrade band, and the RARE-only gate on the heavyweight slot;
   3. UPGRADE MAY CHANGE ONE KEYWORD — append exactly one of exhaust/retain/innate/ethereal, or drop a trailing
      exhaust; every other length/keyword change still rejects, and DataCard turns the diff into BaseLib's
@@ -75,11 +75,12 @@ BLOCK = {"op": "block", "amount": 5}
 
 # --------------------------------------------------------------------------- 1. stamps
 def test_version() -> None:
-    print("Phase AX vocab stamp is 53 (Python + C#):")
-    check(bts1.VOCAB_VERSION == 53, f"bts1.VOCAB_VERSION == 53 (got {bts1.VOCAB_VERSION})")
+    print("Phase AX vocab stamp is at least 53 (Python + C#):")
+    check(bts1.VOCAB_VERSION >= 53, f"bts1.VOCAB_VERSION >= 53 (Phase AY moved it to 54), got {bts1.VOCAB_VERSION}")
     fc = (MOD_CODE / "Engine" / "ForgedCards.cs").read_text(encoding="utf-8")
     m = re.search(r"public const int VocabVersion = (\d+);", fc)
-    check(m is not None and int(m.group(1)) == 53, f"ForgedCards.VocabVersion == 53 (got {m and m.group(1)})")
+    check(m is not None and int(m.group(1)) >= 53,
+          f"ForgedCards.VocabVersion >= 53 (Phase AY moved it to 54), got {m and m.group(1)}")
     check(m is not None and bts1.VOCAB_VERSION <= int(m.group(1)), "bts1.VOCAB_VERSION <= ForgedCards.VocabVersion")
     check("Phase AX" in fc and "spend_forge" in fc and "spread_debuffs" in fc,
           "ForgedCards.cs VocabVersion comment names Phase AX + both new ops")

@@ -21,8 +21,8 @@ validator. (The vocabulary grows as the interpreter grows — more ops/statuses 
 | `ethereal`     | *(none)*          | If this card is still in your hand at end of turn, it Exhausts. A card property. |
 | `purge`        | *(none)*          | **Purge** — when this card is played, it is removed from your **run deck for the rest of the run** (permanent deck-thinning; a stronger `exhaust` that never comes back). A card property. **Mutually exclusive with `exhaust`** (a card can't do both). **Never on a BASIC card.** Put it on a strong one-shot skill/attack you're happy to spend once to thin toward a lean engine (1–3 per class). A generated copy of a purge card (from `add_card`) just vanishes for the combat — it isn't in your run deck to remove. |
 | `purge_card`   | *(none)*          | **Choose-a-card Purge** — when this card is played, **YOU pick a card in your hand and purge THAT card** (removed from your run deck for the rest of the run). The player-choice form of `purge`: instead of the played card removing itself, it lets you thin a *chosen* target — great for cutting a Basic/Curse/dead card you drew. Carries no amount/target. Empty hand = harmless no-op. Put it on a skill/attack (1–2 per class). A chosen generated copy (no run-deck original) just vanishes for the combat. |
-| `forge`        | `amount` (int ≥1) | **Forge N** — stoke your per-combat **Forge** counter by `amount` (shown as a stacking power; resets each combat). The payoff is a damage/block effect with `scale:"forged"`, which ADDS your Forge to its printed amount. Income also works inside `add_trigger` payloads ("At the start of your turn, Forge 2") — see Triggers. A card set that Forges MUST also contain a `scale:"forged"` payoff, and vice versa. |
-| `spend_forge`  | `amount` (int 1–10) | **Spend N Forge** (v53) — CONSUME that much of your per-combat Forge counter as this card's **price**; the rest of the card is what the Forge buys. The cash-out half of the ramp: `forge` is the income, `scale:"forged"` is the slow payoff, `spend_forge` is the burst that empties the counter for something big right now. Put the `forged_ge`-gated payoff FIRST and the `spend_forge` LAST (effects resolve top-to-bottom, so a gate placed after the spend would read the counter this card just emptied — the validator rejects that order). Gate it with `when` `forged_ge` so it never fires on an empty counter (spending more than you hold just empties it — weak, never broken). Never a card's only effect, never on a BASIC, one per card, card-only. **FORGE-CLASS ONLY.** |
+| `forge`        | `amount` (int ≥1) | **Forge N** — stoke your **Forge** counter by `amount` (a stacking power; it resets each combat unless the class sets `forge_persist` — see Run-persistent Forge). Cash it with a `scale:"forged"` payoff (see Scaled amounts — the pairing is required both ways). Income also works inside `add_trigger` payloads ("At the start of your turn, Forge 2") — see Triggers. |
+| `spend_forge`  | `amount` (int 1–10) | **Spend N Forge** (v53) — CONSUME that much of your per-combat Forge counter as this card's **price**; the rest of the card is what the Forge buys. The cash-out half of the ramp: a burst that empties the counter instead of riding the slow payoff. Gate the payoff with `when` `forged_ge` so it never fires on an empty counter, and put that gate FIRST with the `spend_forge` LAST — effects resolve top-to-bottom, so a gate after the spend would read the counter this card just emptied (the validator rejects that order). Spending more than you hold just empties it — weak, never broken. Never a card's only effect, never on a BASIC, one per card, card-only. **FORGE-CLASS ONLY.** |
 | `spread_debuffs`| *(none)* | **Contagion** (v53) — copy EVERY debuff on the struck target (Vulnerable / Weak / Frail / Poison, at their current stack counts) onto **all other living enemies**. Needs a chosen target, so **single-enemy cards only** (`target: "enemy"`). The payoff of a debuff deck against a crowd: stack the debuffs on one enemy, then spread them. Pair it with a debuff EARLIER on the same card so it is never dead; an undebuffed target / a lone enemy is a harmless no-op. Never on a BASIC, one per card, card-only; uncommon/rare. |
 | `channel_orb`  | `orb` (lightning/frost/dark/**random**), optional `amount` (count) | Channel an orb into your next open slot. `orb:"random"` rolls one of lightning/frost/dark — **independently per orb** when `amount > 1`, so a multi-channel "pull" can come up all-matching (the slot-machine jackpot). **ORB-CLASS ONLY** — see Orbs below. |
 | `evoke`        | optional `amount` (count) | Evoke (trigger + consume) your oldest orb(s) now. **ORB-CLASS ONLY.** |
@@ -134,8 +134,8 @@ An ungated pair is rejected (that should just be one bigger number), and a third
   - `"forged"` — **the ADDITIVE exception (the base-game Forge keyword payoff):** the effect deals/blocks its
     printed `amount` (**NOT ignored** here — keep it real, ≥1) **plus your Forge**, the per-combat counter the
     `forge` op builds. `damage`/`block` only (never `draw`). This is "the signature blade that grows hit-by-hit":
-    stoke the counter with `forge` income (cards, per-turn triggers, maybe a relic), cash it with ONE or TWO
-    `scale:"forged"` payoff cards. A set with `forge` income MUST include a `scale:"forged"` payoff and vice versa.
+    stoke the counter with `forge` income, cash it with ONE or TWO `scale:"forged"` payoff cards. A set with
+    `forge` income MUST include a `scale:"forged"` payoff and vice versa.
   - `damage_dealt_unblocked` — **HEAL-ONLY (lifesteal).** A `heal` effect heals for the **unblocked** damage this
     card's earlier `damage` effect(s) dealt this play (blocked damage doesn't count; multi-hit and AoE all add up).
     The card MUST place a `damage` op **before** the `heal`. "Deal 8 damage to ALL enemies. Heal HP equal to the
@@ -397,6 +397,14 @@ The importer parses `orb_pool` / `status_pool` / `summon_pool` independently, so
 (AutoSlay-verified: an orb HUD and custom status icons coexist and both engines fire). Generation keeps a hybrid a
 SEASONING, not two half-classes: ONE full engine plus ONE **splash** pool — splash orb = 2–3 `orb_slots` + ≤1 custom
 orb; splash status = ≤2 custom statuses; splash summon = ONE passive minion — and never all three.
+
+## Run-persistent Forge (a CLASS knob — forge classes only)
+Forge is per-combat by default (it is a power). A forge class may set the character flag **`"forge_persist": true`**
+(v54): each combat ends by banking `min(Forge, 5)`, and the first turn of the next combat pays that carry back as
+Forge income — down the first-Forge path, so the signature blade is summoned too. It rides the run save (surviving
+save-and-quit) and a new run starts at 0. **FORGE-CLASS ONLY**: with no `forge` income there is nothing to carry and
+generation rejects the flag. The cap is the point — a head start, not a snowball, so cards stay priced per combat.
+Reach for it when the fantasy is an heirloom that REMEMBERS across the run. Default `false`.
 
 ## Card shape
 - `id` (snake_case, unique), `name` (short human title), `type` (attack/skill/power),

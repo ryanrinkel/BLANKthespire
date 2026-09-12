@@ -164,6 +164,8 @@ trigger. If the spike is clean, the rest is wiring.
    (5–10) since the Forge counter carries the scaling; validator `_score_effect` already prices `forged` payoffs.
 
 ## Out of scope
-- Run-persistent Forge (base-game blade flavor across a run) — still deferred; per-combat is the model.
+- Run-persistent Forge (base-game blade flavor across a run) — **LANDED, Phase AY (v54)**, as the opt-in class
+  flag `forge_persist` (bank `min(Forge, 5)` at combat end, paid back at the next fight's first turn start).
+  Per-combat stays the model for every class that does not set it, so decision #4 above is unchanged by default.
 - Base-game `AfterForge`/Sovereign-Blade machinery — untouched; ours stays parallel/closed-vocab.
 - Blade-specific synergy cards (base-game Parry/Sword Sage/Summon Forth analogues) — future.

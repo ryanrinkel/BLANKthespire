@@ -226,6 +226,7 @@ class Census:
     plain: int = 0
     x_cost: int = 0
     cost4: int = 0  # Phase AX (v53): cards in the heavyweight cost-4 slot (rare-only)
+    forge_persist: int = 0  # Phase AY (v54): CLASSES (not cards) that keep their Forge between combats
     ops: Counter = field(default_factory=Counter)
     statuses: Counter = field(default_factory=Counter)
     triggers: Counter = field(default_factory=Counter)
@@ -314,6 +315,7 @@ class Census:
         self.plain += other.plain
         self.x_cost += other.x_cost
         self.cost4 += other.cost4  # Phase AX (v53)
+        self.forge_persist += other.forge_persist  # Phase AY (v54)
         for name in ("ops", "statuses", "triggers", "whens", "scales", "keywords", "custom_statuses",
                      "summon_buffs", "ripen_amounts", "payload_ops"):
             getattr(self, name).update(getattr(other, name))
@@ -335,7 +337,13 @@ def census_cards(cards) -> Census:
 def census_bundle(bundle: dict) -> Census:
     """Census a class bundle ({kind:'class', character, cards[]}) or a bare {cards:[...]}."""
     cards = bundle.get("cards") if isinstance(bundle, dict) else None
-    return census_cards(cards or [])
+    cen = census_cards(cards or [])
+    # Phase AY (v54): the one CHARACTER-level reading the census keeps — run-persistent Forge is a class
+    # property, not a card op, so it can only be read off the bundle's character (a bare card list has none).
+    ch = bundle.get("character") if isinstance(bundle, dict) else None
+    if isinstance(ch, dict) and bool(ch.get("forge_persist")):
+        cen.forge_persist = 1
+    return cen
 
 
 # --- code / file decoding (reuse the reference codec) -----------------------------------------------
@@ -423,6 +431,8 @@ def format_report(named: list[tuple[str, Census]]) -> str:
     # should always be matched by rares in the per-class lines above).
     out.append(f"  AX (v53): spend_forge={agg.ops.get('spend_forge', 0)}  spread_debuffs={agg.ops.get('spread_debuffs', 0)}"
                f"  cost4={agg.cost4}")
+    # Phase AY (v54): run-persistent Forge — a CLASS count, so it reads 0 on a bare card-list census.
+    out.append(f"  AY (v54): forge_persist_classes={agg.forge_persist}")
     out.append(f"  triggers: turn_end+turn_start={agg.triggers.get('turn_end',0)+agg.triggers.get('turn_start',0)}  "
                f"reactive[{'/'.join(_REACTIVE_HEAD)}]={'/'.join(str(agg.triggers.get(k,0)) for k in _REACTIVE_HEAD)}"
                f"  | all: {_all(agg.triggers)}")

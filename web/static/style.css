@@ -226,6 +226,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .mech { position: relative; cursor: pointer; background: var(--panel2); border: 1px solid var(--line);
   border-radius: 10px; padding: 10px 12px; border-left: 3px solid var(--accent2); transition: border-color .12s; }
 .mech:hover { border-color: var(--accent); }
+/* Phase AY (v54): the run-persistent-Forge chip is informational (no element to rate) — don't invite a click. */
+.mech-forge { cursor: default; }
+.mech-forge:hover { border-color: var(--line); }
 .mech-top { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; padding-right: 18px; }
 .mech-badge { font-size: 10px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--accent2); }
 .mech-name { font-weight: 600; }

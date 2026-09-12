@@ -319,8 +319,14 @@ public static class ForgedCharacters
             if (!TryParseRelic(d["relic"].AsGodotDictionary(), out relicSpec, out error)) return false;
         }
 
+        // Run-persistent Forge (Phase AY, v54): opt-in per class. A forge class with this set banks its Forge at
+        // combat end and gets it back (capped) at the start of its next combat — see ForgePersist. Absent => false,
+        // so every pre-v54 class keeps the per-combat counter.
+        bool forgePersist = Bool(d, "forge_persist", false);
+
         spec = new CharacterSpec(name, desc, maxHp, maxEnergy, deck.ToArray(), h, s, v, OrbSlots: orbSlots)
-            { OrbPool = orbPool, StatusPool = statusPool, SummonPool = summonPool, Relic = relicSpec };
+            { OrbPool = orbPool, StatusPool = statusPool, SummonPool = summonPool, Relic = relicSpec,
+              ForgePersist = forgePersist };
         error = "";
         return true;
     }
@@ -481,6 +487,18 @@ public static class ForgedCharacters
     /// <summary>True if class <paramref name="k"/> declares a forged relic (so the slot equips it instead of the
     /// default Burning Blood).</summary>
     public static bool HasForgedRelic(int k) => SpecForClass(k).Relic != null;
+
+    /// <summary>Phase AY (v54): true if class <paramref name="k"/> keeps its Forge between combats (the opt-in
+    /// <c>forge_persist</c> flag). Read by <see cref="ForgePersist"/> at the bank/restore sites.</summary>
+    public static bool IsForgePersistClass(int k) => SpecForClass(k).ForgePersist;
+
+    /// <summary>Phase AY (v54): true if <paramref name="player"/> is playing a run-persistent-Forge class. Null /
+    /// a non-forged character (a base-game class in the same run) => false.</summary>
+    public static bool IsForgePersistPlayer(Player? player)
+    {
+        int k = ClassIndexOfPlayer(player);
+        return k >= 1 && k <= ClassCount && IsForgePersistClass(k);
+    }
 
     private static bool TryParseRelic(Godot.Collections.Dictionary d, out RelicSpec? spec, out string error)
     {

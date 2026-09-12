@@ -25,7 +25,14 @@ import sys
 import zlib
 from pathlib import Path
 
-VOCAB_VERSION = 53  # must be <= ForgedCards.VocabVersion (53: Phase AX — STRUCTURAL CAPS + THE #44/#45 OPS:
+VOCAB_VERSION = 54  # must be <= ForgedCards.VocabVersion (54: Phase AY — RUN-PERSISTENT FORGE:
+                    # a new CHARACTER-level flag `forge_persist` (bool, default false, FORGE-CLASS ONLY). A class
+                    # that sets it BANKS up to 5 Forge at the end of each combat and gets it back at the start of
+                    # its first turn of the next one (through the same path a first Forge takes, so the signature
+                    # blade is summoned too). The bank rides the RUN SAVE (a BaseLib SavedSpireField on the
+                    # Player), so it survives save-and-quit. No new card op and no card-text change: a class
+                    # bundle only grows the one optional boolean, and every pre-v54 class keeps the per-combat
+                    # counter. 53: Phase AX — STRUCTURAL CAPS + THE #44/#45 OPS:
                     # card `cost` ceiling 3 -> 4 (the heavyweight slot: RARE-only, and the upgrade `cost` band widens
                     # with it); `tags` maxItems 2 -> 3; an UPGRADE MAY CHANGE ONE KEYWORD (append exactly one of
                     # exhaust/retain/innate/ethereal, or drop a trailing exhaust) instead of matching the base effect

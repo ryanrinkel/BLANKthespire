@@ -11,6 +11,7 @@ using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Entities.Powers;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Rooms;
 
 namespace BlankTheSpire.BlankTheSpireCode.Powers;
 
@@ -20,11 +21,20 @@ namespace BlankTheSpire.BlankTheSpireCode.Powers;
 /// machinery. The <c>forge</c> op (cards, trigger payloads, relic hooks) adds stacks; a damage/block effect
 /// with <c>scale:"forged"</c> ADDS the current stacks to its printed amount — the one ADDITIVE exception in
 /// the F5 scale family (see <see cref="EffectRunner.ScaleValue"/> / <c>DataCard.BonusFor</c>). A pure counter:
-/// no Modify* hooks; the payoff read lives at the card's calc-var sites. Per-combat by nature (powers die at
-/// combat end). In-code loc + a runtime emoji icon (the gap-#26 lesson: never depend on base-game loc keys).
+/// no Modify* hooks; the payoff read lives at the card's calc-var sites. Per-combat by default (powers die at
+/// combat end) — a class that sets <c>forge_persist</c> (Phase AY, v54) carries up to <see cref="PersistCap"/>
+/// into its next combat instead, via <see cref="Engine.ForgePersist"/>. In-code loc + a runtime emoji icon
+/// (the gap-#26 lesson: never depend on base-game loc keys).
 /// </summary>
 public sealed class ForgedForgePower : BlankTheSpirePower
 {
+    /// <summary>Phase AY (v54): the most Forge a <c>forge_persist</c> class may carry OUT of a combat. A HEAD START,
+    /// never a snowball: without a ceiling the counter would compound floor after floor (a turn_start income engine
+    /// banks ten-plus per fight, fifty fights a run) and every <c>scale:"forged"</c> payoff would print free damage by
+    /// Act 2. Five is one good income card — and it is the threshold the contract's own example gate reads
+    /// (<c>when forged_ge value:5</c>), so a ramping persist class opens the next fight already at its first payoff.</summary>
+    public const int PersistCap = 5;
+
     public override PowerType Type => PowerType.Buff;
     // Counter: "Forge 3" then "Forge 2" -> 5 stacks — the base-game Forge accumulation.
     public override PowerStackType StackType => PowerStackType.Counter;
@@ -60,6 +70,30 @@ public sealed class ForgedForgePower : BlankTheSpirePower
             creature.InvokePowerModified(power, -spent, false);
         }
         return spent;
+    }
+
+    /// <summary>Phase AY (v54): BANK this combat's Forge for the next one — the run-persistent half of the counter,
+    /// for classes that opt in with <c>forge_persist</c>. Runs at combat end (see <see cref="AfterCombatEnd"/>),
+    /// while the power is still alive: the game clears powers in <c>Player.AfterCombatEnd</c>, which comes AFTER the
+    /// hook. Stores <c>min(stacks, PersistCap)</c> into the run save; <see cref="Engine.ForgePersist"/> pays it back
+    /// at the start of the player's first turn of the next combat. A non-persist class never banks (and so always
+    /// starts at zero, the Phase M default).</summary>
+    private static void Bank(Player owner, int stacks)
+    {
+        int carry = Math.Min(Math.Max(stacks, 0), PersistCap);
+        Engine.ForgePersist.Banked.Set(owner, carry);
+        MainFile.Logger.Info($"[AY] forge banked: {stacks} at combat end -> carrying {carry} (cap {PersistCap}).");
+    }
+
+    /// <summary>Combat end: bank the counter for a <c>forge_persist</c> class. This hook still sees the live power
+    /// (powers are cleared later, in <c>Player.AfterCombatEnd</c>), so <see cref="PowerModel.Amount"/> is this
+    /// combat's final Forge.</summary>
+    public override Task AfterCombatEnd(CombatRoom room)
+    {
+        var player = Owner?.Player;
+        if (player != null && ForgedCharacters.IsForgePersistPlayer(player))
+            Bank(player, (int)Amount);
+        return Task.CompletedTask;
     }
 
     /// <summary>Phase T (Sovereign Blade — base-game Forge): stoke the counter AND, on the FIRST Forge income of
@@ -110,10 +144,13 @@ public sealed class ForgedForgePower : BlankTheSpirePower
         MainFile.Logger.Info($"[T] blade summoned: '{bladeId}' -> hand ({(fromAnywhere ? "summon_blade" : "first Forge of combat")}).");
     }
 
+    // The tooltip is baked ONCE, at ModelDb init (BaseLib's ModelLocPatch), so it cannot read the running class —
+    // it has to be true for both regimes. Phase AY (v54): most classes still reset each combat; one that keeps its
+    // edge carries up to PersistCap.
     public override List<(string, string)>? Localization =>
         (List<(string, string)>)new PowerLoc("Forge",
-            "Your first Forge each combat summons your signature blade to your hand. Effects that add your Forge deal or block that much more; resets each combat.",
-            "Your first Forge each combat summons your signature blade to your hand. Effects that add your Forge deal or block that much more; resets each combat.");
+            "Your first Forge each combat summons your signature blade to your hand. Effects that add your Forge deal or block that much more. Forge resets each combat — unless your class keeps its edge, carrying up to 5 into the next fight.",
+            "Your first Forge each combat summons your signature blade to your hand. Effects that add your Forge deal or block that much more. Forge resets each combat — unless your class keeps its edge, carrying up to 5 into the next fight.");
 
     // Emoji icon via the runtime renderer (kicked in MainFile); falls back to the shipped placeholder.
     public override string? CustomPackedIconPath => EmojiIconRenderer.IconPath("forge") ?? base.CustomPackedIconPath;

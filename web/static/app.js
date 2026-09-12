@@ -565,12 +565,29 @@ function renderMechanics(character, classId) {
       items.push({ spec, entry });
     }
   }
-  if (!items.length) { box.classList.add("hidden"); return; }
+  // Phase AY (v54): run-persistent Forge is a CLASS KNOB, not a pool entry — no card says it, so the panel is
+  // the only place a player can learn the counter survives the fight. Informational: no feedback subject.
+  const persist = !!character?.forge_persist;
+  if (!items.length && !persist) { box.classList.add("hidden"); return; }
   box.innerHTML = `<div class="mech-head">Class mechanics — custom elements this class invents. `
     + `Click one to see what it does and rate it.</div><div class="mech-grid"></div>`;
   const grid = box.querySelector(".mech-grid");
+  if (persist) grid.appendChild(forgePersistEl());
   for (const { spec, entry } of items) grid.appendChild(mechEl(spec, entry, classId));
   box.classList.remove("hidden");
+}
+
+// Phase AY (v54): the static chip for `"forge_persist": true`. Same shape as a mech chip, but inert — there is
+// no invented element to rate, just a rule about this class's Forge counter.
+function forgePersistEl() {
+  const d = document.createElement("div");
+  d.className = "mech mech-forge";
+  d.innerHTML = `<div class="mech-top"><span class="mech-badge">⚒ Forge</span>`
+    + `<span class="mech-name">Keeps its edge</span></div>`
+    + `<div class="mech-teaser">This class's Forge counter does not fully reset between fights.</div>`
+    + `<ul class="mech-eff"><li>At the end of each combat it banks up to 5 Forge</li>`
+    + `<li>Your first turn of the next combat gets that much Forge back (and summons your blade)</li></ul>`;
+  return d;
 }
 
 function mechEl(spec, entry, classId) {
