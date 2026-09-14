@@ -294,6 +294,10 @@ def _t_contract() -> None:
           "the stale 'EXACTLY ONE custom summon' bullet (pre-AV) now says ONE or TWO")
     print(f"  (rule 0.9) blueprint prompt: {len(sp):,} chars (AV left {BP_AV:,}; delta {len(sp) - BP_AV:+,})")
     print(f"  (rule 0.9) VOCABULARY.md:    {len(vocab):,} chars")
+    # KNOWN RED since Phase AX (2026-09-11): this pins a ceiling measured on THIS phase's day, but there is
+    # only one blueprint prompt and later phases grew it past this line. Do NOT just raise the number - that
+    # is the ratchet rule 0.9 exists to stop. The fix is one shared budget assert; see "the rule-0.9 budget is
+    # asserted in N places" under Cross-cutting mitigations in VOCAB_GAP_REMEDIATION_PLAN.md.
     check(len(sp) <= BP_AV + BP_ALLOWANCE, f"rule 0.9: the AW additions stay within +{BP_ALLOWANCE:,} (got {len(sp) - BP_AV:+,})")
     tester = pathlib.Path(cf.__file__).parents[1] / "scratch" / "gaptest-aw" / "build_tester.py"
     if tester.exists():

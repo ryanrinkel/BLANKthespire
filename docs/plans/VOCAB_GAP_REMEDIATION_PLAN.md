@@ -751,6 +751,9 @@ These are the `VOCAB_EXPANSION_4_PLAN.md` §0 rules; the load-bearing ones repea
 - **0.9 Prompt budget.** The blueprint prompt is tuned for 7B-class local models. Every prompt addition in this
   plan must be paid for by a removal of equal size or land as a one-line "menu" pointer, not a paragraph.
   Measure with the existing prompt-size assert in `tests/test_harness_v2.py` before and after.
+  *Enforcement of this rule is itself an OPEN item — several phase tests pin their own stale ceiling and two are
+  knowingly red. See "the rule-0.9 budget is asserted in N places" under Cross-cutting mitigations before you
+  touch any of them.*
 
 ### Standard commands
 
@@ -1301,6 +1304,21 @@ ceilings (98,357 and 96,153) that Phase AX already passed; both were failing at 
   `class_forge.py:14`: mark LANDED in place so future audits don't re-surface them.
 - **Importer version gate** (`BTS1Codec.cs:65-67`) is one-directional. Add a min-version check in the OTHER
   direction only if an older mod build is still in the wild; otherwise document.
+- **OPEN (raised 2026-09-11, Phase AY): the rule-0.9 budget is asserted in N places, and the old ones have gone
+  stale.** There is ONE blueprint prompt, but several phase tests each pin their own ceiling against whatever it
+  measured on their day: `test_phase_at` "+5% of AR" -> **98,357**, `test_phase_aw` "AV + 1,000" -> **96,153**,
+  `test_phase_ax` / `test_phase_ay` a flat **100,000**. Phase AX took the prompt to 99,147 and so walked past the
+  first two; **both have been failing since AX's commit** (`5e7baa8`) and still fail at AY (99,938). Nothing is
+  broken — they are old measuring sticks bolted to the wall at last year's height, and they no longer test their
+  own phase's feature, just a shared global number.
+  - **Do NOT "fix" them by raising each sign to the current height.** That is the ratchet rule 0.9 exists to stop:
+    every phase would quietly re-baseline and the budget would mean nothing.
+  - **The fix when we come back to it:** ONE budget assert in one place (`tests/test_harness_v2.py` is where rule
+    0.9 says to measure), owning a single named ceiling constant + the current reading; every phase test drops its
+    private copy. Then a phase that wants headroom has to argue for it in exactly one spot.
+  - **Revisit after a few more phases** (AZ/BA+), once we can see the real growth curve and pick a ceiling that is
+    a budget rather than a snapshot. Until then the two reds are KNOWN and expected — do not treat a green
+    `test_phase_at` / `test_phase_aw` as the bar for a new phase; run the full suite and compare against this note.
 
 ---
 

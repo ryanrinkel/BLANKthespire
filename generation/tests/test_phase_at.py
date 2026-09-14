@@ -159,6 +159,10 @@ def _t_contract() -> None:
     check('on_damage_dealt: "On damage dealt"' in app, "app.js keeps the on_damage_dealt label (no new token)")
     bp = cf._BlueprintContract(mode="dossier", triad=True, seed=1).system_prompt()
     print(f"  (rule 0.9) blueprint prompt: {len(bp):,} chars (AR was 93,674; +/-5% = {int(93674 * 0.95):,}..{int(93674 * 1.05):,})")
+    # KNOWN RED since Phase AX (2026-09-11): this pins a ceiling measured on THIS phase's day, but there is
+    # only one blueprint prompt and later phases grew it past this line. Do NOT just raise the number - that
+    # is the ratchet rule 0.9 exists to stop. The fix is one shared budget assert; see "the rule-0.9 budget is
+    # asserted in N places" under Cross-cutting mitigations in VOCAB_GAP_REMEDIATION_PLAN.md.
     check(len(bp) <= int(93674 * 1.05), "rule 0.9: the blueprint prompt stays within +5% of AR")
 
 
