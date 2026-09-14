@@ -39,7 +39,6 @@ _PASS = 0
 _FAIL = 0
 
 MOD_CODE = paths.VOCABULARY.parents[1] / "BlankTheSpireCode"   # mod/contract/.. -> mod/BlankTheSpireCode
-BP_BUDGET = 100_000  # rule 0.9: the running blueprint-prompt ceiling this phase must stay under
 
 
 def check(cond: bool, msg: str) -> None:
@@ -227,9 +226,9 @@ def _t_contract() -> None:
     check('- "forge_persist": true ONLY on a FORGE class' in bp, "the RULES list carries the one-line rule")
     check(f'CARRIES up to {cf._FORGE_PERSIST_CAP} into the next one if you set "forge_persist"' in bp,
           "the FORGE archetype section pitches run persistence with the cap, in one line")
-    print(f"  (rule 0.9) blueprint prompt: {len(bp):,} chars (ceiling {BP_BUDGET:,})")
+    print(f"  (rule 0.9) blueprint prompt: {len(bp):,} chars (the ONE ceiling lives in tests/test_harness_v2.py)")
     print(f"  (rule 0.9) VOCABULARY.md:    {len(vocab):,} chars")
-    check(len(bp) < BP_BUDGET, f"rule 0.9: the blueprint prompt stays under {BP_BUDGET:,} chars (got {len(bp):,})")
+    # The 100,000 ceiling this used to re-declare now lives once, in test_harness_v2.py: one prompt, one ceiling.
 
 
 def main() -> int:

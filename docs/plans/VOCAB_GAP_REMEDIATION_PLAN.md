@@ -750,10 +750,10 @@ These are the `VOCAB_EXPANSION_4_PLAN.md` §0 rules; the load-bearing ones repea
 - **0.8 Vocab versions.** Assigned in build order starting at **v40**. Phase letters continue from **AJ**.
 - **0.9 Prompt budget.** The blueprint prompt is tuned for 7B-class local models. Every prompt addition in this
   plan must be paid for by a removal of equal size or land as a one-line "menu" pointer, not a paragraph.
-  Measure with the existing prompt-size assert in `tests/test_harness_v2.py` before and after.
-  *Enforcement of this rule is itself an OPEN item — several phase tests pin their own stale ceiling and two are
-  knowingly red. See "the rule-0.9 budget is asserted in N places" under Cross-cutting mitigations before you
-  touch any of them.*
+  Measure with the prompt-size assert in `tests/test_harness_v2.py`, before and after. That assert is the ONLY
+  place the ceiling lives (`BP_BUDGET`, asserted on the harness-v2 prompt — the longer, shipped path). A phase
+  test asserts that ITS OWN wording is in the prompt and never pins a size; if your phase needs headroom, argue
+  it in that one spot. See "the rule-0.9 budget is asserted in N places" under Cross-cutting mitigations for why.
 
 ### Standard commands
 
@@ -1279,6 +1279,9 @@ counter + the AY line), `web/static/app.js` + `style.css` (the class-mechanics c
 ceilings (98,357 and 96,153) that Phase AX already passed; both were failing at AX's commit and still are.
 
 ### Phase AZ — New content types (scoping only; each is its own plan)
+- **Before closing out the plan:** the rule-0.9 prompt budget is flagged for reevaluation at the END of plan
+  execution — see the CLOSED "the rule-0.9 budget is asserted in N places" item under Cross-cutting mitigations
+  for the four checks. Do it here, while AQ..AZ's readings are all still in front of you.
 - **Forged potions** — a `potion_pool` on the character (1–2 potions), spec `{name, emoji, effects[]}` reusing the
   card effect vocab (self/enemy target), runtime `ForgedPotion : BlankTheSpirePotion`
   (`Potions/BlankTheSpirePotion.cs`), pool wiring in `Character/BlankTheSpirePotionPool.cs`. Write
@@ -1304,21 +1307,39 @@ ceilings (98,357 and 96,153) that Phase AX already passed; both were failing at 
   `class_forge.py:14`: mark LANDED in place so future audits don't re-surface them.
 - **Importer version gate** (`BTS1Codec.cs:65-67`) is one-directional. Add a min-version check in the OTHER
   direction only if an older mod build is still in the wild; otherwise document.
-- **OPEN (raised 2026-09-11, Phase AY): the rule-0.9 budget is asserted in N places, and the old ones have gone
-  stale.** There is ONE blueprint prompt, but several phase tests each pin their own ceiling against whatever it
-  measured on their day: `test_phase_at` "+5% of AR" -> **98,357**, `test_phase_aw` "AV + 1,000" -> **96,153**,
-  `test_phase_ax` / `test_phase_ay` a flat **100,000**. Phase AX took the prompt to 99,147 and so walked past the
-  first two; **both have been failing since AX's commit** (`5e7baa8`) and still fail at AY (99,938). Nothing is
-  broken — they are old measuring sticks bolted to the wall at last year's height, and they no longer test their
-  own phase's feature, just a shared global number.
-  - **Do NOT "fix" them by raising each sign to the current height.** That is the ratchet rule 0.9 exists to stop:
-    every phase would quietly re-baseline and the budget would mean nothing.
-  - **The fix when we come back to it:** ONE budget assert in one place (`tests/test_harness_v2.py` is where rule
-    0.9 says to measure), owning a single named ceiling constant + the current reading; every phase test drops its
-    private copy. Then a phase that wants headroom has to argue for it in exactly one spot.
-  - **Revisit after a few more phases** (AZ/BA+), once we can see the real growth curve and pick a ceiling that is
-    a budget rather than a snapshot. Until then the two reds are KNOWN and expected — do not treat a green
-    `test_phase_at` / `test_phase_aw` as the bar for a new phase; run the full suite and compare against this note.
+- **CLOSED 2026-09-14 (raised 2026-09-11, Phase AY): the rule-0.9 budget was asserted in N places, and the old
+  ones had gone stale.** There is ONE blueprint prompt, but several phase tests each pinned their own ceiling
+  against whatever it measured on their day: `test_phase_at` "+5% of AR" -> **98,357**, `test_phase_aw`
+  "AV + 1,000" -> **96,153**, `test_phase_ax` / `test_phase_ay` a flat **100,000**. Phase AX took the prompt to
+  99,147 and so walked past the first two; both failed from AX's commit (`5e7baa8`) through AY. They were old
+  measuring sticks bolted to the wall at last year's height, testing a shared global number rather than their own
+  phase's feature.
+  - **Fixed as planned, NOT by raising each sign to the current height** — that ratchet is what rule 0.9 exists to
+    stop. There is now ONE assert, `test_rule_0_9_blueprint_prompt_stays_within_budget` in
+    `tests/test_harness_v2.py`, owning `BP_BUDGET` plus the current readings. AT / AW / AX / AY dropped their
+    private ceilings and keep only the informational print; AT and AW are green again. A phase that wants headroom
+    argues for it in exactly one spot. (AU and AV already had the right idiom: assert your own wording is in the
+    prompt, never a size — that is the pattern for every new phase test.)
+  - **The consolidation surfaced a second bug, and cost ONE deliberate raise: 100,000 -> 101,000.** Every reading
+    the old ceiling was built from was taken with the harness flag OFF. Under `BTS_HARNESS_V2=1` — what the
+    droplet actually runs, and the longer path — Fix D's rotations add **+103**, so the shipped prompt was
+    **100,041, already 41 chars past a ceiling nobody knew it was breaching**. The single assert now measures the
+    v2 path, with `test_rule_0_9_v2_is_the_worst_case` guarding the assumption that v2 stays the longer of the
+    two. Readings at AY: **v2 100,041 / v1 99,938**, ~959 chars of headroom.
+  - **REEVALUATE AT THE END OF PLAN EXECUTION** — after AZ, before this plan is archived. By then the growth curve
+    across AQ..AZ is visible and the ceiling can be a budget rather than a snapshot. Check, in order:
+    1. **Is 101,000 still the right number?** It was set from ONE reading (v2 at 100,041) with ~959 chars of
+       headroom. Plot the per-phase readings and pick a ceiling the remaining phases can actually live under —
+       or conclude the prompt has to shrink, which is the answer rule 0.9 actually wants.
+    2. **Did the one-assert discipline hold?** `grep -rn "rule 0\.9" generation/tests/` should show `BP_BUDGET`
+       in `test_harness_v2.py` and NOWHERE else. Any new private ceiling in a phase test is the same regression
+       coming back; delete it there and note why here.
+    3. **Is v2 still the worst case?** `test_rule_0_9_v2_is_the_worst_case` asserts it, but if the flag is retired
+       (or flipped to default-on and v1 deleted) the two readings collapse into one and both constants should
+       follow. The 41-char breach this consolidation found came from measuring the path we DON'T ship.
+    4. **Does the budget still mean anything for a 7B model?** The whole rule exists for local-model context, not
+       for the number's own sake. If the deployed models moved, re-derive the ceiling from them rather than from
+       the history.
 
 ---
 

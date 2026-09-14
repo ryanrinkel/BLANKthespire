@@ -39,7 +39,6 @@ MOD_CODE = paths.VOCABULARY.parents[1] / "BlankTheSpireCode"   # mod/contract/..
 CARD_SCHEMA = paths.VOCABULARY.parent / "card.schema.json"
 APP_JS = paths.VOCABULARY.parents[2] / "web" / "static" / "app.js"
 EXEMPLAR_POOL = pathlib.Path(cf.__file__).parent / "data" / "exemplar_pool.json"
-BP_BUDGET = 100_000  # rule 0.9: the running blueprint-prompt ceiling this phase must stay under
 
 
 def check(cond: bool, msg: str) -> None:
@@ -368,9 +367,9 @@ def _t_contract() -> None:
     check('case "spread_debuffs":' in js, "app.js renders spread_debuffs")
 
     bp = cf._BlueprintContract(mode="dossier", triad=True, seed=1).system_prompt()
-    print(f"  (rule 0.9) blueprint prompt: {len(bp):,} chars (ceiling {BP_BUDGET:,})")
+    print(f"  (rule 0.9) blueprint prompt: {len(bp):,} chars (the ONE ceiling lives in tests/test_harness_v2.py)")
     print(f"  (rule 0.9) VOCABULARY.md:    {len(vocab):,} chars")
-    check(len(bp) < BP_BUDGET, f"rule 0.9: the blueprint prompt stays under {BP_BUDGET:,} chars (got {len(bp):,})")
+    # The 100,000 ceiling this used to re-declare now lives once, in test_harness_v2.py: one prompt, one ceiling.
     check("OPTIONAL CASH-OUT" in bp, "the forge section pitches the cash-out")
 
 

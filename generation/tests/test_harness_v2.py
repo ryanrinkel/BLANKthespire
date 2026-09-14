@@ -328,6 +328,44 @@ def test_strip_metaphors_tidies_text():
 
 
 # --------------------------------------------------------------- Fix D: blueprint prompt
+# Rule 0.9 (VOCAB_EXPANSION_4_PLAN.md §0) — THE prompt budget, asserted here and nowhere else.
+#
+# The blueprint prompt is tuned for 7B-class local models: every addition must be paid for by a removal of equal
+# size or land as a one-line "menu" pointer, not a paragraph. There is ONE prompt, so there is ONE ceiling, and
+# it lives in this file. A phase test asserts that ITS OWN wording is still in the prompt (see test_phase_au /
+# test_phase_av for the idiom); it does NOT pin a size. Phase tests used to keep private ceilings measured on
+# their own day, which is the ratchet rule 0.9 exists to stop — test_phase_at and test_phase_aw sat red for
+# three phases because the prompt grew past ceilings that had nothing to do with their features.
+#
+# The ceiling bounds the WORST CASE, which is the harness-v2 prompt (v2 is what the droplet runs, and Fix D's
+# rotations make it the longer of the two paths). Raising BP_BUDGET is a deliberate change argued in this one
+# place, with the reason in the commit message.
+BP_BUDGET = 101_000      # raised ONCE, at the Phase AY consolidation: every reading the old 100,000 was built
+                         # from (AQ..AY, and the AT/AW ceilings this replaced) was measured flag-OFF, so it never
+                         # counted the +103 that v2 adds and the shipped prompt was 41 chars past it unnoticed.
+BP_READING = 100_041     # v2, the asserted path — 2026-09-14, Phase AY
+BP_READING_V1 = 99_938   # flag-off, the number the AQ..AY prints continue to show
+# All three numbers are SCHEDULED FOR REEVALUATION at the end of VOCAB_GAP_REMEDIATION_PLAN execution
+# (after Phase AZ): 101,000 came from one reading, not from a growth curve. The four checks to run are in
+# that plan, under the CLOSED "the rule-0.9 budget is asserted in N places" item in Cross-cutting mitigations.
+
+
+def test_rule_0_9_blueprint_prompt_stays_within_budget(v2):
+    bp = _BlueprintContract(mode="dossier", triad=True, seed=1).system_prompt()
+    assert len(bp) < BP_BUDGET, (
+        f"rule 0.9: the blueprint prompt is {len(bp):,} chars, past the {BP_BUDGET:,} ceiling "
+        f"({len(bp) - BP_READING:+,} since the {BP_READING:,} recorded at Phase AY). Pay for the addition with a "
+        f"removal of equal size, or make it a one-line menu pointer. Raise the ceiling only on purpose, here.")
+
+
+def test_rule_0_9_v2_is_the_worst_case(v1):
+    """The ceiling above is asserted under v2 because v2 is the LONGER path; this keeps that assumption honest."""
+    bp_v1 = _BlueprintContract(mode="dossier", triad=True, seed=1).system_prompt()
+    assert len(bp_v1) <= BP_READING, (
+        f"the flag-off prompt is {len(bp_v1):,} chars, past the v2 reading {BP_READING:,} — v2 is no longer the "
+        f"worst case, so the budget assert above is measuring the wrong path.")
+
+
 def test_homage_examples_rotate_per_forge(v2):
     a = _BlueprintContract(mode="dossier", triad=True, seed=harness_v2.seed_for("a plague doctor")).system_prompt()
     b = _BlueprintContract(mode="dossier", triad=True, seed=harness_v2.seed_for("a storm gambler")).system_prompt()

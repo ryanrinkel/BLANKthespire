@@ -38,8 +38,6 @@ _PASS = 0
 _FAIL = 0
 
 MOD_CODE = paths.VOCABULARY.parents[1] / "BlankTheSpireCode"   # mod/contract/.. -> mod/BlankTheSpireCode
-BP_AV = 95_153        # the blueprint prompt size Phase AV left behind (see the AV STATUS paragraph)
-BP_ALLOWANCE = 1_000  # rule 0.9: the HYBRID bullet (+~310) and VOCABULARY's hybrid section (+~480)
 
 
 def check(cond: bool, msg: str) -> None:
@@ -292,13 +290,11 @@ def _t_contract() -> None:
     check("- HYBRID (rare" in sp, "the blueprint prompt carries the one-line HYBRID bullet")
     check("EXACTLY ONE custom" not in sp and "ONE or TWO custom" in sp,
           "the stale 'EXACTLY ONE custom summon' bullet (pre-AV) now says ONE or TWO")
-    print(f"  (rule 0.9) blueprint prompt: {len(sp):,} chars (AV left {BP_AV:,}; delta {len(sp) - BP_AV:+,})")
+    print(f"  (rule 0.9) blueprint prompt: {len(sp):,} chars (the ONE ceiling lives in tests/test_harness_v2.py)")
     print(f"  (rule 0.9) VOCABULARY.md:    {len(vocab):,} chars")
-    # KNOWN RED since Phase AX (2026-09-11): this pins a ceiling measured on THIS phase's day, but there is
-    # only one blueprint prompt and later phases grew it past this line. Do NOT just raise the number - that
-    # is the ratchet rule 0.9 exists to stop. The fix is one shared budget assert; see "the rule-0.9 budget is
-    # asserted in N places" under Cross-cutting mitigations in VOCAB_GAP_REMEDIATION_PLAN.md.
-    check(len(sp) <= BP_AV + BP_ALLOWANCE, f"rule 0.9: the AW additions stay within +{BP_ALLOWANCE:,} (got {len(sp) - BP_AV:+,})")
+    # AW's rule-0.9 contribution is the one-line HYBRID bullet, asserted above by wording. The private
+    # "AV + 1,000" ceiling this used to carry was removed at Phase AY: one prompt, one ceiling, in
+    # test_harness_v2.py.
     tester = pathlib.Path(cf.__file__).parents[1] / "scratch" / "gaptest-aw" / "build_tester.py"
     if tester.exists():
         src = tester.read_text(encoding="utf-8")

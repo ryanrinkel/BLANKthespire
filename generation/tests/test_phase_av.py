@@ -41,7 +41,6 @@ CARD_SCHEMA = paths.VOCABULARY.parent / "card.schema.json"
 APP_JS = paths.VOCABULARY.parents[2] / "web" / "static" / "app.js"
 EXEMPLAR_POOL = pathlib.Path(cf.__file__).parent / "data" / "exemplar_pool.json"
 BP_AU = 93_623      # the blueprint prompt size Phase AU left behind (see the AU STATUS paragraph)
-BP_ALLOWANCE = 1_600  # rule 0.9: "~+1,500 chars net" for the autonomous-minion paragraph
 
 
 def check(cond: bool, msg: str) -> None:
