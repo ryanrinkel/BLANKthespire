@@ -1,7 +1,9 @@
 # Phase BA — Forged Potions (custom, generated class potions) — PLAN
 
 Status: **DONE 2026-09-15 (vocab v55). Mod builds clean (0 errors); generation suite 408 passed;
-`tests/test_phase_ba.py` 120/120; the AutoSlay gate (rule 0.3) PASSED on both arms.**
+`tests/test_phase_ba.py` 120/120; the AutoSlay gate (rule 0.3) PASSED on both arms.** Two real classes
+forged afterwards to sanity-check what the model designs — see "Real-forge sanity check" for the results
+and the two verification gaps left open there.
 
 The scope below was written 2026-09-14 against a reflected API. Four things changed once BA-0 (the
 verify-first step) was actually done; each is recorded in place, and the sections they contradict are
@@ -117,6 +119,39 @@ lands its effects on the owner — the design working as intended, not a miss.
 `common` forged potion is ~1-in-12 of the common tier, and ~40% of runs never roll it at all, so ONE seed is not
 evidence of absence. `AUTOSLAY_VALIDATION_QUEUE.md` already says to run several seeds; this is that caveat
 biting on a drop-table feature rather than a play-pattern one.
+
+---
+
+## Real-forge sanity check (2026-09-15, after the gate) — and where this was left
+
+Two classes forged on the DEFAULT backend (the Ollama-Cloud mixture the droplet runs), to see what the model
+actually designs rather than what the tester hand-wrote. Codes in `generation/scratch/` (gitignored).
+
+| class | kind | potion |
+|---|---|---|
+| **The Overwound** (a clockwork duelist) | plain — no subsystem pool | ⚙️ **Escapement Oil**, uncommon · self — *Gain 2 Strength and 8 Block.* |
+| **Blight-Forge** (a blight-sower) | FORGE class (blade token present) | 🍄 **Sporeburst Tincture**, uncommon · self — *Forge 4 and gain 2 temp Strength. The seed quickens.* |
+
+Both validate clean and stamp v55. **Neither hit `_default_potion`** — no `potion: blueprint shipped none` line in
+either forge log — so the one-line blueprint rule plus the VOCABULARY section is carrying the design without the
+fallback. The Blight-Forge is the result that matters: given a class that HAS its own subsystem, the model reached
+for it unprompted (`forge` is the class-subsystem op, and `temp_strength` matches its own "Violent Bloom"
+temp-stat archetype). The concept was spores; nothing in it said "forge".
+
+**Two verification gaps, deliberately left open:**
+
+1. **The C# importer has never parsed a REAL generated potion.** The AutoSlay gate staged hand-written JSON
+   straight into the slot dir, which bypasses `BTS1Codec.Decode` -> `TryParseCharacter`. Real potions differ in
+   ways that matter — both of the above OMIT `usage`, leaning on the C# default. The Python and C# defaults agree
+   by construction (`combat`), but that is reasoning, not a test. **To close it:** stage a decoded real bundle into
+   a slot and run one AutoSlay seed (covers `TryParseCharacter`), or paste a code through mod settings -> Import a
+   class code (covers the codec half too).
+2. **No real class has yet produced a status / orb / summon pool**, so `apply_status_custom` / `channel_orb` /
+   `summon` on a *generated* potion are still proven only by the gap-tester. Worth re-checking the first time a
+   real status or orb class comes out of the forge.
+
+Neither gap blocks the phase — the runtime paths are all proven by the gate, and the importer's potion parse is a
+direct mirror of `_validate_potion`, which both real potions pass.
 
 ---
 
