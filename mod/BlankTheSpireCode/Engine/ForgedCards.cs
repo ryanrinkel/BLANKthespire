@@ -42,7 +42,19 @@ public static class ForgedCards
     /// v10 (forged statuses, Phase J): + CharacterSpec.StatusPool (a class's ≤4 custom modifier-family statuses
     /// read from `status_pool`; see ForgedCharacters / ForgedStatusPower). Class cards may apply a custom status
     /// by pool name via the `apply_status_custom` op (class-only, like custom-orb channels).</summary>
-    public const int VocabVersion = 54; // 54: Phase AY (VOCAB_GAP_REMEDIATION Wave 4) — RUN-PERSISTENT FORGE.
+    public const int VocabVersion = 55; // 55: Phase BA (VOCAB_GAP_REMEDIATION Wave 4) — FORGED POTIONS.
+                                        //     A new CHARACTER-level array `potion_pool` (0..MaxPotions entries): the
+                                        //     class's own signature potion — {name, emoji, rarity, usage, target,
+                                        //     description, effects[]}. Effects are the RELIC sub-vocabulary (no card,
+                                        //     a ctx + targets) minus the drawback ops, plus `apply_status_custom` so a
+                                        //     status class's potion can hand out its OWN status. The potion lands in
+                                        //     that class's own ForgedClassPotionPoolKK, which PotionFactory
+                                        //     concatenates with the base game's SharedPotionPool at roll time — so it
+                                        //     is an EXTRA entry in the normal drop table, never a replacement. No new
+                                        //     card op and no card-text change; every pre-v55 class parses unchanged
+                                        //     (an absent potion_pool means the class contributes no potion, which is
+                                        //     exactly today's behaviour). See Powers/ForgedPotion.cs.
+                                        // 54: Phase AY (VOCAB_GAP_REMEDIATION Wave 4) — RUN-PERSISTENT FORGE.
                                         //     A new CHARACTER-level flag `forge_persist` (bool, default false,
                                         //     FORGE-CLASS ONLY): the class BANKS min(Forge, ForgedForgePower.PersistCap)
                                         //     at combat end and gets it back at the start of its first turn of the next

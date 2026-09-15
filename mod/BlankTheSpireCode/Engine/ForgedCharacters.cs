@@ -319,6 +319,16 @@ public static class ForgedCharacters
             if (!TryParseRelic(d["relic"].AsGodotDictionary(), out relicSpec, out error)) return false;
         }
 
+        // Forged potion (Phase BA, v55): the class's own potion, added to (not replacing) the base drop table.
+        // Parsed AFTER the orb/status/summon pools so a potion effect can be checked against the class's own
+        // content — apply_status_custom / channel_orb / summon are rejected unless that pool exists.
+        PotionSpec[] potionPool = [];
+        if (d.ContainsKey("potion_pool") && d["potion_pool"].VariantType == Godot.Variant.Type.Array)
+        {
+            if (!TryParsePotionPool(d["potion_pool"].AsGodotArray(), orbPool, statusPool, summonPool,
+                                    out potionPool, out error)) return false;
+        }
+
         // Run-persistent Forge (Phase AY, v54): opt-in per class. A forge class with this set banks its Forge at
         // combat end and gets it back (capped) at the start of its next combat — see ForgePersist. Absent => false,
         // so every pre-v54 class keeps the per-combat counter.
@@ -326,7 +336,7 @@ public static class ForgedCharacters
 
         spec = new CharacterSpec(name, desc, maxHp, maxEnergy, deck.ToArray(), h, s, v, OrbSlots: orbSlots)
             { OrbPool = orbPool, StatusPool = statusPool, SummonPool = summonPool, Relic = relicSpec,
-              ForgePersist = forgePersist };
+              ForgePersist = forgePersist, PotionPool = potionPool };
         error = "";
         return true;
     }
@@ -671,6 +681,179 @@ public static class ForgedCharacters
         if (!RelicConditionKinds.Contains(kind))
         { error = $"relic hook 'when' kind '{kind}' is not supported (v1: {string.Join("/", RelicConditionKinds)})."; return false; }
         cond = new Condition(kind, Int(d, "value"), null, Bool(d, "negate", false));
+        error = "";
+        return true;
+    }
+
+
+    // --- Phase BA (v55): forged potion parsing + validation + resolvers -----------------------------
+
+    /// <summary>The max potions a single class may declare (keep in sync with slotgen POTIONS_PER_CLASS) — one,
+    /// the class's signature potion. It rides that class's OWN potion pool, which the game concatenates with the
+    /// base game's SharedPotionPool at roll time (PotionFactory.GetPotionOptions), so it is an EXTRA entry in the
+    /// drop table rather than a replacement.</summary>
+    public const int MaxPotions = 1;
+
+    /// <summary>The three drop tiers PotionFactory rolls (10% rare / 25% uncommon / 65% common, then a uniform
+    /// pick inside the rolled tier). None/Event/Token are base-game-internal and stay out of the vocabulary.</summary>
+    private static readonly HashSet<string> PotionRarities = ["common", "uncommon", "rare"];
+    /// <summary><c>combat</c> => PotionUsage.CombatOnly, <c>any</c> => AnyTime. <c>Automatic</c> (a potion that
+    /// fires itself) is a different fantasy and is out of scope for v1.</summary>
+    private static readonly HashSet<string> PotionUsages = ["combat", "any"];
+    private static readonly HashSet<string> PotionTargets = ["self", "enemy", "all_enemies"];
+    /// <summary>Effect ops a potion may run. This is the RELIC sub-vocabulary (no card, a ctx + a target — see
+    /// <see cref="EffectRunner.RunRelicEffects"/>) MINUS the relic drawback ops (a potion is a boon you choose to
+    /// drink; <c>discard</c> as a price makes no sense) PLUS <c>apply_status_custom</c>, so a status class's potion
+    /// can hand out its OWN signature status. The last four are CLASS-CONDITIONAL: rejected below unless the class
+    /// actually declares the orb / summon / status content they reach for.</summary>
+    private static readonly HashSet<string> PotionEffectOps =
+        ["damage", "block", "draw", "gain_energy", "heal", "lose_hp", "apply_status",
+         "apply_status_custom", "channel_orb", "summon", "forge"];
+
+    /// <summary>The forged <see cref="PotionSpec"/> for class <paramref name="k"/> potion slot <paramref name="m"/>
+    /// (1-based), or null (an unfilled <c>ForgedClassKKPotionM</c> shell — every pre-v55 class).</summary>
+    public static PotionSpec? PotionSpecFor(int k, int m)
+    {
+        var pool = SpecForClass(k).PotionPool;
+        return m >= 1 && m <= pool.Length ? pool[m - 1] : null;
+    }
+
+    /// <summary>True if class <paramref name="k"/> declares a forged potion (so its shell joins the drop table).</summary>
+    public static bool HasForgedPotions(int k) => SpecForClass(k).PotionPool.Length > 0;
+
+    private static bool TryParsePotionPool(Godot.Collections.Array arr, OrbPoolEntry[] orbPool,
+                                           StatusSpec[] statusPool, SummonSpec[] summonPool,
+                                           out PotionSpec[] pool, out string error)
+    {
+        pool = [];
+        var entries = new List<PotionSpec>();
+        var seen = new HashSet<string>();
+        foreach (var item in arr)
+        {
+            if (item.VariantType != Godot.Variant.Type.Dictionary)
+            { error = "potion_pool entries must be objects."; return false; }
+            if (entries.Count >= MaxPotions)
+            { error = $"potion_pool has more than {MaxPotions} potion(s)."; return false; }
+            if (!TryParsePotion(item.AsGodotDictionary(), entries.Count + 1, orbPool, statusPool, summonPool,
+                                out var spec, out error)) return false;
+            string key = spec!.Name.Trim().ToLowerInvariant();
+            if (key.Length == 0) { error = "a potion needs a non-empty name."; return false; }
+            if (!seen.Add(key)) { error = $"potion_pool has duplicate potion name '{key}'."; return false; }
+            entries.Add(spec);
+        }
+        pool = entries.ToArray();
+        error = "";
+        return true;
+    }
+
+    private static bool TryParsePotion(Godot.Collections.Dictionary d, int index, OrbPoolEntry[] orbPool,
+                                       StatusSpec[] statusPool, SummonSpec[] summonPool,
+                                       out PotionSpec? spec, out string error)
+    {
+        spec = null;
+        string name = Str(d, "name", $"Potion {index}").Trim();
+        if (name.Length == 0) { error = "a potion needs a non-empty name."; return false; }
+        string id = Str(d, "id", name.ToLowerInvariant().Replace(' ', '_'));
+        string emoji = Str(d, "emoji").Trim();
+        string desc = d.ContainsKey("description") ? Str(d, "description") : Str(d, "text");
+
+        string rarity = (d.ContainsKey("rarity") ? Str(d, "rarity") : "common").Trim().ToLowerInvariant();
+        if (!PotionRarities.Contains(rarity))
+        { error = $"potion '{name}': rarity must be one of {string.Join("/", PotionRarities)} (got '{rarity}')."; return false; }
+
+        string usage = (d.ContainsKey("usage") ? Str(d, "usage") : "combat").Trim().ToLowerInvariant();
+        if (!PotionUsages.Contains(usage))
+        { error = $"potion '{name}': usage must be one of {string.Join("/", PotionUsages)} (got '{usage}')."; return false; }
+
+        string target = (d.ContainsKey("target") ? Str(d, "target") : "self").Trim().ToLowerInvariant();
+        if (!PotionTargets.Contains(target))
+        { error = $"potion '{name}': target must be one of {string.Join("/", PotionTargets)} (got '{target}')."; return false; }
+
+        if (!d.ContainsKey("effects") || d["effects"].VariantType != Godot.Variant.Type.Array)
+        { error = $"potion '{name}' needs an 'effects' array."; return false; }
+
+        var effects = new List<EffectSpec>();
+        foreach (var item in d["effects"].AsGodotArray())
+        {
+            if (item.VariantType != Godot.Variant.Type.Dictionary)
+            { error = $"potion '{name}': 'effects' entries must be objects."; return false; }
+            if (!TryParsePotionEffect(item.AsGodotDictionary(), name, target, orbPool, statusPool, summonPool,
+                                      out var eff, out error)) return false;
+            effects.Add(eff!);
+        }
+        if (effects.Count == 0) { error = $"potion '{name}' has no effects (it would do nothing)."; return false; }
+
+        // An out-of-combat potion ("any") must still work out of combat: every op except heal reads a live
+        // CombatState (draw/energy/block/damage/statuses/orbs/summons). Keep `any` to the one op that works on the
+        // map — the same reasoning as the relic combat_end rule.
+        if (usage == "any" && effects.Any(e => e.Op != "heal"))
+        { error = $"potion '{name}': usage 'any' may only use the 'heal' effect (everything else needs a combat)."; return false; }
+
+        spec = new PotionSpec(id, name, desc, emoji, rarity, usage, target, effects.ToArray());
+        error = "";
+        return true;
+    }
+
+    private static bool TryParsePotionEffect(Godot.Collections.Dictionary d, string potion, string target,
+                                             OrbPoolEntry[] orbPool, StatusSpec[] statusPool, SummonSpec[] summonPool,
+                                             out EffectSpec? eff, out string error)
+    {
+        eff = null;
+        string op = Str(d, "op").Trim().ToLowerInvariant();
+        if (!PotionEffectOps.Contains(op))
+        { error = $"potion '{potion}': effect op '{op}' is not supported (v1: {string.Join("/", PotionEffectOps)})."; return false; }
+        int amount = Int(d, "amount", 1);
+        if (amount < 1) { error = $"potion '{potion}': effect '{op}' needs amount >= 1."; return false; }
+
+        string? status = null, statusName = null, orb = null, summonName = null;
+        if (op == "damage" && target == "self")
+        { error = $"potion '{potion}': 'damage' needs an enemy target (set the potion 'target' to enemy/all_enemies)."; return false; }
+
+        if (op == "apply_status")
+        {
+            status = Str(d, "status").Trim().ToLowerInvariant();
+            bool isBuff = EffectRunner.SelfBuffStatuses.Contains(status);
+            bool isDebuff = SummonEnemyStatuses.Contains(status);
+            if (!isBuff && !isDebuff) { error = $"potion '{potion}': apply_status: unsupported status '{status}'."; return false; }
+            // A potion is a boon you CHOOSE to drink, so (unlike a relic hook) it never carries a self-debuff price:
+            // a buff belongs on a self potion, a debuff on a targeted one.
+            if (isBuff && target != "self")
+            { error = $"potion '{potion}': buff '{status}' belongs on a self-target potion (a buff always lands on you)."; return false; }
+            if (isDebuff && target == "self")
+            { error = $"potion '{potion}': debuff '{status}' needs an enemy target (a potion never debuffs its drinker)."; return false; }
+        }
+        else if (op == "apply_status_custom")
+        {
+            statusName = Str(d, "status_name").Trim();
+            if (statusName.Length == 0) { error = $"potion '{potion}': 'apply_status_custom' needs a 'status_name'."; return false; }
+            if (statusPool.Length == 0)
+            { error = $"potion '{potion}': 'apply_status_custom' is status-class only (this class declares no status_pool)."; return false; }
+            var st = statusPool.FirstOrDefault(s => s.Name.Trim().ToLowerInvariant() == statusName.ToLowerInvariant());
+            if (st == null)
+            { error = $"potion '{potion}': status '{statusName}' is not in this class's status_pool."; return false; }
+            if (st.IsBuff && target != "self")
+            { error = $"potion '{potion}': custom buff '{statusName}' belongs on a self-target potion."; return false; }
+            if (!st.IsBuff && target == "self")
+            { error = $"potion '{potion}': custom debuff '{statusName}' needs an enemy target."; return false; }
+        }
+        else if (op == "channel_orb")
+        {
+            orb = Str(d, "orb").Trim();
+            if (orb.Length == 0) { error = $"potion '{potion}': 'channel_orb' needs an 'orb' (\"random\" or a pool orb name)."; return false; }
+            if (orbPool.Length == 0)
+            { error = $"potion '{potion}': 'channel_orb' is orb-class only (this class declares no orb_pool)."; return false; }
+        }
+        else if (op == "summon")
+        {
+            summonName = Str(d, "summon_name").Trim();
+            if (summonName.Length == 0) { error = $"potion '{potion}': 'summon' needs a 'summon_name' (a class minion)."; return false; }
+            if (summonPool.Length == 0)
+            { error = $"potion '{potion}': 'summon' is summon-class only (this class declares no summon_pool)."; return false; }
+            if (!summonPool.Any(s => s.Name.Trim().ToLowerInvariant() == summonName.ToLowerInvariant()))
+            { error = $"potion '{potion}': summon '{summonName}' is not in this class's summon_pool."; return false; }
+        }
+
+        eff = new EffectSpec(op, amount, status, StatusName: statusName, Orb: orb, SummonName: summonName);
         error = "";
         return true;
     }

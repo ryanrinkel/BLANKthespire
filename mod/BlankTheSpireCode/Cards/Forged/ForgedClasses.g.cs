@@ -6,6 +6,8 @@
 // card-slot shells, and one selectable PlaceholderCharacterModel. All data is read from JSON at load via
 // ForgedCharacters; unfilled classes hide themselves from character select and their card slots stay empty.
 
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using BaseLib.Abstracts;
 using BaseLib.Utils;
@@ -21,6 +23,7 @@ using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Cards;
 using MegaCrit.Sts2.Core.Models.Relics;
+using MegaCrit.Sts2.Core.Unlocks;
 
 namespace BlankTheSpire.BlankTheSpireCode.Cards.Forged;
 
@@ -442,6 +445,25 @@ public sealed class ForgedClass01Summon1 : ForgedSummon { protected override int
 public sealed class ForgedClass01Summon2 : ForgedSummon { protected override int SummonClass => 1; protected override int SummonIndex => 2; }
 // Phase L: forged-relic shell for this class (reads RelicSpecFor(K)).
 public sealed class ForgedClass01Relic : BlankTheSpire.BlankTheSpireCode.Powers.ForgedRelic { protected override int RelicClass => 1; }
+// Phase BA: this class's OWN potion pool + its forged-potion shells (each reads PotionSpecFor(K, M)).
+public sealed class ForgedClassPotionPool01 : CustomPotionPoolModel
+{
+    public override Color LabOutlineColor => Color.FromHsv(
+        ForgedCharacters.SpecForClass(1).PoolH,
+        ForgedCharacters.SpecForClass(1).PoolS,
+        ForgedCharacters.SpecForClass(1).PoolV);
+    public override string BigEnergyIconPath => "charui/big_energy.png".ImagePath();
+    public override string TextEnergyIconPath => "charui/text_energy.png".ImagePath();
+
+    // An undeclared potion slot must never be rolled. AllPotions is cached (and the pool frozen) at first read,
+    // so the withholding happens HERE -- PotionFactory calls GetUnlockedPotions fresh on every roll.
+    public override IEnumerable<PotionModel> GetUnlockedPotions(UnlockState unlockState) =>
+        AllPotions.Where(p => p is not BlankTheSpire.BlankTheSpireCode.Powers.ForgedPotion fp || !fp.IsEmptySlot);
+}
+
+[Pool(typeof(ForgedClassPotionPool01))]
+public sealed class ForgedClass01Potion1 : BlankTheSpire.BlankTheSpireCode.Powers.ForgedPotion { protected override int PotionClass => 1; protected override int PotionIndex => 1; }
+
 public sealed class ForgedCharacterSlot01 : PlaceholderCharacterModel, IForgedCharacterSlot
 {
     private static CharacterSpec Spec => ForgedCharacters.SpecForClass(1);
@@ -520,7 +542,9 @@ public sealed class ForgedCharacterSlot01 : PlaceholderCharacterModel, IForgedCh
 
     public override CardPoolModel CardPool => ModelDb.CardPool<ForgedClassPool01>();
     public override RelicPoolModel RelicPool => ModelDb.RelicPool<BlankTheSpireRelicPool>();
-    public override PotionPoolModel PotionPool => ModelDb.PotionPool<BlankTheSpirePotionPool>();
+    // Phase BA (v55): the class's OWN potion pool. PotionFactory concatenates it with the base game's
+    // SharedPotionPool at roll time, so the class's potion is an ADDITION to the normal drop table.
+    public override PotionPoolModel PotionPool => ModelDb.PotionPool<ForgedClassPotionPool01>();
 
     // Track 1 (placeholder identity): a forged class ships no bespoke character art yet, so without these
     // overrides it inherits PlaceholderCharacterModel's IRONCLAD select card + standing model — confusingly
@@ -978,6 +1002,25 @@ public sealed class ForgedClass02Summon1 : ForgedSummon { protected override int
 public sealed class ForgedClass02Summon2 : ForgedSummon { protected override int SummonClass => 2; protected override int SummonIndex => 2; }
 // Phase L: forged-relic shell for this class (reads RelicSpecFor(K)).
 public sealed class ForgedClass02Relic : BlankTheSpire.BlankTheSpireCode.Powers.ForgedRelic { protected override int RelicClass => 2; }
+// Phase BA: this class's OWN potion pool + its forged-potion shells (each reads PotionSpecFor(K, M)).
+public sealed class ForgedClassPotionPool02 : CustomPotionPoolModel
+{
+    public override Color LabOutlineColor => Color.FromHsv(
+        ForgedCharacters.SpecForClass(2).PoolH,
+        ForgedCharacters.SpecForClass(2).PoolS,
+        ForgedCharacters.SpecForClass(2).PoolV);
+    public override string BigEnergyIconPath => "charui/big_energy.png".ImagePath();
+    public override string TextEnergyIconPath => "charui/text_energy.png".ImagePath();
+
+    // An undeclared potion slot must never be rolled. AllPotions is cached (and the pool frozen) at first read,
+    // so the withholding happens HERE -- PotionFactory calls GetUnlockedPotions fresh on every roll.
+    public override IEnumerable<PotionModel> GetUnlockedPotions(UnlockState unlockState) =>
+        AllPotions.Where(p => p is not BlankTheSpire.BlankTheSpireCode.Powers.ForgedPotion fp || !fp.IsEmptySlot);
+}
+
+[Pool(typeof(ForgedClassPotionPool02))]
+public sealed class ForgedClass02Potion1 : BlankTheSpire.BlankTheSpireCode.Powers.ForgedPotion { protected override int PotionClass => 2; protected override int PotionIndex => 1; }
+
 public sealed class ForgedCharacterSlot02 : PlaceholderCharacterModel, IForgedCharacterSlot
 {
     private static CharacterSpec Spec => ForgedCharacters.SpecForClass(2);
@@ -1056,7 +1099,9 @@ public sealed class ForgedCharacterSlot02 : PlaceholderCharacterModel, IForgedCh
 
     public override CardPoolModel CardPool => ModelDb.CardPool<ForgedClassPool02>();
     public override RelicPoolModel RelicPool => ModelDb.RelicPool<BlankTheSpireRelicPool>();
-    public override PotionPoolModel PotionPool => ModelDb.PotionPool<BlankTheSpirePotionPool>();
+    // Phase BA (v55): the class's OWN potion pool. PotionFactory concatenates it with the base game's
+    // SharedPotionPool at roll time, so the class's potion is an ADDITION to the normal drop table.
+    public override PotionPoolModel PotionPool => ModelDb.PotionPool<ForgedClassPotionPool02>();
 
     // Track 1 (placeholder identity): a forged class ships no bespoke character art yet, so without these
     // overrides it inherits PlaceholderCharacterModel's IRONCLAD select card + standing model — confusingly
@@ -1514,6 +1559,25 @@ public sealed class ForgedClass03Summon1 : ForgedSummon { protected override int
 public sealed class ForgedClass03Summon2 : ForgedSummon { protected override int SummonClass => 3; protected override int SummonIndex => 2; }
 // Phase L: forged-relic shell for this class (reads RelicSpecFor(K)).
 public sealed class ForgedClass03Relic : BlankTheSpire.BlankTheSpireCode.Powers.ForgedRelic { protected override int RelicClass => 3; }
+// Phase BA: this class's OWN potion pool + its forged-potion shells (each reads PotionSpecFor(K, M)).
+public sealed class ForgedClassPotionPool03 : CustomPotionPoolModel
+{
+    public override Color LabOutlineColor => Color.FromHsv(
+        ForgedCharacters.SpecForClass(3).PoolH,
+        ForgedCharacters.SpecForClass(3).PoolS,
+        ForgedCharacters.SpecForClass(3).PoolV);
+    public override string BigEnergyIconPath => "charui/big_energy.png".ImagePath();
+    public override string TextEnergyIconPath => "charui/text_energy.png".ImagePath();
+
+    // An undeclared potion slot must never be rolled. AllPotions is cached (and the pool frozen) at first read,
+    // so the withholding happens HERE -- PotionFactory calls GetUnlockedPotions fresh on every roll.
+    public override IEnumerable<PotionModel> GetUnlockedPotions(UnlockState unlockState) =>
+        AllPotions.Where(p => p is not BlankTheSpire.BlankTheSpireCode.Powers.ForgedPotion fp || !fp.IsEmptySlot);
+}
+
+[Pool(typeof(ForgedClassPotionPool03))]
+public sealed class ForgedClass03Potion1 : BlankTheSpire.BlankTheSpireCode.Powers.ForgedPotion { protected override int PotionClass => 3; protected override int PotionIndex => 1; }
+
 public sealed class ForgedCharacterSlot03 : PlaceholderCharacterModel, IForgedCharacterSlot
 {
     private static CharacterSpec Spec => ForgedCharacters.SpecForClass(3);
@@ -1592,7 +1656,9 @@ public sealed class ForgedCharacterSlot03 : PlaceholderCharacterModel, IForgedCh
 
     public override CardPoolModel CardPool => ModelDb.CardPool<ForgedClassPool03>();
     public override RelicPoolModel RelicPool => ModelDb.RelicPool<BlankTheSpireRelicPool>();
-    public override PotionPoolModel PotionPool => ModelDb.PotionPool<BlankTheSpirePotionPool>();
+    // Phase BA (v55): the class's OWN potion pool. PotionFactory concatenates it with the base game's
+    // SharedPotionPool at roll time, so the class's potion is an ADDITION to the normal drop table.
+    public override PotionPoolModel PotionPool => ModelDb.PotionPool<ForgedClassPotionPool03>();
 
     // Track 1 (placeholder identity): a forged class ships no bespoke character art yet, so without these
     // overrides it inherits PlaceholderCharacterModel's IRONCLAD select card + standing model — confusingly
@@ -2050,6 +2116,25 @@ public sealed class ForgedClass04Summon1 : ForgedSummon { protected override int
 public sealed class ForgedClass04Summon2 : ForgedSummon { protected override int SummonClass => 4; protected override int SummonIndex => 2; }
 // Phase L: forged-relic shell for this class (reads RelicSpecFor(K)).
 public sealed class ForgedClass04Relic : BlankTheSpire.BlankTheSpireCode.Powers.ForgedRelic { protected override int RelicClass => 4; }
+// Phase BA: this class's OWN potion pool + its forged-potion shells (each reads PotionSpecFor(K, M)).
+public sealed class ForgedClassPotionPool04 : CustomPotionPoolModel
+{
+    public override Color LabOutlineColor => Color.FromHsv(
+        ForgedCharacters.SpecForClass(4).PoolH,
+        ForgedCharacters.SpecForClass(4).PoolS,
+        ForgedCharacters.SpecForClass(4).PoolV);
+    public override string BigEnergyIconPath => "charui/big_energy.png".ImagePath();
+    public override string TextEnergyIconPath => "charui/text_energy.png".ImagePath();
+
+    // An undeclared potion slot must never be rolled. AllPotions is cached (and the pool frozen) at first read,
+    // so the withholding happens HERE -- PotionFactory calls GetUnlockedPotions fresh on every roll.
+    public override IEnumerable<PotionModel> GetUnlockedPotions(UnlockState unlockState) =>
+        AllPotions.Where(p => p is not BlankTheSpire.BlankTheSpireCode.Powers.ForgedPotion fp || !fp.IsEmptySlot);
+}
+
+[Pool(typeof(ForgedClassPotionPool04))]
+public sealed class ForgedClass04Potion1 : BlankTheSpire.BlankTheSpireCode.Powers.ForgedPotion { protected override int PotionClass => 4; protected override int PotionIndex => 1; }
+
 public sealed class ForgedCharacterSlot04 : PlaceholderCharacterModel, IForgedCharacterSlot
 {
     private static CharacterSpec Spec => ForgedCharacters.SpecForClass(4);
@@ -2128,7 +2213,9 @@ public sealed class ForgedCharacterSlot04 : PlaceholderCharacterModel, IForgedCh
 
     public override CardPoolModel CardPool => ModelDb.CardPool<ForgedClassPool04>();
     public override RelicPoolModel RelicPool => ModelDb.RelicPool<BlankTheSpireRelicPool>();
-    public override PotionPoolModel PotionPool => ModelDb.PotionPool<BlankTheSpirePotionPool>();
+    // Phase BA (v55): the class's OWN potion pool. PotionFactory concatenates it with the base game's
+    // SharedPotionPool at roll time, so the class's potion is an ADDITION to the normal drop table.
+    public override PotionPoolModel PotionPool => ModelDb.PotionPool<ForgedClassPotionPool04>();
 
     // Track 1 (placeholder identity): a forged class ships no bespoke character art yet, so without these
     // overrides it inherits PlaceholderCharacterModel's IRONCLAD select card + standing model — confusingly

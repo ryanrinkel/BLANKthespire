@@ -67,11 +67,13 @@ _PLAIN = {"role": "pool", "name_hint": "Jab", "type": "attack", "rarity": "commo
 
 # --------------------------------------------------------------------------- 1. stamps
 def test_version() -> None:
-    print("Phase AY vocab stamp is 54 (Python + C#):")
-    check(bts1.VOCAB_VERSION == 54, f"bts1.VOCAB_VERSION == 54 (got {bts1.VOCAB_VERSION})")
+    # `>=`, not `==`: the stamp is a shared global that every later phase bumps, and pinning it here made this
+    # test a measuring stick for someone else's number (the AZ rule-0.9 lesson). AY owns `forge_persist`, below.
+    print("Phase AY vocab stamp is 54+ (Python + C#):")
+    check(bts1.VOCAB_VERSION >= 54, f"bts1.VOCAB_VERSION >= 54 (got {bts1.VOCAB_VERSION})")
     fc = _cs("Engine", "ForgedCards.cs")
     m = re.search(r"public const int VocabVersion = (\d+);", fc)
-    check(m is not None and int(m.group(1)) == 54, f"ForgedCards.VocabVersion == 54 (got {m and m.group(1)})")
+    check(m is not None and int(m.group(1)) >= 54, f"ForgedCards.VocabVersion >= 54 (got {m and m.group(1)})")
     check(m is not None and bts1.VOCAB_VERSION <= int(m.group(1)), "bts1.VOCAB_VERSION <= ForgedCards.VocabVersion")
     check("Phase AY" in fc and "forge_persist" in fc,
           "ForgedCards.cs VocabVersion comment names Phase AY + the new flag")

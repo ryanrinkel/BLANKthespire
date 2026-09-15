@@ -25,7 +25,17 @@ import sys
 import zlib
 from pathlib import Path
 
-VOCAB_VERSION = 54  # must be <= ForgedCards.VocabVersion (54: Phase AY — RUN-PERSISTENT FORGE:
+VOCAB_VERSION = 55  # must be <= ForgedCards.VocabVersion (55: Phase BA — FORGED POTIONS: a new
+                    # CHARACTER-level array `potion_pool` carrying the class's own signature potion
+                    # ({name, emoji, rarity: common|uncommon|rare, usage: combat|any, target:
+                    # self|enemy|all_enemies, description, effects[]}). Its effects are the relic
+                    # sub-vocabulary (damage/block/draw/gain_energy/heal/lose_hp/apply_status/forge and
+                    # the class-conditional channel_orb/summon) plus `apply_status_custom`, so a status
+                    # class's potion can hand out its own signature status. The potion joins that class's
+                    # OWN potion pool, which the game concatenates with the base potion table at roll
+                    # time — an EXTRA drop, never a replacement. No new card op and no card-text change;
+                    # every pre-v55 class encodes and imports byte-identically.
+                    # 54: Phase AY — RUN-PERSISTENT FORGE:
                     # a new CHARACTER-level flag `forge_persist` (bool, default false, FORGE-CLASS ONLY). A class
                     # that sets it BANKS up to 5 Forge at the end of each combat and gets it back at the start of
                     # its first turn of the next one (through the same path a first Forge takes, so the signature

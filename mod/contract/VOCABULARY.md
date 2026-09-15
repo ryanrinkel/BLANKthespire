@@ -406,6 +406,48 @@ save-and-quit) and a new run starts at 0. **FORGE-CLASS ONLY**: with no `forge` 
 generation rejects the flag. The cap is the point — a head start, not a snowball, so cards stay priced per combat.
 Reach for it when the fantasy is an heirloom that REMEMBERS across the run. Default `false`.
 
+## The signature potion (a CLASS knob — EVERY class declares one)
+
+Every forged class ships **exactly one custom potion** (v55), declared on the character as
+`"potion_pool": [ { … } ]` — one object. It is added to that class's potion drop table *alongside* the base game's
+potions, never replacing them: the game concatenates the class's own pool with the shared table every time it rolls
+a potion, so a run of this class sees the usual Fire Potion / Block Potion / Fruit Juice **plus** this one.
+
+A potion is a one-shot, no-card effect fired on demand — mechanically the same shape as a relic hook, which is why
+it uses the relic sub-vocabulary rather than the full card one.
+
+| field | values |
+|---|---|
+| `name` | ≤ 24 chars. |
+| `emoji` | ONE emoji — this **is** the potion's art (rendered to its icon at load), so pick one that reads small. |
+| `rarity` | `common` \| `uncommon` \| `rare`. The game rolls a tier first (≈65 / 25 / 10) and then picks uniformly inside it, so a `rare` potion is the scarcest and should be the biggest swing. |
+| `usage` | `combat` (default — usable in a fight) \| `any` (also on the map; then `heal` is the ONLY legal op, since every other op needs a live combat). |
+| `target` | `self` \| `enemy` \| `all_enemies`. Unlike cards, a `self` potion still resolves against you — put every buff and every self-effect here. `damage` and debuffs need `enemy` / `all_enemies`. |
+| `description` | One line of card-style text. |
+| `effects` | 1–2 ops from the table below. |
+
+**Potion ops** — the relic sub-vocabulary, minus the drawback ops (a potion is a boon you *choose* to drink, so it
+never carries a price), plus `apply_status_custom`:
+
+| op | note |
+|---|---|
+| `damage` | Needs `enemy` / `all_enemies`. |
+| `block`, `draw`, `gain_energy`, `heal`, `lose_hp` | Always resolve on you. |
+| `apply_status` + `status` | Buffs (`strength`, `dexterity`, `thorns`, `regen`, `metallicize`, `artifact`, `buffer`, `intangible`, `ritual`, `blur`, `focus`, `temp_strength`, `temp_dexterity`, `temp_thorns`, `temp_focus`, `barricade`) need `target: self`; debuffs (`vulnerable`, `weak`, `frail`, `poison`) need an enemy target. |
+| `apply_status_custom` + `status_name` | **Status classes only** — hand out one of the class's OWN signature statuses. A custom buff needs `self`, a custom debuff an enemy target. |
+| `channel_orb` + `orb` | **Orb classes only** — `"random"` or a name from the class's `orb_pool`. |
+| `summon` + `summon_name` | **Summon classes only** — a minion from the class's `summon_pool`. |
+| `forge` | **Forge classes only** in practice — Forge income, which also summons the blade on the first one. |
+
+**Make it read as THIS class.** The last four ops exist so the potion can reach into the class's own subsystem: a
+status class's potion hands out its signature status, an orb class's channels its orbs, a summon class's calls its
+minion, a forge class's stokes the Forge. A class with none of those gets a plain brew from the first two rows —
+still themed by name, emoji and text. Power level: 1–2 effects at roughly **1.5× a common card's numbers** (a potion
+is a free one-shot with no energy cost, but it is also a limited resource and takes a belt slot).
+
+Every class gets one whether or not the blueprint asks for it — an omitted `potion` is filled in from whatever class
+content exists — so the only real choice is whether it is *interesting*.
+
 ## Card shape
 - `id` (snake_case, unique), `name` (short human title), `type` (attack/skill/power),
   `rarity` (basic/common/uncommon/rare), `cost` (0–4 energy, or `"X"`), `target`, `effects` (1+),

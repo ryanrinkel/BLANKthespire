@@ -619,6 +619,7 @@ a deep class from a pile of synergies.
   "orb_pool": [],
   "status_pool": [],
   "summon_pool": [],
+  "potion": {{ "name": "<= 24 chars", "emoji": "<one emoji>", "rarity": "common|uncommon|rare", "target": "self|enemy|all_enemies", "description": "the effect, one line", "effects": [ {{ "op": "...", "amount": 0 }} ] }},
   "forge_persist": false,
   "archetypes": [
     {{ "id": "snake_case", "name": "Short Name", "description": "the engine, in vocabulary terms" }},
@@ -676,6 +677,10 @@ from the class's NON-basic pool, so every class MUST include at least one non-ba
 of EACH type: ≥1 Attack, ≥1 Skill, and ≥1 Power. A class with no non-basic Power card hangs the game at a \
 merchant. Powers are the build-around engines (use `add_trigger` per-turn effects, or a lasting self-buff like \
 Strength/Dexterity) — give every class one or two regardless of theme.
+- "potion" (REQUIRED, exactly one): the class's SIGNATURE POTION, added to the normal drop table for runs of \
+this class (see THE SIGNATURE POTION in the vocabulary for the ops and shape). Make it read as THIS class: \
+where the class has its own subsystem, the potion reaches for it. 1-2 effects at ~1.5x a common card. \
+"target": "self" for anything landing on YOU (all buffs), "enemy"/"all_enemies" for damage and debuffs.
 - "forge_persist": true ONLY on a FORGE class whose weapon REMEMBERS across the run (it then carries up to {_FORGE_PERSIST_CAP} Forge into the next combat); false everywhere else.
 - "orb_slots": 0 for a normal class; 3-5 ONLY for an orb class (then one archetype must be the orb engine).
 - "max_energy": 3 normally; 4 ONLY with a smaller HP pool (max_hp <= 65); 2 ONLY for a big-energy / X-cost class \
@@ -1823,6 +1828,7 @@ def _validate_blueprint(bp: dict) -> list[str]:
         errs += _validate_status_pool(bp.get("status_pool"))
     if "summon_pool" in bp and bp.get("summon_pool"):
         errs += _validate_summon_pool(bp.get("summon_pool"))
+    errs += _validate_potion(bp)   # Phase BA (v55): the class's signature potion (shape only when present)
     errs += _validate_hybrid(bp)   # Phase AW: <=2 pool kinds, one of them splash-sized
     return errs
 
@@ -2105,6 +2111,138 @@ def _validate_orb_when(when, where: str) -> list[str]:
     if "negate" in when and not isinstance(when.get("negate"), bool):
         errs.append(f"{where}: condition 'negate' must be true/false")
     return errs
+
+
+# --- Phase BA (v55): potion validation (mirrors the C# ForgedCharacters potion parser) ------------
+
+_POTION_RARITIES = {"common", "uncommon", "rare"}
+_POTION_TARGETS = {"self", "enemy", "all_enemies"}
+# The relic sub-vocabulary minus the drawback ops, plus apply_status_custom. Kept in lockstep with
+# ForgedCharacters.PotionEffectOps; tests/test_phase_ba.py asserts the two sets match.
+_POTION_OPS = {"damage", "block", "draw", "gain_energy", "heal", "lose_hp", "apply_status",
+               "apply_status_custom", "channel_orb", "summon", "forge"}
+_POTION_MAX_EFFECTS = 2
+
+
+def _validate_potion(bp: dict) -> list[str]:
+    """Phase BA (v55): the class's signature potion. Shape-checked here exactly as the C# importer checks it,
+    so a bundle that passes the forge always imports.
+
+    Deliberately NOT an error when ABSENT: the assembly stage synthesizes a class-appropriate potion for a
+    blueprint that skipped it (see `_default_potion`), so a cosmetic omission never costs a repair round-trip
+    or — on the staged front-end path, which has no repair — the whole class."""
+    potion = bp.get("potion")
+    if potion is None:
+        return []
+    if not isinstance(potion, dict):
+        return ['potion must be an object ({"name", "emoji", "rarity", "target", "description", "effects"})']
+    errs: list[str] = []
+    name = str(potion.get("name") or "").strip()
+    if not name:
+        errs.append("potion needs a non-empty name")
+    rarity = str(potion.get("rarity") or "common").strip().lower()
+    if rarity not in _POTION_RARITIES:
+        errs.append(f"potion rarity must be one of {sorted(_POTION_RARITIES)} (got {rarity!r})")
+    target = str(potion.get("target") or "self").strip().lower()
+    if target not in _POTION_TARGETS:
+        errs.append(f"potion target must be one of {sorted(_POTION_TARGETS)} (got {target!r})")
+    usage = str(potion.get("usage") or "combat").strip().lower()
+    if usage not in {"combat", "any"}:
+        errs.append(f"potion usage must be combat or any (got {usage!r})")
+
+    effects = potion.get("effects")
+    if not isinstance(effects, list) or not effects:
+        errs.append("potion needs a non-empty effects list")
+        return errs
+    if len(effects) > _POTION_MAX_EFFECTS:
+        errs.append(f"potion has {len(effects)} effects (max {_POTION_MAX_EFFECTS} — a potion is one clean beat)")
+    # name -> is_buff, because the self/enemy rule below depends on the status's TYPE, exactly as the C#
+    # importer's TryParsePotionEffect does (a custom debuff on a self potion is rejected there).
+    status_kinds = {str(x.get("name") or "").strip().lower(): str(x.get("type") or "buff").strip().lower() != "debuff"
+                    for x in (bp.get("status_pool") or []) if isinstance(x, dict)}
+    status_names = set(status_kinds)
+    summon_names = {str(x.get("name") or "").strip().lower()
+                    for x in (bp.get("summon_pool") or []) if isinstance(x, dict)}
+    has_orbs = bool(bp.get("orb_pool"))
+    for i, e in enumerate(effects):
+        if not isinstance(e, dict):
+            errs.append(f"potion effect[{i}] must be an object")
+            continue
+        op = str(e.get("op") or "").strip().lower()
+        if op not in _POTION_OPS:
+            errs.append(f"potion effect[{i}] op {op!r} is not in the potion vocabulary {sorted(_POTION_OPS)}")
+            continue
+        raw = e.get("amount", 1)
+        try:
+            # No `or 1` fallback: the C# importer reads a literal 0 and rejects it, so this must too.
+            amount = 1 if raw is None else int(raw)
+        except (TypeError, ValueError):
+            errs.append(f"potion effect[{i}] amount must be an integer")
+            continue
+        if amount < 1:
+            errs.append(f"potion effect[{i}] ({op}) needs amount >= 1")
+        if op == "damage" and target == "self":
+            errs.append("potion 'damage' needs an enemy target (set the potion target to enemy/all_enemies)")
+        if op == "apply_status":
+            st = str(e.get("status") or "").strip().lower()
+            if st in _RELIC_SELF_BUFFS and target != "self":
+                errs.append(f"potion buff {st!r} belongs on a self-target potion (a buff always lands on you)")
+            elif st in _RELIC_DEBUFFS and target == "self":
+                errs.append(f"potion debuff {st!r} needs an enemy target (a potion never debuffs its drinker)")
+            elif st not in _RELIC_SELF_BUFFS and st not in _RELIC_DEBUFFS:
+                errs.append(f"potion apply_status: unsupported status {st!r}")
+        if op == "apply_status_custom":
+            nm = str(e.get("status_name") or "").strip().lower()
+            if not status_names:
+                errs.append("potion 'apply_status_custom' is status-class only (this class declares no status_pool)")
+            elif nm not in status_names:
+                errs.append(f"potion status {nm!r} is not in this class's status_pool {sorted(status_names)}")
+            elif status_kinds[nm] and target != "self":
+                errs.append(f"potion custom buff {nm!r} belongs on a self-target potion")
+            elif not status_kinds[nm] and target == "self":
+                errs.append(f"potion custom debuff {nm!r} needs an enemy target")
+        if op == "channel_orb" and not has_orbs:
+            errs.append("potion 'channel_orb' is orb-class only (this class declares no orb_pool)")
+        if op == "summon":
+            nm = str(e.get("summon_name") or "").strip().lower()
+            if not summon_names:
+                errs.append("potion 'summon' is summon-class only (this class declares no summon_pool)")
+            elif nm not in summon_names:
+                errs.append(f"potion summon {nm!r} is not in this class's summon_pool {sorted(summon_names)}")
+    if usage == "any" and any(isinstance(e, dict) and str(e.get("op") or "").lower() != "heal" for e in effects):
+        errs.append("potion usage 'any' may only use the 'heal' effect (everything else needs a live combat)")
+    return errs
+
+
+def _default_potion(bp: dict, cards) -> dict:
+    """The fallback the assembly stage uses when a blueprint shipped no potion. Still class-specific where the
+    class HAS its own content to reach for — the whole point of the feature is that the potion reads as this
+    class's — and a plain defensive brew otherwise."""
+    name = str(bp.get("name") or "Forged").strip()
+    statuses = [x for x in (bp.get("status_pool") or []) if isinstance(x, dict)]
+    summons = [x for x in (bp.get("summon_pool") or []) if isinstance(x, dict)]
+    is_forge = any(isinstance(c, dict) and c.get("role") == _BLADE_ROLE for c in cards or [])
+    buff = next((x for x in statuses if x.get("type", "buff") == "buff"), None)
+    if buff is not None:
+        return {"name": f"{buff.get('name', name)} Draught", "emoji": str(buff.get("emoji") or "\U0001F9EA"),
+                "rarity": "uncommon", "usage": "combat", "target": "self",
+                "description": f"Gain 3 {buff.get('name', 'stacks')}.",
+                "effects": [{"op": "apply_status_custom", "status_name": buff.get("name"), "amount": 3}]}
+    if bp.get("orb_pool"):
+        return {"name": f"{name} Decoction", "emoji": "\U0001F52E", "rarity": "uncommon", "usage": "combat",
+                "target": "self", "description": "Channel 2 orbs.",
+                "effects": [{"op": "channel_orb", "orb": "random", "amount": 2}]}
+    if summons:
+        nm = summons[0].get("name")
+        return {"name": f"{nm} Philtre", "emoji": "\U0001F9EB", "rarity": "uncommon", "usage": "combat",
+                "target": "self", "description": f"Summon a {nm}.",
+                "effects": [{"op": "summon", "summon_name": nm, "amount": 1}]}
+    if is_forge:
+        return {"name": "Quenching Oil", "emoji": "\U0001F525", "rarity": "uncommon", "usage": "combat",
+                "target": "self", "description": "Forge 3.", "effects": [{"op": "forge", "amount": 3}]}
+    return {"name": f"{name} Tonic", "emoji": "\U0001F9EA", "rarity": "common", "usage": "combat",
+            "target": "self", "description": "Gain 12 Block and draw 1 card.",
+            "effects": [{"op": "block", "amount": 12}, {"op": "draw", "amount": 1}]}
 
 
 def _validate_forge_persist(bp: dict, cards) -> list[str]:
@@ -3349,6 +3487,14 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
     summon_pool = bp.get("summon_pool") or []
     if summon_pool:
         character["summon_pool"] = summon_pool
+    # Phase BA (v55): carry the class's signature potion. ALWAYS emitted — every forged class gets one, and a
+    # blueprint that skipped it gets a class-appropriate default rather than a potionless class. It rides the
+    # character dict (like status_pool/summon_pool) and the C# importer re-validates it via TryParsePotionPool.
+    potion = bp.get("potion")
+    if not isinstance(potion, dict) or not potion.get("effects"):
+        potion = _default_potion(bp, bp.get("cards") or [])
+        note(f"potion: blueprint shipped none - defaulted to '{potion['name']}'")
+    character["potion_pool"] = [potion]
     res.bundle = {"kind": "class", "character": character, "cards": cards}
     # Phase L: the keystone starter relic rides the bundle as a top-level sibling (the C# importer folds it into
     # the character dict + re-validates via TryParseRelic). Optional — absent → the class uses Burning Blood.

@@ -369,9 +369,10 @@ BP_TOTAL_TRIPWIRE = 120_000   # NOT a per-phase gate — the line at which the s
 # that machinery to the VOCABULARY paste, which is the 55k half: an orb class is shown the Forged-summons rows
 # and the Balance gauge in full. Kind-gating the vocab sections the same way is scoped in
 # VOCAB_GAP_REMEDIATION_PLAN.md (Phase AZ, the rule-0.9 reevaluation) and is NOT built.
-BP_READING = 100_041          # v2, the asserted path — 2026-09-14, Phase AZ
-BP_READING_V1 = 99_938        # flag-off, the number the AQ..AY prints continue to show
-BP_READING_SCAFFOLD = 44_845  # BP_READING minus VOCABULARY.md
+BP_READING = 104_075          # v2, the asserted path — 2026-09-15, Phase BA
+BP_READING_V1 = 103_972       # flag-off, the number the AQ..AY prints continue to show (v2 - v1 = +103, still)
+BP_READING_SCAFFOLD = 45_484  # BP_READING minus VOCABULARY.md (Phase BA: +639 for the signature-potion
+                              # rule + format row; the op table itself went into the vocabulary half)
 
 
 def _scaffold_len(bp: str) -> int:

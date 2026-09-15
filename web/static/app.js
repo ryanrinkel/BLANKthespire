@@ -552,6 +552,9 @@ const MECH_KINDS = [
   { kind: "orb", badge: "◉ Orb", pool: "orb_pool", lines: orbLines },
   { kind: "status", badge: "✦ Status", pool: "status_pool", lines: statusLines },
   { kind: "summon", badge: "⚔ Summon", pool: "summon_pool", lines: summonLines },
+  // Phase BA (v55): the class's signature potion. It carries no card text and it is not in the deck, so this
+  // panel is the only place a player can read what it does before one drops.
+  { kind: "potion", badge: "🧪 Potion", pool: "potion_pool", lines: potionLines },
 ];
 
 function renderMechanics(character, classId) {
@@ -636,6 +639,30 @@ const STATUS_HOOK_LABELS = {
   energy_gain: "energy you gain", card_draw: "cards you draw",
   damage_over_time: "HP lost at its turn start", hit_count: "hits per attack",  // Phase AQ (v47)
 };
+// Phase BA (v55): the signature potion's chip lines — what it does, when you can drink it, and the one fact
+// a player cannot infer from anywhere else: it is an ADDITION to the normal potion table, not a replacement.
+function potionLines(po) {
+  const out = [];
+  const rarity = String(po.rarity || "common");
+  out.push(`${rarity.charAt(0).toUpperCase()}${rarity.slice(1)} potion — usable `
+           + (po.usage === "any" ? "any time" : "in combat"));
+  const tgt = po.target || "self";
+  const eff = (po.effects || []).map((e) => potionEffectText(e, tgt)).filter(Boolean).join(", ");
+  if (eff) out.push(eff);
+  out.push("Drops alongside the usual potions on runs of this class");
+  return out;
+}
+
+// `summon`'s shared phrasing reads `amount` as the minion's HP (its meaning on a card); on a potion the
+// amount is a COUNT, so render that one op here and defer everything else to the shared formatter.
+function potionEffectText(e, target) {
+  if (e && e.op === "summon") {
+    const n = e.amount ?? 1;
+    return `Summon ${e.summon_name || "a minion"}${n > 1 ? ` ×${n}` : ""}`;
+  }
+  return fmtEffect(e, target);
+}
+
 function statusLines(st) {
   const out = [];
   const kind = st.type === "debuff" ? "Debuff" : "Buff";
@@ -762,7 +789,7 @@ let fbState = { classId: null, kind: "card", subjectId: "", chip: null, category
 
 const FB_TITLES = {
   card: "How's this card?", relic: "How's this relic?", orb: "How's this orb?",
-  status: "How's this status?", summon: "How's this summon?",
+  status: "How's this status?", summon: "How's this summon?", potion: "How's this potion?",
 };
 
 // Open the shared feedback popout. `detailHtml` (elements only) shows a description + effect lines so the

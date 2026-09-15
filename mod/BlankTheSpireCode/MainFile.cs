@@ -53,5 +53,17 @@ public partial class MainFile : Node
                 if (st != null && !string.IsNullOrEmpty(st.Emoji))
                     Engine.EmojiIconRenderer.Kick($"status{k}_{m}", st.Emoji);
             }
+
+        // Phase BA (v55): pre-render each forged class potion's emoji the same way (key = "potion{K}_{M}",
+        // matching ForgedPotion.IconKey). A potion's art surface is path-based and BaseLib patches the private
+        // PackedImagePath getter, so the rendered .res reaches the potion bar, the tooltip and the throw VFX
+        // alike. Best-effort — no/failed emoji falls back to the shipped placeholder art.
+        for (int k = 1; k <= Engine.ForgedCharacters.ClassCount; k++)
+            for (int m = 1; m <= Engine.ForgedCharacters.MaxPotions; m++)
+            {
+                var po = Engine.ForgedCharacters.PotionSpecFor(k, m);
+                if (po != null && !string.IsNullOrEmpty(po.Emoji))
+                    Engine.EmojiIconRenderer.Kick($"potion{k}_{m}", po.Emoji);
+            }
     }
 }

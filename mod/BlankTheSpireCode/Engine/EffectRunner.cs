@@ -1155,6 +1155,34 @@ public static class EffectRunner
                 case "apply_status":
                     await ApplyRelicStatus(e.Status, ctx, player, targets, amt, hookTarget);
                     break;
+                case "apply_status_custom":
+                {
+                    // Phase BA (v55): apply one of the CLASS's OWN statuses from a no-card effect — the op that lets a
+                    // status class's POTION hand out its signature status ("drink this, gain 3 Razor Focus"). Same
+                    // resolution as the card/trigger op (ResolveStatusInstance); a buff lands on the owner, a debuff on
+                    // the resolved targets. Unknown name => warn + skip, never a throw.
+                    // Reachable today only from a potion: the relic vocabulary (ForgedCharacters.RelicEffectOps) does
+                    // NOT list this op, so a relic bundle carrying it is rejected at import.
+                    var inst = ForgedCharacters.IsStatusClass(relicClass)
+                                   ? ForgedCharacters.ResolveStatusInstance(relicClass, e.StatusName) : null;
+                    if (inst?.Spec is not { } cst)
+                    {
+                        MainFile.Logger.Warn($"[BA] apply_status_custom: class {relicClass} has no status '{e.StatusName}' (skipped).");
+                        break;
+                    }
+                    if (cst.IsBuff)
+                    {
+                        MainFile.Logger.Info($"[BA] apply_status_custom: gain {amt} {cst.Name} (self buff).");
+                        await inst.ApplyStacks(ctx, player.Creature, player.Creature, amt);
+                    }
+                    else
+                    {
+                        MainFile.Logger.Info($"[BA] apply_status_custom: apply {amt} {cst.Name} to {targets.Count} enemy/ies.");
+                        foreach (var t in targets)
+                            await inst.ApplyStacks(ctx, t, player.Creature, amt);
+                    }
+                    break;
+                }
                 case "discard":
                     // Phase AS (v48): the relic DRAWBACK op — discard N random cards from hand (the Phase R random path, so
                     // on_discard payoffs still fire). Random only; a relic never opens a picker. No-op on an empty hand.

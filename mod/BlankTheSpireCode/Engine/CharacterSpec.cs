@@ -48,6 +48,14 @@ public sealed record CharacterSpec(
     /// false — every pre-v54 class keeps the per-combat counter.</summary>
     public bool ForgePersist { get; init; } = false;
 
+    /// <summary>The class's forged potion pool (Phase BA): the ordered list of ≤<see cref="ForgedCharacters.MaxPotions"/>
+    /// custom potions this class contributes to the potion drop table. Indexed by position (slot M = index+1, mapping
+    /// to the compiled <c>ForgedClassKKPotionM</c> shell). The pool is PER CLASS, and the game concatenates it with the
+    /// base game's SharedPotionPool at roll time — so these are EXTRA potions alongside the normal table, never a
+    /// replacement. Empty = the class contributes none (every pre-v55 class), which is exactly today's behaviour.
+    /// Set via object initializer by <see cref="ForgedCharacters"/>; defaults to empty (incl. the empty-class spec).</summary>
+    public PotionSpec[] PotionPool { get; init; } = [];
+
     /// <summary>The class's forged relic (Phase L): a single custom starting relic, or null if the class uses the
     /// default (Burning Blood). Parsed from the class bundle's optional <c>relic</c> object by
     /// <see cref="ForgedCharacters"/>; fed to the compiled <c>ForgedClassKKRelic</c> shell via

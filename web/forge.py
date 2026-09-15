@@ -254,7 +254,7 @@ def append_card_feedback(*, category: str, card: dict, character: str, note: str
 # players can rate them too. We write them to the SAME log in a card-shaped record (synthetic effects + a
 # `card_id` like "orb:ember") so btsgen.contract.feedback_section() folds them into the prompt with zero
 # generator changes; the extra `element_kind` field flags them for any kind-aware tooling later.
-ELEMENT_KINDS = frozenset({"orb", "status", "summon", "relic"})
+ELEMENT_KINDS = frozenset({"orb", "status", "summon", "relic", "potion"})  # potion: Phase BA (v55)
 
 
 def _element_effects_summary(element_kind: str, element: dict) -> list[dict]:
@@ -268,6 +268,8 @@ def _element_effects_summary(element_kind: str, element: dict) -> list[dict]:
         effs += [{"op": "modifier", "stat": m.get("stat"), "amount": m.get("amount")}
                  for m in (element.get("modifiers") or [])]
         return effs
+    if element_kind == "potion":  # Phase BA (v55): a potion's effects are already a flat card-style list
+        return list(element.get("effects") or [])
     return []
 
 

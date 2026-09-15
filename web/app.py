@@ -1070,13 +1070,14 @@ def card_feedback_route():
 
 def _find_element(bundle: dict, kind: str, element_id: str) -> dict | None:
     """Resolve a forged non-card element from a stored bundle (server-side; we never trust the client's blob).
-    `kind` is orb|status|summon|relic; `element_id` is the element's name (matched case-insensitively). The
+    `kind` is orb|status|summon|relic|potion; `element_id` is the element's name (matched case-insensitively). The
     relic is singular (one per class) so its id is ignored."""
     if kind == "relic":
         relic = bundle.get("relic")
         return relic if isinstance(relic, dict) else None
     character = bundle.get("character") or {}
-    pool = character.get({"orb": "orb_pool", "status": "status_pool", "summon": "summon_pool"}[kind]) or []
+    pool = character.get({"orb": "orb_pool", "status": "status_pool", "summon": "summon_pool",
+                          "potion": "potion_pool"}[kind]) or []
     want = (element_id or "").strip().lower()
     for entry in pool:
         if isinstance(entry, dict) and str(entry.get("name", "")).strip().lower() == want:
