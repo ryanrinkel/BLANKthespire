@@ -508,3 +508,11 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Buildable today?** **No, and there is no surface to build on.** Unlike potions (`CustomPotionModel` + a `PotionPool` on every character model — see `PHASE_BA_FORGED_POTIONS_PLAN.md`), relics, orbs, statuses and summons, nothing in the mod or in BaseLib 3.2.1 exposes a per-character event pool: events are map-level content, not class content, so a forged class has no hook to hang one on. Building it would mean patching the map generator, which is a different kind of mod than everything here.
 - **Priority:** **NONE.** Two independent reasons, either sufficient: no engine surface, and no demand signal in 48 entries of this log.
 - **Status:** **not planned** — this is a deliberate close, not a backlog item. Re-open only if BaseLib grows a per-character event pool; a concept asking for "my class's own events" is NOT on its own enough, because the answer would still be "there is nowhere to put it."
+
+### 51. Wound-Gated Implantation
+- **Surfaced by:** staged front-end ("a blight-sower whose spores take root in")
+- **Fantasy it serves:** Spores that can only take root in already-wounded enemies — the Open Gateway as a mechanical prerequisite, not just a debuff
+- **Mechanic sketch:** A when-gate that checks if the target has lost HP this combat (or has a custom 'Wounded' status), enabling stronger spore effects that only fire on broken flesh — the wound is the door the spore walks through
+- **Buildable today?** No — surfaced as off-vocabulary by the map stage.
+- **Priority:** unset (triage).
+- **Status:** captured
