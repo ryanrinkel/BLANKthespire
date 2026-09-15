@@ -13,7 +13,8 @@ concept that doesn't map cleanly to the catalog as a new entry below. A human
 triages — promote good ones into the vocabulary, mark weak ones `rejected`.
 
 Status values: `captured` (new, untriaged) · `planned` (accepted, queued to
-build) · `building` · `done` (now in vocabulary) · `rejected`.
+build) · `building` · `done` (now in vocabulary) · `rejected` · `not planned`
+(scoped and deliberately closed — a ruling, not a backlog item; see #49/#50).
 
 ---
 
@@ -490,3 +491,20 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Priority:** Verify-then-close (expressible since v18/v21; not yet AutoSlay-proven).
 - **Status:** **planned (verify-then-close)** — likely expressible today; NOT marked done until the tester runs.
 - **Triage (2026-09-09, W0.11):** the sketch is `add_trigger` `trigger:"on_hp_lost"` with a TARGETED `damage` payload (`target: enemy`, gap #9 + #14): a power reading "Whenever you lose HP on your turn, deal N damage to the enemy" — self-inflicted scourge damage retaliates without waiting for an enemy hit, bridging self_sacrifice and counter_riposte. Gap Tester spec (`generation/scratch/gaptest-48/`): one power card carrying that on_hp_lost → damage(target:enemy, 3-5) trigger, plus 2-3 `lose_hp` scourge attacks (1-3 HP each) and one `once_per_turn`-gated variant; the class must validate under the mod contract. AutoSlay gate: grep godot.log for `reactive trigger 'on_hp_lost' fired` immediately following each `lose_hp` resolution on the PLAYER's turn (never after an enemy attack), the targeted damage landing on the first hittable enemy, and 0 mod exceptions — the #4 verify-then-close pattern. Mark `done` only after that log evidence is in AUTOSLAY_VALIDATION_QUEUE.md.
+
+### 49. Curses / status cards as generated content
+- **Surfaced by:** not a harness run — scoped by `VOCAB_GAP_REMEDIATION_PLAN.md` Phase AZ (2026-09-14). Logged here so a future audit finds the ruling instead of re-deriving it.
+- **Fantasy it serves:** a class whose own power corrupts its deck — a cost paid in run-permanent bad cards, not in HP or energy. The Curse-as-price axis (Ironclad's Burning Blood bargains, Necronomicurse, the base game's Curse rewards).
+- **Mechanic sketch:** extend a generated card's `type` with `curse`: unplayable, drawback-shaped, and RUN-permanent (it enters the run deck, not just the combat piles). A class could then price a very strong card by adding its own bespoke Curse to the deck.
+- **Buildable today?** **Partly, and the useful half already shipped.** Phase AP (2026-09-10, vocab v46) landed `add_status_card {card: dazed|wound|burn, pile, amount}` — the class inflicts the base game's own status cards on itself via `CombatState.CreateCard<…>(owner)` + `CardPileCmd.AddGeneratedCardToCombat`, combat-transient and priced negative (burn −2.5 / wound −2.0 / dazed −1.5). So "my power clogs my own deck this fight" is expressible NOW. What is NOT expressible is a **class-authored** Curse: a new card type the generator invents, with its own name/art/drawback, that persists for the run.
+- **Priority:** **LOW — blocked on demand, not on engineering.** The plan's own condition was "do not build until a class concept demands it," and 48 gap entries later there is still **no demand signal**: no harness run has ever surfaced a curse-authoring concept. Every "cost" fantasy so far resolved to `lose_hp`, `add_status_card`, `purge`-as-thinning, or a negative relic modifier.
+- **Cost if demand appears:** not small. A run-permanent generated card needs a card type outside the class's 40 slots (or a slot reserved for it), the run-deck insert path (`CardPileCmd` — the Phase W `purge` work is the mirror image of this), unplayability enforcement, and its own balance model so a class can't price a free win at "one Curse." Treat it as its own phase, not a vocab row.
+- **Status:** **not planned** — re-open only when a concept in this log actually asks for it. If one does, note the concept's number here before starting.
+
+### 50. Events (generated map events)
+- **Surfaced by:** not a harness run — scoped by `VOCAB_GAP_REMEDIATION_PLAN.md` Phase AZ (2026-09-14). Recorded so the audits stop re-surfacing it.
+- **Fantasy it serves:** a forged class bringing its own `?` rooms — narrative beats and bargains written in the class's voice.
+- **Mechanic sketch:** a `event_pool` on the character: prompt text, 2-3 choices, each choice running effects / granting a card / costing HP.
+- **Buildable today?** **No, and there is no surface to build on.** Unlike potions (`CustomPotionModel` + a `PotionPool` on every character model — see `PHASE_BA_FORGED_POTIONS_PLAN.md`), relics, orbs, statuses and summons, nothing in the mod or in BaseLib 3.2.1 exposes a per-character event pool: events are map-level content, not class content, so a forged class has no hook to hang one on. Building it would mean patching the map generator, which is a different kind of mod than everything here.
+- **Priority:** **NONE.** Two independent reasons, either sufficient: no engine surface, and no demand signal in 48 entries of this log.
+- **Status:** **not planned** — this is a deliberate close, not a backlog item. Re-open only if BaseLib grows a per-character event pool; a concept asking for "my class's own events" is NOT on its own enough, because the answer would still be "there is nowhere to put it."

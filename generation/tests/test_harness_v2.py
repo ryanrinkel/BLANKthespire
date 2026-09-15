@@ -330,40 +330,83 @@ def test_strip_metaphors_tidies_text():
 # --------------------------------------------------------------- Fix D: blueprint prompt
 # Rule 0.9 (VOCAB_EXPANSION_4_PLAN.md §0) — THE prompt budget, asserted here and nowhere else.
 #
-# The blueprint prompt is tuned for 7B-class local models: every addition must be paid for by a removal of equal
-# size or land as a one-line "menu" pointer, not a paragraph. There is ONE prompt, so there is ONE ceiling, and
-# it lives in this file. A phase test asserts that ITS OWN wording is still in the prompt (see test_phase_au /
-# test_phase_av for the idiom); it does NOT pin a size. Phase tests used to keep private ceilings measured on
-# their own day, which is the ratchet rule 0.9 exists to stop — test_phase_at and test_phase_aw sat red for
-# three phases because the prompt grew past ceilings that had nothing to do with their features.
+# There is ONE prompt, so the ceiling lives in ONE file. A phase test asserts that ITS OWN wording is still in
+# the prompt (see test_phase_au / test_phase_av for the idiom); it does NOT pin a size. Phase tests used to keep
+# private ceilings measured on their own day, which is the ratchet rule 0.9 exists to stop — test_phase_at and
+# test_phase_aw sat red for three phases because the prompt grew past ceilings that had nothing to do with their
+# features. Both asserts below bound the WORST CASE, the harness-v2 prompt: v2 is what the droplet runs, and
+# Fix D's rotations make it the longer path (by a stable +103 in every commit from Wave 2 through AZ).
 #
-# The ceiling bounds the WORST CASE, which is the harness-v2 prompt (v2 is what the droplet runs, and Fix D's
-# rotations make it the longer of the two paths). Raising BP_BUDGET is a deliberate change argued in this one
-# place, with the reason in the commit message.
-BP_BUDGET = 101_000      # raised ONCE, at the Phase AY consolidation: every reading the old 100,000 was built
-                         # from (AQ..AY, and the AT/AW ceilings this replaced) was measured flag-OFF, so it never
-                         # counted the +103 that v2 adds and the shipped prompt was 41 chars past it unnoticed.
-BP_READING = 100_041     # v2, the asserted path — 2026-09-14, Phase AY
-BP_READING_V1 = 99_938   # flag-off, the number the AQ..AY prints continue to show
-# All three numbers are SCHEDULED FOR REEVALUATION at the end of VOCAB_GAP_REMEDIATION_PLAN execution
-# (after Phase AZ): 101,000 came from one reading, not from a growth curve. The four checks to run are in
-# that plan, under the CLOSED "the rule-0.9 budget is asserted in N places" item in Cross-cutting mitigations.
+# REEVALUATED 2026-09-14 at Phase AZ, against the measured growth curve (Wave 2 -> AZ, 15 phases). The single
+# 101,000 ceiling was a snapshot, and it hid WHERE the growth comes from:
+#
+#     v2 prompt   81,126 -> 100,041   +18,915   (+1,261/phase mean, +1,357 median)
+#     VOCABULARY  40,256 ->  55,196   +14,940   (+996/phase)  <- 79% of it, pasted verbatim
+#     scaffolding 40,870 ->  44,845   + 3,975   (+265/phase, worst single phase +704)
+#
+# The prompt interpolates VOCABULARY.md whole (one `{vocab}` in `_system_prompt_legacy`), so the total is
+# "the vocabulary, plus the scaffolding that frames it". Rule 0.9's "pay for an addition with a removal" can
+# only govern the scaffolding — a phase that adds an op MUST document it, and there is nothing to trade the row
+# against. Measured against the half it can govern, the discipline is working: +265/phase, several phases at
+# zero. So the budget is two terms, both owned here:
+BP_SCAFFOLD_BUDGET = 46_000   # the assert with teeth: prompt MINUS the vocabulary paste. 44,845 today, ~1,155
+                              # of headroom = ~4 phases at the observed mean. This is where "pay with a removal"
+                              # bites, and where a phase argues for headroom.
+BP_TOTAL_TRIPWIRE = 120_000   # NOT a per-phase gate — the line at which the shrink conversation is due. Derived
+                              # from the actual consumer (below), not from last month's reading: ~30k tokens,
+                              # ~20-25% of a 128k context. ~16 phases of runway at the observed total rate.
+#
+# Why the total is a tripwire and not a ceiling: rule 0.9 says the prompt "is tuned for 7B-class local models",
+# and that premise is STALE. The blueprint rides the `structure` role, which is glm-5.2 in every shipped mix
+# (ollama_roles.example/hybrid/kimi3 + ollama_mix.DEFAULT_ROLE_MAP) and Claude or Kimi K3 on the other paths;
+# the small/local model only ever gets `brainstorm`. The blueprint prompt has never gone to a 7B model. What
+# survives the premise is real but different: input cost per forge, and attention dilution. Neither justifies a
+# hard stop at 100k chars; both justify not letting it double unnoticed.
+#
+# When the tripwire trips, the answer is a SHRINK, not a raise — and the lever already exists. `_prune_archetype_
+# sections` + the W0.5 "ALSO AVAILABLE" one-liner + `coverage.sanitize_nominations({"sections": …})` prune
+# class_forge's own archetype sections at blueprint stage and let the model nominate one back. Nothing applies
+# that machinery to the VOCABULARY paste, which is the 55k half: an orb class is shown the Forged-summons rows
+# and the Balance gauge in full. Kind-gating the vocab sections the same way is scoped in
+# VOCAB_GAP_REMEDIATION_PLAN.md (Phase AZ, the rule-0.9 reevaluation) and is NOT built.
+BP_READING = 100_041          # v2, the asserted path — 2026-09-14, Phase AZ
+BP_READING_V1 = 99_938        # flag-off, the number the AQ..AY prints continue to show
+BP_READING_SCAFFOLD = 44_845  # BP_READING minus VOCABULARY.md
 
 
-def test_rule_0_9_blueprint_prompt_stays_within_budget(v2):
+def _scaffold_len(bp: str) -> int:
+    """The prompt minus the vocabulary it pastes in whole — the half rule 0.9 can actually govern."""
+    from btsgen import paths
+    return len(bp) - len(paths.VOCABULARY.read_text(encoding="utf-8"))
+
+
+def test_rule_0_9_blueprint_scaffolding_stays_within_budget(v2):
+    """The assert with teeth: everything in the prompt that ISN'T the vocabulary row it documents."""
     bp = _BlueprintContract(mode="dossier", triad=True, seed=1).system_prompt()
-    assert len(bp) < BP_BUDGET, (
-        f"rule 0.9: the blueprint prompt is {len(bp):,} chars, past the {BP_BUDGET:,} ceiling "
-        f"({len(bp) - BP_READING:+,} since the {BP_READING:,} recorded at Phase AY). Pay for the addition with a "
-        f"removal of equal size, or make it a one-line menu pointer. Raise the ceiling only on purpose, here.")
+    scaffold = _scaffold_len(bp)
+    assert scaffold < BP_SCAFFOLD_BUDGET, (
+        f"rule 0.9: the blueprint scaffolding is {scaffold:,} chars, past the {BP_SCAFFOLD_BUDGET:,} ceiling "
+        f"({scaffold - BP_READING_SCAFFOLD:+,} since the {BP_READING_SCAFFOLD:,} recorded at Phase AZ). This is "
+        f"prompt text that is NOT a vocabulary row: pay for it with a removal of equal size, or make it a "
+        f"one-line menu pointer. Raise the ceiling only on purpose, here.")
+
+
+def test_rule_0_9_total_prompt_stays_under_the_tripwire(v2):
+    """The whole prompt, vocabulary included. Trips long before the model notices — on purpose."""
+    bp = _BlueprintContract(mode="dossier", triad=True, seed=1).system_prompt()
+    assert len(bp) < BP_TOTAL_TRIPWIRE, (
+        f"the blueprint prompt is {len(bp):,} chars, past the {BP_TOTAL_TRIPWIRE:,} tripwire "
+        f"({len(bp) - BP_READING:+,} since the {BP_READING:,} recorded at Phase AZ). The answer here is a SHRINK, "
+        f"not a raise: kind-gate the VOCABULARY paste behind the nomination machinery W0.5 already built. See the "
+        f"note above this assert.")
 
 
 def test_rule_0_9_v2_is_the_worst_case(v1):
-    """The ceiling above is asserted under v2 because v2 is the LONGER path; this keeps that assumption honest."""
+    """Both ceilings are asserted under v2 because v2 is the LONGER path; this keeps that assumption honest."""
     bp_v1 = _BlueprintContract(mode="dossier", triad=True, seed=1).system_prompt()
     assert len(bp_v1) <= BP_READING, (
         f"the flag-off prompt is {len(bp_v1):,} chars, past the v2 reading {BP_READING:,} — v2 is no longer the "
-        f"worst case, so the budget assert above is measuring the wrong path.")
+        f"worst case, so the budget asserts above are measuring the wrong path.")
 
 
 def test_homage_examples_rotate_per_forge(v2):

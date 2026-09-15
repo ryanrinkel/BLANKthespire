@@ -1278,19 +1278,63 @@ counter + the AY line), `web/static/app.js` + `style.css` (the class-mechanics c
 `describe` change. **Pre-existing red left as found:** `test_phase_at` / `test_phase_aw` pin stale prompt-size
 ceilings (98,357 and 96,153) that Phase AX already passed; both were failing at AX's commit and still are.
 
+**STATUS (2026-09-14): Phase AZ EXECUTED (scoping only — no vocab bump, no engine change)** — the plan's last
+phase. All three scoping deliverables plus the rule-0.9 reevaluation the AZ entry gates on.
+
+**(1) The rule-0.9 reevaluation is DONE and cost a redesign of the budget, not a raise** — see the CLOSED
+"the rule-0.9 budget is asserted in N places" item under Cross-cutting mitigations for the four answers and the
+curve. Method, because it is reusable: `git worktree add --detach` one scratch tree, check out each phase commit
+Wave 2 → AZ in turn, and measure `_BlueprintContract(mode="dossier", triad=True, seed=1).system_prompt()` on
+both arms (`BTS_HARNESS_V2` unset, then `=1`). Headline: **79% of all prompt growth is `VOCABULARY.md`, pasted
+in whole**, which rule 0.9's "pay with a removal" cannot govern; the scaffolding it CAN govern grew +265/phase
+and is healthy. So `BP_BUDGET` split into `BP_SCAFFOLD_BUDGET = 46,000` (the assert with teeth) and
+`BP_TOTAL_TRIPWIRE = 120,000` (the shrink-conversation line, re-derived from the ACTUAL consumer — the blueprint
+rides the `structure` role, i.e. glm-5.2 / Claude / Kimi K3, never the 7B the rule was written for). Also swept
+the one leftover private ceiling, `test_phase_av.py`'s dead `BP_ALLOWANCE`.
+
+**(2) Forged potions → `docs/plans/PHASE_BA_FORGED_POTIONS_PLAN.md`**, written against a REFLECTED API, not a
+guess (`MetadataLoadContext` dump of BaseLib 3.2.1 + `sts2.dll`). The find that sizes the phase: `PotionModel.
+OnUse(PlayerChoiceContext choiceContext, Creature target)` hands over a ctx, which is exactly the first argument
+of `EffectRunner.RunRelicEffects(EffectSpec[], PlayerChoiceContext, Player, List<Creature>, int, string)` — **a
+potion is structurally a relic hook firing, so v1 needs NO new runner** (unlike Phase L, which built
+`RelicRunner` from nothing). Spec'd: `potion_pool` (1–2), the relic sub-vocabulary for `effects`, `PotionSpec`
+mirroring `RelicSpec`, `POTIONS_PER_CLASS = 2` → 8 `slotgen` shells, `ForgedRelicIcon` reused whole (weak-cache
+lesson included), v55. **One BLOCKING decision is called out before any code:** `CHARACTER_TMPL` gives every
+class its own `CardPool` but a SHARED `BlankTheSpirePotionPool`, so two potion-forging classes would roll each
+other's potions — the exact bleed the per-class card pools exist to prevent. Recommendation in the plan is
+per-class potion pools (option A).
+
+**(3) Curses / status cards → `VOCABULARY_GAPS.md` #49, status `not planned`.** The useful half already shipped:
+Phase AP's `add_status_card {dazed|wound|burn}` expresses "my power clogs my own deck." What's missing is a
+CLASS-AUTHORED, run-permanent Curse — real work (a card type outside the 40 slots, a run-deck insert path,
+unplayability, its own balance model), and after 48 gap entries there is still **no demand signal** for it. The
+plan's own condition was "do not build until a class concept demands it," so it is logged as a ruling with the
+re-open trigger written down.
+
+**(4) Events → `VOCABULARY_GAPS.md` #50, status `not planned`.** A deliberate close on two independent grounds:
+no engine surface (unlike potions, nothing in the mod or BaseLib 3.2.1 exposes a per-character event pool —
+events are map-level content, so a forged class has nowhere to hang one) and no demand signal. The re-open
+trigger is explicitly *not* "a concept asked for it" — it is "BaseLib grew a pool."
+
+`not planned` is new in the gap log's status legend, added at the head of the file; `_parse_gap_titles` still
+reads all 50 entries and the next auto-append is #51. Suite **406 passed**. No `mod/` file was touched.
+
 ### Phase AZ — New content types (scoping only; each is its own plan)
-- **Before closing out the plan:** the rule-0.9 prompt budget is flagged for reevaluation at the END of plan
-  execution — see the CLOSED "the rule-0.9 budget is asserted in N places" item under Cross-cutting mitigations
-  for the four checks. Do it here, while AQ..AZ's readings are all still in front of you.
-- **Forged potions** — a `potion_pool` on the character (1–2 potions), spec `{name, emoji, effects[]}` reusing the
-  card effect vocab (self/enemy target), runtime `ForgedPotion : BlankTheSpirePotion`
-  (`Potions/BlankTheSpirePotion.cs`), pool wiring in `Character/BlankTheSpirePotionPool.cs`. Write
-  `PHASE_BA_FORGED_POTIONS_PLAN.md`.
-- **Curses / status cards as generated content** — extend card `type` with `curse` (unplayable, ethereal-ish
-  drawback) only after Phase AP proves base status cards work. Write a scope note; do not build until a class
-  concept demands it (no demand signal in `VOCABULARY_GAPS.md` yet).
-- **Events** — no engine surface, no demand signal. Record as "not planned" in `VOCABULARY_GAPS.md` so it stops
-  being re-audited.
+- ✅ **Before closing out the plan:** the rule-0.9 prompt budget was flagged for reevaluation at the END of plan
+  execution. **DONE** — the four checks are answered in the CLOSED "the rule-0.9 budget is asserted in N places"
+  item under Cross-cutting mitigations, against the measured Wave 2 → AZ curve.
+- ✅ **Forged potions** — **`docs/plans/PHASE_BA_FORGED_POTIONS_PLAN.md` written** (2026-09-14), against a
+  reflected API rather than the sketch here. Confirms the shape this bullet guessed (`potion_pool`, 1–2,
+  `{name, emoji, effects[]}`, `ForgedPotion`, the pool wiring) and adds what the sketch could not know: `OnUse`
+  hands over a `PlayerChoiceContext`, so `EffectRunner.RunRelicEffects` runs the effects unchanged (no new
+  runner), and the SHARED `BlankTheSpirePotionPool` is a blocking cross-class-bleed decision to take first.
+- ✅ **Curses / status cards as generated content** — scope note written as **`VOCABULARY_GAPS.md` #49**, status
+  `not planned`. AP did prove base status cards work (`add_status_card`), which covers the expressible half; the
+  class-authored run-permanent Curse is a phase of its own and still has no demand signal, so the entry records
+  the ruling, the cost, and the re-open trigger.
+- ✅ **Events** — recorded as **`VOCABULARY_GAPS.md` #50**, status `not planned`, with the "no engine surface"
+  half now evidenced (BaseLib 3.2.1 exposes no per-character event pool; events are map-level content) so the
+  close does not rest on absence of demand alone.
 
 ---
 
@@ -1326,21 +1370,48 @@ ceilings (98,357 and 96,153) that Phase AX already passed; both were failing at 
     **100,041, already 41 chars past a ceiling nobody knew it was breaching**. The single assert now measures the
     v2 path, with `test_rule_0_9_v2_is_the_worst_case` guarding the assumption that v2 stays the longer of the
     two. Readings at AY: **v2 100,041 / v1 99,938**, ~959 chars of headroom.
-  - **REEVALUATE AT THE END OF PLAN EXECUTION** — after AZ, before this plan is archived. By then the growth curve
-    across AQ..AZ is visible and the ceiling can be a budget rather than a snapshot. Check, in order:
-    1. **Is 101,000 still the right number?** It was set from ONE reading (v2 at 100,041) with ~959 chars of
-       headroom. Plot the per-phase readings and pick a ceiling the remaining phases can actually live under —
-       or conclude the prompt has to shrink, which is the answer rule 0.9 actually wants.
-    2. **Did the one-assert discipline hold?** `grep -rn "rule 0\.9" generation/tests/` should show `BP_BUDGET`
-       in `test_harness_v2.py` and NOWHERE else. Any new private ceiling in a phase test is the same regression
-       coming back; delete it there and note why here.
-    3. **Is v2 still the worst case?** `test_rule_0_9_v2_is_the_worst_case` asserts it, but if the flag is retired
-       (or flipped to default-on and v1 deleted) the two readings collapse into one and both constants should
-       follow. The 41-char breach this consolidation found came from measuring the path we DON'T ship.
-    4. **Does the budget still mean anything for a 7B model?** The whole rule exists for local-model context, not
-       for the number's own sake. If the deployed models moved, re-derive the ceiling from them rather than from
-       the history.
+  - **DONE 2026-09-14 at Phase AZ — reevaluated against the measured curve; the answer was "split the budget,"
+    not "raise it."** Every phase commit from Wave 2 to AZ was checked out in a worktree and its prompt measured
+    on BOTH arms (probe + method in the AZ STATUS paragraph). The curve, and what it exposed:
 
+    | | Wave 2 | AZ | growth | per phase |
+    |---|---|---|---|---|
+    | v2 prompt | 81,126 | 100,041 | +18,915 | +1,261 mean / +1,357 median |
+    | `VOCABULARY.md` | 40,256 | 55,196 | +14,940 | +996 |
+    | scaffolding (prompt − vocab) | 40,870 | 44,845 | +3,975 | +265, worst single phase +704 |
+
+    1. **Was 101,000 right? No — it was a snapshot, and it hid WHERE the growth comes from.** 959 chars of
+       headroom is less than ONE median phase: as a budget it said "no more phases." But the prompt interpolates
+       `VOCABULARY.md` WHOLE (one `{vocab}` in `_system_prompt_legacy`; 100% of its substantive lines are in the
+       shipped prompt), so **79% of all growth is vocabulary**, and rule 0.9's "pay for an addition with a
+       removal" *cannot* govern it — a phase that adds an op MUST document it, and there is nothing to trade the
+       row against. Measured against the half it CAN govern, the discipline is working: +265/phase, several
+       phases at zero. So the budget is now two terms, both owned in `test_harness_v2.py`:
+       **`BP_SCAFFOLD_BUDGET = 46,000`** (prompt minus the vocab paste — the assert with teeth, ~1,155 of
+       headroom ≈ 4 phases) and **`BP_TOTAL_TRIPWIRE = 120,000`** (not a per-phase gate; the line at which the
+       shrink conversation is due).
+    2. **The one-assert discipline held.** `BP_BUDGET` was in `test_harness_v2.py` and nowhere else. One
+       leftover: `test_phase_av.py` still declared `BP_ALLOWANCE = 1_600` with no assert behind it — a dead
+       measuring stick, deleted at the same commit. AV's real rule-0.9 check (its own wording is in the prompt)
+       is untouched and is still the pattern.
+    3. **v2 is still the worst case, and provably stable:** v2 − v1 = **exactly +103 in all 16 measured
+       commits** (Fix D's rotations). The flag is still a live A/B — both arms ship, `harness_v2.enabled()` is
+       read at call time — so the two readings stay separate and `test_rule_0_9_v2_is_the_worst_case` stays.
+    4. **The 7B premise is STALE, and this is what re-derives the number.** The blueprint rides the `structure`
+       role, which is **glm-5.2** in every shipped mix (`ollama_roles.example/hybrid/kimi3.json` +
+       `ollama_mix.DEFAULT_ROLE_MAP`) and Claude or Kimi K3 on the other paths; the small/local model only ever
+       gets `brainstorm`. The blueprint prompt has never gone to a 7B model — `ollama_mix` even sizes its
+       `max_tokens` ask "for Claude's output caps." What survives the premise is real but different: input cost
+       per forge, and attention dilution. Neither justifies a hard stop at 100k chars; both justify not letting
+       it double unnoticed — hence a tripwire derived from the actual consumer (~30k tokens, ~20-25% of a 128k
+       context) rather than from last month's reading.
+    - **The shrink lever, when the tripwire trips (scoped, NOT built):** `_prune_archetype_sections` + the W0.5
+      "ALSO AVAILABLE" one-liner + `coverage.sanitize_nominations({"sections": …})` already prune `class_forge`'s
+      OWN archetype sections at blueprint stage and let the model nominate one back. Nothing applies that
+      machinery to the `VOCABULARY.md` paste, which is the 55k half — an orb class is shown the Forged-summons
+      rows and the Balance gauge in full. Kind-gating the vocab sections the same way is the shrink; it carries
+      W0.5's hazard (the blueprint is where the kind is CHOSEN), which is exactly what the ALSO-AVAILABLE +
+      nomination pattern was built to answer.
 ---
 
 ## Scoreboard
