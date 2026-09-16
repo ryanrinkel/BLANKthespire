@@ -997,7 +997,17 @@ public static class EffectRunner
         Take<WeakPower>("weak");
         Take<FrailPower>("frail");
         Take<PoisonPower>("poison");
-        var others = source.CombatState.HittableEnemies.Where(c => c.IsAlive && c != source).ToList();
+        // The struck target is usually DEAD by now (the card's own leading `damage` killed it), and a dead creature's
+        // CombatState is null — found 2026-09-15 by a real forged class ("Carrier Wave": deal 6, spread) that NRE'd
+        // here on two seeds. Its powers are still readable (the Take<> calls above succeed), so the spread still
+        // happens on a kill — the combat state just comes from the player instead.
+        var cs = source.CombatState ?? card.Owner?.Creature?.CombatState;
+        if (cs == null)
+        {
+            MainFile.Logger.Info($"[AX] spread_debuffs: no combat state to spread into ('{card.Id}') — no-op.");
+            return;
+        }
+        var others = cs.HittableEnemies.Where(c => c.IsAlive && c != source).ToList();
         if (stacks.Count == 0 || others.Count == 0)
         {
             MainFile.Logger.Info($"[AX] spread_debuffs: {stacks.Count} debuff(s) on the target, {others.Count} other enemy(ies) — no-op ('{card.Id}').");
