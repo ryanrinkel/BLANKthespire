@@ -7,7 +7,8 @@ Run locally:
 
 Deploy: gunicorn + nginx on a plain Linux host (see DEPLOY-DIGITALOCEAN.md); set the env secrets
 (GOOGLE_CLIENT_ID/SECRET, OLLAMA_API_KEY, BTSWEB_DATABASE_URL, BTSWEB_SECRET_KEY, STRIPE_* — see
-DEPLOY-DIGITALOCEAN.md). Pricing: free with your own key; one free token per UTC day; paid token packs.
+DEPLOY-DIGITALOCEAN.md). Pricing: free with your own key; one free token per UTC day; optional donations
+(a thank-you token per dollar) — nothing is sold.
 """
 from __future__ import annotations
 
@@ -139,7 +140,7 @@ class FreeForgeLimiter:
 
     Per IP, per UTC day, at most `ip_daily_cap` forges may be paid for with the FREE daily token — the obvious
     abuse is a farm of throwaway Google accounts behind one address, each claiming its free forge. Paid tokens
-    are not IP-capped (a household buying a pack should never hit it). On top, `daily_cap` is a global
+    (starter + thank-you) are not IP-capped (a household of donors should never hit it). On top, `daily_cap` is a global
     kill-switch on ALL token-path forges (free or paid) so a runaway day can't run up the bill; 0 disables
     either limit. Process-local, like forge admission — keep gunicorn at one worker.
     """
@@ -166,7 +167,7 @@ class FreeForgeLimiter:
             if self.daily_cap > 0 and self._day_count >= self.daily_cap:
                 return "the hosted forge has hit its daily limit — bring your own API key to keep forging today."
             if free and self.ip_daily_cap > 0 and self._ip_counts.get(ip, 0) >= self.ip_daily_cap:
-                return ("this network has used its free forges for today — buy tokens or bring your own API "
+                return ("this network has used its free forges for today — bring your own API "
                         "key to keep forging.")
             self._day_count += 1
             if free:
@@ -715,7 +716,7 @@ def forge_class_route():
         if not has_any:
             _user_end(user["id"])
             return jsonify({"error": "you're out of tokens — your free daily token arrives tomorrow (UTC), "
-                                     "or buy a pack, or bring your own API key to keep forging.",
+                                     "or bring your own API key to keep forging.",
                             "token_balance": 0, "free_token_available": False}), 402
         denied = free_limiter.check(ip, free=would_be_free)
         if denied:
@@ -727,7 +728,7 @@ def forge_class_route():
             free_limiter.uncount(ip, free=would_be_free)
             _user_end(user["id"])
             return jsonify({"error": "you're out of tokens — your free daily token arrives tomorrow (UTC), "
-                                     "or buy a pack, or bring your own API key to keep forging.",
+                                     "or bring your own API key to keep forging.",
                             "token_balance": 0, "free_token_available": False}), 402
         token_kind, token_state = res
         reserved = True

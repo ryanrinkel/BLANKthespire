@@ -128,13 +128,17 @@
       <h2>Account</h2>
       <p id="acct-email" class="muted"></p>
       <p class="acct-balance-row"><span id="acct-balance" class="acct-balance"></span> <span class="muted">tokens</span></p>
+      <p id="acct-free" class="hint"></p>
       <p class="hint">One token forges one class with the "Use a token" option. Every account gets a
-        <b>free token each day</b> its balance is empty — forging never costs money.</p>
+        <b>free token each day</b>, on top of any it holds — forging never costs money. Bring your own API
+        key and it never costs a token either.</p>
     </section>
 
     <section class="card">
       <h2>Support the forge</h2>
-      <p class="hint">BLANK the spire is totally free, but each Forge costs money and I fear for my bank account! Your donations cover the cost of tokens directly.</p>
+      <p class="hint">BLANK the spire is totally free, but each Forge costs money and I fear for my bank account!
+        Your donations cover the cost of tokens directly — and as a thank-you, every whole dollar adds a token
+        to your balance.</p>
       <div id="donate" class="donate hidden">
         <div id="donate-presets" class="donate-presets"></div>
         <div class="donate-custom">
@@ -179,6 +183,6 @@
   </footer>
 
   <!-- ?v= busts the 1-hour static cache on deploy: bump it whenever app.js changes. -->
-  <script src="/static/app.js?v=20260916a"></script>
+  <script src="/static/app.js?v=20260916b"></script>
 </body>
 </html>

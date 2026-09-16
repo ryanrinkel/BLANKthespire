@@ -17,8 +17,9 @@ class Base(DeclarativeBase):
 
 # Free tokens every account starts with (new sign-ins, and backfilled to existing rows on migration). One
 # token = one hosted "Use a token" forge (the Ollama gemma/glm mix on our server key). Beyond the starter
-# grant, pricing is: one FREE token per UTC day for everyone (tracked separately from the paid balance, see
-# free_token_available / spend_token below), and paid token packs (billing.PACKS) that never expire.
+# grant, pricing is: one FREE token per UTC day for everyone (tracked separately from the balance, see
+# free_token_available / spend_token below), plus thank-you tokens from optional donations (billing.py).
+# Nothing is sold (token packs ran 2026-09-08..16 and were retired; their Purchase rows remain).
 INITIAL_TOKENS = 5
 
 

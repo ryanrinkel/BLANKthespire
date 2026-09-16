@@ -66,14 +66,11 @@ OLLAMA_API_KEY=...                  # powers the "Use a token" path (our hosted 
 BTSWEB_UNLIMITED_EMAILS=you@example.com   # accounts that forge on the token path without spending tokens
 BTSWEB_FREE_IP_DAILY_CAP=5          # free-token forges per IP per UTC day (throwaway-account farms); 0 = off
 BTSWEB_TOKEN_DAILY_CAP=1000         # global kill-switch on all token-path forges per day; 0 = off
-# --- Stripe token packs (key absent = buy UI hidden, daily free token + BYOK still work) ---
+# --- Stripe donations (key absent = donate UI hidden, daily free token + BYOK still work) ---
 STRIPE_SECRET_KEY=sk_live_...       # sk_test_... while testing; test/live are separate Stripe universes
 STRIPE_WEBHOOK_SECRET=whsec_...     # from the DASHBOARD webhook endpoint (https://blankthespire.com/webhook/stripe,
                                     # events: checkout.session.completed + charge.refunded) — NOT the CLI's secret
-# BTSWEB_TOKEN_PACKS=5:500,11:1000,24:2000,65:5000   # tokens:cents — optional override of billing.DEFAULT_PACKS
-# BTSWEB_STRIPE_TAX=1                # enable Stripe Tax on checkout — register Tax + origin address in the
-#                                    # Stripe dashboard FIRST or session creation fails
-# BTSWEB_DONATIONS=1                 # keep the legacy donate route live (no tokens granted); off by default
+# BTSWEB_DONATION_PRESETS=300,500,1000   # suggested amounts in cents shown by the UI (optional)
 # SENTRY_DSN=https://...             # optional: error reporting (pip install sentry-sdk[flask])
 # Do NOT set BTSWEB_DEV_AUTH in prod.
 ```

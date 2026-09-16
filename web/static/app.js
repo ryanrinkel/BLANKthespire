@@ -79,19 +79,19 @@ function renderTokens() {
   chip.classList.toggle("empty", !unlimited && total <= 0);
 
   const status = el("token-status");
-  if (unlimited) status.textContent = "Forges on our hosted models. Your account forges free.";
+  if (unlimited) status.textContent = "Forges on our models. Your account forges free.";
   else if (free) {
-    status.textContent = "Forges on our hosted models. Uses today's free token"
-      + (paid > 0 ? ` (your ${paid} paid token${paid === 1 ? "" : "s"} stay untouched).` : ".");
+    status.textContent = "Forges on our models. Uses today's free token"
+      + (paid > 0 ? ` (your ${paid} other token${paid === 1 ? "" : "s"} stay untouched).` : ".");
   } else if (paid > 0) {
-    status.textContent = `Forges on our hosted models. Uses 1 of your ${paid} paid token${paid === 1 ? "" : "s"}`
+    status.textContent = `Forges on our models. Uses 1 of your ${paid} token${paid === 1 ? "" : "s"}`
       + " — today's free token is spent; another arrives tomorrow (UTC).";
   } else {
     status.innerHTML = "Today's free token is spent — another arrives tomorrow (UTC). "
-      + '<button id="buy-cta" class="linkish" type="button">Buy tokens</button> to keep forging now, or '
-      + "<b>bring your own key</b> below (free, unlimited).";
+      + "Until then, <b>bring your own key</b> below (free, unlimited), or "
+      + '<button id="donate-cta" class="linkish" type="button">support the forge</button>.';
     // innerHTML replaced the node — re-wire the CTA on every render.
-    el("buy-cta").onclick = () => selectTab("account");
+    el("donate-cta").onclick = () => selectTab("account");
   }
 
   // Keep the Account view's balance in lockstep wherever the numbers change (forge spend, purchase).
@@ -257,14 +257,13 @@ async function forge() {
   if (choice === "token") {
     if (!ME.unlimited) {
       if (spendable() <= 0) {
-        toast("No tokens to spend — buy a pack, wait for tomorrow's free token, or bring your own key.");
-        selectTab("account");
+        toast("No tokens to spend — wait for tomorrow's free token, or bring your own key.");
         return;
       }
       const paid = Number(ME.token_balance || 0);
       const msg = ME.free_token_available
-        ? `This will use today's free token${paid > 0 ? ` (your ${paid} paid token${paid === 1 ? "" : "s"} stay untouched)` : ""}. Forge this class?`
-        : `This will use 1 paid token. You have ${paid}. Forge this class?`;
+        ? `This will use today's free token${paid > 0 ? ` (your ${paid} other token${paid === 1 ? "" : "s"} stay untouched)` : ""}. Forge this class?`
+        : `This will use 1 token. You have ${paid}. Forge this class?`;
       if (!confirm(msg)) return;
     }
   } else if (choice === "byok") {
@@ -1033,9 +1032,9 @@ async function deleteClass(id, name) {
   loadLibrary();
 }
 
-// --- account: balance, token packs (Stripe Checkout), purchase history ---------------------------
+// --- account: balance, donations (pay-what-you-want Stripe Checkout), donation history -----------
 
-let BILLING_CFG = null;  // last /api/billing payload
+let DONATE_CFG = null;  // last /api/billing payload — donate() validates amounts against it
 
 async function loadAccount() {
   el("acct-email").textContent = ME ? (ME.email || ME.name || "") : "";
@@ -1046,7 +1045,7 @@ async function loadAccount() {
     ]);
     const me = (await meR.json()).user;
     if (me) { ME = me; renderTokens(); }
-    renderPacks(await billR.json());
+    renderDonation(await billR.json());
     renderPurchases((await purR.json()).purchases || []);
   } catch (_) {
     toast("Couldn't load your account — check your connection.");
@@ -1060,36 +1059,46 @@ function fmtMoney(cents, currency) {
   } catch (_) { return `$${((cents || 0) / 100).toFixed(2)}`; }
 }
 
-function renderPacks(cfg) {
-  BILLING_CFG = cfg || null;
+function renderDonation(cfg) {
+  DONATE_CFG = cfg || null;
   const enabled = !!(cfg && cfg.enabled);
-  const grid = el("packs");
-  if (!grid) return; // the Account view's pack grid is absent from the markup (2026-09-09 copy edit) — nothing to render
-  grid.innerHTML = "";
-  const note = el("packs-note");
+  const box = el("donate");
+  if (!box) return;
+  box.classList.toggle("hidden", !enabled);
+  const note = el("donate-note");
   if (note) note.classList.toggle("hidden", enabled);
-  for (const p of (cfg && cfg.packs) || []) {
+  if (!enabled) return;
+  const presets = el("donate-presets");
+  presets.innerHTML = "";
+  for (const cents of cfg.presets || []) {
     const b = document.createElement("button");
-    b.className = "pack";
+    b.className = "btn donate-preset";
     b.type = "button";
-    b.disabled = !enabled;
-    const per = fmtMoney(Math.round(p.amount_cents / p.tokens), p.currency);
-    b.innerHTML = `<span class="pack-tokens">${p.tokens} tokens</span>`
-      + `<span class="pack-price">${esc(fmtMoney(p.amount_cents, p.currency))}</span>`
-      + `<span class="pack-per">${esc(per)} / token</span>`;
-    b.onclick = (ev) => buyPack(p.id, ev.currentTarget);
-    grid.appendChild(b);
+    b.textContent = fmtMoney(cents, cfg.currency);
+    b.onclick = (ev) => donate(cents, ev.target);
+    presets.appendChild(b);
   }
+  // Static elements, but wiring here (idempotent) keeps all donate logic in one place.
+  el("donate-btn").onclick = (ev) => {
+    const dollars = parseFloat(el("donate-amount").value);
+    donate(Math.round(dollars * 100), ev.target);
+  };
 }
 
-async function buyPack(packId, btn) {
+async function donate(amountCents, btn) {
+  if (!Number.isFinite(amountCents) || amountCents <= 0) { toast("Enter an amount in dollars first."); return; }
+  if (DONATE_CFG && (amountCents < DONATE_CFG.min_cents || amountCents > DONATE_CFG.max_cents)) {
+    toast(`Donations can be ${fmtMoney(DONATE_CFG.min_cents, DONATE_CFG.currency)} to `
+      + `${fmtMoney(DONATE_CFG.max_cents, DONATE_CFG.currency)}.`);
+    return;
+  }
   btn.disabled = true;
-  const html = btn.innerHTML;
-  btn.innerHTML = "<span class=\"pack-tokens\">Redirecting…</span>";
+  const label = btn.textContent;
+  btn.textContent = "Redirecting…";
   try {
-    const r = await fetch("/api/checkout", {
+    const r = await fetch("/api/donate", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pack: packId }),
+      body: JSON.stringify({ amount_cents: amountCents }),
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
@@ -1097,7 +1106,7 @@ async function buyPack(packId, btn) {
   } catch (e) {
     toast(e.message);
     btn.disabled = false;
-    btn.innerHTML = html;
+    btn.textContent = label;
   }
 }
 
@@ -1111,9 +1120,10 @@ function renderPurchases(purchases) {
     const when = p.created_at
       ? new Date(p.created_at).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
       : "";
+    // "pack" rows are from the week token packs were sold (2026-09-08..16); they stay visible as purchases.
     const what = p.kind === "donation"
       ? `Donated ${fmtMoney(p.amount_cents, p.currency)}`
-      : `${p.tokens} token${p.tokens === 1 ? "" : "s"} for ${fmtMoney(p.amount_cents, p.currency)}`;
+      : `Bought ${p.tokens} token${p.tokens === 1 ? "" : "s"} for ${fmtMoney(p.amount_cents, p.currency)}`;
     li.innerHTML = `<div class="lr-main"><span class="lr-name">${esc(what)}</span>`
       + `<span class="lr-meta">+${p.tokens} token${p.tokens === 1 ? "" : "s"} · ${esc(when)}`
       + (p.status === "refunded" ? ' · <span class="refunded">refunded</span>' : "") + `</span></div>`;
@@ -1130,7 +1140,7 @@ async function handlePurchaseReturn() {
   if (!outcome) return;
   const sessionId = params.get("session_id") || "";
   history.replaceState(null, "", "/app");
-  if (outcome === "cancel") { toast("Checkout canceled — you weren't charged."); return; }
+  if (outcome === "cancel") { toast("Donation canceled — you weren't charged."); return; }
   if (outcome !== "success" || !sessionId) return;
 
   for (let attempt = 0; attempt < 3; attempt++) {
@@ -1140,7 +1150,9 @@ async function handlePurchaseReturn() {
       if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
       if (d.status === "paid") {
         if (applyTokenState(d)) renderTokens();
-        toast(`${d.tokens} token${d.tokens === 1 ? "" : "s"} added — thank you!`);
+        toast(d.tokens > 0
+          ? `Thank you for supporting the forge — ${d.tokens} token${d.tokens === 1 ? "" : "s"} added!`
+          : "Thank you for supporting the forge!");
         selectTab("account");
         return;
       }

@@ -122,6 +122,12 @@ Run it once before touching anything to lock the baseline, then after each fix. 
 
 ## Part 3. Pricing: free with your own key, one free token a day otherwise, $1 a token
 
+> **SUPERSEDED 2026-09-16.** Token packs shipped on 2026-09-08 and were retired on 2026-09-16 in favour of the
+> original donation framing (Ryan's call): forging is free, one free token per UTC day (the separate-from-balance
+> rule below is KEPT), and optional pay-what-you-want donations grant one thank-you token per whole dollar.
+> `billing.py`, `terms.html`, `privacy.html`, the landing page and the Account tab all say so. The rest of this
+> part is left as written for the record.
+
 ### 3.1 The rules, stated precisely
 
 | Who | Forging cost | Notes |

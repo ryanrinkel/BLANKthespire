@@ -1,4 +1,4 @@
-"""Billing: pack math, checkout validation, webhook idempotency, refund clawback, purchase history."""
+"""Billing: donation math + presets, donate validation, webhook idempotency, refund clawback, history."""
 from __future__ import annotations
 
 import logging
@@ -20,7 +20,7 @@ def _balance(app_module, uid):
         return s.query(User).filter_by(id=uid).one().token_balance
 
 
-def _paid_session(sid, uid, tokens, cents, pid="pack_5", intent=None):
+def _paid_session(sid, uid, tokens, cents, pid="donation", intent=None):
     return {"id": sid, "payment_status": "paid", "payment_intent": intent or f"pi_{sid}",
             "amount_total": cents, "currency": "usd", "client_reference_id": str(uid),
             "metadata": {"user_id": str(uid), "tokens": str(tokens), "price_id": pid}}
@@ -30,45 +30,55 @@ def _event(etype, obj):
     return {"type": etype, "data": {"object": obj}}
 
 
-def test_packs_have_no_single_token_pack_and_discount_with_size():
+def test_thank_you_tokens_are_one_per_whole_dollar():
     import billing
-    packs = billing.pack_catalog()
-    assert [p["tokens"] for p in packs] == [5, 11, 24, 65]
-    assert packs[0] == {"id": "pack_5", "tokens": 5, "amount_cents": 500, "currency": "usd",
-                        "per_token_cents": 100.0}
-    assert packs[1]["amount_cents"] == 1000
-    per = [p["amount_cents"] / p["tokens"] for p in packs]
-    assert per == sorted(per, reverse=True) and per[-1] < 100   # bigger packs are cheaper per token
-    assert billing.find_pack("pack_1") is None
+    assert billing.TOKENS_PER_DOLLAR == 1
+    assert billing.tokens_for(100) == 1
+    assert billing.tokens_for(350) == 3          # cents never round up
+    assert billing.tokens_for(99) == 0
 
 
-def test_pack_env_parsing_skips_junk_and_falls_back():
+def test_preset_env_parsing_skips_junk_and_falls_back():
     import billing
-    assert billing._parse_packs("11:1000, junk, 5:500, 3:10") == [(5, 500), (11, 1000)]
-    assert billing._parse_packs("") == billing.DEFAULT_PACKS
+    assert billing._parse_presets("500, junk, 300, 10, 99999999") == [500, 300]
+    assert billing._parse_presets("") == []
+    assert billing.PRESETS  # never empty: falls back to DEFAULT_PRESETS
+    assert all(billing.MIN_DONATION_CENTS <= p <= billing.MAX_DONATION_CENTS for p in billing.PRESETS)
 
 
-def test_billing_probe_and_checkout_when_disabled(client):
+def test_billing_probe_and_donate_when_disabled(client):
     login(client)
     b = client.get("/api/billing").get_json()
-    assert b["enabled"] is False and b["donations"] is False and len(b["packs"]) == 4
-    assert client.post("/api/checkout", json={"pack": "pack_5"}, headers=H).status_code == 503
-    assert client.post("/api/donate", json={"amount_cents": 500}, headers=H).status_code == 404
+    assert b["enabled"] is False and b["tokens_per_dollar"] == 1
+    assert b["min_cents"] == 100 and b["max_cents"] == 50000 and b["presets"]
+    assert "packs" not in b                                            # the pack era is gone from the API
+    assert client.post("/api/donate", json={"amount_cents": 500}, headers=H).status_code == 503
+    assert client.post("/api/checkout", json={"pack": "pack_5"}, headers=H).status_code == 404
     assert client.post("/webhook/stripe", data=b"{}").status_code == 503
 
 
 def test_credit_is_idempotent_across_both_delivery_paths(client, app_module):
     import billing
-    login(client, "buyer@example.com")
-    uid = _user_id(app_module, "buyer@example.com")
-    sess = _paid_session("cs_a1", uid, 11, 1000, "pack_11")
-    assert billing._credit_purchase(sess) == (True, 16)
-    assert billing._credit_purchase(sess) == (False, 16)          # second delivery: no double credit
+    login(client, "donor@example.com")
+    uid = _user_id(app_module, "donor@example.com")
+    sess = _paid_session("cs_a1", uid, 10, 1000)
+    assert billing._credit_purchase(sess) == (True, 15)
+    assert billing._credit_purchase(sess) == (False, 15)          # second delivery: no double credit
     billing.handle_stripe_event(_event("checkout.session.completed", sess), LOG)
-    assert _balance(app_module, uid) == 16
+    assert _balance(app_module, uid) == 15
     hist = client.get("/api/purchases").get_json()["purchases"]
-    assert len(hist) == 1 and hist[0]["tokens"] == 11 and hist[0]["kind"] == "pack"
+    assert len(hist) == 1 and hist[0]["tokens"] == 10 and hist[0]["kind"] == "donation"
     assert hist[0]["amount_cents"] == 1000 and hist[0]["status"] == "paid"
+
+
+def test_pack_era_rows_still_show_in_history(client, app_module):
+    """Purchases made while token packs were live (2026-09-08..16) keep their price_id and stay visible."""
+    import billing
+    login(client, "legacy@example.com")
+    uid = _user_id(app_module, "legacy@example.com")
+    billing._credit_purchase(_paid_session("cs_old", uid, 11, 1000, pid="pack_11"))
+    hist = client.get("/api/purchases").get_json()["purchases"]
+    assert hist[0]["kind"] == "pack" and hist[0]["tokens"] == 11
 
 
 def test_unpaid_or_foreign_sessions_are_ignored(app_module, client):
@@ -90,8 +100,8 @@ def test_refund_claws_back_only_unspent_tokens(client, app_module):
     from models import Purchase
     login(client, "refunder@example.com")
     uid = _user_id(app_module, "refunder@example.com")
-    billing._credit_purchase(_paid_session("cs_r1", uid, 24, 2000, "pack_24", intent="pi_r1"))
-    assert _balance(app_module, uid) == 29
+    billing._credit_purchase(_paid_session("cs_r1", uid, 20, 2000, intent="pi_r1"))
+    assert _balance(app_module, uid) == 25
     # spend most of it, then refund: only what is left can come back
     from models import User
     with app_module.session_scope() as s:
