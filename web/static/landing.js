@@ -92,8 +92,9 @@ async function run() {
   }
 }
 
-// Point the button at the right place: already signed in → straight to the app; local dev (no Google
-// OAuth, /login 503s) → the dev-login bypass; otherwise → Google sign-in (the default href).
+// Point the button at the right place: already signed in → straight to the app; local dev (no OAuth
+// credentials, so the chooser has no buttons) → the dev-login bypass; otherwise → /login, the provider
+// chooser (the default href).
 (async () => {
   try {
     const me = await (await fetch("/api/me")).json();

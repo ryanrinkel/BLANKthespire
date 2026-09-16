@@ -1,12 +1,12 @@
 # Forge a Class — the BLANK the spire website
 
 A small Flask app that reuses the `btsgen` generator to forge a whole **BLANK the spire** class from a
-sentence, hands back a `BTSC` import code, and saves it to a per-user library. Google sign-in; classes in
-MySQL (prod) / SQLite (dev). **BYOK API keys are never persisted** — only generated content is.
+sentence, hands back a `BTSC` import code, and saves it to a per-user library. Sign in with Google, Discord
+or GitHub; classes in MySQL (prod) / SQLite (dev). **BYOK API keys are never persisted** — only generated content is.
 
 This is the app behind [blankthespire.com](https://blankthespire.com).
 
-## Run locally (no Google, no MySQL)
+## Run locally (no OAuth, no MySQL)
 
 ```bash
 cd web
@@ -30,10 +30,10 @@ BTSWEB_DEV_AUTH=1 uv run --project ../generation python app.py
 |------|------|
 | `app.py` | Flask routes: `POST /api/forge-class` (SSE), `GET/PATCH/DELETE /api/classes[/:id]`, static |
 | `forge.py` | wraps `btsgen.class_forge.forge_class` + `bts1.encode_class` (hosted / BYOK / fake) |
-| `auth.py` | Google OAuth (Authlib) + `/dev-login` bypass (env-gated, fails closed in prod) |
+| `auth.py` | OAuth sign-in (Authlib: Google / Discord / GitHub) + `/dev-login` bypass (env-gated, fails closed in prod) |
 | `billing.py` | Stripe pay-what-you-want donations (Checkout + webhook, thank-you tokens, refund clawback) |
 | `db.py`, `models.py` | SQLAlchemy engine + `users` / `classes` / `cards` / `purchases` / `forge_usage` |
-| `static/` | split-flap landing page (`/`) + single-page Forge app (`/app`) |
+| `static/` | split-flap landing page (`/`), sign-in chooser (`/login`) + single-page Forge app (`/app`) |
 | `deploy/` | gunicorn + nginx + systemd units, `deploy.sh` (the only deploy path), `backup.sh` |
 | `tests/` | Flask-test-client suite (SQLite, no network): `PYTHONPATH=generation python -m pytest web/tests` |
 

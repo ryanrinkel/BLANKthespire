@@ -56,6 +56,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .ghost { background: none; }
 .danger { color: var(--danger); border-color: #4a2630; background: none; }
 
+/* /login chooser: one full-width button per configured provider, stacked. */
+.signin-options { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.signin-options .btn { text-align: center; }
+.signin-email { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; }
+
 .settings { margin: 14px 0; border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
 .settings summary { cursor: pointer; color: var(--muted); }
 .modes { display: flex; flex-wrap: wrap; gap: 14px; margin: 12px 0; }

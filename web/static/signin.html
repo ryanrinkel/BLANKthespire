@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sign in — BLANK the spire</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <div class="brand">⚒ <strong>BLANK the spire</strong> <span class="sub">sign in</span></div>
+    <nav><a class="tab" href="/">← Back home</a></nav>
+  </header>
+
+  <main>
+    <section class="card">
+      <h1>Sign in</h1>
+      <p class="muted">Pick a provider — we only ever see the email address and display name it shares.
+        No passwords, ever.</p>
+
+      <!-- One .btn.primary per provider /api/me reports, built by signin.js (CSP forbids inline script). -->
+      <div id="providers" class="signin-options"></div>
+
+      <p id="none" class="hint hidden">Sign-in is not configured on this server.</p>
+
+      <!-- Phase 2 (email magic link) fills this in; hidden until /api/me says email_login. -->
+      <form id="email-form" class="signin-email hidden">
+        <label class="lbl small" for="email">…or get a sign-in link by email</label>
+        <input id="email" class="in" type="email" autocomplete="email" placeholder="you@example.com" />
+        <button class="btn" type="submit">Email me a link</button>
+      </form>
+
+      <p>
+        <a id="dev-signin" class="btn ghost hidden" href="/dev-login?email=dev@example.com">Dev sign-in (local)</a>
+      </p>
+      <p>
+        <a class="btn ghost" href="/">Back to the splash</a>
+        <a class="btn ghost" href="/download">Get the mod &amp; install guide</a>
+      </p>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> ·
+    <a href="mailto:ryan.r.rinkel@gmail.com">Support</a>
+    <p class="foot-note">Unofficial fan project — not affiliated with or endorsed by Mega Crit.</p>
+  </footer>
+
+  <script src="/static/signin.js"></script>
+</body>
+</html>

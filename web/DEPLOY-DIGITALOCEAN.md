@@ -58,8 +58,13 @@ BTSWEB_SECRET_KEY=<long-random-string>
 BTSWEB_BEHIND_PROXY=1
 BTSWEB_DATABASE_URL=mysql+pymysql://USER:PASSWORD@DBHOST:25060/btsweb
 BTSWEB_DB_SSL_CA=/opt/btsweb/web/do-mysql-ca.crt
+# --- sign-in providers: set any subset; each provider's button appears only when its pair is present ---
 GOOGLE_CLIENT_ID=...apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=...
+DISCORD_CLIENT_ID=...                # Discord Developer Portal → your application → OAuth2
+DISCORD_CLIENT_SECRET=...
+GITHUB_CLIENT_ID=...                 # the PROD GitHub OAuth App (the local one is a second app — see §7)
+GITHUB_CLIENT_SECRET=...
 OLLAMA_API_KEY=...                  # powers the "Use a token" path (our hosted Ollama mix; see btsgen/ollama_mix.py)
 # (ANTHROPIC_API_KEY / BTSWEB_HOSTED_ALLOWLIST are retired: `mode=hosted` is rejected outright — the public
 #  paths are the token forge and bring-your-own-key.)
@@ -121,16 +126,44 @@ sudo apt install -y certbot python3-certbot-nginx
 sudo certbot --nginx -d YOURDOMAIN.com      # adds https; OAuth needs https
 ```
 
-## 7. Google OAuth
+## 7. Sign-in providers
 
-In Google Cloud Console → Credentials → your OAuth client → **Authorized redirect URIs**, add:
-`https://YOURDOMAIN.com/auth/callback`. (Already done for localhost during dev; add the prod one too.)
+Each provider is optional: the `/login` chooser renders a button only for providers whose
+`<PROVIDER>_CLIENT_ID` **and** `_SECRET` are both set. The callback URL is always
+`/auth/<provider>/callback`.
+
+**Discord** — [Developer Portal](https://discord.com/developers/applications) → New Application → OAuth2 →
+Redirects. Add **both**:
+
+```
+https://YOURDOMAIN.com/auth/discord/callback
+http://localhost:5000/auth/discord/callback
+```
+
+Scopes: `identify email`. Copy the **Client ID** and **Client Secret** into `.env`.
+
+**GitHub** — Settings → Developer settings → **OAuth Apps**. A GitHub OAuth App allows **exactly one**
+callback URL, so create **two apps**:
+
+| app | Authorization callback URL | where its id/secret go |
+|-----|---------------------------|------------------------|
+| BLANK the spire | `https://YOURDOMAIN.com/auth/github/callback` | the droplet's `/opt/btsweb/web/.env` |
+| BLANK the spire (local) | `http://localhost:5000/auth/github/callback` | your local `web/.env` |
+
+Scope `read:user user:email` is requested by the app itself (nothing to configure). `user:email` is what
+makes `/user/emails` readable — without a verified address there, the account is created with no email
+(it just can't link to another provider or be on `BTSWEB_UNLIMITED_EMAILS`).
+
+**Google** — Cloud Console → Credentials → your OAuth client → **Authorized redirect URIs**. Add
+`https://YOURDOMAIN.com/auth/google/callback` as a second URI. The old
+`https://YOURDOMAIN.com/auth/callback` still works — `auth.py` keeps it as an alias — so add the new one at
+leisure and only drop the alias once the console lists the new URI.
 
 ## 8. Verify
 
-1. Open `https://YOURDOMAIN.com` → **Sign in with Google** (real OAuth, not dev-login).
+1. Open `https://YOURDOMAIN.com` → **Sign in** → one button per configured provider (real OAuth, not dev-login).
 2. Forge with **Use a token** (our hosted models) and with **Bring your own key** — progress should stream live.
-3. Confirm a second Google account sees only its own **My Classes**.
+3. Confirm a second account sees only its own **My Classes**.
 4. Copy a class code, import it in-game, restart, play it.
 
 ## Notes

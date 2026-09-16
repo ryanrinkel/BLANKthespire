@@ -1,4 +1,4 @@
-"""The "Forge a Class" website — Flask app reusing btsgen, Google sign-in, per-user class library.
+"""The "Forge a Class" website — Flask app reusing btsgen, OAuth sign-in, per-user class library.
 
 Run locally:
     cd web
@@ -6,7 +6,7 @@ Run locally:
     # open http://localhost:5000 , click "Dev sign-in", forge with the offline FAKE generator (no key)
 
 Deploy: gunicorn + nginx on a plain Linux host (see DEPLOY-DIGITALOCEAN.md); set the env secrets
-(GOOGLE_CLIENT_ID/SECRET, OLLAMA_API_KEY, BTSWEB_DATABASE_URL, BTSWEB_SECRET_KEY, STRIPE_* — see
+({GOOGLE,DISCORD,GITHUB}_CLIENT_ID/SECRET, OLLAMA_API_KEY, BTSWEB_DATABASE_URL, BTSWEB_SECRET_KEY, STRIPE_* — see
 DEPLOY-DIGITALOCEAN.md). Pricing: free with your own key; one free token per UTC day; optional donations
 (a thank-you token per dollar) — nothing is sold.
 """
