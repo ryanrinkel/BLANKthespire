@@ -181,10 +181,11 @@ slow part (propagation + Resend's verification can take hours — start it befor
 Note both mail vars count as "a sign-in provider is configured" for the boot guards: with them set, the app
 refuses to boot without `BTSWEB_SECRET_KEY`, or with `BTSWEB_DEV_AUTH` on.
 
-**Google** — Cloud Console → Credentials → your OAuth client → **Authorized redirect URIs**. Add
-`https://YOURDOMAIN.com/auth/google/callback` as a second URI. The old
-`https://YOURDOMAIN.com/auth/callback` still works — `auth.py` keeps it as an alias — so add the new one at
-leisure and only drop the alias once the console lists the new URI.
+**Google** — nothing to do for this release: `/login/google` still sends Google back to the legacy
+`https://YOURDOMAIN.com/auth/callback`, the one URI the Cloud Console already lists, so Google sign-in keeps
+working through the deploy. To retire the alias later: Cloud Console → Credentials → your OAuth client →
+**Authorized redirect URIs** → add `https://YOURDOMAIN.com/auth/google/callback`, then switch the Google
+branch in `auth.py`'s `login_provider` to `auth_provider_callback` and drop the `/auth/callback` route.
 
 ## 8. Verify
 

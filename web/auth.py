@@ -411,6 +411,11 @@ def init_auth(app) -> None:
         client = _client(provider)
         if client is None:
             return (f"{provider.title()} sign-in is not configured on this server.", 503)
+        # Google still returns to the legacy /auth/callback: that is the only URI the Google console lists,
+        # and a redirect_uri it does not know is a hard "redirect_uri_mismatch" for every Google sign-in. Point
+        # this at auth_provider_callback once the console also lists /auth/google/callback (DEPLOY §7).
+        if provider == "google":
+            return client.authorize_redirect(url_for("auth_callback", _external=True))
         return client.authorize_redirect(
             url_for("auth_provider_callback", provider=provider, _external=True))
 
