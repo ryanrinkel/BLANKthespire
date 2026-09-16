@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -70,6 +70,11 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    # LEGACY column. Sign-in resolves through the `identities` table (auth._resolve_identity); nothing
+    # reads google_sub after db._ensure_identities backfilled from it. It stays because it is NOT NULL
+    # UNIQUE on prod MySQL and our no-Alembic boot migrations cannot relax nullability across engines —
+    # so new rows are still given a unique value, f"{provider}:{subject}", while rows created before the
+    # identities table keep their raw Google sub.
     google_sub: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     email: Mapped[str] = mapped_column(String(320), default="")
     name: Mapped[str] = mapped_column(String(255), default="")
@@ -86,6 +91,27 @@ class User(Base):
 
     classes: Mapped[list["ForgedClass"]] = relationship(
         back_populates="user", cascade="all, delete-orphan")
+    identities: Mapped[list["Identity"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan")
+
+
+class Identity(Base):
+    """One sign-in method owned by a user: (provider, subject) -> users.id. A user can own several
+    (Google today; Discord/GitHub/email later), which is what lets someone sign in a different way and
+    keep their tokens and classes. `email` is whatever the provider reported (lowercased, "" if none)
+    and is kept here for display/debugging only — the account email that gates unlimited forging lives
+    on users.email and is written ONLY from a provider-VERIFIED address (see auth._resolve_identity)."""
+    __tablename__ = "identities"
+    __table_args__ = (UniqueConstraint("provider", "subject", name="uq_identities_provider_subject"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    provider: Mapped[str] = mapped_column(String(16))   # google | discord | github | email | dev
+    subject: Mapped[str] = mapped_column(String(255))   # the provider's stable id for this person
+    email: Mapped[str] = mapped_column(String(320), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    user: Mapped[User] = relationship(back_populates="identities")
 
 
 class ForgedClass(Base):

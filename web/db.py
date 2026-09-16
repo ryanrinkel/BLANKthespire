@@ -118,12 +118,36 @@ def _backfill_slugs() -> None:
             conn.execute(text("UPDATE classes SET slug = :slug WHERE id = :id"), {"slug": new_slug(), "id": cid})
 
 
+def _ensure_identities() -> None:
+    """Backfill `identities` from the legacy users.google_sub so accounts made before sign-in providers
+    existed resolve exactly like new ones (auth._resolve_identity looks users up by identity, never by
+    google_sub). `dev:<x>` (the local bypass) -> provider "dev", subject <x>; anything else is a raw Google
+    sub. Idempotent — only users with no identity row are touched — so it is safe on every boot, and it is
+    plain SQL so SQLite and MySQL behave the same."""
+    insp = inspect(engine)
+    names = set(insp.get_table_names())
+    if "users" not in names or "identities" not in names:
+        return
+    with engine.begin() as conn:
+        rows = conn.execute(text(
+            "SELECT u.id, u.google_sub, u.email FROM users u "
+            "LEFT JOIN identities i ON i.user_id = u.id WHERE i.id IS NULL")).fetchall()
+        for uid, sub, email in rows:
+            sub = sub or ""
+            provider, subject = ("dev", sub[4:]) if sub.startswith("dev:") else ("google", sub)
+            conn.execute(
+                text("INSERT INTO identities (user_id, provider, subject, email) "
+                     "VALUES (:uid, :provider, :subject, :email)"),
+                {"uid": uid, "provider": provider, "subject": subject, "email": (email or "").strip().lower()})
+
+
 def init_db() -> None:
     """Create tables if absent, then patch in any later-added columns. Safe to call on every boot."""
     Base.metadata.create_all(engine)
     _ensure_user_columns()
     _ensure_class_columns()
     _backfill_slugs()  # rows inserted by code paths that predate the slug (belt and braces)
+    _ensure_identities()  # every user needs an identity row before the first sign-in of this boot
 
 
 def db_ping() -> bool:

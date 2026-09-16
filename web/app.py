@@ -29,7 +29,7 @@ if os.environ.get("BTSWEB_NO_DOTENV", "").strip() not in ("1", "true", "yes"):
     load_dotenv(WEB_DIR / ".env")  # local secrets; in prod these come from the service environment
 # (BTSWEB_NO_DOTENV=1 keeps the test suite hermetic on a box whose web/.env holds real credentials.)
 
-from auth import current_user, init_auth, is_unlimited, require_login  # noqa: E402
+from auth import current_user, init_auth, is_production, is_unlimited, require_login  # noqa: E402
 from billing import init_billing  # noqa: E402
 from db import db_ping, init_db, session_scope  # noqa: E402
 from forge import (ELEMENT_KINDS, VALID_FEEDBACK_CATEGORIES, ForgeError, UsageMeter,  # noqa: E402
@@ -49,13 +49,13 @@ STATIC_FORGED_DIR = WEB_DIR / "static" / "forged"  # gitignored (like static/rel
 
 app = Flask(__name__, static_folder=str(WEB_DIR / "static"), static_url_path="/static")
 
-# Session-signing key. Fail closed: when Google OAuth is configured (a production-looking deploy), a missing
-# key means anyone could forge session cookies with the public default — refuse to boot instead. The insecure
-# default survives only for keyless local dev (dev-login + fake forges, no real accounts).
+# Session-signing key. Fail closed: when a sign-in provider is configured (a production-looking deploy), a
+# missing key means anyone could forge session cookies with the public default — refuse to boot instead. The
+# insecure default survives only for keyless local dev (dev-login + fake forges, no real accounts).
 _secret_key = os.environ.get("BTSWEB_SECRET_KEY", "").strip()
 if not _secret_key:
-    if os.environ.get("GOOGLE_CLIENT_ID", "").strip():
-        raise RuntimeError("BTSWEB_SECRET_KEY must be set when Google OAuth is configured — refusing to "
+    if is_production():
+        raise RuntimeError("BTSWEB_SECRET_KEY must be set when sign-in is configured — refusing to "
                            "boot with the insecure default session key.")
     _secret_key = "dev-insecure-change-me"
 app.secret_key = _secret_key
