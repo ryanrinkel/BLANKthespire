@@ -1064,8 +1064,10 @@ function renderPacks(cfg) {
   BILLING_CFG = cfg || null;
   const enabled = !!(cfg && cfg.enabled);
   const grid = el("packs");
+  if (!grid) return; // the Account view's pack grid is absent from the markup (2026-09-09 copy edit) — nothing to render
   grid.innerHTML = "";
-  el("packs-note").classList.toggle("hidden", enabled);
+  const note = el("packs-note");
+  if (note) note.classList.toggle("hidden", enabled);
   for (const p of (cfg && cfg.packs) || []) {
     const b = document.createElement("button");
     b.className = "pack";
@@ -1181,10 +1183,14 @@ el("choice-skip").onclick = () => sendChoice([]);
 // interactive AND triad (the default; "classic" unchecked) each need the staged front-end: keep the
 // checkboxes honest instead of silently ignoring one (asking for either turns on staged; unchecking
 // staged clears interactive and forces the classic pair, since one-shot forges are 2-archetype).
+// The "classic" checkbox is OPTIONAL in the markup (index.html dropped it on 2026-09-09; triad is the default
+// and buildForgeBody already treats a missing box as unchecked). A top-level throw here would stop every
+// handler below from being wired — the forge button included — so never dereference it unguarded.
 el("interactive").onchange = () => { if (el("interactive").checked) el("staged").checked = true; };
-el("classic").onchange = () => { if (!el("classic").checked) el("staged").checked = true; };
+const classicBox = el("classic");
+if (classicBox) classicBox.onchange = () => { if (!classicBox.checked) el("staged").checked = true; };
 el("staged").onchange = () => {
-  if (!el("staged").checked) { el("interactive").checked = false; el("classic").checked = true; }
+  if (!el("staged").checked) { el("interactive").checked = false; if (classicBox) classicBox.checked = true; }
 };
 el("copy-code").onclick = () => copy(el("r-code").value);
 el("signout").onclick = async () => { await fetch("/logout", { method: "POST" }); location.href = "/"; };
