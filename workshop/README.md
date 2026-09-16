@@ -37,10 +37,13 @@ automatically.
       template README) or in a nested subfolder. Fix the script if nested.
 - [ ] **dependencies field type** — `workshop.json` lists BaseLib's item ID as a string
       (`"3737335127"`); if the uploader complains, try it as a bare number.
-- [ ] **tags** — browse the [STS2 Workshop](https://steamcommunity.com/app/2868840/workshop/) sidebar
-      for the valid tag list and fill in `tags` (`"Tools & APIs"` is reserved for utility mods — not us).
-- [x] **thumbnail** — `workspace\image.png` (1280x720, ~120 KB): the site's split-flap BLANK board, rendered
-      from `workshoprt\image.html` with the real `web/static/style.css` (headless Chrome, `--window-size=1280,720`).
+- [x] **tags** — `["Characters"]`. The game's Workshop declares a SINGLE-SELECT category (`htmlelement: select`)
+      with 19 values: Acts, Ancients, Audio, Cards, Characters, Cosmetics, Events, Expansion, Extensions, Humor,
+      Modifiers, Monsters, Potions, QoL, Relics, Rooms, Tools & APIs, Utility, Misc (read from the browse page's
+      `declaredTags` JSON, 2026-09-15). One tag, and a forged class is a Character.
+- [x] **thumbnail** — `workspace\image.png` (1024x1024 — this Workshop is configured for SQUARE thumbnails, ~150 KB): the
+      site's split-flap BLANK board, rendered from `workshoprt\image.html` with the real `web/static/style.css`
+      (headless Chrome, `--window-size=1024,1024`).
       `workshoprt\mod_image.html` is the matching single-"B" tile behind `mod\BlankTheSpire\mod_image.png`
       (420x420, the in-game Mods-menu icon). Re-render both the same way if the site palette changes.
 - [ ] **smoke test while private** — DELETE the manual `mods\BlankTheSpire` + `mods\BaseLib` copies

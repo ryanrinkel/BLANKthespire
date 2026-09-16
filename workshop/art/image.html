@@ -1,13 +1,16 @@
 <!DOCTYPE html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../../web/static/style.css">
+<!-- Workshop thumbnail. STS2's Workshop uses SQUARE thumbnails (workshopConfig.usesquarethumbnails), so this is 1024x1024.
+     Render: chrome --headless=new --disable-gpu --hide-scrollbars --force-device-scale-factor=1 --window-size=1024,1024
+             --screenshot=workshop/workspace/image.png file:///<repo>/workshop/art/image.html -->
 <style>
-  html,body{width:1280px;height:720px;margin:0;overflow:hidden}
+  html,body{width:1024px;height:1024px;margin:0;overflow:hidden}
   body.landing{background:radial-gradient(120% 90% at 50% -10%, #221c34 0%, var(--bg) 60%)}
-  .splash{min-height:720px;padding:0;justify-content:center}
-  .tile{width:150px;flex:0 0 150px}
-  .flap{font-size:120px}
-  .board{gap:18px}
-  .splash-sub{margin-top:30px;font-size:30px;letter-spacing:8px}
-  .splash-tag{margin-top:26px;font-size:18px}
+  .splash{min-height:1024px;padding:0;justify-content:center}
+  .tile{width:170px;flex:0 0 170px;border-radius:12px;border-bottom-width:4px}
+  .flap{font-size:136px}
+  .board{gap:20px}
+  .splash-sub{margin-top:40px;font-size:40px;letter-spacing:10px}
+  .splash-tag{margin-top:34px;font-size:22px}
 </style></head>
 <body class="landing"><main class="splash">
 <div class="board" role="img">
