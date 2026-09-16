@@ -22,7 +22,11 @@
         <li><b>Account:</b> the email address and display name your sign-in provider shares with us —
             Google, Discord or GitHub — only when the provider has verified the address (we never see your
             password), plus your token balance, the day you last used your free daily token, and when your
-            account was created.</li>
+            account was created. If you sign in by <b>emailed link</b> instead, that is the address you
+            typed, confirmed by your clicking the link we sent to it.</li>
+        <li><b>Sign-in links:</b> when you ask for an emailed sign-in link we store the address, a hash of
+            the one-time token, and the IP that asked, so the link can be checked and abuse can be rate
+            limited. Links expire after 15 minutes and the rows are deleted within a day.</li>
         <li><b>Generated content:</b> the class concepts you enter and the classes/cards the site
             generates for you, so your library persists.</li>
         <li><b>Donations:</b> a record of each donation (amount, thank-you tokens, date, Stripe reference
@@ -55,6 +59,8 @@
         <li><b>Google</b> — sign-in (OAuth), if you choose it.</li>
         <li><b>Discord</b> — sign-in (OAuth), if you choose it.</li>
         <li><b>GitHub</b> — sign-in (OAuth), if you choose it.</li>
+        <li><b>Resend</b> — sends the sign-in link email, if you choose email sign-in. They receive your
+            email address for that purpose only; we don't use them for anything else.</li>
         <li><b>Stripe</b> — payment processing and receipts.</li>
         <li><b>Model providers</b> — your class concept is sent to an AI model to generate the class
             (our hosted model providers for token forges, or the provider you chose when bringing your own
@@ -64,7 +70,8 @@
       <h2>Your choices</h2>
       <ul>
         <li>You can delete any class from your library at any time.</li>
-        <li>To delete your account and its data, email us from the account's address.</li>
+        <li>To delete your account and its data, email us from the account's address — the verified address
+            your sign-in provider gave us, or the one you sign in to with an emailed link.</li>
       </ul>
 
       <h2>Contact</h2>

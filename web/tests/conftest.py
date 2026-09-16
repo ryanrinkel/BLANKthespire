@@ -123,9 +123,12 @@ def stub_forge(app_module, fake_bundle, monkeypatch):
 @pytest.fixture(autouse=True)
 def _reset_process_state(app_module):
     """Limiters, queues and per-user locks are process-local singletons — start every test clean."""
+    import auth
+
     lim = app_module.free_limiter
     with lim._lock:
         lim._day, lim._day_count, lim._ip_counts = -1, 0, {}
+    auth.magic_limiter.reset()
     with app_module._user_active_lock:
         app_module._user_active.clear()
     with app_module._feedback_lock:

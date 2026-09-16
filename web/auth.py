@@ -1,10 +1,11 @@
-"""Sign-in (Authlib over Flask sessions) + a dev-login bypass for local verification.
+"""Sign-in (Authlib over Flask sessions) + email magic links + a dev-login bypass for local verification.
 
 Google, Discord and GitHub each register with Authlib only when their `<PROVIDER>_CLIENT_ID`/`_SECRET` pair is
-set, so a box with one provider's credentials offers exactly one button. Every path — the three OAuth
-providers, the dev bypass, and whatever comes later — builds a Profile and funnels through _resolve_identity,
-which maps one (provider, subject) identity onto a `users` row. Sessions are server-signed cookies; no
-passwords.
+set, so a box with one provider's credentials offers exactly one button. The email magic link is ours (no
+OAuth): a mailed single-use token, enabled when RESEND_API_KEY + BTSWEB_MAIL_FROM are set. Every path — the
+three OAuth providers, the magic link, the dev bypass, and whatever comes later — builds a Profile and
+funnels through _resolve_identity, which maps one (provider, subject) identity onto a `users` row. Sessions
+are server-signed cookies; no passwords.
 
 Local dev: set BTSWEB_DEV_AUTH=1 to expose /dev-login?email=... which logs in a fake user WITHOUT OAuth —
 so the per-user library flow is testable with no credentials. Fail-closed: the route is only registered when
@@ -14,13 +15,19 @@ configured (a production-looking deploy must never carry the bypass).
 from __future__ import annotations
 
 import functools
+import hashlib
 import os
+import secrets
+import threading
+import time
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 
+import requests
 from flask import jsonify, redirect, request, send_from_directory, session, url_for
 
 from db import session_scope
-from models import Identity, User, free_token_available
+from models import Identity, LoginLink, User, free_token_available
 
 GOOGLE_METADATA = "https://accounts.google.com/.well-known/openid-configuration"
 _oauth = None  # set by init_auth when at least one provider's credentials are present
@@ -44,12 +51,30 @@ PROVIDERS = ("google", "discord", "github")
 # automatically.
 PROVIDER_ENV_VARS = ("GOOGLE_CLIENT_ID", "DISCORD_CLIENT_ID", "GITHUB_CLIENT_ID")
 
+# Email magic links need BOTH halves: the Resend API key and the From address they are sent as. Either one
+# alone cannot send mail, so email sign-in stays off (except under the dev bypass, which logs the link).
+MAIL_ENV_VARS = ("RESEND_API_KEY", "BTSWEB_MAIL_FROM")
+RESEND_ENDPOINT = "https://api.resend.com/emails"
+LINK_TTL = timedelta(minutes=15)      # how long an emailed link stays usable
+LINK_SWEEP_AFTER = timedelta(hours=24)  # used or not, a link row is dead weight after a day
+
+
+def mail_configured() -> bool:
+    """True when this deploy can actually send a magic link (Resend key + From address)."""
+    return all(os.environ.get(v, "").strip() for v in MAIL_ENV_VARS)
+
 
 def is_production() -> bool:
-    """True once ANY sign-in provider is configured. The fail-closed boot guards (the session secret key in
-    app.py, the dev-login conflict below) key off this rather than one provider's client id, so they keep
-    covering every provider as more are added."""
-    return any(os.environ.get(v, "").strip() for v in PROVIDER_ENV_VARS)
+    """True once ANY sign-in method that real people can use is configured — an OAuth provider or mail. The
+    fail-closed boot guards (the session secret key in app.py, the dev-login conflict below) key off this
+    rather than one provider's client id, so they keep covering every provider as more are added."""
+    return any(os.environ.get(v, "").strip() for v in PROVIDER_ENV_VARS) or mail_configured()
+
+
+def email_login_enabled() -> bool:
+    """True when /login should offer the email form. Without mail the dev bypass still enables it: the link
+    is logged and returned in the JSON, so the local loop and the tests need no mail provider at all."""
+    return mail_configured() or _dev_auth_enabled()
 
 
 def _credentials(provider: str) -> tuple[str, str]:
@@ -191,6 +216,131 @@ def _identities_of(user_id: int) -> list[dict]:
     return sorted(out, key=lambda d: (order.get(d["provider"], len(order)), d["label"]))
 
 
+# --- email magic links -------------------------------------------------------------------------------
+# A mailed single-use token instead of a password. The GET of a link only RENDERS a Continue button; the
+# POST consumes it (mail scanners prefetch every URL in an email and would burn the token first).
+
+def _now() -> datetime:
+    """UTC now, aware. A function so tests can jump time forward to exercise expiry."""
+    return datetime.now(timezone.utc)
+
+
+def _utc_naive(dt: datetime) -> datetime:
+    """The one convention for login_links datetimes: store and compare NAIVE UTC. DateTime columns hand back
+    naive values on both SQLite and MySQL, and comparing those against an aware datetime raises — so every
+    datetime crosses this boundary on its way into a query or a column."""
+    return dt.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+def _token_hash(token: str) -> str:
+    """Only sha256(token) is stored, so a leaked database is not a stack of live sign-in links."""
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _normalize_email(raw: str) -> str:
+    """strip().lower(), or "" when it is not plausibly an address. Syntax only — no MX lookup and no
+    disposable-domain list: throwaway addresses are deliberately allowed (the IP/global forge caps are the
+    abuse backstop), and the caller answers identically either way."""
+    email = (raw or "").strip().lower()
+    if not email or len(email) > 320 or any(c.isspace() for c in email):
+        return ""
+    local, sep, domain = email.partition("@")
+    if not (sep and local and domain) or "@" in domain:
+        return ""
+    if "." not in domain or domain.startswith(".") or domain.endswith("."):
+        return ""
+    return email
+
+
+def _client_ip() -> str:
+    """The caller's address, same derivation as app._client_ip (duplicated rather than imported: app imports
+    auth, not the other way round). ProxyFix + BTSWEB_BEHIND_PROXY keep this honest behind nginx."""
+    return request.headers.get("X-Forwarded-For", request.remote_addr or "?").split(",")[0].strip()
+
+
+def _public_url() -> str:
+    """Absolute base for the link inside the email — BTSWEB_PUBLIC_URL when set (the same var app.py embeds
+    in import codes), else the host this request arrived on."""
+    return (os.environ.get("BTSWEB_PUBLIC_URL", "").strip().rstrip("/")
+            or request.url_root.rstrip("/"))
+
+
+def _send_magic_link(email: str, url: str) -> None:
+    """Send one sign-in link through Resend's HTTPS API (no SDK — requests is already a dependency).
+    Deliberately plain text, one URL, no tracking pixels or click-wrapping: HTML mail and redirect-tracking
+    are what put magic links in the spam folder. Module-level so tests can swap it for a capture stub."""
+    body = ("Here is your sign-in link for BLANK the spire:\n\n"
+            f"{url}\n\n"
+            "This link expires in 15 minutes. If you didn't ask for it, ignore this email.\n")
+    resp = requests.post(
+        RESEND_ENDPOINT,
+        headers={"Authorization": f"Bearer {os.environ.get('RESEND_API_KEY', '').strip()}"},
+        json={"from": os.environ.get("BTSWEB_MAIL_FROM", "").strip(), "to": [email],
+              "subject": "Your BLANK the spire sign-in link", "text": body},
+        timeout=10)
+    resp.raise_for_status()
+
+
+class MagicLinkLimiter:
+    """Abuse backstop for POST /api/auth/email/start, shaped like app.FreeForgeLimiter (one lock, bucketed
+    windows, process-local — keep gunicorn at one worker).
+
+    Two caps: per normalized email, so the endpoint cannot be used to bomb one person's inbox, and per IP, so
+    it cannot be used to bomb everyone's. Over either cap the caller still gets the same "Check your inbox."
+    200 with nothing stored and nothing sent — a silent drop, so the endpoint also leaks nothing about who
+    has an account. Windows are tumbling buckets (like the limiter's UTC day): cheap, and close enough.
+    """
+
+    def __init__(self, per_email: int = 3, email_window_s: int = 15 * 60,
+                 per_ip: int = 10, ip_window_s: int = 3600) -> None:
+        self.per_email, self.email_window_s = per_email, email_window_s
+        self.per_ip, self.ip_window_s = per_ip, ip_window_s
+        self._lock = threading.Lock()
+        self.reset()
+
+    def reset(self) -> None:
+        """Forget every window — boot state, and what the test harness calls between tests."""
+        self._email_bucket, self._email_counts = -1, {}
+        self._ip_bucket, self._ip_counts = -1, {}
+
+    def _roll(self, now: float) -> None:
+        bucket = int(now // self.email_window_s)
+        if bucket != self._email_bucket:
+            self._email_bucket, self._email_counts = bucket, {}
+        bucket = int(now // self.ip_window_s)
+        if bucket != self._ip_bucket:
+            self._ip_bucket, self._ip_counts = bucket, {}
+
+    def check(self, email: str, ip: str) -> bool:
+        """True if this request may send a link (and counts it); False when either cap is already reached."""
+        now = time.time()
+        with self._lock:
+            self._roll(now)
+            if self.per_email > 0 and self._email_counts.get(email, 0) >= self.per_email:
+                return False
+            if self.per_ip > 0 and self._ip_counts.get(ip, 0) >= self.per_ip:
+                return False
+            self._email_counts[email] = self._email_counts.get(email, 0) + 1
+            self._ip_counts[ip] = self._ip_counts.get(ip, 0) + 1
+            return True
+
+
+magic_limiter = MagicLinkLimiter()
+
+
+def _claim_link(token: str, *, consume: bool) -> str | None:
+    """The address a live magic link belongs to, or None when it is unknown, expired or already used.
+    consume=True stamps used_at inside the same transaction, so a link can only ever be spent once."""
+    now = _utc_naive(_now())
+    with session_scope() as s:
+        row = s.query(LoginLink).filter_by(token_hash=_token_hash(token)).one_or_none()
+        if row is None or row.used_at is not None or row.expires_at is None or row.expires_at < now:
+            return None
+        if consume:
+            row.used_at = now
+        return row.email
+
+
 def require_login(fn):
     """Decorator: 401 JSON for unauthenticated API calls."""
     @functools.wraps(fn)
@@ -273,6 +423,65 @@ def init_auth(app) -> None:
         /auth/google/callback (see DEPLOY-DIGITALOCEAN.md §7)."""
         return auth_provider_callback("google")
 
+    @app.route("/api/auth/email/start", methods=["POST"])
+    def api_email_start():
+        """Ask for a magic link. The answer is ALWAYS the same 200 body — link sent, rate-limited, or
+        gibberish in the box — so the endpoint cannot be used to probe who has an account or to confirm a
+        send. It lives under /api/ so app.py's X-Requested-With guard already covers it."""
+        if not email_login_enabled():
+            return jsonify({"error": "email sign-in is not configured on this server"}), 503
+        answer = {"ok": True, "message": "Check your inbox."}
+        email = _normalize_email((request.get_json(silent=True) or {}).get("email", ""))
+        ip = _client_ip()
+        if not email or not magic_limiter.check(email, ip):
+            return jsonify(answer)
+
+        token = secrets.token_urlsafe(32)
+        now = _now()
+        with session_scope() as s:
+            # Sweep: a day-old row is dead whether it was used or abandoned. Cheap, and it keeps the table
+            # from growing forever without a cron job.
+            s.query(LoginLink).filter(
+                LoginLink.created_at < _utc_naive(now - LINK_SWEEP_AFTER)).delete(synchronize_session=False)
+            # created_at is set explicitly (rather than left to server_default) so every row in the table is
+            # naive UTC on MySQL too, which is what the sweep and the expiry check compare against.
+            s.add(LoginLink(email=email, token_hash=_token_hash(token), ip=ip,
+                            created_at=_utc_naive(now), expires_at=_utc_naive(now + LINK_TTL)))
+        url = f"{_public_url()}/auth/email/{token}"
+
+        if mail_configured():
+            try:
+                _send_magic_link(email, url)
+            except Exception as exc:  # a dead mail provider must not change the answer (or leak a stacktrace)
+                app.logger.warning("magic-link send failed for %s: %s", email, exc)
+            return jsonify(answer)
+        # No mail configured ⇒ email_login_enabled() only said yes because of the dev bypass: hand the link
+        # back so local dev is one click, and log it for the terminal.
+        app.logger.info("magic sign-in link for %s: %s", email, url)
+        return jsonify({**answer, "link": url})
+
+    @app.route("/auth/email/<token>", methods=["GET", "POST"])
+    def auth_email(token):
+        """GET renders a Continue button; POST consumes the token and signs in.
+
+        The GET must never consume: Gmail's link scanner, Outlook SafeLinks and corporate proxies fetch every
+        URL in an email, which would burn a single-use token before the person clicked it.
+        The POST is deliberately NOT under /api/, so the X-Requested-With guard does not apply — a cross-site
+        form could submit it, but that only signs the ATTACKER's own browser into the account whose owner
+        asked for the link, and only if the attacker already holds the token (which only the inbox has)."""
+        email = _claim_link(token, consume=request.method == "POST")
+        if email is None:
+            return send_from_directory(app.static_folder, "signin-expired.html"), 410
+        if request.method == "GET":
+            return send_from_directory(app.static_folder, "signin-continue.html")
+        # A clicked link is proof of the address (that is the whole point), so email_verified=True — which
+        # lets rule 3 hand this person their existing Google/Discord account. current_user_id is Phase 3's
+        # "link while signed in".
+        user = _resolve_identity(Profile("email", email, email, True, email.split("@")[0]),
+                                 current_user_id=(current_user() or {}).get("id"))
+        _login_session(user)
+        return redirect("/app")
+
     @app.route("/logout", methods=["POST"])
     def logout():
         """POST-only: a GET link on a third-party page must not be able to sign someone out (CSRF)."""
@@ -290,9 +499,9 @@ def init_auth(app) -> None:
             user = {**user, "token_balance": bal, "free_token_available": free,
                     "unlimited": is_unlimited(user.get("email", "")),
                     "identities": _identities_of(user["id"])}
-        # email_login flips on in Phase 2 (the magic link); signin.js keeps its form hidden until then.
+        # email_login gates signin.js's email form: mail configured, or the dev bypass standing in for it.
         return jsonify({"user": user, "dev_auth": _dev_auth_enabled(),
-                        "providers": configured_providers(), "email_login": False})
+                        "providers": configured_providers(), "email_login": email_login_enabled()})
 
     if _dev_auth_enabled():
         @app.route("/dev-login")

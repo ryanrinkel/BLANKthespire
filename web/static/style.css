@@ -59,7 +59,13 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 /* /login chooser: one full-width button per configured provider, stacked. */
 .signin-options { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
 .signin-options .btn { text-align: center; }
-.signin-email { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; }
+.signin-email { margin-top: 10px; }
+/* "or" between the provider buttons and the email form — the rule IS the divider, so the form itself
+   carries no border (it may stand alone when a deploy has mail and no OAuth provider). */
+.signin-or { display: flex; align-items: center; gap: 10px; margin: 18px 0 0; color: var(--muted);
+             font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
+.signin-or::before, .signin-or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.signin-sent { margin-top: 14px; }
 
 .settings { margin: 14px 0; border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
 .settings summary { cursor: pointer; color: var(--muted); }

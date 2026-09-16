@@ -213,8 +213,10 @@ def test_configured_nowhere_means_503_not_a_crash(client, path):
 
 
 def test_api_me_reports_the_configured_providers(client):
+    """No OAuth credentials in the test env ⇒ no buttons. email_login is on only because the dev bypass
+    stands in for a mail provider (see test_auth_email.py)."""
     me = client.get("/api/me").get_json()
-    assert me["providers"] == [] and me["email_login"] is False
+    assert me["providers"] == [] and me["email_login"] is True
 
 
 def test_configured_providers_follows_the_env_pairs(monkeypatch):

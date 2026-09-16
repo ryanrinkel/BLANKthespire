@@ -23,11 +23,15 @@
 
       <p id="none" class="hint hidden">Sign-in is not configured on this server.</p>
 
-      <!-- Phase 2 (email magic link) fills this in; hidden until /api/me says email_login. -->
+      <!-- The magic link. Both this and the divider stay hidden until /api/me says email_login (mail
+           configured, or the dev bypass standing in for it); signin.js does the swap. -->
+      <p id="or" class="signin-or hidden">or</p>
       <form id="email-form" class="signin-email hidden">
-        <label class="lbl small" for="email">…or get a sign-in link by email</label>
-        <input id="email" class="in" type="email" autocomplete="email" placeholder="you@example.com" />
+        <label class="lbl small" for="email">Get a sign-in link by email</label>
+        <input id="email" class="in" type="email" autocomplete="email" placeholder="you@example.com"
+               required />
         <button class="btn" type="submit">Email me a link</button>
+        <p id="email-error" class="hint hidden">That didn’t go through — try again in a moment.</p>
       </form>
 
       <p>

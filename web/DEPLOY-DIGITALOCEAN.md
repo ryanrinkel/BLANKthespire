@@ -65,6 +65,8 @@ DISCORD_CLIENT_ID=...                # Discord Developer Portal → your applica
 DISCORD_CLIENT_SECRET=...
 GITHUB_CLIENT_ID=...                 # the PROD GitHub OAuth App (the local one is a second app — see §7)
 GITHUB_CLIENT_SECRET=...
+RESEND_API_KEY=re_...                # email magic links; BOTH mail vars must be set or email sign-in is off
+BTSWEB_MAIL_FROM=sign-in@blankthespire.com   # must be a Resend-verified domain (SPF+DKIM — see §7)
 OLLAMA_API_KEY=...                  # powers the "Use a token" path (our hosted Ollama mix; see btsgen/ollama_mix.py)
 # (ANTHROPIC_API_KEY / BTSWEB_HOSTED_ALLOWLIST are retired: `mode=hosted` is rejected outright — the public
 #  paths are the token forge and bring-your-own-key.)
@@ -154,6 +156,31 @@ Scope `read:user user:email` is requested by the app itself (nothing to configur
 makes `/user/emails` readable — without a verified address there, the account is created with no email
 (it just can't link to another provider or be on `BTSWEB_UNLIMITED_EMAILS`).
 
+**Email (Resend)** — the magic link is ours, not OAuth: no redirect URI, but it needs DNS, which is the
+slow part (propagation + Resend's verification can take hours — start it before you need it).
+
+1. Create the account at [resend.com](https://resend.com) → **Domains** → **Add domain** →
+   `blankthespire.com`. Resend shows a set of records.
+2. At **DigitalOcean → Networking → Domains → blankthespire.com**, add exactly what Resend listed — an SPF
+   TXT record and the DKIM records (a CNAME/TXT pair on a `resend._domainkey`-style host) — plus a DMARC
+   record of your own:
+
+   | type | hostname | value |
+   |------|----------|-------|
+   | TXT | `_dmarc` | `v=DMARC1; p=none` |
+
+   `p=none` is monitor-only: it never bounces mail while you are still watching deliverability. Tighten to
+   `quarantine` later if you care to. **Without DKIM the links land in spam** — this is not optional.
+3. Wait for the domain to read **verified** in Resend (refresh; minutes to hours).
+4. Create an API key (**sending access** is enough), put `RESEND_API_KEY` and
+   `BTSWEB_MAIL_FROM=sign-in@blankthespire.com` in `.env`, `sudo systemctl restart btsweb`.
+5. Test before announcing: request a link from `/login` **to a Gmail address and to an Outlook/Hotmail
+   address**, and check the spam folder in both. Outlook SafeLinks will prefetch the URL — that is exactly
+   why the GET only renders a Continue button and the POST is what consumes the token.
+
+Note both mail vars count as "a sign-in provider is configured" for the boot guards: with them set, the app
+refuses to boot without `BTSWEB_SECRET_KEY`, or with `BTSWEB_DEV_AUTH` on.
+
 **Google** — Cloud Console → Credentials → your OAuth client → **Authorized redirect URIs**. Add
 `https://YOURDOMAIN.com/auth/google/callback` as a second URI. The old
 `https://YOURDOMAIN.com/auth/callback` still works — `auth.py` keeps it as an alias — so add the new one at
@@ -161,7 +188,8 @@ leisure and only drop the alias once the console lists the new URI.
 
 ## 8. Verify
 
-1. Open `https://YOURDOMAIN.com` → **Sign in** → one button per configured provider (real OAuth, not dev-login).
+1. Open `https://YOURDOMAIN.com` → **Sign in** → one button per configured provider (real OAuth, not
+   dev-login), plus the email form when the two mail vars are set.
 2. Forge with **Use a token** (our hosted models) and with **Bring your own key** — progress should stream live.
 3. Confirm a second account sees only its own **My Classes**.
 4. Copy a class code, import it in-game, restart, play it.

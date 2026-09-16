@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Continue sign-in — BLANK the spire</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <div class="brand">⚒ <strong>BLANK the spire</strong> <span class="sub">sign in</span></div>
+    <nav><a class="tab" href="/">← Back home</a></nav>
+  </header>
+
+  <main>
+    <section class="card">
+      <h1>One more click</h1>
+      <p class="muted">Your sign-in link checks out. Press the button to finish signing in.</p>
+
+      <!-- No action: the form posts to this same URL. The link is only spent by the POST, because mail
+           scanners and corporate proxies fetch every URL in an email and would otherwise burn it first. -->
+      <form method="post" class="signin-options">
+        <button class="btn primary" type="submit">Continue to BLANK the spire</button>
+      </form>
+
+      <p class="hint">Links expire 15 minutes after they are sent and work only once.</p>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> ·
+    <a href="mailto:ryan.r.rinkel@gmail.com">Support</a>
+    <p class="foot-note">Unofficial fan project — not affiliated with or endorsed by Mega Crit.</p>
+  </footer>
+</body>
+</html>

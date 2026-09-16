@@ -114,6 +114,25 @@ class Identity(Base):
     user: Mapped[User] = relationship(back_populates="identities")
 
 
+class LoginLink(Base):
+    """One emailed magic link: a single-use, 15-minute sign-in ticket for `email`.
+
+    Only sha256(token) is stored — the raw token (secrets.token_urlsafe(32)) exists in the email and
+    nowhere else, so a database dump is not a stack of live sign-in links. `used_at` is what makes a link
+    single-use; `ip` is the address that asked for it (abuse forensics). Rows are swept after 24 h by
+    auth's start route. Datetimes are naive UTC (see auth._utc_naive): DateTime columns come back naive
+    from both SQLite and MySQL, so one convention avoids aware/naive comparisons."""
+    __tablename__ = "login_links"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    email: Mapped[str] = mapped_column(String(320), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    ip: Mapped[str] = mapped_column(String(64), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    expires_at: Mapped[datetime] = mapped_column(DateTime)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime, default=None, nullable=True)
+
+
 class ForgedClass(Base):
     __tablename__ = "classes"
 
