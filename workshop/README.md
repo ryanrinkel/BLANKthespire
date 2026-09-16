@@ -39,7 +39,10 @@ automatically.
       (`"3737335127"`); if the uploader complains, try it as a bare number.
 - [ ] **tags** — browse the [STS2 Workshop](https://steamcommunity.com/app/2868840/workshop/) sidebar
       for the valid tag list and fill in `tags` (`"Tools & APIs"` is reserved for utility mods — not us).
-- [ ] **thumbnail** — create `workspace\image.png` (< 1MB).
+- [x] **thumbnail** — `workspace\image.png` (1280x720, ~120 KB): the site's split-flap BLANK board, rendered
+      from `workshoprt\image.html` with the real `web/static/style.css` (headless Chrome, `--window-size=1280,720`).
+      `workshoprt\mod_image.html` is the matching single-"B" tile behind `mod\BlankTheSpire\mod_image.png`
+      (420x420, the in-game Mods-menu icon). Re-render both the same way if the site palette changes.
 - [ ] **smoke test while private** — DELETE the manual `mods\BlankTheSpire` + `mods\BaseLib` copies
       first (avoid double-load), subscribe to the hidden item, confirm BaseLib auto-installs, launch,
       import a class code, play a hand.
