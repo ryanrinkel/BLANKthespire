@@ -1,6 +1,9 @@
 # Sign-in providers — Discord, GitHub, email magic link — PLAN
 
-Status: **PLANNED 2026-09-16.** Nothing built yet. Written against `web/auth.py`, `web/models.py`,
+Status: **BUILT 2026-09-16** on branch `auth-providers` (Phases 0-3, 100 web tests green), not yet merged or
+deployed. Still manual: Discord app + two GitHub OAuth apps (Phase 1 portal setup), Resend account + DNS (Phase 2).
+Deviation: `/login/google` keeps returning to the legacy `/auth/callback` until the Google console lists
+`/auth/google/callback` (see DEPLOY-DIGITALOCEAN.md §7). Originally: PLANNED 2026-09-16, nothing built. Written against `web/auth.py`, `web/models.py`,
 `web/db.py`, `web/app.py`, `web/static/{landing,index}.html` as of v0.2.0 (the live droplet).
 
 ## Why
