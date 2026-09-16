@@ -6,6 +6,12 @@
 
 const LABELS = { google: "Google", discord: "Discord", github: "GitHub" };
 
+// Link mode (/login?link=1, from the Account tab's "Link another"): the visitor IS signed in and stays so —
+// the provider flow they pick attaches its identity to their account (auth._resolve_identity rule 2) and
+// comes back to /app#account. Without the flag a signed-in visitor never reaches this page (the server
+// bounces them to /app), so everything below only has to tell the two apart.
+const LINKING = new URLSearchParams(location.search).get("link") === "1";
+
 const el = (id) => document.getElementById(id);
 
 // The magic link: POST the address, then swap the form for "check your inbox". The server answers the same
@@ -61,25 +67,40 @@ function wireEmailForm() {
     me = await (await fetch("/api/me")).json();
   } catch (_) { /* offline or the API is down — fall through to the "not configured" copy */ }
 
-  if (me && me.user) { window.location.replace("/app"); return; }
+  if (me && me.user && !LINKING) { window.location.replace("/app"); return; }
 
-  const providers = (me && me.providers) || [];
+  const owned = new Set(((me && me.user && me.user.identities) || []).map((i) => i.provider));
+  if (me && me.user) {
+    el("title").textContent = "Link another sign-in";
+    el("lede").textContent = "You're signed in as " + (me.user.name || me.user.email || "this account")
+      + ". Linking lets you sign in with any of these later.";
+    el("back-app").classList.remove("hidden");
+  }
+
+  // In link mode the account's existing providers are dropped: re-running one of them would just sign in
+  // again (rule 1) and link nothing.
+  const providers = ((me && me.providers) || []).filter((p) => !owned.has(p));
   const box = el("providers");
   for (const p of providers) {
     const a = document.createElement("a");
     a.className = "btn primary";
     a.href = "/login/" + p;
-    a.textContent = "Continue with " + (LABELS[p] || p);
+    a.textContent = (LINKING ? "Link " : "Continue with ") + (LABELS[p] || p);
     box.appendChild(a);
   }
 
   if (me && me.email_login) {
+    // Offered in link mode too: a magic link clicked while signed in attaches an email identity (rule 2).
     el("email-form").classList.remove("hidden");
     if (providers.length) el("or").classList.remove("hidden");
     wireEmailForm();
   }
   if (me && me.dev_auth) el("dev-signin").classList.remove("hidden");
   if (!providers.length && !(me && (me.dev_auth || me.email_login))) {
+    el("none").classList.remove("hidden");
+  }
+  if (LINKING && !providers.length && !(me && me.email_login)) {
+    el("none").textContent = "Every sign-in method this server offers is already linked to your account.";
     el("none").classList.remove("hidden");
   }
 })();

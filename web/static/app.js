@@ -4,6 +4,9 @@ const $ = (sel) => document.querySelector(sel);
 const el = (id) => document.getElementById(id);
 
 let ME = null;
+// The non-user half of /api/me ({dev_auth, providers, email_login}) — ME is data.user, so the Account tab's
+// sign-in methods (which providers this deploy offers at all) need the envelope kept too.
+let ME_META = null;
 
 // CSRF: the server rejects any mutating /api/* call without `X-Requested-With: fetch` (a cross-site form or
 // script can't set a custom header). Patch fetch() once so every same-origin call carries it.
@@ -44,6 +47,7 @@ async function boot() {
   const r = await fetch("/api/me");
   const data = await r.json();
   ME = data.user;
+  ME_META = data;
   if (data.dev_auth) {
     el("dev-signin").classList.remove("hidden");
     el("mode-fake-label").classList.remove("hidden");  // no-key offline forge, dev only
@@ -58,7 +62,8 @@ async function boot() {
   el("gate").classList.add("hidden");
   restoreByok();
   renderTokens();
-  selectTab("forge");
+  // #account is where a finished "link another sign-in" comes back to (auth._landing), so honour the hash.
+  selectTab(location.hash === "#account" ? "account" : "forge");
   handlePurchaseReturn();
 }
 
@@ -1038,18 +1043,59 @@ let DONATE_CFG = null;  // last /api/billing payload — donate() validates amou
 
 async function loadAccount() {
   el("acct-email").textContent = ME ? (ME.email || ME.name || "") : "";
+  renderSignInMethods();
   try {
-    // Balance can have moved server-side (webhook credit, another tab, the daily grant) — refresh it too.
+    // Balance can have moved server-side (webhook credit, another tab, the daily grant) — refresh it too,
+    // along with the identities: coming back from a link flow lands here and must show the new method.
     const [meR, billR, purR] = await Promise.all([
       fetch("/api/me"), fetch("/api/billing"), fetch("/api/purchases"),
     ]);
-    const me = (await meR.json()).user;
-    if (me) { ME = me; renderTokens(); }
+    const meData = await meR.json();
+    if (meData.user) { ME = meData.user; ME_META = meData; renderTokens(); renderSignInMethods(); }
     renderDonation(await billR.json());
     renderPurchases((await purR.json()).purchases || []);
   } catch (_) {
     toast("Couldn't load your account — check your connection.");
   }
+}
+
+// Which sign-ins reach this account, and what is left to add. No unlinking in v1 (see index.html).
+const IDENTITY_LABELS = { google: "Google", discord: "Discord", github: "GitHub", email: "Email", dev: "Dev" };
+
+// Light masking for the identity label: an address shows as "r…@gmail.com" — enough to tell two accounts
+// apart without printing the whole thing. A display name or a provider id is left as it is.
+function maskIdentity(label) {
+  const at = String(label || "").indexOf("@");
+  return at > 0 ? label[0] + "…" + label.slice(at) : String(label || "");
+}
+
+function renderSignInMethods() {
+  const list = el("acct-identities");
+  if (!list) return;
+  const identities = (ME && ME.identities) || [];
+  list.innerHTML = "";
+  for (const i of identities) {
+    const li = document.createElement("li");
+    li.textContent = (IDENTITY_LABELS[i.provider] || i.provider)
+      + (i.label ? ` (${maskIdentity(i.label)})` : "");
+    list.appendChild(li);
+  }
+
+  // Everything this deploy offers that the account hasn't got yet. /login?link=1 is the chooser in link
+  // mode: it keeps the session, so whatever is picked there attaches to this account.
+  const owned = new Set(identities.map((i) => i.provider));
+  const missing = ((ME_META && ME_META.providers) || []).filter((p) => !owned.has(p));
+  if (ME_META && ME_META.email_login && !owned.has("email")) missing.push("email");
+  const options = el("acct-link-options");
+  options.innerHTML = "";
+  for (const p of missing) {
+    const a = document.createElement("a");
+    a.className = "btn ghost";
+    a.href = "/login?link=1";
+    a.textContent = IDENTITY_LABELS[p] || p;
+    options.appendChild(a);
+  }
+  el("acct-link-row").classList.toggle("hidden", missing.length === 0);
 }
 
 function fmtMoney(cents, currency) {

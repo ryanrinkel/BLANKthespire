@@ -157,6 +157,18 @@
       <p id="purchases-empty" class="muted hidden">No donations yet.</p>
       <ul id="purchase-list" class="lib"></ul>
     </section>
+
+    <!-- Sign-in methods: every identity this account can sign in with, plus the ones still free to add.
+         Both lists are built by app.js from /api/me (identities, providers, email_login). No unlinking in
+         v1 — an account down to its last identity could lock itself out. -->
+    <section class="card">
+      <h2>Sign-in methods</h2>
+      <p class="hint">Any of these signs you in to this same account.</p>
+      <ul id="acct-identities" class="signin-methods"></ul>
+      <p id="acct-link-row" class="acct-link-row hidden">
+        <span class="hint">Link another:</span> <span id="acct-link-options"></span>
+      </p>
+    </section>
   </main>
 
   <!-- Per-card feedback overlay (single reusable modal) -->

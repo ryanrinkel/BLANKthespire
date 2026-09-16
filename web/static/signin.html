@@ -14,9 +14,11 @@
 
   <main>
     <section class="card">
-      <h1>Sign in</h1>
-      <p class="muted">Pick a provider — we only ever see the email address and display name it shares.
-        No passwords, ever.</p>
+      <!-- Both the heading and the lede are rewritten by signin.js in link mode (/login?link=1, reached
+           from the Account tab), where this page adds a provider to the account already signed in. -->
+      <h1 id="title">Sign in</h1>
+      <p id="lede" class="muted">Pick a provider — we only ever see the email address and display name it
+        shares. No passwords, ever.</p>
 
       <!-- One .btn.primary per provider /api/me reports, built by signin.js (CSP forbids inline script). -->
       <div id="providers" class="signin-options"></div>
@@ -38,6 +40,7 @@
         <a id="dev-signin" class="btn ghost hidden" href="/dev-login?email=dev@example.com">Dev sign-in (local)</a>
       </p>
       <p>
+        <a id="back-app" class="btn ghost hidden" href="/app#account">Back to the app</a>
         <a class="btn ghost" href="/">Back to the splash</a>
         <a class="btn ghost" href="/download">Get the mod &amp; install guide</a>
       </p>

@@ -165,6 +165,13 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .foot-note { margin: 8px 0 0; font-size: 11px; }
 .refunded { color: var(--danger); }
 
+/* Account → sign-in methods: one plain line per linked identity, then the "Link another" ghost buttons. */
+.signin-methods { list-style: none; padding: 0; margin: 8px 0 0; }
+.signin-methods li { padding: 2px 0; }
+.acct-link-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.acct-link-row .hint, .acct-link-row .btn { margin: 0; }
+.acct-link-row #acct-link-options { display: flex; flex-wrap: wrap; gap: 8px; }
+
 /* an inline, link-styled button (e.g. the out-of-tokens "support the forge" CTA inside hint text) */
 .linkish { background: none; border: none; padding: 0; font: inherit; cursor: pointer;
   color: var(--accent); font-weight: 600; text-decoration: underline; }

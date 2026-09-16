@@ -191,6 +191,14 @@ def _resolve_identity(p: Profile, *, current_user_id: int | None = None) -> dict
         return {"id": user.id, "email": user.email, "name": user.name}
 
 
+def _landing(user: dict, signed_in_as: int | None) -> str:
+    """Where a successful sign-in lands. Normally /app — but when the flow ran while already signed in and
+    the identity attached to THAT account (rule 2, the "link another sign-in" flow), /app#account puts the
+    person back on the Account tab they started from, with the new method listed. An identity owned by
+    someone else resolves to that other user (rule 1) — a plain sign-in, so it lands on /app like one."""
+    return "/app#account" if signed_in_as is not None and user["id"] == signed_in_as else "/app"
+
+
 def current_user() -> dict | None:
     """The signed-in user as {id, email, name}, or None."""
     uid = session.get("user_id")
@@ -387,8 +395,12 @@ def init_auth(app) -> None:
 
     @app.route("/login")
     def login():
-        """The chooser page: one button per configured provider (signin.js reads /api/me.providers)."""
-        if current_user() is not None:
+        """The chooser page: one button per configured provider (signin.js reads /api/me.providers).
+
+        A signed-in visitor is bounced to the app UNLESS ?link=1 — that is the Account tab's "link another
+        sign-in", where the point is to run a provider flow while signed in so the new identity attaches to
+        this account (_resolve_identity rule 2). signin.js renders that case as "Link another sign-in"."""
+        if current_user() is not None and request.args.get("link") != "1":
             return redirect("/app")
         return send_from_directory(app.static_folder, "signin.html")
 
@@ -411,11 +423,14 @@ def init_auth(app) -> None:
             return (f"{provider.title()} sign-in is not configured on this server.", 503)
         token = client.authorize_access_token()
         profile = _PROFILE[provider](client, token)
-        # current_user_id is Phase 3's "link another provider while signed in" (rule 2) — free here, and it
-        # means a signed-in user who runs the flow again attaches rather than splitting into a second account.
-        user = _resolve_identity(profile, current_user_id=(current_user() or {}).get("id"))
+        # current_user_id is "link another provider while signed in" (rule 2): a signed-in user who runs the
+        # flow attaches the identity rather than splitting into a second account. Deliberate: if the identity
+        # already belongs to someone ELSE, rule 1 wins and this signs in as that other user — plain sign-in
+        # semantics. We never merge two accounts behind the user's back (that stays a support action).
+        signed_in_as = (current_user() or {}).get("id")
+        user = _resolve_identity(profile, current_user_id=signed_in_as)
         _login_session(user)
-        return redirect("/app")
+        return redirect(_landing(user, signed_in_as))
 
     @app.route("/auth/callback")
     def auth_callback():
@@ -475,12 +490,13 @@ def init_auth(app) -> None:
         if request.method == "GET":
             return send_from_directory(app.static_folder, "signin-continue.html")
         # A clicked link is proof of the address (that is the whole point), so email_verified=True — which
-        # lets rule 3 hand this person their existing Google/Discord account. current_user_id is Phase 3's
-        # "link while signed in".
+        # lets rule 3 hand this person their existing Google/Discord account. current_user_id is the
+        # "link while signed in" path (rule 2), and lands on the Account tab when it attached there.
+        signed_in_as = (current_user() or {}).get("id")
         user = _resolve_identity(Profile("email", email, email, True, email.split("@")[0]),
-                                 current_user_id=(current_user() or {}).get("id"))
+                                 current_user_id=signed_in_as)
         _login_session(user)
-        return redirect("/app")
+        return redirect(_landing(user, signed_in_as))
 
     @app.route("/logout", methods=["POST"])
     def logout():
