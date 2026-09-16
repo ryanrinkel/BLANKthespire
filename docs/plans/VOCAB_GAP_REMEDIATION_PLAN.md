@@ -1198,6 +1198,17 @@ APPENDING it to both the base and upgrade lists, which under the new rule puts `
 claims to be the appended keyword. `smoke_relic._inject_ethereal` now inserts in front of a trailing `exhaust` (base)
 and in front of an upgrade's appended keyword, keeping all four shapes importable; `tests/test_phase_ax.py` pins that.
 
+**(8) FIXED 2026-09-15 — the first REAL class to carry `spread_debuffs` found a runtime NRE the gap-tester could
+not.** The Plaguefather (forged for the Phase BA importer check, see `PHASE_BA_FORGED_POTIONS_PLAN.md`) has
+"Carrier Wave": *Deal 6 damage. Spread the target's debuffs.* On two seeds (`GAPCLOSEBA2`, `GAPCLOSEBA3`) it
+threw at `EffectRunner.SpreadDebuffs` line 1000, `source.CombatState.HittableEnemies`: the card's own leading
+`damage` had KILLED the struck target, and a dead creature's `CombatState` is null. The AX tester never saw it —
+its contagion card was built to spread, not to kill. The fix reads `source.CombatState ??
+card.Owner.Creature.CombatState`; the corpse's powers are still readable (the `Take<>` calls succeed), so the
+spread still lands on a kill. The same seed on the fixed build ran to `RunCompleted` (49 rooms, 23 combats, 0 mod
+frames). Lesson for every "damage, then read the target" op: after `damage`, the target may be dead — never
+dereference its `CombatState`; take it from the owner.
+
 **Lockstep:** `ForgedCards` (VocabVersion 53, SupportedOps, AmountOps, the caps, `ValidateUpgradeShape`,
 `StatusOccurrence`/`StatusVarName`/`StatusDisplay`, the occurrence-aware `VarKey`, the cost band + rare gate, two
 Describe sentences), `EffectRunner` (both op cases, `SpreadDebuffs`, the gated-status branch), `DataCard` (named

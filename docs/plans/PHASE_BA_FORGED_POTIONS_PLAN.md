@@ -138,20 +138,75 @@ fallback. The Blight-Forge is the result that matters: given a class that HAS it
 for it unprompted (`forge` is the class-subsystem op, and `temp_strength` matches its own "Violent Bloom"
 temp-stat archetype). The concept was spores; nothing in it said "forge".
 
-**Two verification gaps, deliberately left open:**
+**Two verification gaps were left open that morning. The first is CLOSED and the second half-closed the same
+evening — see the next section.** As originally recorded:
 
 1. **The C# importer has never parsed a REAL generated potion.** The AutoSlay gate staged hand-written JSON
    straight into the slot dir, which bypasses `BTS1Codec.Decode` -> `TryParseCharacter`. Real potions differ in
    ways that matter — both of the above OMIT `usage`, leaning on the C# default. The Python and C# defaults agree
-   by construction (`combat`), but that is reasoning, not a test. **To close it:** stage a decoded real bundle into
-   a slot and run one AutoSlay seed (covers `TryParseCharacter`), or paste a code through mod settings -> Import a
-   class code (covers the codec half too).
+   by construction (`combat`), but that is reasoning, not a test.
 2. **No real class has yet produced a status / orb / summon pool**, so `apply_status_custom` / `channel_orb` /
-   `summon` on a *generated* potion are still proven only by the gap-tester. Worth re-checking the first time a
-   real status or orb class comes out of the forge.
+   `summon` on a *generated* potion are still proven only by the gap-tester.
 
-Neither gap blocks the phase — the runtime paths are all proven by the gate, and the importer's potion parse is a
-direct mirror of `_validate_potion`, which both real potions pass.
+---
+
+## Importer gap — CLOSED with a real code paste (2026-09-15, evening)
+
+**The paste.** A third class was forged on the default backend (the Ollama-Cloud mixture) from "a plague doctor
+whose bespoke ailments fester on enemies and spread between them" -> **Plaguefather**, a STATUS class (Contagion
+`damage_over_time`, Festering `damage_taken`, Quarantine `block_gained`), 35 cards, relic The First Vial, and a
+potion of exactly the shape gap 2 asked for:
+
+> 🧪 **Phial of Contagion**, uncommon · **all_enemies** — *Apply 3 Contagion to ALL enemies.* —
+> `[{"op":"apply_status_custom","status_name":"Contagion","amount":3}]` (no `usage` key, like the other two).
+
+The `.btsc.txt` code (4,236 chars, `BTSC.55.…`) went through the mod's REAL import path — not the slot-dir
+shortcut — via a small hook added for exactly this: **`ForgedCharacters.ImportQueuedCode`**, called at the top of
+`MainFile.Initialize`. If `user://forged/import_code.txt` exists at boot (optional first line `slot=N`), its
+contents run through the SAME two calls the settings-screen "Import" button makes — `BTS1Codec.TryDecode`, then
+`TryImportClassBundle` — the outcome is logged under `[IMPORT]`, and the file is renamed `.imported` /
+`.rejected`. It runs before any class spec is read, so the class is playable in that same launch, and the
+AutoSlay smoke can drive a real code end to end with no hand on the UI:
+
+```bash
+{ printf 'slot=3\n'; cat scratch/gapclose-ba/plague_doctor.btsc.txt; } > "$APPDATA/SlayTheSpire2/forged/import_code.txt"
+uv run btsgen-autoslay-smoke --seeds GAPCLOSEBA1 --character class3 --relic off --timeout 600
+```
+
+```
+[IMPORT] queued code (4236 chars): decoded (18997 chars of bundle JSON) and imported into class slot 03.
+[Spike] emoji '🧪' rendered (opaque pixels: True); saved .../bts_emoji_potion3_1.res -> Ok.
+[Spike] emoji icon 'potion3_1' IS loadable (.res) -> exposing as power icon.
+```
+
+So the codec half (version gate, gunzip, CRC) AND `TryParseCharacter` -> `TryParsePotionPool` -> the
+class-conditional `apply_status_custom` check (against a status pool parsed moments earlier) have accepted a real
+generated potion, `usage` defaulted and all. **Gap 1 closed.**
+
+**Four seeds, and what they showed** (tag excerpts in `generation/scratch/gapclose-ba/godot_tags_*.txt`, gitignored):
+
+| seed | rooms / combats | verdict | note |
+|---|---|---|---|
+| `GAPCLOSEBA1` | 1 / 0 | harness stall at Neow | AutoSlay took **Kaleidoscope**, whose `AfterObtained` reward-gen NRE'd in base code (`CardFactory.CreateForReward`); the mod's `RewardGuard` (initial release) logged and suppressed it, then the harness timed out. Pre-existing, not BA. |
+| `GAPCLOSEBA2` | Act 3, 15 combats | **mod NRE** | `EffectRunner.SpreadDebuffs` line 1000 — see below |
+| `GAPCLOSEBA3` | Act 2, 15 combats | **mod NRE** | same line, same card |
+| `GAPCLOSEBA2` on the fixed build | **49 / 23** | **PASS — RunCompleted** | 0 mod frames; `spread_debuffs` copied `vulnerable 1, weak 1` to 3 enemies once and no-op'd honestly 7 times |
+
+**The real class found a real bug — in Phase AX, not BA.** Card 22 "Carrier Wave" (*Deal 6 damage. Spread the
+target's debuffs.*) NRE'd at `source.CombatState.HittableEnemies` on two seeds: the card's own leading `damage`
+KILLED the struck target, and a dead creature's `CombatState` is null. The AX gap-tester never hit it because its
+contagion card was built to spread, not to kill. Fix: read the combat state from `source.CombatState ??
+card.Owner.Creature.CombatState` — the powers on the corpse are still readable (the `Take<>` calls above the
+crash line succeed), so the spread still happens on a kill, which is the better design anyway. The same seed on
+the fixed build completed the run.
+
+**Gap 2 is half-closed.** A real status class's `apply_status_custom` / `all_enemies` potion now parses, registers
+and renders its icon through the real path. It did **not** roll in 63 combats across the four seeds (47 potion
+uses, all base-game): an `uncommon` forged potion is ~1-in-13 of the 25% uncommon tier, so ~40% of runs this
+length never see it. The runtime `apply_status_custom` path on a potion is therefore still proven by the gate's
+tester only — that code is unchanged since, and the tester's `enemy` arm runs the same `RunRelicEffects` case
+(`all_enemies` differs only in `ResolveTargets`). Worth one more look the first time a real forged potion is
+actually drunk in a logged run.
 
 ---
 

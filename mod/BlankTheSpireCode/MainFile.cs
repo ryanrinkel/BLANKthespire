@@ -25,6 +25,10 @@ public partial class MainFile : Node
         // The in-game "forge" screen (appears in the main-menu mod settings list).
         ModConfigRegistry.Register(ModId, new ForgeConfig());
 
+        // Queued import (the file-drop twin of the settings screen's "Import" button): runs a dropped class code
+        // through the SAME codec + importer, BEFORE any class spec is read, so the class plays in this launch.
+        Engine.ForgedCharacters.ImportQueuedCode();
+
         // EXPLORE SPIKE: pre-render an emoji glyph to a PNG so SpikeSharpenPower can try it as its icon.
         Engine.EmojiIconRenderer.Kick("sharpen", "🗡️");
 

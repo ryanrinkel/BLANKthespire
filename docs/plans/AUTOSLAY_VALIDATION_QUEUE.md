@@ -116,6 +116,13 @@ If a gap-tester's `04.json` isn't present, rebuild it first: `uv run python scra
 **Universal pass bar for every item:** **0 mod exceptions** in `godot.log`, **no hang**, and the run quits on
 its own. (Import is already proven clean for all four — every card loaded with 0 exceptions before the env hang.)
 
+**Smoking a REAL forged code (2026-09-15, Phase BA importer check):** you do not have to unpack a bundle into the
+slot dir by hand. Drop the code into `%APPDATA%/SlayTheSpire2/forged/import_code.txt` (optional first line
+`slot=N`) and launch the smoke; `ForgedCharacters.ImportQueuedCode` runs it through the SAME `BTS1Codec.TryDecode` +
+`TryImportClassBundle` the settings-screen button uses, logs `[IMPORT] queued code ...` in `godot.log`, renames the
+file `.imported` / `.rejected`, and the class is playable in that launch (`--character classN`). Unstage by deleting
+`forged/characters/NN.json` + `NN/cards/` afterwards. See `PHASE_BA_FORGED_POTIONS_PLAN.md`, "Importer gap".
+
 **Coverage caveat — AutoSlay plays RANDOMLY.** A single seed may never push the gauge to |8|, empty the draw
 pile, or exhaust a card. To raise the odds the mechanic actually fires, run each item with **several seeds**
 (e.g. `--seeds GAPTEST1 GAPTEST1B GAPTEST1C`) or **loop mode**. Most sensitive to this: P's `draw_pile_empty`

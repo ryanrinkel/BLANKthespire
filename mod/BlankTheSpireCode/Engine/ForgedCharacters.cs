@@ -1417,6 +1417,64 @@ public static class ForgedCharacters
         return true;
     }
 
+    /// <summary>The file-drop twin of the settings screen's "Import" button (see <see cref="ImportQueuedCode"/>).</summary>
+    public const string QueuedImportPath = "user://forged/import_code.txt";
+
+    /// <summary>
+    /// Boot-time queued import: if <see cref="QueuedImportPath"/> exists at mod init, its contents go through EXACTLY
+    /// the two stages the "Import" button runs — <see cref="BTS1Codec.TryDecode"/>, then
+    /// <see cref="TryImportClassBundle"/> — and the outcome is logged under <c>[IMPORT]</c>. An optional first line
+    /// <c>slot=N</c> pins the class slot (otherwise auto, like the slider at 0). The file is renamed to
+    /// <c>.imported</c> / <c>.rejected</c> so it runs once. Called BEFORE any class spec is read, so the imported
+    /// class is playable in the SAME launch — which is what lets the AutoSlay smoke push a REAL generated code
+    /// through the codec + importer with no hand on the UI (the Phase BA "importer has only ever parsed
+    /// hand-staged JSON" gap). Splash art is not fetched here (no scene tree yet); the button path still does that.
+    /// </summary>
+    public static void ImportQueuedCode()
+    {
+        if (!Godot.FileAccess.FileExists(QueuedImportPath)) return;
+        string text;
+        using (var f = Godot.FileAccess.Open(QueuedImportPath, Godot.FileAccess.ModeFlags.Read))
+        {
+            if (f == null)
+            { MainFile.Logger.Warn($"[IMPORT] could not open {QueuedImportPath}: {Godot.FileAccess.GetOpenError()}"); return; }
+            text = f.GetAsText();
+        }
+
+        string code = text.Trim();
+        int slot = 0;
+        int nl = code.IndexOf('\n');
+        string first = (nl >= 0 ? code[..nl] : code).Trim();
+        if (first.StartsWith("slot=", StringComparison.OrdinalIgnoreCase) && int.TryParse(first[5..], out int pinned))
+        {
+            slot = pinned;
+            code = nl >= 0 ? code[(nl + 1)..] : "";
+        }
+
+        bool ok = false;
+        string outcome;
+        if (!BTS1Codec.TryDecode(code, out var json, out var kind, out var decodeError))
+            outcome = $"decode FAILED: {decodeError}";
+        else if (kind != BTS1Codec.BtsKind.Class)
+            outcome = "decoded, but it is a card (BTS1) code, not a class (BTSC) code";
+        else if (!TryImportClassBundle(json, slot, out int k, out var err))
+            outcome = $"decoded ({json.Length} chars of bundle JSON) but the importer REJECTED it: {err}";
+        else
+        {
+            ok = true;
+            outcome = $"decoded ({json.Length} chars of bundle JSON) and imported into class slot {k:00}";
+        }
+        MainFile.Logger.Info($"[IMPORT] queued code ({code.Length} chars): {outcome}.");
+
+        // The class loader caches on first read; make sure the freshly written files are what this launch sees.
+        _classes = null;
+        _cards = null;
+
+        string done = QueuedImportPath + (ok ? ".imported" : ".rejected");
+        if (Godot.FileAccess.FileExists(done)) Godot.DirAccess.RemoveAbsolute(done);
+        Godot.DirAccess.RenameAbsolute(QueuedImportPath, done);
+    }
+
     private static string Str(Godot.Collections.Dictionary d, string key, string fallback = "") =>
         d.ContainsKey(key) ? d[key].AsString() : fallback;
 

@@ -474,6 +474,7 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Triage (2026-09-09, W0.11):** duplicate demand for #45 — folded into the single `spread_debuffs` op (copy the target's debuffs to all other enemies). The "at turn start" half is just that op inside an `add_trigger` turn_start payload. Adjacency stays rejected per #34.
 
 ### 47. Contagion Spread
+- **Demand:** ×2 — re-surfaced by: staged front-end ("a plague doctor whose bespoke ailments f")
 - **Surfaced by:** staged front-end ("a plague doctor who brews slow contagion")
 - **Fantasy it serves:** The disease leaping from one enemy to another — airborne spores, contagious touch
 - **Mechanic sketch:** A mechanic where a status on one enemy spreads to adjacent or all enemies when it reaches a threshold, modeling epidemic transmission
