@@ -42,6 +42,8 @@ public static class ForgedSplash
             CacheKey(d, "relic_icon_url", classSlot, "relic.png");
             // A re-import may have replaced relic.png; drop the slot's taken-over texture so it reloads.
             Powers.ForgedRelicIcon.Invalidate(classSlot);
+            // Likewise sprite.png: the select card is derived from it, so drop the stale portrait.png.
+            ForgedPortrait.Invalidate(classSlot);
         }
         catch (Exception e)
         {
