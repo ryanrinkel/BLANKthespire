@@ -179,6 +179,9 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 
 /* --- footer (terms / privacy / support) ---------------------------------------------------------- */
 .foot { text-align: center; color: var(--muted); font-size: 12px; padding: 26px 18px 30px; }
+/* Body links wear the accent so they read on the dark panels (browser default is navy on near-black). */
+a { color: var(--accent); }
+a:hover { color: var(--ink); }
 .foot a { color: var(--muted); }
 .foot a:hover { color: var(--ink); }
 
@@ -333,3 +336,30 @@ body.landing {
 .step-body p { margin: 0; color: var(--muted); font-size: 14px; }
 .fill { color: var(--accent); font-weight: 800; border-bottom: 2px solid var(--accent); padding: 0 3px; }
 
+
+/* --- 2026-09-17: BYOK cost warning, class view bar, admin forge stats -------------------------- */
+.hint.warn { color: #f2b45c; }
+.view-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px;
+            padding-bottom: 10px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.view-bar .btn { padding: 6px 12px; font-size: 13px; }
+.stats-head { display: flex; align-items: center; gap: 10px; }
+.stats-head h2 { margin: 0; }
+.stats-head select.in { width: auto; padding: 6px 10px; font-size: 13px; }
+.stat-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; margin: 14px 0; }
+.stat-tile { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
+.stat-tile .k { font-size: 12px; color: var(--muted); }
+.stat-tile .v { font-size: 22px; font-weight: 600; margin-top: 2px; }
+.stat-tile .s { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.stats-chart { margin: 8px 0 14px; }
+.stats-chart svg { width: 100%; height: auto; display: block; }
+.stats-chart .axis { fill: var(--muted); font-size: 11px; }
+.stats-chart .grid { stroke: var(--line); stroke-width: 1; }
+.stats-legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.stats-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.stats-tables { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.stats-tables h4 { margin: 0 0 6px; font-size: 13px; color: var(--muted); font-weight: 500; }
+.stats-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.stats-table th, .stats-table td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--line); }
+.stats-table th { color: var(--muted); font-weight: 500; font-size: 12px; }
+.stats-table td.num, .stats-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.stats-wrap { overflow-x: auto; }

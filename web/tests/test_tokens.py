@@ -80,7 +80,7 @@ def test_token_forge_spends_free_first_then_paid(client, app_module, stub_forge)
     assert ev[0][0] == "progress" and ev[0][1]["free_token_available"] is False
     assert ev[0][1]["token_balance"] == 5
     assert ev[-1][0] == "result" and ev[-1][1]["token_balance"] == 5 and ev[-1][1]["slug"]
-    assert ev[-1][1]["share_url"].endswith("/api/deck/" + ev[-1][1]["slug"])
+    assert ev[-1][1]["share_url"].endswith("/deck/" + ev[-1][1]["slug"])  # the public share page
     ev2 = sse_events(_forge(client))
     assert ev2[-1][0] == "result" and ev2[-1][1]["token_balance"] == 4
     assert ev2[-1][1]["free_token_available"] is False

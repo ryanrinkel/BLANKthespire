@@ -41,6 +41,17 @@ UNLIMITED_EMAILS = {
     if e.strip()
 }
 
+# Accounts that may read the operator dashboard (/api/admin/stats): comma-separated addresses in
+# BTSWEB_ADMIN_EMAILS, matched against users.email exactly like UNLIMITED_EMAILS. Empty/unset ⇒ the
+# unlimited list doubles as the admin list (it is already the "this is us" roster), so a deploy that only
+# ever set BTSWEB_UNLIMITED_EMAILS keeps working; set BTSWEB_ADMIN_EMAILS to narrow it (testers on the
+# unlimited list are not necessarily operators).
+ADMIN_EMAILS = {
+    e.strip().lower()
+    for e in os.environ.get("BTSWEB_ADMIN_EMAILS", "").split(",")
+    if e.strip()
+} or set(UNLIMITED_EMAILS)
+
 
 # The OAuth providers, in the order the chooser page shows them. A provider is "configured" (and gets a
 # button) only when both halves of its env pair are set.
@@ -93,6 +104,12 @@ def configured_providers() -> list[str]:
 def is_unlimited(email: str) -> bool:
     """True if this email is on the unlimited-tokens master list (never decremented on the token path)."""
     return (email or "").strip().lower() in UNLIMITED_EMAILS
+
+
+def is_admin(email: str) -> bool:
+    """True if this email may read the operator dashboard (see ADMIN_EMAILS). Same matching rule as
+    is_unlimited: users.email only ever holds a provider-VERIFIED address."""
+    return (email or "").strip().lower() in ADMIN_EMAILS
 
 
 def _dev_auth_enabled() -> bool:
@@ -519,6 +536,7 @@ def init_auth(app) -> None:
                 free = bool(row is not None and free_token_available(row))
             user = {**user, "token_balance": bal, "free_token_available": free,
                     "unlimited": is_unlimited(user.get("email", "")),
+                    "admin": is_admin(user.get("email", "")),
                     "identities": _identities_of(user["id"])}
         # email_login gates signin.js's email form: mail configured, or the dev bypass standing in for it.
         return jsonify({"user": user, "dev_auth": _dev_auth_enabled(),

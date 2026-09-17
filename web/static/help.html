@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Help — BLANK the spire</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <style>
+    .steps { padding-left: 20px; }
+    .steps li { margin: 18px 0; }
+    .shot { margin: 10px 0 0; padding: 0; }
+    .shot img { display: block; max-width: 100%; border: 1px solid var(--line); border-radius: 10px; }
+    .shot figcaption { font-size: 12px; color: var(--muted); margin-top: 6px; }
+    .callout { border-left: 3px solid var(--uncommon); background: var(--panel2); border-radius: 0 10px 10px 0;
+               padding: 10px 14px; margin: 10px 0 0; }
+    code.codeish { font-family: ui-monospace, Consolas, monospace; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">⚒ <strong>BLANK the spire</strong> <span class="sub">help</span></div>
+    <nav>
+      <a class="tab" href="/app">← Back to Forge</a>
+      <a class="tab" href="/download">Get the mod ⬇</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="card">
+      <h1>Where do I paste my code?</h1>
+      <p>Inside the game, not on this site. Forge a class here, copy its import code (it starts with
+        <code class="codeish">BTSC.</code>), then in Slay the Spire 2 open the main menu →
+        <b>Mods</b> / <b>mod settings</b> → <b>BLANK the spire</b> → paste it into
+        <b>Import a class code</b> and press <b>Import</b>. Restart the game and your class appears at
+        character select.</p>
+    </section>
+
+    <section class="card">
+      <h2>Step by step</h2>
+      <ol class="steps">
+        <li>
+          <b>Forge a class on the site and press Copy code.</b> The code starts with
+          <code class="codeish">BTSC.</code> and ends with a short hash — copy all of it.
+          <figure class="shot">
+            <img src="/static/img/help/step-1.png" alt="The forge result on blankthespire.com with the Copy code button" loading="lazy" />
+            <figcaption>The result view on the site — the import code box and its Copy code button.</figcaption>
+          </figure>
+        </li>
+        <li>
+          <b>Launch Slay the Spire 2 and open the main menu → Mods / mod settings.</b>
+          <figure class="shot">
+            <img src="/static/img/help/step-2.png" alt="The Slay the Spire 2 main menu with the Mods entry highlighted" loading="lazy" />
+            <figcaption>Main menu — the Mods / mod settings entry.</figcaption>
+          </figure>
+        </li>
+        <li>
+          <b>Choose BLANK the spire</b> from the list of installed mods.
+          <figure class="shot">
+            <img src="/static/img/help/step-3.png" alt="The mod list with BLANK the spire selected" loading="lazy" />
+            <figcaption>The mod list — pick BLANK the spire to open its settings.</figcaption>
+          </figure>
+        </li>
+        <li>
+          <b>Paste the code into "Import a class code" and press Import.</b>
+          <figure class="shot">
+            <img src="/static/img/help/step-4.png" alt="The Import a class code field with a BTSC code pasted in" loading="lazy" />
+            <figcaption>The Import a class code field, with the code pasted and Import ready to press.</figcaption>
+          </figure>
+        </li>
+        <li>
+          <b>Restart the game.</b>
+          <div class="callout"><b>The restart is REQUIRED.</b> The mod will say so right after the import.
+            A newly imported class is only loaded at startup — it will <b>not</b> appear at character select
+            until you fully quit and relaunch the game.</div>
+          <figure class="shot">
+            <img src="/static/img/help/step-5.png" alt="The mod's restart-required confirmation after a successful import" loading="lazy" />
+            <figcaption>The confirmation after a successful import — restart before you look for the class.</figcaption>
+          </figure>
+        </li>
+        <li>
+          <b>Start a new run and pick your class</b> from the character select screen.
+          <figure class="shot">
+            <img src="/static/img/help/step-6.png" alt="The character select screen showing a forged class" loading="lazy" />
+            <figcaption>Character select — your forged class sits alongside the base-game characters.</figcaption>
+          </figure>
+        </li>
+      </ol>
+    </section>
+
+    <section class="card">
+      <h2>Troubleshooting</h2>
+      <ul class="steps">
+        <li><b>"Code rejected" / "invalid code".</b> Make sure the <i>whole</i> code was copied — including the
+          <code class="codeish">BTSC.</code> prefix at the front and the short hash after the final dot. A code
+          cut off at either end can't be decoded. The Copy code button always copies the whole thing.</li>
+        <li><b>The class doesn't appear at character select.</b> You didn't restart. Quit the game completely
+          and relaunch — imported classes only load at startup.</li>
+        <li><b>There's no Mods menu / the game isn't modded.</b> The mod isn't installed yet — see
+          <a href="/download">Get the mod</a>.</li>
+        <li><b>Anything else.</b> <a href="https://github.com/ryanrinkel/BLANKthespire/issues">Report a bug</a>
+          on GitHub. If the game crashed, include the lines from
+          <code class="codeish">%APPDATA%\SlayTheSpire2\logs\godot.log</code>.</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Next</h2>
+      <p><a class="btn primary" href="/app">Forge a class</a>
+         <a class="btn" href="/download">Get the mod</a>
+         <a class="btn" href="https://github.com/ryanrinkel/BLANKthespire" target="_blank" rel="noopener">GitHub</a></p>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> ·
+    <a href="/download">Get the mod</a> ·
+    <a href="https://github.com/ryanrinkel/BLANKthespire" target="_blank" rel="noopener">GitHub</a> ·
+    <a href="mailto:ryan.r.rinkel@gmail.com">Support</a>
+    <p class="foot-note">Unofficial fan project — not affiliated with or endorsed by Mega Crit.</p>
+  </footer>
+  <script src="/static/help.js"></script>
+</body>
+</html>

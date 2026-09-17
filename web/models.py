@@ -259,6 +259,10 @@ class ForgeUsage(Base):
     token_kind: Mapped[str | None] = mapped_column(String(10), default=None, nullable=True)  # free|paid|unlimited
     role: Mapped[str] = mapped_column(String(32), default="")   # brainstorm | structure | cards | ...
     model: Mapped[str] = mapped_column(String(128), default="")
+    # WHERE the call went, never WHAT it was authenticated with: "hosted" (our Ollama mix), "anthropic", or
+    # for BYOK the hostname of the user's base_url ("api.openai.com", ...). Keys are never stored anywhere.
+    # Added after the table existed ⇒ patched in by db._ensure_forge_usage_columns.
+    provider: Mapped[str] = mapped_column(String(64), default="")
     calls: Mapped[int] = mapped_column(Integer, default=0)
     input_tokens: Mapped[int] = mapped_column(Integer, default=0)
     output_tokens: Mapped[int] = mapped_column(Integer, default=0)

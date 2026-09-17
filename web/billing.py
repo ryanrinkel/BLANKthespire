@@ -4,7 +4,9 @@ Pricing is DONATION-BASED (restored 2026-09-16; token packs ran 2026-09-08..16 a
 FREE with your own API key, and every account gets ONE free token per UTC day on the hosted models
 (models.free_token_available — tracked separately from the balance, so a donor's thank-you tokens never
 block it). Donations are optional support; as a thank-you, each whole dollar donated grants one bonus token
-(TOKENS_PER_DOLLAR below — set to 0 to make donations pure).
+(TOKENS_PER_DOLLAR below — set to 0 to make donations pure). Larger gifts get a tiered bonus on top of that
+base: +10% from $10, +20% from $20, +30% from $50 (BONUS_TIERS below), applied to the whole-dollar count and
+floored — $10 → 11, $20 → 24, $50 → 65. The UI reads the tiers from /api/billing to show them.
 
 Shape: the browser POSTs /api/donate with an amount → we create a Stripe Checkout Session and redirect the
 user to Stripe's hosted page (no card data ever touches this server). Credit lands via TWO paths that share
@@ -39,6 +41,8 @@ STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "").strip()
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "").strip()
 
 TOKENS_PER_DOLLAR = 1        # thank-you tokens per whole dollar donated
+# (min_cents, bonus_pct) in ASCENDING order — the last tier a donation reaches wins. Sent to the UI verbatim.
+BONUS_TIERS = [(1000, 10), (2000, 20), (5000, 30)]
 MIN_DONATION_CENTS = 100     # Stripe's floor is $0.50; $1 keeps the fee overhead sane
 MAX_DONATION_CENTS = 50000   # fat-finger guard
 
@@ -61,8 +65,15 @@ PRESETS = _parse_presets(os.environ.get("BTSWEB_DONATION_PRESETS", "")) or list(
 
 
 def tokens_for(amount_cents: int) -> int:
-    """Thank-you tokens for a donation: one per WHOLE dollar (a $3.50 gift is 3 tokens)."""
-    return (int(amount_cents) // 100) * TOKENS_PER_DOLLAR
+    """Thank-you tokens for a donation: one per WHOLE dollar (a $3.50 gift is 3 tokens), plus the tiered bonus
+    for larger gifts. Both steps floor, so $19.99 is 19 + floor(1.9) = 20 and $50 is 50 + 15 = 65."""
+    cents = int(amount_cents)
+    base = (cents // 100) * TOKENS_PER_DOLLAR
+    pct = 0
+    for min_cents, tier_pct in BONUS_TIERS:
+        if cents >= min_cents:
+            pct = tier_pct
+    return base + (base * pct) // 100
 
 
 def billing_enabled() -> bool:
@@ -155,6 +166,7 @@ def init_billing(app) -> None:
             "min_cents": MIN_DONATION_CENTS,
             "max_cents": MAX_DONATION_CENTS,
             "tokens_per_dollar": TOKENS_PER_DOLLAR,
+            "bonus_tiers": [{"min_cents": c, "pct": p} for c, p in BONUS_TIERS],
             "currency": "usd",
         })
 

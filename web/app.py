@@ -18,7 +18,9 @@ import queue
 import shutil
 import threading
 import time
+import urllib.parse
 import uuid
+from html import escape as html_escape
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -29,13 +31,13 @@ if os.environ.get("BTSWEB_NO_DOTENV", "").strip() not in ("1", "true", "yes"):
     load_dotenv(WEB_DIR / ".env")  # local secrets; in prod these come from the service environment
 # (BTSWEB_NO_DOTENV=1 keeps the test suite hermetic on a box whose web/.env holds real credentials.)
 
-from auth import current_user, init_auth, is_production, is_unlimited, require_login  # noqa: E402
+from auth import current_user, init_auth, is_admin, is_production, is_unlimited, require_login  # noqa: E402
 from billing import init_billing  # noqa: E402
 from db import db_ping, init_db, session_scope  # noqa: E402
 from forge import (ELEMENT_KINDS, VALID_FEEDBACK_CATEGORIES, ForgeError, UsageMeter,  # noqa: E402
                    append_card_feedback, append_element_feedback, forge_to_bundle, list_models)
-from models import (ForgeJob, ForgeUsage, ForgedCard, ForgedClass, User, free_token_available,  # noqa: E402
-                    new_slug, spend_token, unspend_token)
+from models import (ForgeJob, ForgeUsage, ForgedCard, ForgedClass, Purchase, User,  # noqa: E402
+                    free_token_available, new_slug, spend_token, unspend_token)
 
 # Splash art (Track 2/3): generated at persist time, written to static/forged/<id>/, served by nginx,
 # its URL embedded in the import code so the mod can fetch it. Backend is chosen by BTSGEN_IMAGE_BACKEND
@@ -319,6 +321,14 @@ def app_view():
     return send_from_directory(app.static_folder, "index.html")
 
 
+# Where the mod actually comes from. The Workshop listing is the headline install path (subscribers get
+# BaseLib automatically as a Workshop dependency); until the item itself is uploaded this points at the
+# game's Workshop hub, so override it with the item URL the first upload mints.
+WORKSHOP_URL = os.environ.get(
+    "BTSWEB_WORKSHOP_URL", "https://steamcommunity.com/app/2868840/workshop/").strip()
+GITHUB_URL = "https://github.com/ryanrinkel/BLANKthespire"
+
+
 def mod_version() -> str:
     """The current mod version, read from the mod manifest (mod/BlankTheSpire.json) so the download page and
     the release zip name can't drift from what was actually built. Falls back to the newest release zip on disk,
@@ -343,8 +353,17 @@ _REPO_ROOT = WEB_DIR.parent
 def download():
     """Public install + download page (no login). The release zip lives under static/releases/; the version
     is stamped from the mod manifest at request time (the page is a tiny template with one placeholder)."""
-    html = (WEB_DIR / "static" / "download.html").read_text(encoding="utf-8").replace("{{VERSION}}", mod_version())
-    return Response(html, mimetype="text/html")
+    page = (WEB_DIR / "static" / "download.html").read_text(encoding="utf-8")
+    page = (page.replace("{{VERSION}}", mod_version())
+                .replace("{{WORKSHOP_URL}}", WORKSHOP_URL)
+                .replace("{{GITHUB_URL}}", GITHUB_URL))
+    return Response(page, mimetype="text/html")
+
+
+@app.route("/help")
+def help_page():
+    """Public "where do I paste my code?" walkthrough (no login) — the page every in-game step links to."""
+    return send_from_directory(app.static_folder, "help.html")
 
 
 @app.route("/terms")
@@ -357,6 +376,51 @@ def terms():
 def privacy():
     """Public privacy policy — what we store (and what we deliberately don't, e.g. BYOK keys)."""
     return send_from_directory(app.static_folder, "privacy.html")
+
+
+# A forged class can only be played by importing its code, so a shared link has to SHOW the code. /deck/<slug>
+# is that link: the public, read-only twin of the result view, rendered client-side by render.js off
+# /api/deck/<slug>, with the Open Graph tags stamped in server-side so the unfurl on Discord/X/Reddit shows
+# the class name, blurb and splash art. No login, no owner data — only what /api/deck already exposes.
+
+_DECK_404_HTML = """<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Class not found — BLANK the spire</title>
+<link rel="stylesheet" href="/static/style.css" /></head>
+<body><main><section class="card"><h1>Class not found</h1>
+<p class="muted">This class link is no longer valid — it may have been deleted, or the link was mistyped.</p>
+<p><a class="btn primary" href="/app">Forge your own</a> <a class="btn" href="/download">Get the mod</a></p>
+</section></main></body></html>"""
+
+DECK_DESC_MAX = 200  # og:description is truncated by every crawler anyway; keep the unfurl tight
+
+
+@app.route("/deck/<slug>")
+def deck_page(slug: str):
+    """Public share page for one forged class: its identity, cards and — the whole point — its import code.
+    Same slug validation as /api/deck/<slug> (the JSON this page fetches); a miss renders a small 404 page
+    instead of JSON because a human (or a crawler) is on the other end."""
+    slug = (slug or "").strip()
+    if not slug or len(slug) > 32:
+        return Response(_DECK_404_HTML, mimetype="text/html", status=404)
+    with session_scope() as s:
+        cls = s.query(ForgedClass).filter_by(slug=slug).one_or_none()
+        if cls is None:
+            return Response(_DECK_404_HTML, mimetype="text/html", status=404)
+        character = cls.detail().get("character") or {}
+        title = str(character.get("name") or cls.name or "A forged class").strip()
+        desc = str(character.get("description") or cls.concept or "").strip()
+        image = _splash_url(cls.id, cls.splash_hash) if cls.splash_hash else ""
+    if len(desc) > DECK_DESC_MAX:
+        desc = desc[:DECK_DESC_MAX - 1].rstrip() + "…"
+    page = (WEB_DIR / "static" / "deck.html").read_text(encoding="utf-8")
+    # Every value lands inside an HTML attribute (og:*/twitter:*) or text node — escape with quote=True so a
+    # class named `" onload=` can't break out of the meta tag it is stamped into.
+    for key, value in (("{{TITLE}}", title), ("{{DESC}}", desc), ("{{IMAGE}}", image),
+                       ("{{URL}}", f"{PUBLIC_BASE_URL}/deck/{slug}"), ("{{SLUG}}", slug)):
+        page = page.replace(key, html_escape(value, quote=True))
+    return Response(page, mimetype="text/html")
 
 
 @app.route("/healthz")
@@ -616,9 +680,10 @@ except (ValueError, TypeError, AttributeError):
 
 
 def _record_usage(meter: UsageMeter, *, user_id: int, forge_id: str, mode: str, token_kind: str | None,
-                  class_id: int | None, ok: bool) -> None:
-    """Write one forge_usage row per (role, model) the forge touched. Best-effort: never raises (telemetry
-    must not break a forge that already succeeded)."""
+                  class_id: int | None, ok: bool, provider: str = "") -> None:
+    """Write one forge_usage row per (role, model) the forge touched. `provider` is WHERE the calls went
+    ("hosted" / "anthropic" / a BYOK hostname — never the key). Best-effort: never raises (telemetry must
+    not break a forge that already succeeded)."""
     try:
         rows = meter.rows()
         if not rows:
@@ -634,6 +699,7 @@ def _record_usage(meter: UsageMeter, *, user_id: int, forge_id: str, mode: str, 
                                + r["cached_tokens"] * price[2]) / 1_000_000
                         cost = int(round(usd * 1_000_000))
                 s.add(ForgeUsage(user_id=user_id, class_id=class_id, forge_id=forge_id, mode=mode,
+                                 provider=provider or "",
                                  token_kind=token_kind, role=r["role"], model=r["model"], calls=r["calls"],
                                  input_tokens=r["input_tokens"], output_tokens=r["output_tokens"],
                                  cached_tokens=r["cached_tokens"], est_cost_micros=cost, ok=1 if ok else 0))
@@ -649,15 +715,17 @@ def forge_class_route():
     concept = (body.get("concept") or "").strip()
     mode = body.get("mode", "byok")  # 'byok' (OpenAI-compat) | 'anthropic' (BYOK) | 'hosted' | 'fake'
     pool_per = int(body.get("pool_per_archetype", 4) or 4)
-    # Interactive forge mode: pause mid-forge for the player's archetype pick. Off = today's autonomous
-    # behavior, untouched. It NEEDS the staged front-end, so asking for interactive implies staged — never
-    # silently drop the player's explicit request over the other checkbox.
+    # Interactive forge mode: pause mid-forge for the player's archetype pick. Off = the autonomous
+    # behavior, untouched.
     interactive = bool(body.get("interactive", False))
     # Triad (the DEFAULT since 2026-08-17): forge a three-archetype class (tension triangle). The UI sends
-    # triad=false for the "Classic pair" opt-out. Like interactive it NEEDS the staged front-end (the one-shot
-    # blueprint path has no triad prompt), so asking for triad implies staged.
+    # triad=false for the "Classic pair" opt-out.
     triad = bool(body.get("triad", True))
-    staged = bool(body.get("staged", True)) or interactive or triad
+    # The web forge ALWAYS runs the staged creative front-end (cloud -> cluster -> map -> compose ->
+    # relic-intent). The one-shot blueprint path lives on only in the CLI: it has no triad prompt and no
+    # interactive checkpoint, so there is nothing for the site to opt out to — the request body is not
+    # consulted for `staged` at all.
+    staged = True
 
     # BYOK keys (OpenAI-compat or Anthropic) ride in the body, used once, never persisted.
     key = None
@@ -736,6 +804,20 @@ def forge_class_route():
     forge_id = uuid.uuid4().hex
     meter = UsageMeter(default_model=(key or {}).get("model", "") if key else "", default_role=mode)
     usage_mode = "byok" if mode in ("byok", "anthropic") else mode
+    # WHERE this forge's calls go, for the usage ledger — never WHAT authenticates them (the key is used
+    # once, in the worker, and stored nowhere). Our own Ollama mixture is "hosted"; a BYOK OpenAI-compatible
+    # endpoint is recorded as the bare hostname of its base_url ("api.openai.com", "openrouter.ai", ...).
+    if ollama_mix:
+        provider = "hosted"
+    elif mode == "anthropic":
+        provider = "anthropic"
+    elif mode == "byok":
+        try:  # a malformed base_url is the worker's ForgeError to raise, not a 500 out of telemetry
+            provider = (urllib.parse.urlsplit((key or {}).get("base_url") or "").hostname or "").lower()
+        except ValueError:
+            provider = ""
+    else:
+        provider = "fake"
     _open_forge_job(forge_id, user["id"], mode=usage_mode, token_kind=token_kind, token_day=token_day,
                     concept=concept)
 
@@ -758,7 +840,7 @@ def forge_class_route():
         if transitioned and reserved:
             data.update(refund_state(state))
         _record_usage(meter, user_id=user["id"], forge_id=forge_id, mode=usage_mode,
-                      token_kind=token_kind, class_id=None, ok=False)
+                      token_kind=token_kind, class_id=None, ok=False, provider=provider)
         q.put(("error", data))
 
     def finish_done(out: dict) -> None:
@@ -778,7 +860,7 @@ def forge_class_route():
             return
         transitioned, _ = _settle_forge_job(forge_id, ok=True, class_id=saved.get("id"))
         _record_usage(meter, user_id=user["id"], forge_id=forge_id, mode=usage_mode,
-                      token_kind=token_kind, class_id=saved.get("id"), ok=True)
+                      token_kind=token_kind, class_id=saved.get("id"), ok=True, provider=provider)
         if not transitioned:
             app.logger.info("forge %s finished after its job was settled — class %s saved late",
                             forge_id, saved.get("id"))
@@ -787,7 +869,16 @@ def forge_class_route():
         if reserved and token_state:  # tell the browser the new balance so the header updates now
             saved.update(token_state)
         if saved.get("slug"):
-            saved["share_url"] = f"{PUBLIC_BASE_URL}/api/deck/{saved['slug']}"
+            saved["share_url"] = f"{PUBLIC_BASE_URL}/deck/{saved['slug']}"  # the public share page
+        # What this one forge consumed, summed across every (role, model). The browser shows it to BYOK
+        # users ("this forge used …") so the bill that lands on their own provider is never a surprise.
+        # Best-effort like the ledger write: telemetry must never sink a forge that already succeeded.
+        try:
+            rows = meter.rows()
+            saved["usage"] = {k: sum(int(r.get(k) or 0) for r in rows)
+                              for k in ("calls", "input_tokens", "cached_tokens", "output_tokens")}
+        except Exception as e:  # noqa: BLE001
+            app.logger.warning("usage summary failed (forge %s): %s", forge_id, e)
         q.put(("result", saved))
 
     def on_wall_clock() -> None:
@@ -922,6 +1013,47 @@ def forge_answer():
     entry["answer"] = picks
     entry["event"].set()
     return jsonify({"ok": True, "picked": picks})
+
+
+# --- "what will this cost me?" ------------------------------------------------------------------
+
+# How many recent successful forges the estimate averages over, and what to answer before the ledger has
+# any: measured numbers from the staged triad front-end (2026-09), so a brand-new deploy still tells a BYOK
+# user roughly what one forge will put on their provider bill.
+FORGE_ESTIMATE_SAMPLE = 30
+FORGE_ESTIMATE_FALLBACK = {"calls": 53, "input_tokens": 1_370_000,
+                           "cached_tokens": 720_000, "output_tokens": 28_000}
+_ESTIMATE_FIELDS = ("calls", "input_tokens", "cached_tokens", "output_tokens")
+
+
+@app.route("/api/forge-estimate")
+@require_login
+def forge_estimate():
+    """Average LLM consumption of one forge, from the last FORGE_ESTIMATE_SAMPLE successful forges in the
+    usage ledger (any mode — the staged front-end does the same work whoever pays for it). The BYOK panel
+    shows it before the user hands over a key. Falls back to measured constants on an empty ledger."""
+    with session_scope() as s:
+        rows = (s.query(ForgeUsage.forge_id, ForgeUsage.calls, ForgeUsage.input_tokens,
+                        ForgeUsage.cached_tokens, ForgeUsage.output_tokens)
+                .filter(ForgeUsage.ok == 1)
+                .order_by(ForgeUsage.created_at.desc(), ForgeUsage.id.desc())
+                .all())
+    # One query, grouped in Python: rows arrive newest-first, so the first FORGE_ESTIMATE_SAMPLE distinct
+    # forge_ids are the newest forges — and every row of those forges is summed wherever it turns up.
+    per_forge: dict[str, dict] = {}
+    for r in rows:
+        acc = per_forge.get(r.forge_id)
+        if acc is None:
+            if len(per_forge) >= FORGE_ESTIMATE_SAMPLE:
+                continue
+            acc = per_forge[r.forge_id] = dict.fromkeys(_ESTIMATE_FIELDS, 0)
+        for f in _ESTIMATE_FIELDS:
+            acc[f] += int(getattr(r, f) or 0)
+    n = len(per_forge)
+    if not n:
+        return jsonify({"forges_sampled": 0, **FORGE_ESTIMATE_FALLBACK, "fallback": True})
+    avg = {f: int(round(sum(a[f] for a in per_forge.values()) / n)) for f in _ESTIMATE_FIELDS}
+    return jsonify({"forges_sampled": n, **avg, "fallback": False})
 
 
 # --- library CRUD ------------------------------------------------------------------------------
@@ -1125,6 +1257,120 @@ def element_feedback_route():
     if not ok:
         return jsonify({"error": "could not record feedback"}), 503
     return jsonify({"ok": True})
+
+
+# --- operator dashboard -------------------------------------------------------------------------
+
+ADMIN_STATS_WINDOWS = (7, 30, 90, 0)   # ?days=...; 0 means all time
+ADMIN_STATS_TOP_MODELS = 20
+
+
+@app.route("/api/admin/stats")
+@require_login
+def admin_stats():
+    """Everything the operator page shows, in one call: forge counts by outcome/mode/token kind, a daily
+    series, who forged, what our hosted path consumed (and cost), which models and providers did the work,
+    and donations — all over ?days=7|30|90|0 (0 = all time; anything else falls back to 30).
+
+    Windowing is by row CREATION: forge_jobs.started_at (its creation column — a job is inserted the moment
+    the token is reserved) and created_at on forge_usage / purchases. `users.accounts` is deliberately NOT
+    windowed: it is the size of the whole account table, not a signup count.
+
+    Read-only and admin-gated (auth.ADMIN_EMAILS); no key, address or concept text ever leaves here."""
+    user = current_user()
+    if not is_admin(user.get("email", "")):
+        return jsonify({"error": "forbidden"}), 403
+    from datetime import datetime, timedelta, timezone
+    try:
+        days = int(request.args.get("days", 30))
+    except (TypeError, ValueError):
+        days = 30
+    if days not in ADMIN_STATS_WINDOWS:
+        days = 30
+    now = datetime.now(timezone.utc).replace(tzinfo=None)   # naive UTC, the one convention for DateTime cols
+    since = now - timedelta(days=days) if days else None
+
+    with session_scope() as s:
+        jq = s.query(ForgeJob.user_id, ForgeJob.mode, ForgeJob.token_kind, ForgeJob.status,
+                     ForgeJob.refunded, ForgeJob.started_at)
+        uq = s.query(ForgeUsage.forge_id, ForgeUsage.mode, ForgeUsage.provider, ForgeUsage.model,
+                     ForgeUsage.calls, ForgeUsage.input_tokens, ForgeUsage.output_tokens,
+                     ForgeUsage.cached_tokens, ForgeUsage.est_cost_micros)
+        pq = s.query(Purchase.tokens, Purchase.amount_cents).filter(Purchase.status == "paid")
+        if since is not None:
+            jq = jq.filter(ForgeJob.started_at >= since)
+            uq = uq.filter(ForgeUsage.created_at >= since)
+            pq = pq.filter(Purchase.created_at >= since)
+        jobs, usage, purchases = jq.all(), uq.all(), pq.all()
+        accounts = s.query(User).count()
+
+    by_mode = {"token": 0, "byok": 0, "fake": 0}
+    by_token_kind = {"free": 0, "paid": 0, "unlimited": 0}
+    daily: dict[str, dict] = {}
+    forgers: set[int] = set()
+    ok_n = failed_n = refunded_n = 0
+    for j in jobs:
+        if j.mode in by_mode:
+            by_mode[j.mode] += 1
+        if j.token_kind in by_token_kind:
+            by_token_kind[j.token_kind] += 1
+        ok_n += int(j.status == "done")
+        failed_n += int(j.status == "failed")
+        refunded_n += int(bool(j.refunded))
+        forgers.add(j.user_id)
+        if j.started_at is not None:
+            day = daily.setdefault(j.started_at.strftime("%Y-%m-%d"),
+                                   {"day": j.started_at.strftime("%Y-%m-%d"), "token": 0, "byok": 0, "fake": 0})
+            if j.mode in day:
+                day[j.mode] += 1
+
+    # Hosted = the "Use a token" path: the only rows whose bill is ours. est_cost_usd stays null (rather
+    # than 0.0) when NO row carried a price, so "free on the flat plan" and "unpriced model" stay distinct.
+    hosted = {"forges": 0, "calls": 0, "input_tokens": 0, "cached_tokens": 0, "output_tokens": 0,
+              "est_cost_usd": None}
+    hosted_forge_ids: set[str] = set()
+    cost_micros, priced = 0, False
+    models: dict[tuple, dict] = {}
+    providers: dict[str, set] = {}
+    for r in usage:
+        if r.mode == "token":
+            hosted_forge_ids.add(r.forge_id)
+            for f in ("calls", "input_tokens", "cached_tokens", "output_tokens"):
+                hosted[f] += int(getattr(r, f) or 0)
+            if r.est_cost_micros is not None:
+                cost_micros += int(r.est_cost_micros)
+                priced = True
+        key = (r.model or "", r.provider or "", r.mode or "")
+        m = models.setdefault(key, {"model": key[0], "provider": key[1], "mode": key[2], "forges": set(),
+                                    "calls": 0, "input_tokens": 0, "output_tokens": 0})
+        m["forges"].add(r.forge_id)
+        for f in ("calls", "input_tokens", "output_tokens"):
+            m[f] += int(getattr(r, f) or 0)
+        if r.provider:  # rows written before the provider column existed carry "" — nothing to attribute
+            providers.setdefault(r.provider, set()).add(r.forge_id)
+    hosted["forges"] = len(hosted_forge_ids)
+    if priced:
+        hosted["est_cost_usd"] = round(cost_micros / 1_000_000, 6)
+
+    model_rows = sorted(({**m, "forges": len(m["forges"])} for m in models.values()),
+                        key=lambda d: (-d["forges"], -d["calls"], d["model"]))[:ADMIN_STATS_TOP_MODELS]
+    provider_rows = sorted(({"provider": p, "forges": len(ids)} for p, ids in providers.items()),
+                           key=lambda d: (-d["forges"], d["provider"]))
+
+    return jsonify({
+        "days": days,
+        "since": since.strftime("%Y-%m-%d") if since is not None else None,
+        "forges": {"total": len(jobs), "ok": ok_n, "failed": failed_n, "refunded": refunded_n,
+                   "by_mode": by_mode, "by_token_kind": by_token_kind},
+        "users": {"forgers": len(forgers), "accounts": accounts},
+        "daily": [daily[k] for k in sorted(daily)],
+        "hosted": hosted,
+        "models": model_rows,
+        "providers": provider_rows,
+        "donations": {"count": len(purchases),
+                      "amount_cents": sum(int(p.amount_cents or 0) for p in purchases),
+                      "tokens": sum(int(p.tokens or 0) for p in purchases)},
+    })
 
 
 # Refund the tokens of any forge the previous process took down with it (deploy restarts).

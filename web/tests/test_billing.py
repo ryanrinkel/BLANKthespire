@@ -30,12 +30,24 @@ def _event(etype, obj):
     return {"type": etype, "data": {"object": obj}}
 
 
-def test_thank_you_tokens_are_one_per_whole_dollar():
+def test_thank_you_tokens_are_one_per_dollar_plus_tier_bonus():
     import billing
     assert billing.TOKENS_PER_DOLLAR == 1
+    assert billing.BONUS_TIERS == [(1000, 10), (2000, 20), (5000, 30)]
+    # base: one per WHOLE dollar, cents never round up
     assert billing.tokens_for(100) == 1
-    assert billing.tokens_for(350) == 3          # cents never round up
+    assert billing.tokens_for(350) == 3
     assert billing.tokens_for(99) == 0
+    assert billing.tokens_for(999) == 9          # just under the first tier: no bonus
+    # +10% from $10, +20% from $20, +30% from $50 — the bonus floors too
+    assert billing.tokens_for(1000) == 11
+    assert billing.tokens_for(1500) == 16        # 15 + floor(1.5)
+    assert billing.tokens_for(1999) == 20        # 19 + floor(1.9)
+    assert billing.tokens_for(2000) == 24
+    assert billing.tokens_for(3500) == 42
+    assert billing.tokens_for(4999) == 58        # 49 + floor(9.8)
+    assert billing.tokens_for(5000) == 65
+    assert billing.tokens_for(10000) == 130
 
 
 def test_preset_env_parsing_skips_junk_and_falls_back():
@@ -51,6 +63,10 @@ def test_billing_probe_and_donate_when_disabled(client):
     b = client.get("/api/billing").get_json()
     assert b["enabled"] is False and b["tokens_per_dollar"] == 1
     assert b["min_cents"] == 100 and b["max_cents"] == 50000 and b["presets"]
+    # the tiers reach the UI even with billing off, so it can advertise them
+    assert b["bonus_tiers"] == [{"min_cents": 1000, "pct": 10},
+                                {"min_cents": 2000, "pct": 20},
+                                {"min_cents": 5000, "pct": 30}]
     assert "packs" not in b                                            # the pack era is gone from the API
     assert client.post("/api/donate", json={"amount_cents": 500}, headers=H).status_code == 503
     assert client.post("/api/checkout", json={"pack": "pack_5"}, headers=H).status_code == 404

@@ -110,6 +110,19 @@ def _ensure_class_columns() -> None:
             conn.execute(text("CREATE UNIQUE INDEX ix_classes_slug ON classes (slug)"))
 
 
+def _ensure_forge_usage_columns() -> None:
+    """Same tiny forward-only migration as _ensure_class_columns, for the `forge_usage` table: add the
+    `provider` column (where the call went — "hosted" / "anthropic" / a BYOK hostname) to DBs created
+    before it. Idempotent; SQLite + MySQL."""
+    insp = inspect(engine)
+    if "forge_usage" not in insp.get_table_names():
+        return  # create_all will make it fresh with the column already present
+    cols = {c["name"] for c in insp.get_columns("forge_usage")}
+    if "provider" not in cols:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE forge_usage ADD COLUMN provider VARCHAR(64) DEFAULT ''"))
+
+
 def _backfill_slugs() -> None:
     """Give every class row without a slug a fresh random one (idempotent; safe on every boot)."""
     with engine.begin() as conn:
@@ -146,6 +159,7 @@ def init_db() -> None:
     Base.metadata.create_all(engine)
     _ensure_user_columns()
     _ensure_class_columns()
+    _ensure_forge_usage_columns()
     _backfill_slugs()  # rows inserted by code paths that predate the slug (belt and braces)
     _ensure_identities()  # every user needs an identity row before the first sign-in of this boot
 

@@ -71,6 +71,10 @@ OLLAMA_API_KEY=...                  # powers the "Use a token" path (our hosted 
 # (ANTHROPIC_API_KEY / BTSWEB_HOSTED_ALLOWLIST are retired: `mode=hosted` is rejected outright — the public
 #  paths are the token forge and bring-your-own-key.)
 BTSWEB_UNLIMITED_EMAILS=you@example.com   # accounts that forge on the token path without spending tokens
+# BTSWEB_ADMIN_EMAILS=you@example.com     # who sees the Account tab's forge-stats dashboard (defaults to the unlimited list)
+# BTSWEB_WORKSHOP_URL=https://steamcommunity.com/sharedfiles/filedetails/?id=...   # the mod's Workshop item; the
+#                                     # /download page links the STS2 Workshop hub until this is set
+# BTSWEB_MODEL_PRICES='{"glm-5.2": [in, out, cached]}'  # $/1M tokens for the hosted mix — feeds the dashboard's spend estimate
 BTSWEB_FREE_IP_DAILY_CAP=5          # free-token forges per IP per UTC day (throwaway-account farms); 0 = off
 BTSWEB_TOKEN_DAILY_CAP=1000         # global kill-switch on all token-path forges per day; 0 = off
 # --- Stripe donations (key absent = donate UI hidden, daily free token + BYOK still work) ---

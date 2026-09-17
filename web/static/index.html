@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Forge a Class — BLANK the spire</title>
-  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="/static/style.css?v=20260917" />
 </head>
 <body>
   <header>
@@ -14,6 +14,7 @@
       <button id="nav-library" class="tab">My Classes</button>
       <button id="nav-account" class="tab">Account</button>
       <a class="tab" href="/download">Get the mod ⬇</a>
+      <a class="tab" href="/help" title="Where do I paste my class code?">Help ?</a>
       <span class="spacer"></span>
       <span id="tokens" class="tokens hidden" title="Tokens are spent by the 'Use a token' forge option — every account gets a free token each day."></span>
       <span id="who" class="who"></span>
@@ -27,13 +28,14 @@
     <p>Be as detailed or as vague as you like. At the end you will get a code. Copy the code it generates to paste into the mod menu in-game.</p>
     <a id="signin" class="btn primary" href="/login">Sign in</a>
     <a class="btn ghost" href="/download">Get the mod &amp; install guide</a>
+    <a class="btn ghost" href="/help">Help — where does my code go?</a>
     <!-- what is this dev sign in? should we remove before production? -->
     <a id="dev-signin" class="btn ghost hidden" href="/dev-login?email=dev@example.com">Dev sign-in (local)</a>
   </section>
 
   <!-- Forge view -->
   <main id="view-forge" class="hidden">
-    <section class="card">
+    <section id="forge-input" class="card">
       <label class="lbl" for="concept">Describe your class</label>
       <!-- can we add a few more contrasting examples and select one at random so the user doesn't always see the same sample text? another example might be 'the bravest toaster in the world' -->
       <textarea id="concept" rows="3" placeholder="e.g. a venomous plague doctor who sacrifices health to stack poison, then turns blood into armor"></textarea>
@@ -70,15 +72,16 @@
             <button id="load-models" class="btn" type="button">Load available models</button>
           </div>
           <p class="hint" id="byok-hint"></p>
+          <p class="hint warn" id="byok-estimate"></p>
         </div>
         <label class="small" style="display:block;margin-top:.6rem;">
-          <input id="staged" type="checkbox" checked />
-          Creative mode — diverge on the theme, map to archetypes, compose in tension (a few extra steps)
-        </label>
-        <label class="small" style="display:block;margin-top:.35rem;">
           <input id="interactive" type="checkbox" />
-          Interactive forge — pause once your theme is mapped, and pick the build engines yourself
+          Interactive forge
         </label>
+        <p class="hint" style="margin-top:.25rem;">Normally the forge maps your theme onto the game's build
+          engines (the archetypes) and picks the strongest combination itself. With <b>Interactive forge</b> on,
+          it pauses once your theme is mapped, shows you the candidate engines, and lets you pick up to two of
+          them. You get a short timer; if you don't answer, the forge decides for you.</p>
       </details>
 
       <button id="forge-btn" class="btn primary">Forge the class</button>
@@ -98,6 +101,12 @@
     </section>
 
     <section id="result" class="card hidden">
+      <div id="view-bar" class="view-bar hidden">
+        <span id="view-title" class="muted"></span>
+        <span class="spacer"></span>
+        <button id="share-link" class="btn hidden" title="Copy a public link to this class">🔗 Copy share link</button>
+        <button id="view-back" class="btn ghost hidden">← Back to the forge</button>
+      </div>
       <h2 id="r-name"></h2>
       <p id="r-desc" class="muted"></p>
       <div id="r-archetypes" class="archetypes hidden"></div>
@@ -108,7 +117,9 @@
         <label class="lbl small">Class import code</label>
         <textarea id="r-code" rows="3" readonly></textarea>
         <button id="copy-code" class="btn">Copy code</button>
-        <p class="hint">Paste in-game → mod settings → <em>Import a class code</em> → Import → Restart.</p>
+        <p class="hint">Paste in-game → mod settings → <em>Import a class code</em> → Import → Restart.
+          <a href="/help">Where do I paste this?</a></p>
+        <p id="r-usage" class="hint hidden"></p>
       </div>
     </section>
   </main>
@@ -138,7 +149,7 @@
       <h2>Support the forge</h2>
       <p class="hint">BLANK the spire is totally free, but each Forge costs money and I fear for my bank account!
         Your donations cover the cost of tokens directly — and as a thank-you, every whole dollar adds a token
-        to your balance.</p>
+        to your balance. Give $10 or more and we add a bonus on top: <b>$10 → 11 tokens, $20 → 24, $50 → 65</b>.</p>
       <div id="donate" class="donate hidden">
         <div id="donate-presets" class="donate-presets"></div>
         <div class="donate-custom">
@@ -150,6 +161,34 @@
       <p id="donate-note" class="hint hidden">Donations aren't available right now — your free daily token
         and BYOK forging both keep working.</p>
       <p class="hint">Payments are handled by Stripe — we never see your card details.</p>
+    </section>
+
+    <!-- Admin-only (users.admin from /api/me): forge telemetry from forge_jobs / forge_usage / purchases.
+         Everything inside is built by app.js loadStats(); the card stays hidden for everyone else. -->
+    <section id="stats" class="card hidden">
+      <div class="stats-head">
+        <h2>Forge stats</h2>
+        <span class="spacer"></span>
+        <select id="stats-days" class="in small">
+          <option value="7">Last 7 days</option>
+          <option value="30" selected>Last 30 days</option>
+          <option value="90">Last 90 days</option>
+          <option value="0">All time</option>
+        </select>
+      </div>
+      <div id="stats-tiles" class="stat-tiles"></div>
+      <div id="stats-chart" class="stats-chart"></div>
+      <div class="stats-tables">
+        <div>
+          <h4>Where the calls go</h4>
+          <table id="stats-providers" class="stats-table"></table>
+        </div>
+        <div>
+          <h4>Models</h4>
+          <table id="stats-models" class="stats-table"></table>
+        </div>
+      </div>
+      <p id="stats-note" class="hint"></p>
     </section>
 
     <section class="card">
@@ -194,7 +233,9 @@
     <a href="mailto:ryan.r.rinkel@gmail.com">Support</a>
   </footer>
 
-  <!-- ?v= busts the 1-hour static cache on deploy: bump it whenever app.js changes. -->
-  <script src="/static/app.js?v=20260916b"></script>
+  <!-- ?v= busts the 1-hour static cache on deploy: bump both whenever either file changes. render.js holds
+       the class renderers shared with the public /deck page and must load first. -->
+  <script src="/static/render.js?v=20260917"></script>
+  <script src="/static/app.js?v=20260917"></script>
 </body>
 </html>

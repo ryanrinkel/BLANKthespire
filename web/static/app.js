@@ -1,7 +1,5 @@
 "use strict";
 
-const $ = (sel) => document.querySelector(sel);
-const el = (id) => document.getElementById(id);
 
 let ME = null;
 // The non-user half of /api/me ({dev_auth, providers, email_login}) — ME is data.user, so the Account tab's
@@ -62,6 +60,7 @@ async function boot() {
   el("gate").classList.add("hidden");
   restoreByok();
   renderTokens();
+  loadEstimate();
   // #account is where a finished "link another sign-in" comes back to (auth._landing), so honour the hash.
   selectTab(location.hash === "#account" ? "account" : "forge");
   handlePurchaseReturn();
@@ -113,6 +112,7 @@ function renderTokens() {
     const byok = document.querySelector('input[name="mode"][value="byok"]');
     if (byok) { byok.checked = true; applyMode(); }
   }
+  renderForgeButton();
 }
 
 // Show the fields for the selected mode (token vs BYOK vs offline-fake).
@@ -120,6 +120,85 @@ function applyMode() {
   const m = currentMode();
   el("token-fields").style.display = m === "token" ? "" : "none";
   el("byok-fields").style.display = m === "byok" ? "" : "none";
+  renderForgeButton();
+  renderEstimate();
+}
+
+// The forge button says what the click will cost, in the same words as the settings hint: today's free
+// token, one of the paid ones, the user's own key, or nothing at all (unlimited accounts).
+function renderForgeButton() {
+  const btn = el("forge-btn");
+  if (!btn) return;
+  const m = currentMode();
+  let cost;
+  if (m === "byok") cost = "uses your API key";
+  else if (m === "fake") cost = "offline demo";
+  else if (!ME || ME.unlimited) cost = "free — unlimited account";
+  else if (ME.free_token_available) cost = "uses today's free token";
+  else {
+    const paid = Number(ME.token_balance || 0);
+    cost = paid > 0 ? `uses 1 of your ${paid} token${paid === 1 ? "" : "s"}` : "no tokens left";
+  }
+  btn.textContent = `Forge the class (${cost})`;
+}
+
+// --- BYOK cost estimate ---------------------------------------------------------------------------
+// /api/forge-estimate is the rolling average of recent forges (calls, input/cached/output tokens), so the
+// warning tracks the real pipeline instead of a number someone typed once. Dollar figures are only given
+// for current Claude models (Anthropic list prices per 1M tokens as of 2026-06); every other provider gets
+// the token counts and a pointer to its own price sheet — we won't guess at rates we can't verify.
+let ESTIMATE = null;
+const CLAUDE_PRICES = [  // [model id prefix, input $/M, output $/M, cache-read $/M]
+  ["claude-opus-5", 5, 25, 0.5],
+  ["claude-sonnet-5", 2, 10, 0.2],
+  ["claude-haiku-4-5", 1, 5, 0.1],
+  ["claude-opus-4", 5, 25, 0.5],
+  ["claude-sonnet-4", 3, 15, 0.3],
+];
+
+async function loadEstimate() {
+  try {
+    const r = await fetch("/api/forge-estimate");
+    if (r.ok) ESTIMATE = await r.json();
+  } catch (_) { /* the hint falls back to the generic wording */ }
+  renderEstimate();
+}
+
+function fmtTokens(n) {
+  n = Number(n || 0);
+  return n >= 1_000_000 ? (n / 1_000_000).toFixed(1) + "M" : n >= 1000 ? Math.round(n / 1000) + "K" : String(n);
+}
+
+function claudePrice(model) {
+  const id = String(model || "").toLowerCase();
+  for (const [prefix, inp, out, cached] of CLAUDE_PRICES) if (id.startsWith(prefix)) return { inp, out, cached };
+  return null;
+}
+
+// One paragraph, reused by the hint under the key fields and the confirm dialog.
+function estimateText(model) {
+  const e = ESTIMATE;
+  if (!e) return "A forge makes roughly 50 model calls and around 1.4M input tokens — check your provider's pricing.";
+  const calls = e.calls, inp = e.input_tokens, cached = e.cached_tokens, out = e.output_tokens;
+  let s = `A forge makes about ${calls} calls: ~${fmtTokens(inp)} input tokens (~${fmtTokens(cached)} of them `
+    + `cacheable) and ~${fmtTokens(out)} output tokens.`;
+  const price = claudePrice(model);
+  if (price) {
+    const uncached = Math.max(0, inp - cached);
+    const usd = (uncached * price.inp + cached * price.cached + out * price.out) / 1_000_000;
+    const usdNoCache = (inp * price.inp + out * price.out) / 1_000_000;
+    s += ` At Anthropic list prices that is roughly $${usd.toFixed(2)} per forge with prompt caching`
+      + ` (up to $${usdNoCache.toFixed(2)} without).`;
+  } else {
+    s += " Multiply by your provider's per-token prices — this can be a few dollars per forge on frontier models.";
+  }
+  return s;
+}
+
+function renderEstimate() {
+  const box = el("byok-estimate");
+  if (!box) return;
+  box.textContent = "⚠ " + estimateText(el("model").value.trim());
 }
 
 function show(id) {
@@ -131,7 +210,7 @@ function selectTab(which) {
   el("nav-forge").classList.toggle("active", which === "forge");
   el("nav-library").classList.toggle("active", which === "library");
   el("nav-account").classList.toggle("active", which === "account");
-  if (which === "forge") show("view-forge");
+  if (which === "forge") { show("view-forge"); el("forge-input").classList.remove("hidden"); }
   else if (which === "account") { show("view-account"); loadAccount(); }
   else { show("view-library"); loadLibrary(); }
 }
@@ -245,19 +324,14 @@ async function forge() {
 
   // The wire `mode` is derived: BYOK splits into Anthropic's native path vs the OpenAI-compatible path
   // based on the chosen provider, so the backend routing is unchanged.
-  const stagedEl = el("staged");
-  const interactiveEl = el("interactive");
-  const classicEl = el("classic");
-  const stagedOn = stagedEl ? stagedEl.checked : true;
+  // Every web forge runs the staged creative front-end with a three-archetype triad (the one-shot /
+  // "classic pair" opt-outs were removed on 2026-09-17; the server ignores `staged` and always stages).
   const body = {
     concept,
     mode: choice,
-    staged: stagedOn,
-    // interactive forge mode: mid-forge archetype pick (only meaningful with the staged front-end)
-    interactive: !!(interactiveEl && interactiveEl.checked && stagedOn),
-    // triad (three-archetype tension triangle) is the DEFAULT; "Classic pair" opts out. It needs the
-    // staged front-end, like interactive, so one-shot forges are classic too.
-    triad: !!(stagedOn && !(classicEl && classicEl.checked)),
+    // interactive forge mode: pause at the archetype checkpoint for the player's pick
+    interactive: !!el("interactive").checked,
+    triad: true,
   };
   if (choice === "token") {
     if (!ME.unlimited) {
@@ -276,6 +350,7 @@ async function forge() {
     const api_key = el("api_key").value.trim();
     const model = el("model").value.trim();
     if (!api_key || !model) { toast("Enter your API key and a model — or switch to 'Use a token'."); return; }
+    if (!confirm(`This forge bills YOUR API key (${model}).\n\n${estimateText(model)}\n\nForge this class?`)) return;
     if (p.mode === "anthropic") {
       body.mode = "anthropic";
       body.key = { api_key, model };
@@ -294,9 +369,7 @@ async function forge() {
   el("log").textContent = "";
   resetChoice();  // clear any choice panel left over from a previous forge
   // Echo what we asked for, so a mode mishap (e.g. a stale page) is visible in the log immediately.
-  appendLog(`• requested: ${body.mode} · ${body.staged ? "creative" : "one-shot"}`
-            + (body.interactive ? " · interactive" : "")
-            + (body.triad ? "" : " · classic pair"));
+  appendLog(`• requested: ${body.mode}` + (body.interactive ? " · interactive" : ""));
 
   try {
     const resp = await fetch("/api/forge-class", {
@@ -354,6 +427,38 @@ function onForgeEvent(event, data) {
   else if (event === "choice") renderChoice(data);
   else if (event === "error") { appendLog("✗ " + data.error); toast(data.error); }
   else if (event === "result") { appendLog("✓ done"); renderResult(data); }
+}
+
+// A freshly forged class: spinner off, then the shared renderer + the share bar + what it consumed.
+function renderResult(cls) {
+  el("spinner").classList.add("hidden");
+  renderClassView(cls);
+  renderShareBar(cls, false);
+  renderUsage(cls);
+}
+
+// The bar above a rendered class: a share link (the public /deck/<slug> page) and, when the class was opened
+// from the library, a way back to the forge. Classes without a slug simply get no share button.
+function renderShareBar(cls, viewing) {
+  const share = el("share-link");
+  const url = cls.share_url || (cls.slug ? `${location.origin}/deck/${cls.slug}` : "");
+  share.dataset.url = url;
+  share.classList.toggle("hidden", !url);
+  el("view-back").classList.toggle("hidden", !viewing);
+  el("view-title").textContent = viewing ? "Viewing a saved class" : "Your new class";
+  el("view-bar").classList.remove("hidden");
+}
+
+// What this forge consumed (the server sums the usage meter): shown after a BYOK forge so the cost warning
+// is followed by the real number; hidden on the token path where the tokens aren't the user's.
+function renderUsage(cls) {
+  const line = el("r-usage");
+  const u = cls.usage;
+  if (!u || currentMode() !== "byok") { line.classList.add("hidden"); return; }
+  line.textContent = `This forge used ${u.calls} calls · ${fmtTokens(u.input_tokens)} input tokens`
+    + (u.cached_tokens ? ` (${fmtTokens(u.cached_tokens)} from cache)` : "")
+    + ` · ${fmtTokens(u.output_tokens)} output tokens on your key.`;
+  line.classList.remove("hidden");
 }
 
 // --- interactive forge: the mid-forge archetype pick ----------------------------------------------
@@ -454,527 +559,6 @@ function appendLog(line) {
   log.scrollTop = log.scrollHeight;
 }
 
-// --- result + cards ------------------------------------------------------------------------------
-
-function renderResult(cls) {
-  el("spinner").classList.add("hidden");
-  el("r-name").textContent = cls.character?.name || cls.name;
-  el("r-desc").textContent = cls.character?.description || "";
-  renderArchetypes(cls.archetypes);
-  renderRelic(cls.relic, cls.id);
-  renderMechanics(cls.character, cls.id);
-  el("r-code").value = cls.code;
-  const wrap = el("r-cards");
-  wrap.innerHTML = "";
-  for (const c of cls.cards || []) wrap.appendChild(cardEl(c, cls.id));
-  el("result").classList.remove("hidden");
-}
-
-// --- the archetypes the class was built around ---------------------------------------------------
-// The same cards the player picked from at the archetype checkpoint: themed title + one strategy line.
-// Classes forged before this was stored (or via paths without a pitch) fall back to the catalog
-// name + description; an empty list (old classes) hides the section entirely.
-
-function renderArchetypes(archetypes) {
-  const box = el("r-archetypes");
-  box.innerHTML = "";
-  const list = (archetypes || []).filter((a) => a && (a.title || a.name || a.id));
-  if (!list.length) { box.classList.add("hidden"); return; }
-  for (const a of list) {
-    const d = document.createElement("div");
-    d.className = "arch";
-    const headline = a.title || a.name || a.id;
-    const line = a.pitch || a.description || "";
-    d.innerHTML = `<div class="mech-top"><span class="mech-badge">⚙ Archetype</span>`
-      + `<span class="mech-name">${esc(headline)}</span></div>`
-      + (line ? `<div class="mech-teaser">${esc(line)}</div>` : "");
-    box.appendChild(d);
-  }
-  box.classList.remove("hidden");
-}
-
-// --- forged keystone relic ----------------------------------------------------------------------
-
-function renderRelic(relic, classId) {
-  const box = el("r-relic");
-  if (!relic) { box.classList.add("hidden"); box.innerHTML = ""; return; }
-  const lines = relicLines(relic);
-  box.innerHTML = `<button class="cc-fb" title="Give feedback" aria-label="Give feedback">💬</button>`
-    + `<div class="relic-top"><span class="relic-badge">⬦ Keystone relic</span>`
-    + `<span class="relic-name">${esc(relic.name || "")}</span></div>`
-    + (relic.description ? `<div class="relic-desc">${esc(relic.description)}</div>` : "")
-    + (lines.length ? `<ul class="relic-eff">${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>` : "");
-  // Only persisted (forged / re-opened) classes can take feedback — they have an id to tie it to.
-  const fb = box.querySelector(".cc-fb");
-  if (classId != null) {
-    fb.onclick = (ev) => {
-      ev.stopPropagation();
-      openFeedback({ classId, kind: "relic", subjectId: relic.name || "", title: relic.name || "Keystone relic",
-                     detailHtml: elementDetailHtml(relic.description, lines), chip: box });
-    };
-  } else { fb.remove(); }
-  box.classList.remove("hidden");
-}
-
-function relicLines(relic) {
-  return [...(relic.modifiers || []).map(fmtMod), ...(relic.hooks || []).map(fmtHook)].filter(Boolean);
-}
-
-const RELIC_MOD_LABELS = {
-  max_energy: "max energy", first_attack: "first-attack damage",
-  cost_reduction: "card cost reduction", start_combat_block: "block at combat start",
-  attack_base: "damage on every attack", max_hp: "max HP", // Phase AS (v48); max_hp may be negative (the price)
-};
-function fmtMod(m) {
-  return `${m.amount > 0 ? "+" : ""}${m.amount} ${RELIC_MOD_LABELS[m.stat] || m.stat}`;
-}
-function ordinal(n) { return n + ({ 1: "st", 2: "nd", 3: "rd" }[n % 100 > 10 && n % 100 < 14 ? 0 : n % 10] || "th"); }
-
-const RELIC_TRIGGER_LABELS = {
-  turn_start: "Turn start", turn_end: "Turn end", attacked: "When attacked",
-  on_exhaust: "On exhaust", on_card_played: "On card played", combat_end: "Combat end",
-  on_card_drawn: "On card drawn", on_damage_dealt: "On damage dealt", on_block_gained: "On block gained",
-  on_hp_lost: "On HP lost",
-};
-function fmtHook(h) {
-  let trig = RELIC_TRIGGER_LABELS[h.trigger] || h.trigger;
-  // Phase AS (v48): a typed on_card_played reads "On Attack played"; every_n reads "every 3rd".
-  if (h.trigger === "on_card_played" && h.card_type) trig = `On ${h.card_type[0].toUpperCase()}${h.card_type.slice(1)} played`;
-  const every = h.every_n ? ` (every ${ordinal(h.every_n)})` : "";
-  const eff = (h.effects || []).map(fmtEffect).join(", ");
-  const tgt = h.target && h.target !== "self" ? ` → ${h.target}` : "";
-  const cond = h.when?.kind ? ` (if ${String(h.when.kind).replace(/_/g, " ")})` : "";
-  const once = h.once_per_combat ? " · once/combat" : "";
-  return `${trig}${every}${tgt}: ${eff}${cond}${once}`;
-}
-
-// --- forged class mechanics (custom orbs / statuses / summons) -----------------------------------
-// These carry no card text, so a player can't otherwise tell what an invented orb/status/summon does.
-// We surface each as a chip; clicking it opens the feedback popout with a full description + effect lines.
-
-const MECH_KINDS = [
-  { kind: "orb", badge: "◉ Orb", pool: "orb_pool", lines: orbLines },
-  { kind: "status", badge: "✦ Status", pool: "status_pool", lines: statusLines },
-  { kind: "summon", badge: "⚔ Summon", pool: "summon_pool", lines: summonLines },
-  // Phase BA (v55): the class's signature potion. It carries no card text and it is not in the deck, so this
-  // panel is the only place a player can read what it does before one drops.
-  { kind: "potion", badge: "🧪 Potion", pool: "potion_pool", lines: potionLines },
-];
-
-function renderMechanics(character, classId) {
-  const box = el("r-mechanics");
-  box.innerHTML = "";
-  const items = [];
-  for (const spec of MECH_KINDS) {
-    for (const entry of (character?.[spec.pool] || [])) {
-      // Base orbs are plain name strings (lightning/frost/dark) — they have no custom definition to describe.
-      if (typeof entry !== "object" || entry == null) continue;
-      items.push({ spec, entry });
-    }
-  }
-  // Phase AY (v54): run-persistent Forge is a CLASS KNOB, not a pool entry — no card says it, so the panel is
-  // the only place a player can learn the counter survives the fight. Informational: no feedback subject.
-  const persist = !!character?.forge_persist;
-  if (!items.length && !persist) { box.classList.add("hidden"); return; }
-  box.innerHTML = `<div class="mech-head">Class mechanics — custom elements this class invents. `
-    + `Click one to see what it does and rate it.</div><div class="mech-grid"></div>`;
-  const grid = box.querySelector(".mech-grid");
-  if (persist) grid.appendChild(forgePersistEl());
-  for (const { spec, entry } of items) grid.appendChild(mechEl(spec, entry, classId));
-  box.classList.remove("hidden");
-}
-
-// Phase AY (v54): the static chip for `"forge_persist": true`. Same shape as a mech chip, but inert — there is
-// no invented element to rate, just a rule about this class's Forge counter.
-function forgePersistEl() {
-  const d = document.createElement("div");
-  d.className = "mech mech-forge";
-  d.innerHTML = `<div class="mech-top"><span class="mech-badge">⚒ Forge</span>`
-    + `<span class="mech-name">Keeps its edge</span></div>`
-    + `<div class="mech-teaser">This class's Forge counter does not fully reset between fights.</div>`
-    + `<ul class="mech-eff"><li>At the end of each combat it banks up to 5 Forge</li>`
-    + `<li>Your first turn of the next combat gets that much Forge back (and summons your blade)</li></ul>`;
-  return d;
-}
-
-function mechEl(spec, entry, classId) {
-  const d = document.createElement("div");
-  d.className = "mech mech-" + spec.kind;
-  const emoji = entry.emoji ? esc(entry.emoji) + " " : "";
-  const lines = spec.lines(entry);
-  // Show the FULL effect in the chip (e.g. an orb's channel AND evoke), not just a teaser — the player
-  // shouldn't have to open the popout to read what it does. The popout stays for giving feedback.
-  const descHtml = entry.description ? `<div class="mech-teaser">${esc(entry.description)}</div>` : "";
-  const effHtml = lines.length
-    ? `<ul class="mech-eff">${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>` : "";
-  d.innerHTML = `<button class="cc-fb" title="Give feedback" aria-label="Give feedback">💬</button>`
-    + `<div class="mech-top"><span class="mech-badge">${spec.badge}</span>`
-    + `<span class="mech-name">${emoji}${esc(entry.name || "")}</span></div>`
-    + descHtml + effHtml;
-  d.onclick = () => openFeedback({
-    classId, kind: spec.kind, subjectId: entry.name || "", title: (entry.emoji ? entry.emoji + " " : "") + (entry.name || ""),
-    detailHtml: elementDetailHtml(entry.description, lines), chip: d,
-  });
-  if (classId == null) d.querySelector(".cc-fb").remove();
-  return d;
-}
-
-// Build the popout body shared by every non-card element: an italic description plus a bulleted effect list.
-function elementDetailHtml(description, lines) {
-  return (description ? `<p class="fb-detail-desc">${esc(description)}</p>` : "")
-    + (lines && lines.length ? `<ul class="fb-detail-eff">${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>` : "");
-}
-
-// Phase AR (v49): a `passive_timing: turn_start` orb (the Plasma shape) says so; fmtEffect already appends a
-// per-effect `when` gate ("… (if you have 3+ orbs)").
-const ORB_VAL_LABELS = { passive: "Each turn while channeled", passive_turn_start: "At the start of each turn while channeled", evoke: "On evoke" };
-function orbLines(orb) {
-  const out = [];
-  const passive = (orb.passive || []).map((e) => fmtEffect(e, "enemy")).join(", ");
-  const evoke = (orb.evoke || []).map((e) => fmtEffect(e, "enemy")).join(", ");
-  if (passive) out.push(`${orb.passive_timing === "turn_start" ? ORB_VAL_LABELS.passive_turn_start : ORB_VAL_LABELS.passive}: ${passive}`);
-  if (evoke) out.push(`${ORB_VAL_LABELS.evoke}: ${evoke}`);
-  return out;
-}
-
-const STATUS_HOOK_LABELS = {
-  damage_dealt: "your attacks", damage_taken: "damage you take",
-  block_gained: "block you gain", turn_start: "turn start", turn_end: "turn end",
-  energy_gain: "energy you gain", card_draw: "cards you draw",
-  damage_over_time: "HP lost at its turn start", hit_count: "hits per attack",  // Phase AQ (v47)
-};
-// Phase BA (v55): the signature potion's chip lines — what it does, when you can drink it, and the one fact
-// a player cannot infer from anywhere else: it is an ADDITION to the normal potion table, not a replacement.
-function potionLines(po) {
-  const out = [];
-  const rarity = String(po.rarity || "common");
-  out.push(`${rarity.charAt(0).toUpperCase()}${rarity.slice(1)} potion — usable `
-           + (po.usage === "any" ? "any time" : "in combat"));
-  const tgt = po.target || "self";
-  const eff = (po.effects || []).map((e) => potionEffectText(e, tgt)).filter(Boolean).join(", ");
-  if (eff) out.push(eff);
-  out.push("Drops alongside the usual potions on runs of this class");
-  return out;
-}
-
-// `summon`'s shared phrasing reads `amount` as the minion's HP (its meaning on a card); on a potion the
-// amount is a COUNT, so render that one op here and defer everything else to the shared formatter.
-function potionEffectText(e, target) {
-  if (e && e.op === "summon") {
-    const n = e.amount ?? 1;
-    return `Summon ${e.summon_name || "a minion"}${n > 1 ? ` ×${n}` : ""}`;
-  }
-  return fmtEffect(e, target);
-}
-
-function statusLines(st) {
-  const out = [];
-  const kind = st.type === "debuff" ? "Debuff" : "Buff";
-  const hook = STATUS_HOOK_LABELS[st.hook] || (st.hook ? String(st.hook).replace(/_/g, " ") : "");
-  // Phase AQ: a multiplicative damage status reads as a percent scaler, not a flat stack bonus.
-  const mode = st.mode === "multiplicative" ? " (+10% per stack, up to double)" : "";
-  out.push(hook ? `${kind} — affects ${hook}${mode}` : kind);
-  if (st.decay && st.decay !== "none") out.push(`Decays: ${String(st.decay).replace(/_/g, " ")}`);
-  return out;
-}
-
-// Phase AV (v52): a pool entry is PASSIVE (an Osty-style bodyguard) unless it declares a move cycle; an
-// autonomous entry may also be ETHEREAL (attackable:false) and carry on_summon / on_death / on_nth_attack
-// payoffs. Mirrors SummonRunner.Describe on the C# side (same order: HP-or-Ethereal, the move cycle, on
-// summon, on death, every Nth hit).
-function summonMoves(sm) {
-  if (Array.isArray(sm.moves) && sm.moves.length) return sm.moves.map((m) => m && m.actions).filter(Array.isArray);
-  if (Array.isArray(sm.actions) && sm.actions.length) return [sm.actions];
-  return [];
-}
-
-// The minion sub-vocabulary is its own small op set (attack / block / heal_self / apply_status) — map it
-// onto the card-effect phraser so one formatter serves both.
-function summonActionAsEffect(x) {
-  const op = x.op === "attack" ? "damage" : x.op === "heal_self" ? "heal" : x.op;
-  return { ...x, op };
-}
-
-function summonActionPhrase(actions) {
-  return (actions || []).map((x) => fmtEffect(summonActionAsEffect(x), x.target || "enemy")).join(", ");
-}
-
-function summonLines(sm) {
-  const out = [];
-  const moves = summonMoves(sm);
-  out.push(sm.attackable === false ? "Ethereal (cannot be attacked)"
-                                   : `Max HP: ${sm.max_hp != null ? sm.max_hp : "?"}`);
-  if (!moves.length) {
-    out.push("A passive minion — summon it, then spend cards to make it attack.");
-  } else if (moves.length === 1) {
-    out.push(`Each turn: ${summonActionPhrase(moves[0])}`);
-  } else {
-    moves.forEach((m, i) => out.push(`Turn ${i + 1}: ${summonActionPhrase(m)}`));
-  }
-  if (Array.isArray(sm.on_summon) && sm.on_summon.length) out.push(`On summon: ${summonActionPhrase(sm.on_summon)}`);
-  if (Array.isArray(sm.on_death) && sm.on_death.length) out.push(`On death: ${summonActionPhrase(sm.on_death)}`);
-  const nth = sm.on_nth_attack;
-  if (nth && Array.isArray(nth.actions) && nth.actions.length) {
-    out.push(`Every ${nth.n}th hit: ${summonActionPhrase(nth.actions)}`);
-  }
-  return out;
-}
-
-// A card's `upgrade` (when present) is a positional overlay: upgrade.effects[i] replaces effects[i]
-// (same op, better numbers — mirrors the mod's per-var delta in EffectRunner.UpgradeDelta), and
-// upgrade.cost is the ABSOLUTE post-upgrade cost. Merge each entry over its base effect so a sparse
-// upgrade spec still renders as a whole card.
-function upgradedView(c) {
-  const up = c.upgrade || {};
-  const effects = (c.effects || []).map((e, i) => ({ ...e, ...((up.effects || [])[i] || {}) }));
-  return { ...c, name: (c.name || "") + "+", cost: up.cost ?? c.cost, effects };
-}
-
-function hasUpgrade(c) {
-  return c.upgrade != null && typeof c.upgrade === "object" && !Array.isArray(c.upgrade)
-    && ((Array.isArray(c.upgrade.effects) && c.upgrade.effects.length > 0) || c.upgrade.cost != null);
-}
-
-function cardEl(c, classId) {
-  const d = document.createElement("div");
-  d.className = "cardchip r-" + (c.rarity || "common");
-  d.dataset.cardId = c.id ?? "";
-  d.innerHTML = `<button class="cc-fb" title="Give feedback" aria-label="Give feedback">💬</button>`
-    + `<div class="cc-top"><span class="cc-name"></span><span class="cc-cost"></span></div>`
-    + `<div class="cc-meta">${esc(c.type)} · ${esc(c.rarity)}</div>`
-    + `<div class="cc-eff"></div>`;
-  // Name/cost/effects are painted (not baked into the innerHTML) so the upgrade toggle can repaint
-  // them without rebuilding the chip — the feedback button keeps its listener and rated state.
-  const paint = (view) => {
-    d.querySelector(".cc-name").textContent = view.name ?? "";
-    d.querySelector(".cc-cost").textContent = view.cost ?? "";
-    d.querySelector(".cc-eff").textContent =
-      (view.effects || []).map((e) => fmtEffect(e, view.target)).join(". ");
-  };
-  paint(c);
-  if (hasUpgrade(c)) {
-    const lab = document.createElement("label");
-    lab.className = "cc-up";
-    lab.innerHTML = `<input type="checkbox"> Show upgraded`;
-    lab.querySelector("input").onchange = (ev) => {
-      d.classList.toggle("upgraded", ev.target.checked);
-      paint(ev.target.checked ? upgradedView(c) : c);
-    };
-    d.appendChild(lab);
-  }
-  // classId is needed to tie feedback to a persisted card; only forged/re-opened classes have one.
-  const fb = d.querySelector(".cc-fb");
-  if (classId != null) {
-    fb.onclick = (ev) => {
-      ev.stopPropagation();
-      openFeedback({ classId, kind: "card", subjectId: c.id ?? "", title: c.name || "", chip: d });
-    };
-  } else {
-    fb.remove();
-  }
-  return d;
-}
-
-// --- per-card feedback overlay ------------------------------------------------------------------
-
-// UI labels → the generator's canonical categories (btsgen.contract). Order = display order.
-const FB_CATEGORIES = [
-  { value: "great", label: "Good" },
-  { value: "overpowered", label: "Seems OP" },
-  { value: "underpowered", label: "Underpowered" },
-  { value: "off_theme", label: "Off-theme" },
-  { value: "confusing", label: "Doesn't make sense" },
-  { value: "doesnt_work", label: "Doesn't work" },
-];
-
-// What the popout rates. `kind` is "card" for deck cards, or "orb"/"status"/"summon"/"relic" for the
-// non-card elements; `subjectId` is the card id (cards) or the element name (elements).
-let fbState = { classId: null, kind: "card", subjectId: "", chip: null, category: null };
-
-const FB_TITLES = {
-  card: "How's this card?", relic: "How's this relic?", orb: "How's this orb?",
-  status: "How's this status?", summon: "How's this summon?", potion: "How's this potion?",
-};
-
-// Open the shared feedback popout. `detailHtml` (elements only) shows a description + effect lines so the
-// player can actually evaluate a mechanic that carries no card text.
-function openFeedback({ classId, kind, subjectId, title, detailHtml, chip }) {
-  fbState = { classId, kind, subjectId: subjectId ?? "", chip, category: null };
-  el("fb-title").textContent = FB_TITLES[kind] || "How's this?";
-  el("fb-card-name").textContent = title || "";
-  const detail = el("fb-detail");
-  detail.innerHTML = detailHtml || "";
-  detail.classList.toggle("hidden", !detailHtml);
-  el("fb-note").value = "";
-  el("fb-submit").disabled = true;
-  const wrap = el("fb-cats");
-  wrap.innerHTML = "";
-  for (const cat of FB_CATEGORIES) {
-    const b = document.createElement("button");
-    b.className = "fb-cat";
-    b.textContent = cat.label;
-    b.onclick = () => {
-      fbState.category = cat.value;
-      for (const x of wrap.children) x.classList.toggle("selected", x === b);
-      el("fb-submit").disabled = false;
-    };
-    wrap.appendChild(b);
-  }
-  el("fb-overlay").classList.remove("hidden");
-}
-
-function closeFeedback() { el("fb-overlay").classList.add("hidden"); }
-
-async function submitFeedback() {
-  if (!fbState.category) return;
-  const btn = el("fb-submit");
-  btn.disabled = true;
-  // Cards and elements have separate server endpoints (different server-side resolution), same payload shape.
-  const isCard = fbState.kind === "card";
-  const url = isCard ? "/api/card-feedback" : "/api/element-feedback";
-  const body = isCard
-    ? { class_id: fbState.classId, card_id: fbState.subjectId }
-    : { class_id: fbState.classId, element_kind: fbState.kind, element_id: fbState.subjectId };
-  body.category = fbState.category;
-  body.note = el("fb-note").value.trim();
-  try {
-    const r = await fetch(url, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
-    if (fbState.chip) {
-      fbState.chip.classList.add("rated");
-      const fb = fbState.chip.querySelector(".cc-fb");
-      if (fb) {
-        fb.textContent = "✓";
-        const label = (FB_CATEGORIES.find((c) => c.value === fbState.category) || {}).label;
-        fb.title = label ? `You rated this: ${label} — click to change` : "Feedback sent — click to change";
-      }
-    }
-    closeFeedback();
-    toast("Thanks for the feedback!");
-  } catch (e) {
-    toast(e.message);
-    btn.disabled = false;
-  }
-}
-
-// --- effect -> in-game-style text ----------------------------------------------------------------
-// Render each effect op the way the card reads in play ("Deal 6 damage", "At the end of each turn:
-// gain 1 Strength") instead of the raw vocabulary op ("add_trigger 2"). The CARD carries one target
-// (enemy/self/all_enemies); a trigger's nested payload is always self/orb, so those pass "self".
-
-const STATUS_NAMES = {
-  vulnerable: "Vulnerable", weak: "Weak", frail: "Frail", poison: "Poison", strength: "Strength",
-  dexterity: "Dexterity", thorns: "Thorns", regen: "Regen", metallicize: "Metallicize", artifact: "Artifact",
-  buffer: "Buffer", intangible: "Intangible", ritual: "Ritual", blur: "Blur", barricade: "Barricade",
-  focus: "Focus", temp_strength: "Strength (this turn)", temp_dexterity: "Dexterity (this turn)",
-  temp_thorns: "Thorns (this turn)", temp_focus: "Focus (this turn)", // Phase AN (v44)
-};
-const TRIGGER_PREFIX = {
-  turn_start: "At the start of each turn", turn_end: "At the end of each turn",
-  ripen: "After it ripens in hand", on_hp_lost: "Whenever you lose HP",
-};
-const SCALE_SUFFIX = {
-  cards_in_hand: " per card in hand", cards_retained: " per card retained",
-  unspent_energy_last_turn: " per unspent energy",
-  forged: " plus your Forge", // Phase M (gap #36): the additive Forge payoff
-};
-const titleCase = (s) => String(s || "").replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
-const statusName = (s) => STATUS_NAMES[s] || titleCase(s);
-
-function condCore(c) {
-  const v = c.value;
-  switch (c.kind) {
-    case "orb_count_ge": return `you have ${v ?? "enough"}+ orbs`;
-    case "orbs_match": return "your channeled orbs match";
-    case "target_has_status": return `the enemy has ${statusName(c.status)}`;
-    case "no_block": return "you have no Block";
-    case "has_block": return "you have Block";
-    case "hp_below_half": return "you're below half HP";
-    case "enemy_count_ge": return `there are ${v ?? "enough"}+ enemies`;
-    case "turn_at_least": return `it's turn ${v ?? "?"}+`;
-    case "hand_size_ge": return `your hand has ${v ?? "enough"}+ cards`;
-    case "retained_last_turn": return "you retained a card last turn";
-    case "forged_ge": return `your Forge is ${v ?? "enough"}+`;
-    // Phase AR (v49): the later kinds, now reachable from an orb chip too (were falling through to titleCase).
-    case "draw_pile_empty": return "your draw pile is empty";
-    case "hp_lost_ge": return `you've lost ${v ?? "enough"}+ HP this turn`;
-    case "dark_ge": return `your Dark is ${v ?? "enough"}+`;
-    case "light_ge": return `your Light is ${v ?? "enough"}+`;
-    case "centered": return `you're centered (within ${v ?? "?"})`;
-    case "target_hp_below_half": return "the enemy is below half HP";
-    case "target_has_block": return "the enemy has Block";
-    case "energy_ge": return `you have ${v ?? "enough"}+ energy`;
-    case "cards_played_this_turn_ge": return `you've played ${v ?? "enough"}+ cards this turn`;
-    default: return titleCase(c.kind);
-  }
-}
-const condText = (c) => ` (${c.negate ? "unless" : "if"} ${condCore(c)})`;
-
-function effPhrase(e, target) {
-  const a = e.amount;
-  const scale = (e.scale && e.scale !== "x") ? (SCALE_SUFFIX[e.scale] || "") : "";
-  const hits = e.hits > 1 ? ` ×${e.hits}` : "";
-  const toAll = target === "all_enemies" ? " to all enemies" : "";
-  switch (e.op) {
-    case "damage": return `Deal ${a ?? ""} damage${scale}${toAll}${hits}${e.unblockable === true ? " (ignores Block)" : ""}`; // Phase AN (v44)
-    case "block": return `Gain ${a ?? ""} Block${scale}`;
-    case "draw": return `Draw ${a ?? 1} card${(a ?? 1) == 1 ? "" : "s"}${scale}`;
-    case "gain_energy": return `Gain ${a ?? 1} energy`;
-    case "lose_hp": return `Lose ${a ?? ""} HP`;
-    case "gain_max_hp": return `Gain ${a ?? ""} Max HP`; // Phase AN (v44)
-    case "cost_shift": { // Phase AO (v45)
-      const kind = { attack: "Attacks", skill: "Skills", power: "Powers" }[e.card_type] || "cards";
-      const life = e.scope === "combat" ? "this combat" : "this turn";
-      return e.count ? `Your next ${e.count > 1 ? e.count + " " : ""}${kind} cost ${a ?? 1} less ${life}` : `Your ${kind} cost ${a ?? 1} less ${life}`;
-    }
-    case "heal": return `Heal ${a ?? ""}`;
-    case "discard": return `Discard ${a ?? 1} ${e.cards === "choose" ? "chosen" : "random"} card${(a ?? 1) == 1 ? "" : "s"}`; // Phase AP (v46)
-    case "retrieve_card": { // Phase AP (v46)
-      const n = a ?? 1;
-      const pile = e.pile === "exhaust" ? "exhaust" : "discard";
-      return e.cards === "choose" ? `Return ${n} chosen card${n == 1 ? "" : "s"} from your ${pile} pile to hand`
-                                  : `Return ${n} random card${n == 1 ? "" : "s"} from your ${pile} pile to hand`;
-    }
-    case "add_status_card": { // Phase AP (v46)
-      const n = a ?? 1;
-      const name = { dazed: "Dazed", burn: "Burn" }[e.card] || "Wound";
-      const pile = { draw: "draw pile", discard: "discard pile" }[e.pile] || "hand";
-      return `Add ${n} ${n == 1 || name === "Dazed" ? name : name + "s"} to your ${pile}`;
-    }
-    case "gain_orb_slot": return `Gain ${a ?? 1} orb slot${(a ?? 1) == 1 ? "" : "s"}`;
-    case "forge": return `Forge ${a ?? 1}`; // Phase M (gap #36): stoke the Forge counter
-    case "spend_forge": return `Spend ${a ?? 1} Forge`; // Phase AX (v53, gap #44): the ramp cash-out (the card's price)
-    case "spread_debuffs": return "Copy the target's debuffs to all other enemies"; // Phase AX (v53, gaps #45-#47)
-    case "exhaust": return "Exhaust";
-    case "innate": return "Innate";
-    case "retain": return "Retain";
-    case "ethereal": return "Ethereal";
-    case "evoke": return "Evoke your next orb";
-    case "channel_orb": return `Channel ${titleCase(e.orb || "an orb")}${a > 1 ? ` ×${a}` : ""}`;
-    case "apply_status":
-      return target === "self" ? `Gain ${a ?? ""} ${statusName(e.status)}`
-                               : `Apply ${a ?? ""} ${statusName(e.status)}${toAll}`;
-    case "apply_status_custom": return `Apply ${a ?? ""} ${e.status_name || "status"}`;
-    case "summon": return `Summon ${e.summon_name || "a minion"}${a ? ` (${a} HP)` : ""}`;
-    case "summon_attack": return `Minion attacks for ${a ?? ""}${hits}`;
-    case "buff_summon": return `Give your minion +${a ?? ""} ${statusName(e.status)}`;
-    case "sacrifice_summon": return "Sacrifice your minion"; // Phase AV (v52): consume it (its on_death rattle fires)
-    case "add_trigger":
-      return `${TRIGGER_PREFIX[e.trigger] || "Each turn"}: `
-             + (e.effects || []).map((x) => effPhrase(x, "self")).join(", ");
-    default: return a != null ? `${titleCase(e.op)} ${a}` : titleCase(e.op);
-  }
-}
-
-function fmtEffect(e, target) {
-  const base = effPhrase(e, target).replace(/\s+/g, " ").trim();
-  return base + (e.when && e.when.kind ? condText(e.when) : "");
-}
-
 // --- library -------------------------------------------------------------------------------------
 
 async function loadLibrary() {
@@ -1015,12 +599,22 @@ async function copyClassCode(id) {
   const cls = await r.json();
   await copy(cls.code);
 }
+// Open a saved class in "viewing" mode: the forge input card and the progress log get out of the way so
+// the class has the page to itself; the Forge tab (or the bar's back button) brings the forge back.
 async function openClass(id) {
   const r = await fetch(`/api/classes/${id}`);
   const cls = await r.json();
-  selectTab("forge");
+  el("nav-forge").classList.remove("active");
+  el("nav-library").classList.add("active");
+  el("nav-account").classList.remove("active");
+  show("view-forge");
+  el("forge-input").classList.add("hidden");
   el("progress").classList.add("hidden");
-  renderResult(cls);
+  el("spinner").classList.add("hidden");
+  renderClassView(cls);
+  renderShareBar(cls, true);
+  el("r-usage").classList.add("hidden");
+  window.scrollTo({ top: 0 });
 }
 async function renameClass(id, oldName) {
   const name = prompt("New name:", oldName);
@@ -1057,6 +651,7 @@ async function loadAccount() {
   } catch (_) {
     toast("Couldn't load your account — check your connection.");
   }
+  loadStats();
 }
 
 // Which sign-ins reach this account, and what is left to add. No unlinking in v1 (see index.html).
@@ -1211,22 +806,112 @@ async function handlePurchaseReturn() {
   toast("Payment is processing — your balance will update shortly.");
 }
 
-// --- helpers -------------------------------------------------------------------------------------
+// --- admin: forge stats dashboard -----------------------------------------------------------------
+// Only accounts on BTSWEB_ADMIN_EMAILS (defaults to the unlimited list) get user.admin from /api/me; for
+// everyone else the card stays hidden and nothing is fetched. Data: /api/admin/stats?days=N — forge_jobs
+// (one row per attempt: mode, token kind, status), forge_usage (LLM tokens per role/model/provider) and
+// purchases. Chart colors were validated against the dark panel surface (#1e1c28) — keep them paired
+// with the legend + hover labels so identity never rides on color alone.
+const STATS_SERIES = [
+  { key: "token", label: "Hosted (our key)", color: "#8f55eb" },
+  { key: "byok", label: "Bring your own key", color: "#28a07f" },
+  { key: "fake", label: "Offline demo", color: "#c48420" },
+];
 
-async function copy(text) {
-  try { await navigator.clipboard.writeText(text); toast("Copied!"); }
-  catch (_) { toast("Copy failed — select the text manually."); }
+async function loadStats() {
+  const card = el("stats");
+  if (!card) return;
+  if (!ME || !ME.admin) { card.classList.add("hidden"); return; }
+  card.classList.remove("hidden");
+  const days = el("stats-days").value;
+  try {
+    const r = await fetch(`/api/admin/stats?days=${encodeURIComponent(days)}`);
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    renderStats(await r.json());
+  } catch (e) {
+    el("stats-note").textContent = "Couldn't load forge stats: " + e.message;
+  }
 }
-function esc(s) {
-  return String(s ?? "").replace(/[&<>"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
+
+function fmtInt(n) { return Number(n || 0).toLocaleString("en-US"); }
+function fmtUsd(n) { return n == null ? "—" : "$" + Number(n).toFixed(2); }
+function pct(a, b) { return b > 0 ? Math.round((100 * a) / b) + "%" : "—"; }
+
+function renderStats(d) {
+  const f = d.forges || {}, bm = f.by_mode || {}, bk = f.by_token_kind || {};
+  const h = d.hosted || {}, u = d.users || {}, dn = d.donations || {};
+  const tiles = [
+    { k: "Forges", v: fmtInt(f.total), s: `${fmtInt(f.ok)} ok · ${fmtInt(f.failed)} failed · ${fmtInt(f.refunded)} refunded` },
+    { k: "Hosted (our key)", v: fmtInt(bm.token), s: `${pct(bm.token, f.total)} of forges · free ${fmtInt(bk.free)} · paid ${fmtInt(bk.paid)} · ∞ ${fmtInt(bk.unlimited)}` },
+    { k: "Bring your own key", v: fmtInt(bm.byok), s: `${pct(bm.byok, f.total)} of forges` + (bm.fake ? ` · ${fmtInt(bm.fake)} offline demo` : "") },
+    { k: "People forging", v: fmtInt(u.forgers), s: `${fmtInt(u.accounts)} accounts total` },
+    { k: "Hosted LLM spend", v: fmtUsd(h.est_cost_usd), s: `${fmtInt(h.calls)} calls · ${fmtTokens(h.input_tokens)} in (${fmtTokens(h.cached_tokens)} cached) · ${fmtTokens(h.output_tokens)} out` },
+    { k: "Donations", v: fmtMoney(dn.amount_cents || 0, "usd"), s: `${fmtInt(dn.count)} donations · ${fmtInt(dn.tokens)} tokens granted` },
+  ];
+  el("stats-tiles").innerHTML = tiles.map((t) =>
+    `<div class="stat-tile"><div class="k">${esc(t.k)}</div><div class="v">${esc(t.v)}</div><div class="s">${esc(t.s)}</div></div>`).join("");
+
+  renderStatsChart(d.daily || []);
+
+  const provRows = (d.providers || []).map((p) =>
+    `<tr><td>${esc(p.provider || "unknown")}</td><td class="num">${fmtInt(p.forges)}</td><td class="num">${pct(p.forges, f.total)}</td></tr>`).join("");
+  el("stats-providers").innerHTML = `<tr><th>Provider</th><th class="num">Forges</th><th class="num">Share</th></tr>`
+    + (provRows || `<tr><td colspan="3" class="muted">No usage rows in this window.</td></tr>`);
+
+  const modelRows = (d.models || []).map((m) =>
+    `<tr><td>${esc(m.model || "?")}<div class="muted">${esc(m.provider || "")} · ${esc(m.mode || "")}</div></td>`
+    + `<td class="num">${fmtInt(m.forges)}</td><td class="num">${fmtInt(m.calls)}</td>`
+    + `<td class="num">${fmtTokens(m.input_tokens)}</td><td class="num">${fmtTokens(m.output_tokens)}</td></tr>`).join("");
+  el("stats-models").innerHTML = `<tr><th>Model</th><th class="num">Forges</th><th class="num">Calls</th><th class="num">In</th><th class="num">Out</th></tr>`
+    + (modelRows || `<tr><td colspan="5" class="muted">No usage rows in this window.</td></tr>`);
+
+  el("stats-note").textContent = (d.since ? `Since ${d.since} (UTC). ` : "All time. ")
+    + "Hosted spend is estimated from the model price table (BTSWEB_MODEL_PRICES; models on the Ollama flat plan "
+    + "count as $0). BYOK forges bill the user's own provider and carry no cost here.";
 }
-let toastTimer = null;
-function toast(msg) {
-  const t = el("toast");
-  t.textContent = msg;
-  t.classList.remove("hidden");
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.add("hidden"), 3200);
+
+// Stacked bars, one per day with forges, hosted / BYOK / demo. Inline SVG, no library: recessive grid,
+// 2px surface gaps between segments, legend above, per-bar hover title. Days with no forges are skipped
+// (the API only returns days that have some), so the x axis labels the first, last and a few in between.
+function renderStatsChart(daily) {
+  const box = el("stats-chart");
+  if (!daily.length) { box.innerHTML = `<p class="hint">No forges in this window.</p>`; return; }
+  const W = 720, H = 200, padL = 34, padR = 8, padT = 8, padB = 22;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+  const totals = daily.map((r) => STATS_SERIES.reduce((n, s) => n + Number(r[s.key] || 0), 0));
+  const max = Math.max(1, ...totals);
+  const step = innerW / daily.length;
+  const barW = Math.max(2, Math.min(28, step - 3));
+  const y = (v) => padT + innerH - (v / max) * innerH;
+  const ticks = [0, Math.ceil(max / 2), max];
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Forges per day by mode">`;
+  for (const t of ticks) {
+    svg += `<line class="grid" x1="${padL}" x2="${W - padR}" y1="${y(t).toFixed(1)}" y2="${y(t).toFixed(1)}" />`
+      + `<text class="axis" x="${padL - 6}" y="${(y(t) + 4).toFixed(1)}" text-anchor="end">${t}</text>`;
+  }
+  daily.forEach((r, i) => {
+    const x = padL + i * step + (step - barW) / 2;
+    let acc = 0;
+    const parts = STATS_SERIES.map((s) => `${s.label}: ${Number(r[s.key] || 0)}`).join(" · ");
+    svg += `<g><title>${esc(r.day)} — ${esc(parts)}</title>`;
+    for (const s of STATS_SERIES) {
+      const v = Number(r[s.key] || 0);
+      if (!v) continue;
+      const top = y(acc + v), bottom = y(acc);
+      const hgt = Math.max(0, bottom - top - (acc ? 2 : 0));  // 2px surface gap between stacked segments
+      svg += `<rect x="${x.toFixed(1)}" y="${top.toFixed(1)}" width="${barW.toFixed(1)}" height="${hgt.toFixed(1)}" rx="2" fill="${s.color}" />`;
+      acc += v;
+    }
+    svg += `</g>`;
+    const labelEvery = Math.max(1, Math.ceil(daily.length / 8));
+    if (i % labelEvery === 0 || i === daily.length - 1) {
+      svg += `<text class="axis" x="${(x + barW / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle">${esc(r.day.slice(5))}</text>`;
+    }
+  });
+  svg += `</svg>`;
+  const legend = `<div class="stats-legend">` + STATS_SERIES.map((s) =>
+    `<span><i style="background:${s.color}"></i>${esc(s.label)}</span>`).join("") + `</div>`;
+  box.innerHTML = legend + `<div class="stats-wrap">${svg}</div>`;
 }
 
 // --- wiring --------------------------------------------------------------------------------------
@@ -1238,19 +923,9 @@ el("tokens").onclick = () => selectTab("account");  // the header chip doubles a
 el("forge-btn").onclick = forge;
 el("choice-go").onclick = () => sendChoice([...(choiceState?.picked || [])]);
 el("choice-skip").onclick = () => sendChoice([]);
-// interactive AND triad (the default; "classic" unchecked) each need the staged front-end: keep the
-// checkboxes honest instead of silently ignoring one (asking for either turns on staged; unchecking
-// staged clears interactive and forces the classic pair, since one-shot forges are 2-archetype).
-// The "classic" checkbox is OPTIONAL in the markup (index.html dropped it on 2026-09-09; triad is the default
-// and buildForgeBody already treats a missing box as unchecked). A top-level throw here would stop every
-// handler below from being wired — the forge button included — so never dereference it unguarded.
-el("interactive").onchange = () => { if (el("interactive").checked) el("staged").checked = true; };
-const classicBox = el("classic");
-if (classicBox) classicBox.onchange = () => { if (!classicBox.checked) el("staged").checked = true; };
-el("staged").onchange = () => {
-  if (!el("staged").checked) { el("interactive").checked = false; if (classicBox) classicBox.checked = true; }
-};
 el("copy-code").onclick = () => copy(el("r-code").value);
+el("share-link").onclick = () => copy(el("share-link").dataset.url);
+el("view-back").onclick = () => selectTab("forge");
 el("signout").onclick = async () => { await fetch("/logout", { method: "POST" }); location.href = "/"; };
 el("load-models").onclick = loadModels;
 
@@ -1291,7 +966,9 @@ for (const radio of document.querySelectorAll('input[name="mode"]')) {
   radio.onchange = applyMode;
 }
 
-el("provider").onchange = () => { applyProvider(); saveByok(); };
+el("provider").onchange = () => { applyProvider(); saveByok(); renderEstimate(); };
+el("model").oninput = renderEstimate;
+el("stats-days").onchange = loadStats;
 
 // Sniff an unambiguous key prefix and jump the dropdown to the matching provider.
 el("api_key").oninput = () => {

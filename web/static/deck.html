@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{TITLE}} — BLANK the spire</title>
+
+  <!-- Unfurl card. Stamped server-side by app.deck_page (every value html.escape'd) so crawlers, which
+       never run our JS, still see the class name, blurb and splash art. -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="BLANK the spire" />
+  <meta property="og:title" content="{{TITLE}}" />
+  <meta property="og:description" content="{{DESC}}" />
+  <meta property="og:image" content="{{IMAGE}}" />
+  <meta property="og:url" content="{{URL}}" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="{{TITLE}}" />
+  <meta name="twitter:description" content="{{DESC}}" />
+  <meta name="twitter:image" content="{{IMAGE}}" />
+  <meta name="description" content="{{DESC}}" />
+
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <div class="brand">⚒ <strong>BLANK the spire</strong> <span class="sub">a forged class</span></div>
+    <nav>
+      <a class="tab" href="/app">Forge your own →</a>
+      <a class="tab" href="/download">Get the mod ⬇</a>
+    </nav>
+  </header>
+
+  <!-- data-slug / data-api feed deck.js: the CSP forbids inline JS, so the slug rides on the element
+       rather than being written into a script block. -->
+  <main id="deck" data-slug="{{SLUG}}" data-api="/api/deck/{{SLUG}}">
+    <section class="card">
+      <p class="muted">Someone forged this class with BLANK the spire — copy the code below to play it, or
+        <a href="/app">forge your own</a>.</p>
+    </section>
+
+    <section id="result" class="card">
+      <h2 id="r-name"></h2>
+      <p id="r-desc" class="muted"></p>
+      <div id="r-archetypes" class="archetypes hidden"></div>
+      <div id="r-relic" class="relic hidden"></div>
+      <div id="r-mechanics" class="mechanics hidden"></div>
+      <div id="r-cards" class="cards"></div>
+      <div class="codebox">
+        <label class="lbl small">Class import code</label>
+        <textarea id="r-code" rows="3" readonly></textarea>
+        <button id="copy-code" class="btn">Copy code</button>
+        <p class="hint">Paste in-game → mod settings → <em>Import a class code</em> → Import → Restart.
+          <a href="/help">Where do I paste this?</a></p>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <footer class="foot">
+    <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> ·
+    <a href="/help">Help</a> ·
+    <a href="https://github.com/ryanrinkel/BLANKthespire" target="_blank" rel="noopener">GitHub</a> ·
+    <a href="mailto:ryan.r.rinkel@gmail.com">Support</a>
+    <p class="foot-note">Unofficial fan project — not affiliated with or endorsed by Mega Crit.</p>
+  </footer>
+
+  <script src="/static/render.js?v=20260917"></script>
+  <script src="/static/deck.js?v=20260917"></script>
+</body>
+</html>

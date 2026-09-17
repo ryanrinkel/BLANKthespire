@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Download & Install — BLANK the spire</title>
+  <title>Get the mod — BLANK the spire</title>
   <link rel="stylesheet" href="/static/style.css" />
   <style>
     .steps { padding-left: 20px; }
@@ -15,27 +15,63 @@
     .starter h4 { margin: 0 0 4px; }
     .starter textarea { font-family: ui-monospace, Consolas, monospace; font-size: 11px; }
     .dlbtn { font-size: 17px; padding: 14px 26px; }
+    .sidelink { margin: 12px 0 0; font-size: 13px; }
+    details.card > summary { cursor: pointer; font-size: 17px; font-weight: 700; list-style: none; }
+    details.card > summary::-webkit-details-marker { display: none; }
+    details.card > summary::before { content: "▸ "; color: var(--muted); }
+    details.card[open] > summary::before { content: "▾ "; }
+    details.card > summary + .hint { margin-top: 6px; }
   </style>
 </head>
 <body>
   <header>
-    <div class="brand">⚒ <strong>BLANK the spire</strong> <span class="sub">download & install</span></div>
-    <nav><a class="tab" href="/app">← Back to Forge</a></nav>
+    <div class="brand">⚒ <strong>BLANK the spire</strong> <span class="sub">get the mod</span></div>
+    <nav>
+      <a class="tab" href="/app">← Back to Forge</a>
+      <a class="tab" href="/help">Help</a>
+    </nav>
   </header>
 
   <main>
     <section class="card">
       <h1>Play your forged classes in Slay the Spire 2</h1>
-      <p class="muted">One download (BaseLib is bundled in). Unzip into the game's <code>mods</code> folder,
-         launch, and import a class code.</p>
-      <a class="btn primary dlbtn" href="/static/releases/BlankTheSpire-{{VERSION}}.zip" download>
-        ⬇ Download BlankTheSpire-{{VERSION}}.zip
+      <p class="muted">Subscribe on the Steam Workshop and Steam does the rest — no folders, no unzipping,
+         and updates arrive automatically.</p>
+      <a class="btn primary dlbtn" href="{{WORKSHOP_URL}}" target="_blank" rel="noopener">
+        ⬈ Subscribe on the Steam Workshop
       </a>
-      <p class="hint">Requires Slay the Spire 2 on Steam (Windows).</p>
+      <ol class="steps">
+        <li><b>Subscribe</b> to BLANK the spire on the Workshop.</li>
+        <li><b>Launch Slay the Spire 2.</b> Steam downloads the mod before the game starts.</li>
+        <li><b>The mod loads itself.</b> <b>BaseLib</b> (the mod loader) comes along automatically as a
+          Workshop dependency — you never install it by hand.</li>
+      </ol>
+      <p class="hint">Requires Slay the Spire 2 on Steam.</p>
+      <p class="sidelink">Where do I paste my code? → <a href="/help">Step-by-step with screenshots</a></p>
     </section>
 
     <section class="card">
-      <h2>Install (one drop)</h2>
+      <h2>Forge a class &amp; play it</h2>
+      <ol class="steps">
+        <li><a href="/app">Forge a class</a> on this site → copy the <b>import code</b> (starts with <code>BTSC.</code>).</li>
+        <li>In-game: main menu → <b>mod settings</b> → <b>BLANK the spire</b> → paste into
+          <b>Import a class code</b> → <b>Import</b> → <b>Restart</b>.
+          (<a href="/help">Where do I paste my code?</a>)</li>
+        <li>Start a new run and pick your class. (The restart is required to load a new class — that's normal.)</li>
+      </ol>
+    </section>
+
+    <details class="card">
+      <summary>Manual install (advanced) — zip download</summary>
+      <p class="hint">Only for people who can't use the Steam Workshop (no Steam copy of the game, an offline
+         machine, or a hand-managed <code>mods</code> folder). Everyone else: subscribe above.</p>
+
+      <a class="btn dlbtn" href="/static/releases/BlankTheSpire-{{VERSION}}.zip" download>
+        ⬇ Download BlankTheSpire-{{VERSION}}.zip
+      </a>
+      <p class="hint">One download (BaseLib is bundled in this zip). Unzip into the game's <code>mods</code> folder.</p>
+
+      <h3>Install (one drop)</h3>
       <ol class="steps">
         <li><b>Find your STS2 <code>mods</code> folder.</b> In Steam: right-click <i>Slay the Spire 2</i> →
           <i>Manage</i> → <i>Browse local files</i>. Make a <code>mods</code> folder there if it doesn't exist.</li>
@@ -66,17 +102,7 @@
       </ol>
       <p class="hint">If the game won't load mods on your distro, that's a <b>BaseLib</b> (loader) issue, not the
          cards — tell me and we'll sort it.</p>
-    </section>
-
-    <section class="card">
-      <h2>Forge a class &amp; play it</h2>
-      <ol class="steps">
-        <li><a href="/app">Forge a class</a> on this site → copy the <b>import code</b> (starts with <code>BTSC.</code>).</li>
-        <li>In-game: main menu → <b>mod settings</b> → <b>BLANK the spire</b> → paste into
-          <b>Import a class code</b> → <b>Import</b> → <b>Restart</b>.</li>
-        <li>Start a new run and pick your class. (The restart is required to load a new class — that's normal.)</li>
-      </ol>
-    </section>
+    </details>
 
     <section class="card">
       <h2>Starter classes</h2>
@@ -107,13 +133,23 @@
         <li><b>Restart loads a new class</b> — the mod tells you; it's normal.</li>
         <li>Forged classes are <b>loosely balanced</b> — expect swingy/overpowered cards. That's half the fun.</li>
       </ul>
-      <p class="hint">Found a bug or a hang? Text me — and if it crashed, send the line from
-         <code>%APPDATA%\SlayTheSpire2\logs\godot.log</code>.</p>
+      <p class="hint">Found a bug or a hang? <a href="{{GITHUB_URL}}/issues">Open an issue</a> — and if it
+         crashed, include the lines from <code>%APPDATA%\SlayTheSpire2\logs\godot.log</code>.</p>
+    </section>
+
+    <section class="card">
+      <h2>Source &amp; bug reports</h2>
+      <p class="muted">BLANK the spire is an open-source fan mod. The whole thing — mod, website, generator — is
+         on GitHub.</p>
+      <p><a class="btn" href="{{GITHUB_URL}}" target="_blank" rel="noopener">Source code on GitHub</a>
+         <a class="btn" href="{{GITHUB_URL}}/issues" target="_blank" rel="noopener">Report a bug</a></p>
     </section>
   </main>
 
   <footer class="foot">
     <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> ·
+    <a href="/help">Help</a> ·
+    <a href="{{GITHUB_URL}}" target="_blank" rel="noopener">GitHub</a> ·
     <a href="mailto:ryan.r.rinkel@gmail.com">Support</a>
     <p class="foot-note">Unofficial fan project — not affiliated with or endorsed by Mega Crit.</p>
   </footer>
