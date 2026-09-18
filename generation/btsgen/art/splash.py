@@ -87,6 +87,7 @@ def _write_sidecar(res: ImageResult, art: ClassArt, style: StyleProfile, prompt:
         "class_id": art.class_id,
         "file": res.path.name,
         "backend": res.backend,
+        "model": res.model,
         "style": style.name,
         "size": [res.width, res.height],
         "cost_usd": res.cost_usd,

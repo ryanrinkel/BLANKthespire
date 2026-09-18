@@ -11,6 +11,7 @@ from .request import ClassArt, StyleProfile
 
 def splash_prompt(art: ClassArt, style: StyleProfile, enriched_body: str | None = None) -> str:
     parts = [f'Splash art for "{art.name}", a playable class in a dark-fantasy deckbuilder.']
+    _append_concept(parts, art)
     if enriched_body:
         parts.append(enriched_body)
     else:
@@ -40,6 +41,7 @@ def sprite_prompt(art: ClassArt, style: StyleProfile, enriched_body: str | None 
     """The standing combat-model sprite: one whole figure, cut out on alpha, facing right (the player
     side faces its enemies to the right in battle; the mod handles cropping/scaling/animation)."""
     parts = [f'Full-body character sprite of "{art.name}", the playable hero of a dark-fantasy deckbuilder.']
+    _append_concept(parts, art)
     if enriched_body:
         parts.append(enriched_body)
     else:
@@ -59,6 +61,17 @@ def sprite_prompt(art: ClassArt, style: StyleProfile, enriched_body: str | None 
     if style.prompt_suffix:
         parts.append(style.prompt_suffix)
     return " ".join(p.strip() for p in parts if p and p.strip())
+
+
+def _append_concept(parts: list[str], art: ClassArt) -> None:
+    """The player's own words, verbatim, ALWAYS — before any description/enrichment. A forge abstracts
+    "Truman from the Truman Show" into "a man who rewrites himself mid-scene"; the image must still draw
+    Truman. Named subjects (real or fictional) are to be depicted literally and recognizably."""
+    c = (art.concept or "").strip()
+    if c:
+        parts.append(f'The player asked for: "{c}". Depict exactly that subject, literally and recognizably '
+                     "(if it names a specific person, character, creature or thing, draw that one, with its "
+                     "canonical look, costume and props), not a generic stand-in.")
 
 
 def _append_theme(parts: list[str], art: ClassArt) -> None:

@@ -6,12 +6,15 @@ from .request import StyleProfile
 
 DEFAULT_STYLE = StyleProfile(
     name="default",
+    # 2026-09-17 A/B (five prod prompts, Qwen Image 3): DESCRIBING the look in words reproduces the game's
+    # own cel-shaded ink-line style; merely naming Slay the Spire changed nothing, and attaching STS2
+    # portraits as references matched this but bled their characters/text into the output.
     prompt_suffix=(
-        "Painterly digital illustration in the manner of AAA game key art: confident visible "
-        "brushwork, dramatic rim lighting, strong silhouette read, cinematic color grading with "
-        "deep shadows and one bold accent color, moody dark-fantasy atmosphere — character splash "
-        "art for a Slay-the-Spire-like roguelike deckbuilder. Detailed, expressive face; "
-        "atmospheric background depth with volumetric light. No text, no UI, no card frame."
+        "Art style: bold stylized game illustration in the manner of Slay the Spire's character art — "
+        "confident dark ink outlines, flat cel-shaded color blocks with light painterly texture, simplified "
+        "graphic shapes, a saturated limited palette with one bold accent color, and a moody dark-fantasy "
+        "atmosphere with a strong silhouette read. Not photorealistic, not painterly-realistic. "
+        "Style only: no lettering or text anywhere, no UI, no card frame."
     ),
     negative="text, watermark, ui, hud, card frame, logo, signature, border",
     size=(1024, 576),
@@ -24,10 +27,11 @@ DEFAULT_STYLE = StyleProfile(
 SPRITE_STYLE = StyleProfile(
     name="sprite",
     prompt_suffix=(
-        "Painterly digital illustration with confident brushwork and dramatic rim lighting, "
-        "dark-fantasy character art in the same style family as the class splash, for a "
-        "Slay-the-Spire-like roguelike deckbuilder. Strong readable silhouette, grounded stance, "
-        "crisp clean cut-out edges, rich material detail on costume and props."
+        "Art style: bold stylized game illustration in the manner of Slay the Spire's character art — "
+        "confident dark ink outlines, flat cel-shaded color blocks with light painterly texture, simplified "
+        "graphic shapes, a saturated limited palette; the same style family as the class splash. "
+        "Not photorealistic. Strong readable silhouette, grounded stance, crisp clean cut-out edges, "
+        "clear material detail on costume and props. No lettering or text anywhere."
     ),
     negative=(
         "background, scenery, ground plane, cast shadow, text, watermark, ui, hud, frame, logo, "

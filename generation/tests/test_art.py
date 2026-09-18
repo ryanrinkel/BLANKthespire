@@ -233,3 +233,20 @@ def test_enrich_failure_falls_back_to_template(tmp_path, monkeypatch):
     assert res.ok  # enrichment failing must never fail the forge
     meta = json.loads((tmp_path / "cryo.splash.meta.json").read_text())
     assert meta["enriched"] is False and "frost" in meta["prompt"]
+
+
+# --- the player's literal subject survives into the image prompt (2026-09-17) --------------------
+def test_prompt_carries_verbatim_concept_even_when_enriched():
+    art = ClassArt(class_id="tru", name="Truman Burbank, Ad-Lib Escapee", description="a man who rewrites himself",
+                   concept="Truman from the Truman Show")
+    p = splash_prompt(art, DEFAULT_STYLE, enriched_body="A clean-cut man in a sweater vest under studio lights.")
+    assert 'The player asked for: "Truman from the Truman Show"' in p
+    assert "literally and recognizably" in p
+    assert p.index("player asked for") < p.index("sweater vest")  # the literal ask leads the description
+    s = sprite_prompt(art, SPRITE_STYLE)
+    assert 'The player asked for: "Truman from the Truman Show"' in s
+
+
+def test_prompt_omits_concept_line_when_empty():
+    p = splash_prompt(ClassArt(class_id="x", name="X", description="frost"), DEFAULT_STYLE)
+    assert "player asked for" not in p

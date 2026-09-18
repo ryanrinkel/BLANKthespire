@@ -58,6 +58,7 @@ class ImageResult:
     ok: bool
     backend: str
     path: Path | None = None
+    model: str | None = None  # the concrete model used (openrouter/openai); A/B provenance
     cost_usd: float | None = None
     width: int | None = None
     height: int | None = None
