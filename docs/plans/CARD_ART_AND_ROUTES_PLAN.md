@@ -10,8 +10,13 @@ What we learned from the 2026-09-17/18 A/B runs (memory notes `e2e-route-ab-2026
 3. **Cost truth:** OpenRouter meters real cost per call; our rate table under-counts by 30-45% and the Ollama
    rows are priced at $0. Record metered cost, price art, stop guessing.
 
-Status: PLAN. Nothing below is built. The working tree already holds UNCOMMITTED prerequisites (OpenRouter
-image backend, literal-naming prompts, Anthropic hardening). Step 0 lands those first.
+Status (2026-09-18): Steps 0-4 BUILT and committed (2e8ed40..3548f5f); Step 5 (droplet rollout, Workshop
+update of v0.2.2) NOT yet run. Deviations from the plan as written: card renders ask the OpenAI family for
+`background=opaque` (mini returned half-transparent cut-outs unasked; `BTSGEN_IMAGE_CARD_BACKGROUND=auto`
+reverts); portraits are 256-colour quantized by default (`BTSGEN_CARD_ART_COLORS=0` for lossless) because a
+lossless 1000x760 portrait is ~765 KB, not ~150 KB, so a class zip is ~14 MB opaque/quantized (~26 MB
+lossless); the mod sweeps only `*.png` from `KK/cards/` on re-import because that directory also holds the
+class's `NN.json` card files. `CardSpec.ClassSlot` is stamped in `LoadCards` instead of a `ClassSlotFor` map.
 
 ---
 
