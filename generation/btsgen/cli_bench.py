@@ -1,10 +1,10 @@
 """btsgen-bench — the creative-harness benchmark (docs/plans/DEPLOYMENT_PLAN.md §2.3). CLI only, no web wiring.
 
-Forges a FIXED list of 12 concept sentences (spanning tone and mechanics) on the token path (the Ollama-Cloud
-mixture, staged triad front-end) and reports the plan's metrics table from census.py:
+Forges a FIXED list of 12 concept sentences (spanning tone and mechanics) on the token path (the hosted
+mixture, OpenRouter primary, staged triad front-end) and reports the plan's metrics table from census.py:
 
     uv run btsgen-bench --fake                      # offline smoke (fake stages + fake cards; no keys)
-    uv run btsgen-bench                             # the real thing (needs OLLAMA_API_KEY; costs cents on glm-5.2)
+    uv run btsgen-bench                             # the real thing (needs OPENROUTER_API_KEY; costs cents on glm-5.3)
     uv run btsgen-bench --v2 --out docs/plans/HARNESS_BENCH.md   # under BTS_HARNESS_V2=1, written to a file
 
 Run it once BEFORE touching the harness to lock the baseline, then after each fix. The gate in the plan: v2
@@ -65,7 +65,8 @@ def _build_backends(fake: bool, ollama_config: str | None):
     from . import ollama_mix
     role_map = ollama_mix.load_role_map(ollama_config) if ollama_config else None
     _bp, card_gen_factory, relic_gen, make_gen = ollama_mix.build_ollama_mix(role_map)
-    return card_gen_factory, relic_gen, make_gen, "ollama mix:\n" + ollama_mix.describe(role_map)
+    return (card_gen_factory, relic_gen, make_gen,
+            "hosted mix (OpenRouter primary):\n" + ollama_mix.describe(role_map))
 
 
 def forge_concepts(concepts: list[str], *, fake: bool, ollama_config: str | None = None, triad: bool = True,
@@ -209,7 +210,7 @@ def run(concepts: list[str], *, fake: bool, ollama_config: str | None = None, on
     results = forge_concepts(concepts, fake=fake, ollama_config=ollama_config, on_event=on_event)
     m = compute_metrics(results)
     harness = "v2 (BTS_HARNESS_V2=1)" if harness_v2.enabled() else "v1 (flag off)"
-    return format_report(results, m, mode="fake-offline" if fake else "ollama mix (token path)", harness=harness), m
+    return format_report(results, m, mode="fake-offline" if fake else "hosted mix (token path)", harness=harness), m
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -1,8 +1,8 @@
-"""Ollama-Cloud *mixture* backend — a parallel path to the Anthropic flow.
+"""Hosted *mixture* backend (OpenRouter primary, tiered fallback) — a parallel path to the Anthropic flow.
 
 The forge makes two kinds of LLM call: a handful of CREATIVE front-end calls (cloud/cluster, map/compose,
 relic-intent, reframed-blueprint) and ~23 strict closed-vocabulary CARD calls. The existing CLI/web paths
-force both onto ONE backend+model. This module lets each *role* pick its own Ollama model (and even its own
+force both onto ONE backend+model. This module lets each *role* pick its own model (and even its own
 endpoint), so we can brainstorm on a small/permissive model and CODE THE CARDS on a strong model (GLM-class).
 
 It produces the same `(blueprint_gen, card_gen_factory, relic_gen, make_gen)` tuple `cli_forge_class` /
@@ -20,20 +20,41 @@ JSON mode); the strong schema-faithful model handles it reliably and fuses arche
 divergent stage (the cloud) stays on the small permissive model.
 
 A role spec is {model, base_url?, api_key?, response_format?, temperature?, max_tokens_cap?, extra_body?}.
-`extra_body` is merged verbatim into the request payload (e.g. {"reasoning_effort": "none"} to disable a
-hybrid-reasoning model's hidden thinking — see DEFAULT_ROLE_MAP's structure role). `base_url` and
-`api_key` default to the top-level `defaults` block (Ollama Cloud), but a role may override them — e.g. point
-`brainstorm` at a LOCAL `http://localhost:11434/v1` uncensored model while `cards` stay on cloud GLM.
+`extra_body` is merged verbatim into the request payload (e.g. {"reasoning": {"effort": "low"}} to hold a
+hybrid-reasoning model's hidden thinking to a floor — see DEFAULT_ROLE_MAP's structure role). `base_url` and
+`api_key` default to the top-level `defaults` block (OpenRouter), but a role may override them — e.g. point
+`brainstorm` at a LOCAL `http://localhost:11434/v1` uncensored model while `cards` stay on hosted GLM.
 `${VAR}` values are expanded from the environment (so the key never sits in a committed file).
 
-METERED FALLBACK — the top-level `fallback` block arms an automatic escape hatch for when the flat Ollama
-Cloud plan runs out of GPU-time quota: the SAME harness re-issues the failed call against a per-token
-OpenAI-compatible provider (default: OpenRouter, serving the same glm/ministral model families). It is a
-no-op until its api_key expands non-empty — set OPENROUTER_API_KEY on the server and it is live, unset it
-and the forge behaves exactly as before. Quota errors (HTTP 429/402) trip a process-wide breaker that routes
-ALL calls to the fallback for `cooldown_s` (default 1h — Ollama session limits reset on 5h windows), so a
-mid-forge quota wall costs one failed call, not thirty. Transient transport faults (endpoint unreachable /
-stalled / dropped) trip a short 5-minute breaker instead. Set `"fallback": null` to disable it outright.
+TIERED FAILOVER — the top-level `fallbacks` list is an ORDERED chain of whole backends the same harness
+re-issues a failed call against. The shipped default is:
+
+    primary            OpenRouter  z-ai/glm-5.3   (the class Ryan picked in the 2026-09-18 A/B)
+      -> openrouter-glm52   OpenRouter  z-ai/glm-5.2   (covers a glm-5.3-only outage on the same key)
+      -> ollama             Ollama Cloud glm-5.2       (covers an OpenRouter credit/outage wall)
+
+A tier whose api_key expands empty is DROPPED at build time, so `OLLAMA_API_KEY` unset simply means the last
+tier does not exist and the forge behaves as an OpenRouter-only route. The singular legacy `fallback` key
+(the three `generation/ollama_roles.*.json` files) is still accepted and wrapped into a one-item list;
+`"fallback": null` still opts out entirely.
+
+Each tier carries its OWN `extra_body`, applied to the structure+cards roles only (brainstorm is a
+non-reasoning gemma and gets none). This matters: glm-5.3 on OpenRouter 400s on `reasoning:{enabled:false}`
+("Reasoning is mandatory") and the generator's drop-rejected-key logic cannot catch it (the message names no
+key), glm-5.2 on OpenRouter accepts it, and Ollama Cloud wants `reasoning_effort:"none"` instead. A tier that
+omits `extra_body` inherits the role's (the pre-tier behavior).
+
+Failure semantics, per error class:
+  402 / 429          account-level quota/credit — trips a process-wide breaker KEYED BY `base_url` for that
+                     tier's `cooldown_s`, so EVERY tier on that endpoint is skipped (a 429 on OpenRouter
+                     skips both OpenRouter tiers and lands on Ollama) instead of burning ~30 failed calls.
+  transport fault    endpoint unreachable / sent no data / dropped mid-response — same breaker, 5 minutes.
+  404 / 408 / 5xx    model-level outage ("no endpoints found", gateway hiccup) — skips to the next tier for
+                     THIS CALL ONLY. No breaker: the next call tries the tier again.
+  anything else      401 / 403 / 400 are misconfiguration or a real contract error and stay LOUD.
+
+`.model` / `.last_meta` report the tier that actually answered (quarantine reports and the cost ledger name
+the real model).
 """
 from __future__ import annotations
 
@@ -51,118 +72,206 @@ from .generator import EndpointHTTPError, OpenAICompatGenerator, load_env
 _log = logging.getLogger("btsgen.ollama_mix")
 
 CLOUD_BASE_URL = "https://ollama.com/v1"
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
-# Sane built-in mix, all on Ollama Cloud. Models verified live in the cloud catalog (GET /v1/models).
-# Override any of this via --ollama-config <path.json>.
+# Sane built-in mix. Primary is OpenRouter glm-5.3 (2026-09-18 A/B: 36 cards, 0 skipped briefs, vs 3 skipped
+# on glm-5.2). Override any of this via --ollama-config <path.json>.
 DEFAULT_ROLE_MAP: dict = {
-    "defaults": {"base_url": CLOUD_BASE_URL, "api_key": "${OLLAMA_API_KEY}"},
+    "defaults": {"base_url": OPENROUTER_BASE_URL, "api_key": "${OPENROUTER_API_KEY}"},
     # Cap any per-stage max_tokens request (the blueprint asks for 48000, sized for Claude's output caps —
     # too high for most open models). min(requested, cap) keeps requests valid without truncating real work.
+    # glm-5.3 at effort "low" bills hidden reasoning as output tokens against this; the E2E leg ran clean.
     "max_tokens_cap": 24000,
     "roles": {
         # creative + non-reasoning for divergent brainstorming; warm temperature. (Was ministral-3:8b until
         # Mistral's small line was retired from Ollama Cloud 2026-07-15 — the only Mistral left is the 675b
-        # large, too heavy/slow for a hot divergent stage. gemma4:31b is the replacement: reliably creative,
+        # large, too heavy/slow for a hot divergent stage. gemma-4-31b is the replacement: reliably creative,
         # cheapish, and crucially NON-reasoning — the reasoning models on offer (deepseek-v4-flash,
         # minimax-m2.5) dump everything into a hidden `reasoning` field and return EMPTY content, which is
         # unparseable.) response_format=json_object pins output to valid JSON GRAMMAR at the API level — a hot
         # model otherwise emits malformed JSON (missing commas, keys inside arrays) for the complex map/compose
         # schema, which is UNPARSEABLE so the one repair attempt can't even act on it. JSON mode guarantees
         # parseable output, so any remaining SCHEMA mistake becomes a fixable validation error.
-        "brainstorm": {"model": "gemma4:31b", "temperature": 0.9,
+        "brainstorm": {"model": "google/gemma-4-31b-it", "temperature": 0.9,
                        "response_format": {"type": "json_object"}},
         # strong, schema-faithful model turns the dossier into card briefs; pin to JSON.
-        # reasoning_effort "none": glm-5.2 is a HYBRID-REASONING model — left on, it burns 10-20k tokens of
-        # hidden thinking against max_tokens on big calls (the triad blueprint REPAIR re-emit hit ~20k of
-        # the 24k cap), truncating the visible answer mid-JSON ("unparseable blueprint", 2 of 3 forges on
-        # 2026-08-16). Probe-verified (scratch/probe_glm_nothink.py): "none" is honored by Ollama Cloud and
-        # zeroes the reasoning stream, while "low"/think=false/OpenRouter-style knobs are ignored. The
-        # structure/cards stages are convergent translation work — the creative divergence already happened
-        # upstream — so no-think costs nothing we rely on and returns the whole token budget to content.
-        "structure": {"model": "glm-5.2", "response_format": {"type": "json_object"}, "temperature": 0.4,
-                      "extra_body": {"reasoning_effort": "none"}},
+        # reasoning.effort "low": glm-5.3 REQUIRES reasoning (OpenRouter 400s on `reasoning:{enabled:false}`
+        # with "Reasoning is mandatory"), and left unbounded a hybrid-reasoning model burns 10-20k tokens of
+        # hidden thinking against max_tokens on big calls (glm-5.2's triad blueprint REPAIR re-emit hit ~20k
+        # of the 24k cap, truncating the visible answer mid-JSON — "unparseable blueprint", 2 of 3 forges on
+        # 2026-08-16). "low" is the floor the model accepts. usage.include makes OpenRouter return the
+        # METERED `usage.cost` per call, which the web ledger records instead of guessing from a rate table.
+        "structure": {"model": "z-ai/glm-5.3", "response_format": {"type": "json_object"}, "temperature": 0.4,
+                      "extra_body": {"reasoning": {"effort": "low"}, "usage": {"include": True}}},
         # GLM codes the cards: strict closed-vocab JSON, low temperature, pinned to a JSON body
-        "cards": {"model": "glm-5.2", "response_format": {"type": "json_object"}, "temperature": 0.3,
-                  "extra_body": {"reasoning_effort": "none"}},
+        "cards": {"model": "z-ai/glm-5.3", "response_format": {"type": "json_object"}, "temperature": 0.3,
+                  "extra_body": {"reasoning": {"effort": "low"}, "usage": {"include": True}}},
     },
-    # Metered failover (see module docstring). Same model families via OpenRouter, per-token billed;
-    # armed only when OPENROUTER_API_KEY is set. Slugs verified live 2026-07-10.
-    "fallback": {
-        "base_url": "https://openrouter.ai/api/v1",
-        "api_key": "${OPENROUTER_API_KEY}",
-        "models": {
-            # matches the primary brainstorm swap (ministral → gemma) so divergent behavior is the same
-            # whether or not the quota breaker is tripped. Slug verified live on OpenRouter 2026-07-15.
-            "brainstorm": "google/gemma-3-27b-it",
-            "structure": "z-ai/glm-5.2",
-            "cards": "z-ai/glm-5.2",
-        },
-        "cooldown_s": 3600,
-    },
+    # Ordered failover chain (see module docstring). Each tier is a whole backend: endpoint + per-role model
+    # slugs + its own extra_body + its own breaker cooldown. A tier whose api_key expands empty is dropped.
+    "fallbacks": [
+        # Same key, same endpoint, one model generation back: covers a glm-5.3-only outage. glm-5.2 ACCEPTS
+        # `reasoning:{enabled:false}` (and is cheaper with thinking off), so this tier says so explicitly.
+        # Short cooldown: an endpoint-level breaker trip here is almost always the 5.3 tier's doing.
+        {"name": "openrouter-glm52", "base_url": OPENROUTER_BASE_URL, "api_key": "${OPENROUTER_API_KEY}",
+         "models": {"brainstorm": "google/gemma-4-31b-it", "structure": "z-ai/glm-5.2", "cards": "z-ai/glm-5.2"},
+         "extra_body": {"reasoning": {"enabled": False}, "usage": {"include": True}}, "cooldown_s": 900},
+        # Different vendor, different key: the hedge for an OpenRouter credit wall while the Ollama Pro
+        # credits last. Ollama Cloud honors `reasoning_effort:"none"` and ignores the OpenRouter-style knobs
+        # (probe-verified, scratch/probe_glm_nothink.py). 1h cooldown: Ollama session limits reset on 5h
+        # windows, so a quota trip here is worth remembering for a while.
+        {"name": "ollama", "base_url": CLOUD_BASE_URL, "api_key": "${OLLAMA_API_KEY}",
+         "models": {"brainstorm": "gemma4:31b", "structure": "glm-5.2", "cards": "glm-5.2"},
+         "extra_body": {"reasoning_effort": "none"}, "cooldown_s": 3600},
+    ],
 }
 
-# Process-wide failover breaker. One quota trip diverts every role of every in-flight forge — quota is an
-# account-level condition, so probing it per-call would just burn ~30 failed requests per forge.
+# The primary tier's own breaker cooldown when IT is the one that 402/429s (historically 1h — Ollama session
+# limits reset on 5h windows, and an OpenRouter credit wall is not self-healing either).
+PRIMARY_COOLDOWN_S = 3600
+
+# Process-wide failover breaker, KEYED BY ENDPOINT (`base_url`). One quota trip diverts every role of every
+# in-flight forge away from that endpoint — quota is an account-level condition, so probing it per-call would
+# just burn ~30 failed requests per forge — while leaving tiers on OTHER endpoints untouched.
 _BREAKER_LOCK = threading.Lock()
-_breaker_until = 0.0  # time.monotonic() deadline; 0 = closed (primary active)
+_breaker_until: dict[str, float] = {}  # base_url -> time.monotonic() deadline; absent/past = closed
 _TRANSPORT_COOLDOWN_S = 300
 
-def _breaker_active() -> bool:
-    with _BREAKER_LOCK:
-        return time.monotonic() < _breaker_until
+# Model-level outages (the tier is up, this model is not) and gateway hiccups: skip the tier for ONE call.
+_SKIP_CODES = frozenset({404, 408})
+# Account-level quota/credit exhaustion: trip the endpoint's breaker.
+_QUOTA_CODES = frozenset({402, 429})
+# Transport-fault fingerprints OpenAICompatGenerator raises as plain RuntimeError after its own one retry.
+_TRANSPORT_MARKERS = ("could not reach", "sent no data", "dropped mid-response")
 
-def _trip_breaker(seconds: float, reason: str) -> None:
-    global _breaker_until
+
+def _breaker_key(base_url: str) -> str:
+    return (base_url or "").rstrip("/")
+
+
+def _breaker_active(base_url: str | None = None) -> bool:
+    """True when `base_url`'s breaker is open. With no argument: true when ANY endpoint is tripped."""
+    with _BREAKER_LOCK:
+        now = time.monotonic()
+        if base_url is None:
+            return any(d > now for d in _breaker_until.values())
+        return _breaker_until.get(_breaker_key(base_url), 0.0) > now
+
+
+def _trip_breaker(base_url: str, seconds: float, reason: str) -> None:
+    key = _breaker_key(base_url)
     with _BREAKER_LOCK:
         deadline = time.monotonic() + seconds
-        if deadline > _breaker_until:
-            _breaker_until = deadline
-            _log.warning("ollama primary tripped (%s) — routing to metered fallback for %ds", reason, seconds)
+        if deadline > _breaker_until.get(key, 0.0):
+            _breaker_until[key] = deadline
+            _log.warning("hosted endpoint %s tripped (%s) — skipping its tiers for %ds", key, reason, seconds)
 
-def _reset_breaker() -> None:
-    """Test hook / manual override: close the breaker so the next call tries the primary again."""
-    global _breaker_until
+
+def _reset_breaker(base_url: str | None = None) -> None:
+    """Test hook / manual override: close the breaker(s) so the next call tries the endpoint again."""
     with _BREAKER_LOCK:
-        _breaker_until = 0.0
+        if base_url is None:
+            _breaker_until.clear()
+        else:
+            _breaker_until.pop(_breaker_key(base_url), None)
+
+
+class _Tier:
+    """One rung of the failover chain: a built generator plus how long ITS quota trip should be remembered."""
+
+    __slots__ = ("name", "gen", "cooldown_s")
+
+    def __init__(self, gen, cooldown_s: int = PRIMARY_COOLDOWN_S, name: str | None = None) -> None:
+        self.gen = gen
+        self.cooldown_s = int(cooldown_s)
+        self.name = name or getattr(gen, "model", "tier")
+
+    @property
+    def base_url(self) -> str:
+        return getattr(self.gen, "base_url", "")
 
 
 class _FailoverGenerator:
-    """Same duck-typed surface the pipelines consume (`.model`, `first_attempt`, `repair`), wrapping a
-    primary (plan-based Ollama Cloud) and a fallback (metered) OpenAICompatGenerator built from the SAME
-    contract/params — so a failed-over call is byte-identical except for endpoint + model slug. `repair`
-    carries plain chat messages, so a conversation started on the primary repairs fine on the fallback."""
+    """Same duck-typed surface the pipelines consume (`.model`, `first_attempt`, `repair`), wrapping an
+    ORDERED list of tiers built from the SAME contract/params — so a failed-over call is byte-identical
+    except for endpoint, model slug and the tier's own `extra_body`. `repair` carries plain chat messages, so
+    a conversation started on one tier repairs fine on the next.
 
-    def __init__(self, primary: OpenAICompatGenerator, fallback: OpenAICompatGenerator,
-                 cooldown_s: int) -> None:
-        self._primary = primary
-        self._fallback = fallback
-        self._cooldown_s = cooldown_s
+    A call walks the list: tiers whose endpoint breaker is open are skipped outright; a tier that raises a
+    skip-class error (404/408/5xx) or trips its breaker (402/429/transport) hands the call to the next tier.
+    If every tier's breaker is open the LAST tier is still attempted — a cooling-down route is better than no
+    route, and it keeps the pre-tier behavior where the final fallback was never itself gated."""
+
+    def __init__(self, tiers: list[_Tier]) -> None:
+        if not tiers:
+            raise RuntimeError("_FailoverGenerator needs at least one tier.")
+        self._tiers = list(tiers)
+        self._last: _Tier | None = None  # the tier that actually answered most recently
+
+    # ---- diagnostics -------------------------------------------------------
+    def _active(self) -> _Tier:
+        """The tier that answered last, or — before any call — the first one not currently breakered."""
+        if self._last is not None:
+            return self._last
+        for t in self._tiers:
+            if not _breaker_active(t.base_url):
+                return t
+        return self._tiers[-1]
 
     @property
-    def model(self) -> str:  # quarantine reports name the model that actually answered
-        return self._fallback.model if _breaker_active() else self._primary.model
+    def model(self) -> str:  # quarantine reports / cost ledger name the model that actually answered
+        return self._active().gen.model
 
     @property
-    def last_meta(self) -> dict:  # diagnostics from whichever twin actually answered (see OpenAICompat)
-        return self._fallback.last_meta if _breaker_active() else self._primary.last_meta
+    def last_meta(self) -> dict:  # diagnostics from whichever tier answered (see OpenAICompatGenerator)
+        return self._active().gen.last_meta
 
+    @property
+    def tiers(self) -> list[_Tier]:
+        return list(self._tiers)
+
+    # ---- routing -----------------------------------------------------------
     def _call(self, method: str, *args):
-        if _breaker_active():
-            return getattr(self._fallback, method)(*args)
-        try:
-            return getattr(self._primary, method)(*args)
-        except EndpointHTTPError as e:
-            if e.code not in (402, 429):  # a 401/403/5xx-with-body is misconfig or a real fault — stay loud
-                raise
-            _trip_breaker(self._cooldown_s, f"HTTP {e.code} from {self._primary.base_url}")
-        except RuntimeError as e:
-            # transport-shaped failures already got one in-place retry inside the primary; anything else
-            # (unexpected response shape, …) is not the endpoint's availability and must surface.
-            msg = str(e)
-            if not any(s in msg for s in ("could not reach", "sent no data", "dropped mid-response")):
-                raise
-            _trip_breaker(_TRANSPORT_COOLDOWN_S, f"transport: {msg[:120]}")
-        return getattr(self._fallback, method)(*args)
+        last_exc: Exception | None = None
+        attempted = False
+        # The breaker is re-read per tier, INSIDE the walk: a 402/429 from the primary trips the whole
+        # endpoint, so the sibling tier sharing that base_url is skipped on this very call.
+        for tier in self._tiers:
+            if _breaker_active(tier.base_url):
+                continue
+            attempted = True
+            try:
+                out = getattr(tier.gen, method)(*args)
+            except EndpointHTTPError as e:
+                if e.code in _QUOTA_CODES:
+                    # Account-level: remember it for the whole endpoint, then try the next tier.
+                    _trip_breaker(tier.base_url, tier.cooldown_s, f"HTTP {e.code} from {tier.name}")
+                elif e.code in _SKIP_CODES or e.code >= 500:
+                    # Model-level outage / gateway hiccup: THIS call only, no breaker.
+                    _log.warning("tier %s returned HTTP %d — skipping it for this call", tier.name, e.code)
+                else:
+                    raise  # 400/401/403 — misconfig or a real contract error; stay loud
+                last_exc = e
+                continue
+            except RuntimeError as e:
+                # transport-shaped failures already got one in-place retry inside the tier; anything else
+                # (unexpected response shape, …) is not the endpoint's availability and must surface.
+                msg = str(e)
+                if not any(s in msg for s in _TRANSPORT_MARKERS):
+                    raise
+                _trip_breaker(tier.base_url, _TRANSPORT_COOLDOWN_S, f"transport: {msg[:120]}")
+                last_exc = e
+                continue
+            self._last = tier
+            return out
+        if not attempted:
+            # Every endpoint is cooling down. A cooling route beats no route (and it keeps the pre-tier
+            # behavior, where the final fallback was never itself gated by the breaker).
+            tier = self._tiers[-1]
+            out = getattr(tier.gen, method)(*args)
+            self._last = tier
+            return out
+        raise last_exc  # every tier refused; the last failure is the honest one to surface
 
     def first_attempt(self, brief):
         return self._call("first_attempt", brief)
@@ -197,13 +306,13 @@ def _expand(value):
 def _normalize(role_map: dict) -> dict:
     """Fill each role's base_url/api_key from `defaults`, expand ${VAR}s, and guarantee all three roles exist
     (a missing role falls back to `cards`, then `structure`, then any present role)."""
-    load_env()  # so ${OLLAMA_API_KEY} (in generation/.env) is visible
+    load_env()  # so ${OPENROUTER_API_KEY} (in generation/.env) is visible
     defaults = role_map.get("defaults", {})
-    base_default = _expand(defaults.get("base_url", CLOUD_BASE_URL))
-    key_default = _expand(defaults.get("api_key", "${OLLAMA_API_KEY}"))
+    base_default = _expand(defaults.get("base_url", OPENROUTER_BASE_URL))
+    key_default = _expand(defaults.get("api_key", "${OPENROUTER_API_KEY}"))
     cap = role_map.get("max_tokens_cap")
     # Calls stream, so the read timeout bounds silence-between-chunks, not total generation — but big cloud
-    # models under load can stall long before the first chunk. Keep the Ollama path's default generous
+    # models under load can stall long before the first chunk. Keep the hosted path's default generous
     # (vs the generator's 180s); let a role override per model.
     timeout_default = int(role_map.get("timeout", 300))
 
@@ -215,41 +324,77 @@ def _normalize(role_map: dict) -> dict:
         s["base_url"] = _expand(s.get("base_url", base_default))
         s["api_key"] = _expand(s.get("api_key", key_default))
         if not s.get("model"):
-            raise RuntimeError(f"ollama role '{name}' is missing a 'model'.")
+            raise RuntimeError(f"hosted role '{name}' is missing a 'model'.")
         if not s["api_key"]:
             raise RuntimeError(
-                f"ollama role '{name}' has no API key. Set OLLAMA_API_KEY in generation/.env "
-                "(or give the role an explicit api_key)."
+                f"hosted role '{name}' has no API key. Set OPENROUTER_API_KEY in generation/.env "
+                "(see .env.example) or give the role an explicit api_key."
             )
         s["timeout"] = int(s.get("timeout", timeout_default))
         roles[name] = s
 
     if not roles:
-        raise RuntimeError("ollama role map has no roles.")
+        raise RuntimeError("hosted role map has no roles.")
     # Backfill the three roles the forge needs from whatever is present.
     for need in ("cards", "structure", "brainstorm"):
         if need not in roles:
             donor = roles.get("cards") or roles.get("structure") or next(iter(roles.values()))
             roles[need] = dict(donor)
-    return {"roles": roles, "max_tokens_cap": cap,
-            "fallback": _normalize_fallback(role_map.get("fallback", DEFAULT_ROLE_MAP["fallback"]))}
+    # `fallbacks` (the tier list) wins; the singular legacy `fallback` key is still honored; neither present
+    # means inherit the built-in chain (still inert per-tier without the env vars).
+    if "fallbacks" in role_map:
+        raw_fbs = role_map["fallbacks"]
+    elif "fallback" in role_map:
+        raw_fbs = role_map["fallback"]
+    else:
+        raw_fbs = DEFAULT_ROLE_MAP["fallbacks"]
+    return {"roles": roles, "max_tokens_cap": cap, "fallbacks": _normalize_fallbacks(raw_fbs)}
 
 
-def _normalize_fallback(fb: dict | None) -> dict | None:
-    """Expand + validate the metered-failover block; None (disarmed) unless its api_key resolves. A custom
-    role map without a `fallback` key inherits the built-in OpenRouter one — still inert without the env
-    var — while an explicit `"fallback": null` opts out entirely."""
-    if not fb:
+# Sentinel: a tier that does not mention `extra_body` at all inherits the ROLE's (pre-tier behavior, which
+# the three shipped ollama_roles.*.json files rely on). An explicit `"extra_body": null` means "send none".
+_INHERIT_EXTRA_BODY = object()
+
+
+def _normalize_fallbacks(fbs) -> list[dict]:
+    """Expand + validate the ORDERED failover chain. Accepts a list of tiers, a single tier dict (the legacy
+    singular `fallback` key), or None/empty (failover disabled). A tier whose api_key expands empty is
+    dropped — that is how `OLLAMA_API_KEY` unset silently removes the last-resort tier."""
+    if not fbs:
+        return []
+    if isinstance(fbs, dict):  # legacy singular `fallback` block -> a one-item chain
+        fbs = [fbs]
+    out: list[dict] = []
+    for i, fb in enumerate(fbs):
+        if not fb:
+            continue
+        api_key = _expand(fb.get("api_key", "${OPENROUTER_API_KEY}"))
+        name = fb.get("name") or f"fallback{i + 1}"
+        if not api_key:
+            _log.debug("failover tier '%s' dropped: its api_key expands empty", name)
+            continue
+        models = dict(fb.get("models") or DEFAULT_ROLE_MAP["fallbacks"][0]["models"])
+        for need in ("cards", "structure", "brainstorm"):
+            if not models.get(need):
+                models[need] = models.get("cards") or models.get("structure") or next(iter(models.values()))
+        out.append({
+            "name": name,
+            "base_url": _expand(fb.get("base_url", OPENROUTER_BASE_URL)),
+            "api_key": api_key,
+            "models": models,
+            "extra_body": fb["extra_body"] if "extra_body" in fb else _INHERIT_EXTRA_BODY,
+            "cooldown_s": int(fb.get("cooldown_s", 3600)),
+        })
+    return out
+
+
+def _tier_extra_body(tier: dict, role: str, role_spec: dict):
+    """A tier's extra_body applies to the structure+cards roles ONLY — brainstorm rides a non-reasoning
+    model on every tier and must not be handed a reasoning knob it will 400 on."""
+    if role == "brainstorm":
         return None
-    api_key = _expand(fb.get("api_key", "${OPENROUTER_API_KEY}"))
-    if not api_key:
-        return None
-    models = dict(fb.get("models") or DEFAULT_ROLE_MAP["fallback"]["models"])
-    for need in ("cards", "structure", "brainstorm"):
-        if not models.get(need):
-            models[need] = models.get("cards") or models.get("structure") or next(iter(models.values()))
-    return {"base_url": _expand(fb.get("base_url", "https://openrouter.ai/api/v1")),
-            "api_key": api_key, "models": models, "cooldown_s": int(fb.get("cooldown_s", 3600))}
+    eb = tier.get("extra_body", _INHERIT_EXTRA_BODY)
+    return role_spec.get("extra_body") if eb is _INHERIT_EXTRA_BODY else eb
 
 
 # Creative harness v2 (BTS_HARNESS_V2=1, the temperature half of Fix E): warm the STRUCTURE role (map/compose +
@@ -284,7 +429,7 @@ def build_ollama_mix(role_map: dict | None = None, *, on_usage=None):
     os.environ.setdefault("BTS_STAGE_ATTEMPTS", "2")
     cfg = _normalize(effective_role_map(role_map))
     cap = cfg["max_tokens_cap"]
-    fb = cfg["fallback"]
+    fbs = cfg["fallbacks"]
 
     def _tagged(role: str, model: str):
         """Wrap on_usage so each usage dict also says which role/model produced it (the web's per-forge cost
@@ -297,34 +442,34 @@ def build_ollama_mix(role_map: dict | None = None, *, on_usage=None):
     def _gen(role: str, contract_mod, max_tokens: int):
         spec = cfg["roles"][role]
         eff = min(max_tokens, int(spec.get("max_tokens_cap", cap))) if (spec.get("max_tokens_cap") or cap) else max_tokens
-        # Reasoning models (kimi-k3, …) bill hidden thinking against max_tokens BEFORE any visible content,
-        # so a small stage budget (relic-intent asks for 2000) truncates the answer to nothing. A role
-        # serving such a model can set a floor; applied after the cap so the floor wins when both are set.
+        # Reasoning models (glm-5.3, kimi-k3, …) bill hidden thinking against max_tokens BEFORE any visible
+        # content, so a small stage budget (relic-intent asks for 2000) truncates the answer to nothing. A
+        # role serving such a model can set a floor; applied after the cap so the floor wins when both are set.
         if spec.get("max_tokens_floor"):
             eff = max(eff, int(spec["max_tokens_floor"]))
-        primary = OpenAICompatGenerator(
-            spec["base_url"], spec["api_key"], spec["model"],
-            contract_mod=contract_mod, max_tokens=eff, timeout=spec["timeout"],
-            response_format=spec.get("response_format"),
-            temperature=spec.get("temperature"),
-            on_usage=_tagged(role, spec["model"]),
-            extra_body=spec.get("extra_body"),
-        )
-        if not fb:
+
+        def _build(base_url: str, api_key: str, model: str, extra_body):
+            # Every tier differs ONLY in endpoint, model slug and extra_body — same contract, JSON pin,
+            # temperature, token budget and timeout — so a failed-over call exercises the identical harness.
+            return OpenAICompatGenerator(
+                base_url, api_key, model,
+                contract_mod=contract_mod, max_tokens=eff, timeout=spec["timeout"],
+                response_format=spec.get("response_format"),
+                temperature=spec.get("temperature"),
+                on_usage=_tagged(role, model),
+                extra_body=extra_body,
+            )
+
+        primary = _build(spec["base_url"], spec["api_key"], spec["model"], spec.get("extra_body"))
+        if not fbs:
             return primary
-        # The fallback twin differs ONLY in endpoint + model slug — same contract, JSON pin, temperature,
-        # token budget, timeout and extra_body — so a failed-over call exercises the identical harness.
-        # (If the fallback endpoint rejects an extra_body key by name, the generator drops that key
-        # per-model and retries — it degrades to the old behavior instead of failing the call.)
-        fallback = OpenAICompatGenerator(
-            fb["base_url"], fb["api_key"], fb["models"][role],
-            contract_mod=contract_mod, max_tokens=eff, timeout=spec["timeout"],
-            response_format=spec.get("response_format"),
-            temperature=spec.get("temperature"),
-            on_usage=_tagged(role, fb["models"][role]),
-            extra_body=spec.get("extra_body"),
-        )
-        return _FailoverGenerator(primary, fallback, fb["cooldown_s"])
+        tiers = [_Tier(primary, PRIMARY_COOLDOWN_S, name="primary")]
+        for fb in fbs:
+            tiers.append(_Tier(
+                _build(fb["base_url"], fb["api_key"], fb["models"][role],
+                       _tier_extra_body(fb, role, spec)),
+                fb["cooldown_s"], name=fb["name"]))
+        return _FailoverGenerator(tiers)
 
     # One-shot blueprint generator (only used when the staged front-end is OFF) + relic generator. The
     # one-shot path is the classic 2-archetype flow — triad lives in the staged front-end — so pin the
@@ -342,8 +487,17 @@ def load_role_map(path: str | os.PathLike) -> dict:
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
+def _no_think(extra_body) -> bool:
+    """Whether a tier's extra_body asks the model NOT to think (either provider's spelling)."""
+    if not isinstance(extra_body, dict):
+        return False
+    reasoning = extra_body.get("reasoning")
+    return (extra_body.get("reasoning_effort") == "none"
+            or (isinstance(reasoning, dict) and reasoning.get("enabled") is False))
+
+
 def describe(role_map: dict | None = None) -> str:
-    """One-line-per-role summary for the CLI banner (no secrets — just role -> model @ host)."""
+    """One-line-per-role/tier summary for the CLI banner (no secrets — just role -> model @ host)."""
     cfg = _normalize(effective_role_map(role_map))
     lines = []
     for role in ("brainstorm", "structure", "cards"):
@@ -354,14 +508,18 @@ def describe(role_map: dict | None = None) -> str:
             extras.append(f"t={s['temperature']}")
         if s.get("response_format"):
             extras.append("json")
-        if (s.get("extra_body") or {}).get("reasoning_effort") == "none":
+        if _no_think(s.get("extra_body")):
             extras.append("no-think")
+        effort = (s.get("extra_body") or {}).get("reasoning", {})
+        if isinstance(effort, dict) and effort.get("effort"):
+            extras.append(f"think={effort['effort']}")
         tail = f" ({', '.join(extras)})" if extras else ""
         lines.append(f"  {role:10s} -> {s['model']} @ {host}{tail}")
-    fb = cfg["fallback"]
-    if fb:
-        host = fb["base_url"].replace("https://", "").replace("http://", "").split("/")[0]
-        lines.append(f"  fallback   -> {fb['models']['cards']} @ {host} (metered, armed)")
+    fbs = cfg["fallbacks"]
+    if fbs:
+        for i, fb in enumerate(fbs, 1):
+            host = fb["base_url"].replace("https://", "").replace("http://", "").split("/")[0]
+            lines.append(f"  fallback {i} -> {fb['name']}: {fb['models']['cards']} @ {host} (armed)")
     else:
-        lines.append("  fallback   -> not armed (set OPENROUTER_API_KEY for metered failover)")
+        lines.append("  fallback   -> none armed (set OPENROUTER_API_KEY / OLLAMA_API_KEY for failover tiers)")
     return "\n".join(lines)

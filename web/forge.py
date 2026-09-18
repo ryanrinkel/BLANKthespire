@@ -411,7 +411,7 @@ def forge_to_bundle(concept: str, *, key: dict | None = None, hosted: bool = Fal
                 from btsgen.ollama_mix import build_ollama_mix
                 blueprint_gen, card_factory, relic_gen, make_gen = build_ollama_mix(on_usage=on_usage)
             except RuntimeError as e:
-                raise ForgeError(f"hosted Ollama generation unavailable: {e}") from e
+                raise ForgeError(f"hosted generation unavailable: {e}") from e
             if staged:
                 from btsgen.frontend import BlueprintBuilder, load_catalog
                 front_end = BlueprintBuilder(make_gen, catalog=load_catalog(), on_event=on_event,
