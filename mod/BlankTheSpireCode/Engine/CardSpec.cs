@@ -137,6 +137,13 @@ public sealed record CardSpec(
     string[]? Tags = null,
     int? UpgradedCost = null)
 {
+    /// <summary>The 1-based forged CLASS slot this spec was loaded for, or 0 for the shared forged-card pool
+    /// (and for codegen'd cards). Stamped by <see cref="ForgedCharacters"/> when it reads
+    /// <c>user://forged/characters/KK/cards/NN.json</c>, because a card's own slot number is per-class and the
+    /// compiled shells (<c>ForgedClassKKCardNN</c>) hand <see cref="DataCard"/> only the spec. Read by
+    /// <see cref="DataCard.CustomPortrait"/> so per-card art resolves under the right class directory.</summary>
+    public int ClassSlot { get; init; }
+
     /// <summary>Phase AE (gap #25): does this card declare <paramref name="tag"/> (a lowercase synergy slug)?
     /// Purely declarative metadata read by the <c>tag_cards_owned</c> scalar's deck scan (see EffectRunner
     /// .TagCardsOwned); we keep tags in the spec (not the game's CanonicalTags) since only our own scan needs them.</summary>

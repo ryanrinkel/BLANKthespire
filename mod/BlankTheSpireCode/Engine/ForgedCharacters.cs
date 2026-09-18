@@ -221,7 +221,9 @@ public static class ForgedCharacters
                 if (file == null) continue;
                 if (ForgedCards.TryParseCardJson(file.GetAsText(), n, out var spec, out var err, allowBasic: true, allowCustomOrbs: true) && spec != null)
                 {
-                    result[(k, n)] = spec;
+                    // Stamp the owning class onto the spec: the compiled shells hand DataCard only the spec, but
+                    // per-card art lives under user://forged/characters/KK/cards/<id>.png — a CLASS directory.
+                    result[(k, n)] = spec with { ClassSlot = k };
                     MainFile.Logger.Info($"[ForgedClass] class {k:00} card {n:00} <- '{spec.Title}'.");
                 }
                 else

@@ -2,9 +2,11 @@
 using BaseLib.Abstracts;
 using BaseLib.Extensions;
 using BaseLib.Utils;
+using BlankTheSpire.BlankTheSpireCode.Cards.Forged; // ForgedCardArt (per-card generated portraits)
 using BlankTheSpire.BlankTheSpireCode.Character;
 using BlankTheSpire.BlankTheSpireCode.Extensions;
 using BlankTheSpire.BlankTheSpireCode.Powers;
+using Godot; // Texture2D (CustomPortrait)
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
@@ -393,4 +395,12 @@ public abstract class DataCard : ConstructedCardModel
     public override string CustomPortraitPath => TypePlaceholder.BigCardImagePath();
     public override string PortraitPath => TypePlaceholder.CardImagePath();
     public override string BetaPortraitPath => TypePlaceholder.CardImagePath();
+
+    /// <summary>Per-CARD generated art, when the class's import carried a <c>card_art_url</c> and this card
+    /// was in the zip (see <see cref="ForgedCardArt"/>). BaseLib's Harmony prefixes on
+    /// <c>CardModel.Portrait</c>/<c>PortraitPath</c> check this BEFORE <see cref="CustomPortraitPath"/>, so a
+    /// null here (no art, partial zip, shared-pool card with no class) falls through to the type doodle
+    /// above with no further wiring. <see cref="CardSpec.ClassSlot"/> is 0 for non-class cards, which
+    /// <see cref="ForgedCardArt"/> reads as "no art".</summary>
+    public override Texture2D? CustomPortrait => ForgedCardArt.TryGetTexture(Spec.ClassSlot, Spec.Id);
 }
