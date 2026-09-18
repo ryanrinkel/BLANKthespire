@@ -148,6 +148,10 @@ class ForgedClass(Base):
     # patched in by db._ensure_class_columns on existing DBs.
     splash_hash: Mapped[str | None] = mapped_column(String(64), default=None, nullable=True)
     sprite_hash: Mapped[str | None] = mapped_column(String(64), default=None, nullable=True)
+    # Same marker for the per-card portrait pack (web/static/forged/<id>/cards.zip — ONE zip per class,
+    # not ~34 URLs, so the mod's import does one download instead of one per card). NULL = not generated;
+    # a PARTIAL pack (budget/cost cap hit mid-run) still gets a hash — the mod falls back per missing card.
+    card_art_hash: Mapped[str | None] = mapped_column(String(64), default=None, nullable=True)
     # Unguessable public handle for /api/deck/<slug> sharing (the numeric id is enumerable and stays
     # internal). 22 url-safe chars = 128 bits. Backfilled onto existing rows by db._ensure_class_columns.
     slug: Mapped[str | None] = mapped_column(String(32), default=None, nullable=True, unique=True, index=True)
@@ -184,6 +188,7 @@ class ForgedClass(Base):
             "code": self.code,
             "splash_hash": self.splash_hash,  # app layer turns these into absolute *_url fields
             "sprite_hash": self.sprite_hash,
+            "card_art_hash": self.card_art_hash,
         }
         # The emoji relic icon has no hash column; its URL lives in the bundle (stamped post-forge).
         if bundle.get("relic_icon_url"):
@@ -257,7 +262,10 @@ class ForgeUsage(Base):
     forge_id: Mapped[str] = mapped_column(String(32), index=True)  # groups the rows of one forge
     mode: Mapped[str] = mapped_column(String(16), default="token")  # token | byok | anthropic | fake
     token_kind: Mapped[str | None] = mapped_column(String(10), default=None, nullable=True)  # free|paid|unlimited
-    role: Mapped[str] = mapped_column(String(32), default="")   # brainstorm | structure | cards | ...
+    # brainstorm | structure | cards | ... for LLM calls, and "art:splash" / "art:sprite" / "art:cards" for
+    # the image rows (one per asset kind per forge; token columns 0, cost in metered_cost_micros). Anything
+    # that only wants the LLM numbers filters role NOT LIKE 'art:%' (see app.forge_estimate).
+    role: Mapped[str] = mapped_column(String(32), default="")
     model: Mapped[str] = mapped_column(String(128), default="")
     # WHERE the call went, never WHAT it was authenticated with: "hosted" (our Ollama mix), "anthropic", or
     # for BYOK the hostname of the user's base_url ("api.openai.com", ...). Keys are never stored anywhere.
@@ -268,7 +276,14 @@ class ForgeUsage(Base):
     output_tokens: Mapped[int] = mapped_column(Integer, default=0)
     cached_tokens: Mapped[int] = mapped_column(Integer, default=0)
     # Micro-dollars (1e-6 USD) so the column stays an integer; NULL = not ours to pay (BYOK) or unknown model.
+    # est_cost_micros is our RATE-TABLE guess (app.MODEL_PRICES x tokens). metered_cost_micros is what the
+    # provider actually billed, reported per call by OpenRouter (usage:{include:true} -> usage.cost) and by
+    # the image backends (ImageResult.cost_usd) — NULL when no call on the row carried one (Ollama never
+    # does). Measured 2026-09-18: the rate table undercounts a real forge by 30-45%, so anything summing
+    # money prefers metered when present and falls back to est per row. Added after the table existed ⇒
+    # patched in by db._ensure_forge_usage_columns.
     est_cost_micros: Mapped[int | None] = mapped_column(Integer, default=None, nullable=True)
+    metered_cost_micros: Mapped[int | None] = mapped_column(Integer, default=None, nullable=True)
     ok: Mapped[int] = mapped_column(Integer, default=1)  # 1 = the forge succeeded
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 

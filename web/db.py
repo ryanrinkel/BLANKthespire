@@ -89,13 +89,13 @@ def _ensure_user_columns() -> None:
 
 def _ensure_class_columns() -> None:
     """Same tiny forward-only migration as _ensure_user_columns, for the `classes` table: add the
-    splash_hash (Track 2 splash art) and sprite_hash (combat-model sprite) columns to DBs created
-    before them. Idempotent; SQLite + MySQL."""
+    splash_hash (Track 2 splash art), sprite_hash (combat-model sprite) and card_art_hash (the per-card
+    portrait zip) columns to DBs created before them. Idempotent; SQLite + MySQL."""
     insp = inspect(engine)
     if "classes" not in insp.get_table_names():
         return  # create_all will make it fresh with the columns already present
     cols = {c["name"] for c in insp.get_columns("classes")}
-    for col in ("splash_hash", "sprite_hash"):
+    for col in ("splash_hash", "sprite_hash", "card_art_hash"):
         if col not in cols:
             with engine.begin() as conn:
                 conn.execute(text(f"ALTER TABLE classes ADD COLUMN {col} VARCHAR(64)"))
@@ -112,8 +112,9 @@ def _ensure_class_columns() -> None:
 
 def _ensure_forge_usage_columns() -> None:
     """Same tiny forward-only migration as _ensure_class_columns, for the `forge_usage` table: add the
-    `provider` column (where the call went — "hosted" / "anthropic" / a BYOK hostname) to DBs created
-    before it. Idempotent; SQLite + MySQL."""
+    `provider` column (where the call went — "hosted" / "anthropic" / a BYOK hostname) and
+    `metered_cost_micros` (what the provider actually billed, vs the rate-table est_cost_micros) to DBs
+    created before them. Idempotent; SQLite + MySQL."""
     insp = inspect(engine)
     if "forge_usage" not in insp.get_table_names():
         return  # create_all will make it fresh with the column already present
@@ -121,6 +122,11 @@ def _ensure_forge_usage_columns() -> None:
     if "provider" not in cols:
         with engine.begin() as conn:
             conn.execute(text("ALTER TABLE forge_usage ADD COLUMN provider VARCHAR(64) DEFAULT ''"))
+    if "metered_cost_micros" not in cols:
+        # Nullable with no default: existing rows stay NULL = "nobody metered this", which is exactly
+        # what they are (they predate usage:{include:true}), so the readers fall back to est_cost_micros.
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE forge_usage ADD COLUMN metered_cost_micros INTEGER"))
 
 
 def _backfill_slugs() -> None:

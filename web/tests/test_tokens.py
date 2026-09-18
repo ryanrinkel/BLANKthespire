@@ -156,10 +156,12 @@ def test_usage_ledger_records_rows_and_cost(client, app_module, stub_forge):
     assert set(by) == {("cards", "glm-5.2"), ("structure", "z-ai/glm-5.2")}
     r = by[("cards", "glm-5.2")]
     assert (r.input_tokens, r.output_tokens, r.cached_tokens, r.calls) == (1000, 200, 300, 1)
-    assert r.est_cost_micros == 0                       # Ollama flat plan: priced at zero
+    # Ollama's per-token list (the flat plan ended 2026-08-31): 700 uncached in @ $1.40/M + 200 out @
+    # $4.40/M + 300 cached @ $0.26/M = $0.001938. Nothing metered these calls, so the real-cost column is NULL.
+    assert r.est_cost_micros == 1938 and r.metered_cost_micros is None
     assert r.token_kind == "free" and r.mode == "token" and r.ok == 1
-    # OpenRouter overflow slug is priced: 500 in @ $0.49/M + 100 out @ $1.56/M = $0.000401
-    assert by[("structure", "z-ai/glm-5.2")].est_cost_micros == 401
+    # OpenRouter glm-5.2: 500 in @ $0.5544/M + 100 out @ $1.7424/M = $0.000451
+    assert by[("structure", "z-ai/glm-5.2")].est_cost_micros == 451
 
 
 def test_byok_usage_rows_carry_no_cost(client, app_module, stub_forge):

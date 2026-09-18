@@ -52,12 +52,22 @@ class UsageMeter:
     Accepts both shapes the generators emit: OpenAI-compatible dicts ({prompt_tokens, completion_tokens,
     prompt_tokens_details.cached_tokens}, tagged by ollama_mix with _role/_model) and Anthropic usage objects
     (input_tokens, output_tokens, cache_read_input_tokens). Thread-safe; never raises (the generators already
-    swallow callback errors, but a meter must not lose a forge's numbers to a bad payload either)."""
+    swallow callback errors, but a meter must not lose a forge's numbers to a bad payload either).
+
+    METERED COST: OpenRouter is asked for `usage:{include:true}`, so its usage dicts carry `cost` — the real
+    USD the call billed. It is summed per (role, model) into `cost_usd`, which stays None when NO call on
+    that row reported one (Ollama and Anthropic never do) — "unmetered" and "free" must not collapse into 0.
+
+    ART: the same meter also carries the forge's IMAGE spend (add_art / art_rows), so the splash, the sprite
+    and the per-card portrait pack land in the same forge_usage ledger as the LLM calls. Art is kept in a
+    SEPARATE bucket from rows(): the LLM totals the BYOK panel and /api/forge-estimate quote must stay a
+    token number, not a token number with 35 image calls stirred into it."""
 
     def __init__(self, default_model: str = "", default_role: str = "") -> None:
         import threading
         self._lock = threading.Lock()
         self._rows: dict[tuple[str, str], dict] = {}
+        self._art: dict[tuple[str, str], dict] = {}
         self.default_model = default_model or ""
         self.default_role = default_role or ""
 
@@ -71,25 +81,69 @@ class UsageMeter:
                 det = usage.get("prompt_tokens_details") or {}
                 cached = int((det.get("cached_tokens") if isinstance(det, dict) else 0)
                              or usage.get("cache_read_input_tokens") or 0)
+                cost = _usd(usage.get("cost"))
             else:  # anthropic.types.Usage
                 role, model = self.default_role, self.default_model
                 inp = int(getattr(usage, "input_tokens", 0) or 0)
                 out = int(getattr(usage, "output_tokens", 0) or 0)
                 cached = int(getattr(usage, "cache_read_input_tokens", 0) or 0)
+                cost = None
         except (TypeError, ValueError, AttributeError):
             return
         with self._lock:
             row = self._rows.setdefault((role, model), {"role": role, "model": model, "calls": 0,
                                                         "input_tokens": 0, "output_tokens": 0,
-                                                        "cached_tokens": 0})
+                                                        "cached_tokens": 0, "cost_usd": None})
             row["calls"] += 1
             row["input_tokens"] += inp
             row["output_tokens"] += out
             row["cached_tokens"] += cached
+            if cost is not None:
+                row["cost_usd"] = (row["cost_usd"] or 0.0) + cost
+
+    def add_art(self, kind: str, model: str | None, cost_usd=None, calls: int = 1) -> None:
+        """Record `calls` generated images of one asset kind ('splash' | 'sprite' | 'cards'). `cost_usd` is
+        ImageResult.cost_usd: real on OpenRouter, advisory on OpenAI, 0.0 procedural, None unknown — summed
+        exactly like the LLM metered cost (None stays None until some call reports a number). Thread-safe:
+        the card-art pool calls this from six worker threads. Never raises."""
+        try:
+            role = f"art:{str(kind or '').strip() or 'other'}"
+            model = str(model or "")
+            cost = _usd(cost_usd)
+            n = max(0, int(calls))
+        except (TypeError, ValueError):
+            return
+        if not n:
+            return
+        with self._lock:
+            row = self._art.setdefault((role, model), {"role": role, "model": model, "calls": 0,
+                                                       "cost_usd": None})
+            row["calls"] += n
+            if cost is not None:
+                row["cost_usd"] = (row["cost_usd"] or 0.0) + cost
 
     def rows(self) -> list[dict]:
+        """The LLM rows only — what the estimate, the BYOK 'this forge used…' summary and the token ledger
+        mean by usage. Art lives in art_rows()."""
         with self._lock:
             return [dict(r) for r in self._rows.values()]
+
+    def art_rows(self) -> list[dict]:
+        """One row per (asset kind, image model): {role: 'art:<kind>', model, calls, cost_usd}. Token
+        columns don't apply (an image call bills per image, not per token) and are written as 0."""
+        with self._lock:
+            return [dict(r) for r in self._art.values()]
+
+
+def _usd(value) -> float | None:
+    """A provider-reported USD amount as a float, or None when it isn't a usable number. A bool is NOT a
+    cost (True would otherwise meter as $1)."""
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _guard_outbound_url(base_url: str) -> None:

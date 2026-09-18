@@ -39,10 +39,12 @@ from forge import (ELEMENT_KINDS, VALID_FEEDBACK_CATEGORIES, ForgeError, UsageMe
 from models import (ForgeJob, ForgeUsage, ForgedCard, ForgedClass, Purchase, User,  # noqa: E402
                     free_token_available, new_slug, spend_token, unspend_token)
 
-# Splash art (Track 2/3): generated at persist time, written to static/forged/<id>/, served by nginx,
-# its URL embedded in the import code so the mod can fetch it. Backend is chosen by BTSGEN_IMAGE_BACKEND
-# (unset -> 'null' = no splash; 'procedural' = a free placeholder). Image gen never blocks a forge, and
-# btsgen.art is imported LAZILY (in _generate_splash) so a missing/broken art module can't stop app boot.
+# Generated art (Track 2/3): the class splash, the combat sprite, the relic icon and the per-card portrait
+# pack (cards.zip) are all made at persist time, written to static/forged/<id>/, served by nginx, and their
+# URLs embedded in the import code so the mod can fetch them. Backend is chosen by BTSGEN_IMAGE_BACKEND
+# (unset -> 'null' = no art; 'procedural' = a free placeholder; a comma list is a fallback chain). Image gen
+# never blocks a forge, and btsgen.art is imported LAZILY (inside each _generate_* helper) so a missing or
+# broken art module can't stop app boot.
 
 # Absolute base for asset URLs that travel OUTSIDE a request (embedded in the import code, read by the
 # mod). nginx serves /static/forged/ straight from disk; override per env (local: http://localhost:5000).
@@ -460,10 +462,16 @@ _pending_choices: dict[str, dict] = {}
 _choices_lock = threading.Lock()
 
 
+# Art kinds whose file is not <kind>.png. 'cards' is the per-card portrait PACK: one zip per class (~34
+# PNGs) so the mod's import does ONE download instead of ~34 synchronous ones on its UI thread.
+_ART_FILENAMES = {"cards": "cards.zip"}
+
+
 def _art_url(class_id: int, kind: str, digest: str | None = None) -> str:
-    """Absolute, public URL of a class's generated art file — kind is 'splash' or 'sprite' (nginx
-    serves it directly). The hash rides as a cache-bust query so a regenerated file isn't served stale."""
-    url = f"{PUBLIC_BASE_URL}/static/forged/{class_id}/{kind}.png"
+    """Absolute, public URL of a class's generated art file — kind is 'splash', 'sprite', 'relic' (a PNG
+    each) or 'cards' (the cards.zip pack); nginx serves the whole static/forged tree straight from disk.
+    The hash rides as a cache-bust query so a regenerated file isn't served stale."""
+    url = f"{PUBLIC_BASE_URL}/static/forged/{class_id}/{_ART_FILENAMES.get(kind, f'{kind}.png')}"
     return f"{url}?v={digest[:8]}" if digest else url
 
 
@@ -475,12 +483,12 @@ def _sprite_url(class_id: int, sprite_hash: str | None = None) -> str:
     return _art_url(class_id, "sprite", sprite_hash)
 
 
-def _generate_art(kind: str, class_id: int, out: dict, bundle: dict) -> str | None:
+def _generate_art(kind: str, class_id: int, out: dict, bundle: dict, meter=None) -> str | None:
     """Best-effort: render one art asset ('splash' = select-screen background, 'sprite' = the standing
     combat model) to static/forged/<id>/<kind>.png and return its content digest (or None if no backend
     is configured / generation failed). Mutates `bundle` in place to carry `<kind>_url` so the
-    re-encoded import code delivers it to the mod. NEVER raises — a forge must succeed even if image
-    generation doesn't."""
+    re-encoded import code delivers it to the mod. `meter` (a forge.UsageMeter) gets the image's model and
+    metered cost for the ledger. NEVER raises — a forge must succeed even if image generation doesn't."""
     try:
         from btsgen.art import class_art_from_bundle, forge_splash, forge_sprite  # lazy: never block app boot
         forge = forge_sprite if kind == "sprite" else forge_splash
@@ -488,6 +496,8 @@ def _generate_art(kind: str, class_id: int, out: dict, bundle: dict) -> str | No
         res = forge(class_art_from_bundle(out), out_path=dest)  # backend from BTSGEN_IMAGE_BACKEND
         if not (res.ok and res.path):
             return None
+        if meter is not None:  # one image, priced by whichever backend actually answered
+            meter.add_art(kind, res.model or res.backend, res.cost_usd)
         import hashlib
         digest = hashlib.sha256(res.path.read_bytes()).hexdigest()[:16]
         bundle[f"{kind}_url"] = _art_url(class_id, kind, digest)
@@ -519,11 +529,170 @@ def _generate_relic_icon(class_id: int, out: dict, bundle: dict) -> str | None:
         return None
 
 
-def _persist_class(user_id: int, concept: str, out: dict, forge_meta: dict | None = None) -> dict:
+# --- per-card portrait pack ----------------------------------------------------------------------
+# One illustration per card, delivered as ONE zip (static/forged/<id>/cards.zip) rather than ~34 URLs:
+# the mod fetches it once at import and unpacks it, instead of making ~34 synchronous HTTP calls on the
+# game's UI thread. Entry names are FLAT (`<card_id>.png`, no directories) because the mod flattens them
+# to the leaf anyway.
+#
+# The guardrails exist because this is the one step whose cost and wall-clock scale with the class: ~34
+# images at ~10 s and ~$0.004 each. Whichever of the two caps trips first stops the run and ships a
+# PARTIAL zip — the mod falls back to its per-type doodle for every card the pack is missing, so a
+# half-finished pack is a strictly better outcome than none, and far better than a forge that hangs.
+CARD_ART_WORKERS = 6            # IO-bound (the backends are HTTP); the 1-vCPU droplet is fine with six
+CARD_ART_BUDGET_S = 150.0       # wall clock for the whole pack (BTSWEB_CARD_ART_BUDGET_S)
+CARD_ART_MAX_USD = 0.40         # spend cap for the whole pack (BTSWEB_CARD_ART_MAX_USD)
+CARD_ART_PROGRESS_EVERY = 4     # SSE lines: one per N cards, so the page never looks hung
+
+
+def _env_float(name: str, default: float) -> float:
+    try:
+        raw = os.environ.get(name, "").strip()
+        return float(raw) if raw else float(default)
+    except (TypeError, ValueError):
+        return float(default)
+
+
+def _card_art_enabled() -> bool:
+    """BTSWEB_CARD_ART=0 turns the whole step off (kill-switch for a bad image vendor day)."""
+    return os.environ.get("BTSWEB_CARD_ART", "1").strip().lower() not in ("0", "false", "no", "off")
+
+
+def _card_art_id(card: dict, index: int) -> str:
+    """The zip entry stem for one card: its own id (that is what the mod looks a portrait up by), reduced
+    to filesystem-safe characters. Falls back to the ordinal so a card with no id still gets a file."""
+    raw = str((card or {}).get("id") or "").strip()
+    safe = "".join(c if (c.isalnum() or c in "-_") else "_" for c in raw)[:64].strip("_")
+    return safe or f"card_{index}"
+
+
+def _generate_card_art(class_id: int, out: dict, bundle: dict, on_event=None, meter=None) -> str | None:
+    """Best-effort: render one portrait per card into static/forged/<id>/cards/<card_id>.png, zip the
+    successes into static/forged/<id>/cards.zip, stamp `bundle["card_art_url"]` and return the zip's
+    content digest (None = nothing was produced — no backend, disabled, or every card failed).
+
+    Runs the cards on a CARD_ART_WORKERS-wide pool and stops early when either guardrail trips:
+    BTSWEB_CARD_ART_BUDGET_S wall clock or BTSWEB_CARD_ART_MAX_USD metered spend. "Stops" means the
+    not-yet-started cards are cancelled (in-flight ones are left to finish — killing them would waste
+    an image that is already paid for) and whatever succeeded is zipped and shipped.
+
+    `on_event(str)` receives "card art n/N" progress for the SSE stream; `meter` (a forge.UsageMeter)
+    collects the pack's model + metered cost for the forge_usage ledger. NEVER raises: identical contract
+    to _generate_art — a forge must succeed even when its art does not."""
+    from concurrent.futures import CancelledError, ThreadPoolExecutor, as_completed
+
+    def note(msg: str) -> None:
+        if on_event is not None:
+            try:
+                on_event(msg)
+            except Exception:  # noqa: BLE001 — a broken progress sink must never break a forge
+                pass
+
+    try:
+        if not _card_art_enabled():
+            return None
+        cards = [c for c in (out.get("cards") or []) if isinstance(c, dict)]
+        if not cards:
+            return None
+        from btsgen.art import class_art_from_bundle, forge_card_art  # lazy: never block app boot
+
+        art = class_art_from_bundle(out)  # built ONCE and shared: read-only, thread-safe
+        cards_dir = STATIC_FORGED_DIR / str(class_id) / "cards"
+        shutil.rmtree(cards_dir, ignore_errors=True)  # a re-run must never zip a previous run's art
+        cards_dir.mkdir(parents=True, exist_ok=True)
+
+        budget_s = _env_float("BTSWEB_CARD_ART_BUDGET_S", CARD_ART_BUDGET_S)
+        max_usd = _env_float("BTSWEB_CARD_ART_MAX_USD", CARD_ART_MAX_USD)
+        deadline = time.monotonic() + budget_s if budget_s > 0 else None
+        stop = threading.Event()
+        total = len(cards)
+
+        def render(card: dict, card_id: str):
+            if stop.is_set():   # a cap tripped while this one sat in the queue
+                return None
+            return forge_card_art(art, card, out_path=cards_dir / f"{card_id}.png")
+
+        made: dict[str, Path] = {}
+        spent = 0.0
+        done = 0
+        note(f"card art: {total} cards…")
+        pool = ThreadPoolExecutor(max_workers=max(1, CARD_ART_WORKERS))
+        try:
+            futures = {}
+            for i, card in enumerate(cards):
+                cid = _card_art_id(card, i)
+                futures[pool.submit(render, card, cid)] = cid
+            for fut in as_completed(futures):
+                cid = futures[fut]
+                try:
+                    res = fut.result()
+                except CancelledError:
+                    continue
+                except Exception as e:  # noqa: BLE001 — one bad card is not a failed forge
+                    app.logger.warning("card art %s failed for class %s: %s", cid, class_id, e)
+                    res = None
+                done += 1
+                if res is not None and res.ok and res.path:
+                    made[cid] = Path(res.path)
+                    if res.cost_usd:
+                        spent += float(res.cost_usd)
+                    if meter is not None:
+                        # model, else the backend name: the local backends report no model, and a ledger
+                        # row that names neither is unattributable a month later.
+                        meter.add_art("cards", res.model or res.backend, res.cost_usd)
+                if not stop.is_set():
+                    over_time = deadline is not None and time.monotonic() >= deadline
+                    over_cost = max_usd > 0 and spent >= max_usd
+                    if over_time or over_cost:
+                        stop.set()
+                        for f in futures:
+                            f.cancel()
+                        why = f"time budget ({int(budget_s)}s)" if over_time else f"cost cap (${max_usd:.2f})"
+                        note(f"card art: {why} reached at {len(made)}/{total} — shipping a partial pack")
+                        app.logger.warning("card art for class %s stopped early: %s (%d/%d done)",
+                                           class_id, why, len(made), total)
+                if done % CARD_ART_PROGRESS_EVERY == 0 or done == total:
+                    note(f"card art {done}/{total}…")
+        finally:
+            pool.shutdown(wait=True)
+
+        if not made:
+            shutil.rmtree(cards_dir, ignore_errors=True)  # don't leave an empty cards/ per class
+            note("card art: none produced")
+            return None
+
+        import hashlib
+        import io
+        import zipfile
+        buf = io.BytesIO()
+        # STORED, not deflated: PNG is already compressed, so deflating burns droplet CPU per class for
+        # ~0 bytes. Flat entry names, sorted, so the pack is reproducible for a given set of renders.
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as z:
+            for cid in sorted(made):
+                z.write(made[cid], arcname=f"{cid}.png")
+        blob = buf.getvalue()
+        (STATIC_FORGED_DIR / str(class_id) / "cards.zip").write_bytes(blob)
+        digest = hashlib.sha256(blob).hexdigest()[:16]
+        bundle["card_art_url"] = _art_url(class_id, "cards", digest)
+        note(f"card art: packed {len(made)}/{total} portraits")
+        return digest
+    except Exception as e:  # logged, swallowed — art is cosmetic, the class still ships
+        app.logger.warning("card art failed for class %s: %s", class_id, e)
+        return None
+
+
+def _persist_class(user_id: int, concept: str, out: dict, forge_meta: dict | None = None,
+                   on_event=None, meter=None) -> dict:
     """Save a forged class (+ denormalized card rows) for the user; return the detail shape. After the
     row gets its id, generate the art (best-effort) and re-encode the import code so it carries the
-    splash_url/sprite_url — the harness/forge_to_bundle is never touched. Splash + sprite are two
-    independent ~20s cloud calls, so they run concurrently (each writes a distinct bundle key).
+    splash_url/sprite_url/card_art_url — the harness/forge_to_bundle is never touched. Splash, sprite,
+    relic icon and the per-card portrait pack are independent cloud work, so they run concurrently (each
+    writes a distinct bundle key).
+
+    `on_event(str)` (the forge route's SSE sink) carries the card-art step's progress to the browser — it
+    is the long one (~34 images) and an unnarrated minute looks like a hang. `meter` (forge.UsageMeter)
+    collects every image's model + metered cost, which the route's _record_usage then writes as the
+    forge's `art:*` ledger rows.
 
     `forge_meta` (interactive forge mode) stamps how the class was made — offered/picked archetypes — into
     bundle_json for the guided-vs-unguided fun experiment. Analysis-only: stripped before encoding the
@@ -556,12 +725,16 @@ def _persist_class(user_id: int, concept: str, out: dict, forge_meta: dict | Non
         class_id = cls.id
 
     from concurrent.futures import ThreadPoolExecutor
-    with ThreadPoolExecutor(max_workers=3) as pool:
-        f_splash = pool.submit(_generate_art, "splash", class_id, out, bundle)
-        f_sprite = pool.submit(_generate_art, "sprite", class_id, out, bundle)
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        f_splash = pool.submit(_generate_art, "splash", class_id, out, bundle, meter)
+        f_sprite = pool.submit(_generate_art, "sprite", class_id, out, bundle, meter)
         f_relic = pool.submit(_generate_relic_icon, class_id, out, bundle)
+        # The card pack runs INSIDE this pool (it owns a nested worker pool of its own) so the code
+        # returned below already carries every URL — the mod gets one code, not a code plus a promise.
+        f_cards = pool.submit(_generate_card_art, class_id, out, bundle, on_event, meter)
         splash_digest, sprite_digest = f_splash.result(), f_sprite.result()
         relic_digest = f_relic.result()
+        cards_digest = f_cards.result()
 
     with session_scope() as s:
         cls = s.query(ForgedClass).filter_by(id=class_id).one_or_none()
@@ -570,7 +743,8 @@ def _persist_class(user_id: int, concept: str, out: dict, forge_meta: dict | Non
             raise RuntimeError("this class was deleted while its art was still generating")
         cls.splash_hash = splash_digest or cls.splash_hash
         cls.sprite_hash = sprite_digest or cls.sprite_hash
-        if splash_digest or sprite_digest or relic_digest:  # art made: re-encode the code so it delivers the URLs
+        cls.card_art_hash = cards_digest or cls.card_art_hash
+        if splash_digest or sprite_digest or relic_digest or cards_digest:  # re-encode so the code delivers the URLs
             cls.bundle_json = json.dumps(bundle, separators=(",", ":"))
             # the import code never carries forge_meta/archetypes — the mod payload stays identical to an
             # auto forge's (both are report/analysis data, not game content)
@@ -584,6 +758,8 @@ def _persist_class(user_id: int, concept: str, out: dict, forge_meta: dict | Non
             detail["sprite_url"] = _sprite_url(cls.id, sprite_digest)
         if relic_digest:
             detail["relic_icon_url"] = _art_url(cls.id, "relic", relic_digest)
+        if cards_digest:
+            detail["card_art_url"] = _art_url(cls.id, "cards", cards_digest)
         return detail
 
 
@@ -669,15 +845,22 @@ def _reconcile_forge_jobs() -> int:
     return n
 
 
-# Estimated provider prices in USD per MILLION tokens: (input, output, cache-read). Only the token path is our
-# cost; models on the Ollama flat plan are 0 until the plan's ceiling, OpenRouter overflow slugs carry the plan's
-# glm-5.2 rates. Override/extend with BTSWEB_MODEL_PRICES='{"model": [in, out, cached], ...}'. Unknown model
-# => est_cost NULL (recorded, not priced).
+# Estimated provider prices in USD per MILLION tokens: (input, output, cache-read). This is the FALLBACK
+# estimate only: when a call reports what it actually billed (OpenRouter's usage.cost) the ledger records that
+# in metered_cost_micros and every money reader prefers it — the table under-counted a real forge by 30-45% in
+# the 2026-09-18 A/B, which is why it is a fallback and not the number.
+#
+# Bare slugs (`gemma4:31b`, `glm-5.2`) are OLLAMA CLOUD, the last-resort tier: they were priced at 0 for the
+# flat plan, which Ollama retired for per-token billing on 2026-08-31 — a 0 there silently reported our most
+# expensive tier as free. Namespaced slugs are OpenRouter, fetched live from GET /api/v1/models on 2026-09-18.
+# Override/extend with BTSWEB_MODEL_PRICES='{"model": [in, out, cached], ...}'. Unknown model => est_cost NULL
+# (recorded, not priced).
 MODEL_PRICES: dict[str, tuple[float, float, float]] = {
-    "gemma4:31b": (0.0, 0.0, 0.0),
-    "glm-5.2": (0.0, 0.0, 0.0),
-    "z-ai/glm-5.2": (0.49, 1.56, 0.09),
-    "google/gemma-4-31b-it": (0.10, 0.30, 0.0),
+    "gemma4:31b": (0.14, 0.40, 0.05),          # Ollama Cloud per-token list
+    "glm-5.2": (1.40, 4.40, 0.26),             # Ollama Cloud per-token list
+    "z-ai/glm-5.3": (0.91, 2.86, 0.169),       # OpenRouter, the hosted primary since Step 1
+    "z-ai/glm-5.2": (0.5544, 1.7424, 0.10296),  # OpenRouter, the middle fallback tier
+    "google/gemma-4-31b-it": (0.09, 0.34, 0.05),  # OpenRouter, brainstorm at every tier
 }
 try:
     MODEL_PRICES.update({k: tuple(float(x) for x in v)  # type: ignore[misc]
@@ -688,12 +871,18 @@ except (ValueError, TypeError, AttributeError):
 
 def _record_usage(meter: UsageMeter, *, user_id: int, forge_id: str, mode: str, token_kind: str | None,
                   class_id: int | None, ok: bool, provider: str = "") -> None:
-    """Write one forge_usage row per (role, model) the forge touched. `provider` is WHERE the calls went
-    ("hosted" / "anthropic" / a BYOK hostname — never the key). Best-effort: never raises (telemetry must
-    not break a forge that already succeeded)."""
+    """Write one forge_usage row per (role, model) the forge touched — LLM calls AND the art the persist step
+    generated (role 'art:splash' / 'art:sprite' / 'art:cards', token columns 0). `provider` is WHERE the calls
+    went ("hosted" / "anthropic" / a BYOK hostname — never the key).
+
+    Two money columns per row: `est_cost_micros` is the MODEL_PRICES guess from the token counts (token path
+    only — a BYOK forge is billed to the user's own provider), `metered_cost_micros` is what the provider said
+    it actually charged (OpenRouter's usage.cost / ImageResult.cost_usd), NULL when nothing metered the row.
+
+    Best-effort: never raises (telemetry must not break a forge that already succeeded)."""
     try:
-        rows = meter.rows()
-        if not rows:
+        rows, art = meter.rows(), meter.art_rows()
+        if not (rows or art):
             return
         with session_scope() as s:
             for r in rows:
@@ -709,9 +898,28 @@ def _record_usage(meter: UsageMeter, *, user_id: int, forge_id: str, mode: str, 
                                  provider=provider or "",
                                  token_kind=token_kind, role=r["role"], model=r["model"], calls=r["calls"],
                                  input_tokens=r["input_tokens"], output_tokens=r["output_tokens"],
-                                 cached_tokens=r["cached_tokens"], est_cost_micros=cost, ok=1 if ok else 0))
+                                 cached_tokens=r["cached_tokens"], est_cost_micros=cost,
+                                 metered_cost_micros=_micros(r.get("cost_usd")), ok=1 if ok else 0))
+            for r in art:
+                # No est_cost for art: an image bills per image, not per token, and MODEL_PRICES is a
+                # per-token table. The metered number from the backend is the only price there is.
+                s.add(ForgeUsage(user_id=user_id, class_id=class_id, forge_id=forge_id, mode=mode,
+                                 provider=provider or "",
+                                 token_kind=token_kind, role=r["role"], model=r["model"], calls=r["calls"],
+                                 input_tokens=0, output_tokens=0, cached_tokens=0, est_cost_micros=None,
+                                 metered_cost_micros=_micros(r.get("cost_usd")), ok=1 if ok else 0))
     except Exception as e:  # noqa: BLE001
         app.logger.warning("forge_usage write failed (forge %s): %s", forge_id, e)
+
+
+def _micros(usd) -> int | None:
+    """USD float -> micro-dollars (the integer ledger unit), or None when nothing reported a cost."""
+    if usd is None:
+        return None
+    try:
+        return int(round(float(usd) * 1_000_000))
+    except (TypeError, ValueError):
+        return None
 
 
 @app.route("/api/forge-class", methods=["POST"])
@@ -861,7 +1069,10 @@ def forge_class_route():
                               "offered_archetypes": choice_meta.get("offered", []),
                               "picked_archetypes": choice_meta.get("picked", []),
                               "answered": choice_meta.get("answered", False)}
-            saved = _persist_class(user["id"], concept, out, forge_meta=forge_meta)
+            # on_event: the card-art step narrates itself over the same SSE stream the forge used.
+            # meter: its image costs join this forge's ledger rows (written by _record_usage below).
+            saved = _persist_class(user["id"], concept, out, forge_meta=forge_meta,
+                                   on_event=on_event, meter=meter)
         except Exception as e:
             finish_failed(f"forged, but saving failed: {e}")
             return
@@ -1038,11 +1249,17 @@ _ESTIMATE_FIELDS = ("calls", "input_tokens", "cached_tokens", "output_tokens")
 def forge_estimate():
     """Average LLM consumption of one forge, from the last FORGE_ESTIMATE_SAMPLE successful forges in the
     usage ledger (any mode — the staged front-end does the same work whoever pays for it). The BYOK panel
-    shows it before the user hands over a key. Falls back to measured constants on an empty ledger."""
+    shows it before the user hands over a key. Falls back to measured constants on an empty ledger.
+
+    `art:*` rows are excluded: this number answers "what will one forge put on MY provider bill" for a BYOK
+    user, and art is generated on OUR image key regardless of who pays for the tokens — folding ~35 image
+    "calls" (and their zero token counts) in would only make the quote wrong in both directions."""
+    from sqlalchemy import func as sa_func
     with session_scope() as s:
         rows = (s.query(ForgeUsage.forge_id, ForgeUsage.calls, ForgeUsage.input_tokens,
                         ForgeUsage.cached_tokens, ForgeUsage.output_tokens)
-                .filter(ForgeUsage.ok == 1)
+                .filter(ForgeUsage.ok == 1,
+                        sa_func.coalesce(ForgeUsage.role, "").notlike("art:%"))
                 .order_by(ForgeUsage.created_at.desc(), ForgeUsage.id.desc())
                 .all())
     # One query, grouped in Python: rows arrive newest-first, so the first FORGE_ESTIMATE_SAMPLE distinct
@@ -1143,6 +1360,8 @@ def deck_resolve(slug: str):
             detail["splash_url"] = _splash_url(cls.id, cls.splash_hash)
         if cls.sprite_hash:
             detail["sprite_url"] = _sprite_url(cls.id, cls.sprite_hash)
+        if cls.card_art_hash:
+            detail["card_art_url"] = _art_url(cls.id, "cards", cls.card_art_hash)
         return jsonify(detail)
 
 
@@ -1301,8 +1520,9 @@ def admin_stats():
         jq = s.query(ForgeJob.user_id, ForgeJob.mode, ForgeJob.token_kind, ForgeJob.status,
                      ForgeJob.refunded, ForgeJob.started_at)
         uq = s.query(ForgeUsage.forge_id, ForgeUsage.mode, ForgeUsage.provider, ForgeUsage.model,
-                     ForgeUsage.calls, ForgeUsage.input_tokens, ForgeUsage.output_tokens,
-                     ForgeUsage.cached_tokens, ForgeUsage.est_cost_micros)
+                     ForgeUsage.role, ForgeUsage.calls, ForgeUsage.input_tokens, ForgeUsage.output_tokens,
+                     ForgeUsage.cached_tokens, ForgeUsage.est_cost_micros,
+                     ForgeUsage.metered_cost_micros)
         pq = s.query(Purchase.tokens, Purchase.amount_cents).filter(Purchase.status == "paid")
         if since is not None:
             jq = jq.filter(ForgeJob.started_at >= since)
@@ -1333,6 +1553,11 @@ def admin_stats():
 
     # Hosted = the "Use a token" path: the only rows whose bill is ours. est_cost_usd stays null (rather
     # than 0.0) when NO row carried a price, so "free on the flat plan" and "unpriced model" stay distinct.
+    # Per row we prefer the METERED cost (what the provider actually billed) and fall back to the rate-table
+    # estimate — mixing is deliberate: a forge's glm rows are metered by OpenRouter while an Ollama-tier row
+    # never is, and half a real number beats a whole guess. The token/call counters skip `art:*` rows: an
+    # image call has no tokens, and counting it as a "call" would corrupt the per-forge LLM averages. Its
+    # COST is still ours and is counted.
     hosted = {"forges": 0, "calls": 0, "input_tokens": 0, "cached_tokens": 0, "output_tokens": 0,
               "est_cost_usd": None}
     hosted_forge_ids: set[str] = set()
@@ -1340,12 +1565,15 @@ def admin_stats():
     models: dict[tuple, dict] = {}
     providers: dict[str, set] = {}
     for r in usage:
+        is_art = str(r.role or "").startswith("art:")
         if r.mode == "token":
             hosted_forge_ids.add(r.forge_id)
-            for f in ("calls", "input_tokens", "cached_tokens", "output_tokens"):
-                hosted[f] += int(getattr(r, f) or 0)
-            if r.est_cost_micros is not None:
-                cost_micros += int(r.est_cost_micros)
+            if not is_art:
+                for f in ("calls", "input_tokens", "cached_tokens", "output_tokens"):
+                    hosted[f] += int(getattr(r, f) or 0)
+            billed = r.metered_cost_micros if r.metered_cost_micros is not None else r.est_cost_micros
+            if billed is not None:
+                cost_micros += int(billed)
                 priced = True
         key = (r.model or "", r.provider or "", r.mode or "")
         m = models.setdefault(key, {"model": key[0], "provider": key[1], "mode": key[2], "forges": set(),

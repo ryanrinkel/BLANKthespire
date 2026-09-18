@@ -50,6 +50,9 @@ def app_module():
     app_mod.app.config["TESTING"] = True
     # Art is cosmetic and the relic icon would hit the Twemoji CDN — never in tests.
     app_mod._generate_relic_icon = lambda *a, **k: None
+    # Generated art (splash/sprite/cards.zip) goes to the throwaway temp tree: a test run must never
+    # litter the real web/static/forged/ with classes the repo's own deploy then serves.
+    app_mod.STATIC_FORGED_DIR = _TMP / "forged"
     return app_mod
 
 
