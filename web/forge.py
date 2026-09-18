@@ -171,18 +171,12 @@ def _build_generators(key: dict | None, hosted: bool, fake: bool, model: str | N
                                                      on_usage=on_usage)
         return blueprint_gen, card_factory, relic_gen
 
-    if hosted:  # our Anthropic key (server-side secret, never sent to the browser)
-        from btsgen.generator import AnthropicGenerator
-        # 48000: headroom for adaptive thinking + full-blueprint repair (shared budget; truncation → unparseable
-        # JSON). Safe under every hosted model's output cap (Haiku 4.5 / Sonnet 4.6 = 64K, Opus 4.8 = 128K).
-        try:
-            blueprint_gen = AnthropicGenerator(model=model, contract_mod=_BlueprintContract(triad=False), max_tokens=48000)
-        except RuntimeError as e:
-            raise ForgeError(f"hosted generation unavailable: {e}") from e
-        relic_gen = AnthropicGenerator(model=model, contract_mod=_RelicContract(), max_tokens=6000)
-        return blueprint_gen, (lambda: AnthropicGenerator(model=model)), relic_gen
+    if hosted:  # REMOVED 2026-09-18: the server holds no Anthropic credential for forges. Token forges run on
+        # the Ollama mixture (OpenRouter failover) via `ollama_mix`; Anthropic is reachable ONLY through a
+        # user's own BYOK key above. Kept as an explicit refusal so a stray hosted=True can never bill us.
+        raise ForgeError("the server-side Anthropic path is retired — use a token or bring your own API key.")
 
-    raise ForgeError("no generation path selected (need a BYOK key, the hosted option, or fake).")
+    raise ForgeError("no generation path selected (need a BYOK key, a token, or fake).")
 
 
 # Server-side off-vocab gap capture. The staged front-end surfaces mechanics the theme wants but the engine
@@ -324,11 +318,9 @@ def _make_gen_factory(key: dict | None, hosted: bool, fake: bool, model: str | N
         return lambda contract_mod, *, max_tokens: OpenAICompatGenerator(
             base_url, api_key, m, contract_mod=contract_mod, max_tokens=max_tokens, timeout=300,
             on_usage=on_usage)
-    if hosted:
-        from btsgen.generator import AnthropicGenerator
-        return lambda contract_mod, *, max_tokens: AnthropicGenerator(
-            model=model, contract_mod=contract_mod, max_tokens=max_tokens)
-    raise ForgeError("no generation path selected (need a BYOK key, the hosted option, or fake).")
+    if hosted:  # see _build_generators: no server-side Anthropic credential, ever
+        raise ForgeError("the server-side Anthropic path is retired — use a token or bring your own API key.")
+    raise ForgeError("no generation path selected (need a BYOK key, a token, or fake).")
 
 
 def list_models(base_url: str, api_key: str) -> list[str]:

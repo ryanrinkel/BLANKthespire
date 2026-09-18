@@ -191,13 +191,15 @@ spine — lean into it rather than discarding a mapping.
 
 """ + lines_ask + """
 
+NAMING: if the theme names a specific real or fictional person, character, creature or thing, the class "name" IS that subject's actual name — the full name where one exists ("Truman from the Truman Show" -> "Truman Burbank", "gandalf" -> "Gandalf the Grey") — optionally followed by a comma and a 2-3 word epithet ("Truman Burbank, Ad-Lib Escapee"). NEVER replace a named subject with a generic title ("The Escapee", "The Grey Pilgrim"). Only an unnamed theme gets an invented title.
+
 Output EXACTLY ONE JSON object, nothing else:
 {
   "mappings": [
     { "cluster": "cluster name", "archetype_id": "an id from the catalog", "metaphor": "the resonance, one line", "off_vocab": false }
   ],
   "candidates": [
-    { "name": "<= 24 chars", "fantasy": "the class fantasy in one line", """ + ids_schema + """
+    { "name": "<= 32 chars", "fantasy": "the class fantasy in one line", """ + ids_schema + """
 """ + lines_schema + """
       "core_loop": "the turn-to-turn play loop",
       "weakness": "where the class is vulnerable", "suggested_max_hp": 72 }
@@ -445,10 +447,12 @@ reusable mechanical engines. """ + fuse + """
 
 """ + lines_ask + """
 
+NAMING: if the theme names a specific real or fictional person, character, creature or thing, the class "name" IS that subject's actual name — the full name where one exists ("Truman from the Truman Show" -> "Truman Burbank", "gandalf" -> "Gandalf the Grey") — optionally followed by a comma and a 2-3 word epithet ("Truman Burbank, Ad-Lib Escapee"). NEVER replace a named subject with a generic title ("The Escapee", "The Grey Pilgrim"). Only an unnamed theme gets an invented title.
+
 Output EXACTLY ONE JSON object, nothing else:
 {
   "candidates": [
-    { "name": "<= 24 chars", "fantasy": "the class fantasy in one line", """ + ids_schema + """
+    { "name": "<= 32 chars", "fantasy": "the class fantasy in one line", """ + ids_schema + """
 """ + lines_schema + """
       "core_loop": "the turn-to-turn play loop",
       "weakness": "where the class is vulnerable", "suggested_max_hp": 72 }

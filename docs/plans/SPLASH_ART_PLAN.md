@@ -125,6 +125,27 @@ in `_persist_class`, before the result event) — candidate to make async later.
 background (`CustomCharacterSelectBg`, a scene) is intentionally left for Track 2's generated splash.
 Original design below.
 
+**Second cloud backend BUILT 2026-09-17:** `backends/openrouter.py` — OpenRouter's unified Image API
+(`POST /api/v1/images`, ~50 models behind one key: Qwen Image 3, Seedream, FLUX.2, Nano Banana, Recraft,
+GPT Image 2.5). Same stdlib-urllib shape as openai.py. `OPENROUTER_API_KEY`; `BTSGEN_OPENROUTER_MODEL`
+(default `qwen/qwen-image-3`, $0.03/img at 1K, ~50 s); `BTSGEN_OPENROUTER_SPRITE_MODEL` (default
+`openai/gpt-image-2.5-flare` — only the GPT Image family and Sourceful Riverflow offer transparent output
+there). Sends `StyleProfile.ref_images` as `input_references` (base64 data URLs) — the first backend to
+honor them. Reports the metered `usage.cost` and the model in the sidecar (`ImageResult.model`). Live A/B
+2026-09-17 on five prod prompts: Qwen alone ≈ gpt-image-2's painterly-realistic look at 2/3 the cost;
+Qwen + three STS2 character-select portraits as refs (+ a one-sentence style prefix, $0.039) shifts the
+output to the game's own cel-shaded ink-outline style — the style-consistency lever this plan wanted.
+Select with `BTSGEN_IMAGE_BACKEND=openrouter`.
+
+**Style + literalness (same day):** a second A/B showed the references were not the lever — DESCRIBING the look
+in words ("confident dark ink outlines, flat cel-shaded color blocks, simplified graphic shapes...") reproduces the
+game's style on its own at $0.03, while merely naming Slay the Spire changed nothing. `DEFAULT_STYLE` /
+`SPRITE_STYLE` now carry that description. Literalness: `prompt.py` always leads with the player's verbatim
+concept (`The player asked for: "..."` — even when enrichment replaces the theme lines), `enrich.py` is told
+to keep named subjects recognizable, and the front-end's candidate prompts (`stage_map.py`) + the blueprint
+schema name a NAMED subject by its real name plus an optional epithet ("Truman Burbank, Ad-Lib Escapee";
+cap raised 24 -> 32 chars, the validator's limit).
+
 
 
 The 4 `ForgedCharacterSlotKK` (and `BlankTheSpire`) extend `PlaceholderCharacterModel`, which falls

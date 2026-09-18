@@ -610,7 +610,7 @@ a deep class from a pile of synergies.
 
 # THE BLUEPRINT FORMAT (output EXACTLY this shape, a single JSON object, nothing else)
 {{
-  "name": "<= 24 chars",
+  "name": "<= 32 chars; a subject NAMED in the concept keeps its real name, + optional ', epithet'",
   "description": "<= 160 chars, the class fantasy",
   "max_hp": 70,
   "max_energy": 3,
@@ -946,7 +946,7 @@ for a second signature under the card cap)."""
         c = brief.candidate
         seed = {"orb": "orb", "status": "status", "summon": "summon"}.get(c.class_kind, "")
         bp = _fake_blueprint(ClassBrief(concept=seed))
-        bp["name"] = (c.name or bp["name"])[:24]
+        bp["name"] = (c.name or bp["name"])[:32]  # the validator's cap; front-end names may carry an epithet
         bp["description"] = (c.fantasy or bp["description"])[:160]
         bp["max_hp"] = int(c.suggested_max_hp)
         ids = list(c.archetype_ids) or ["a", "b"]

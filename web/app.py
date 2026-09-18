@@ -302,7 +302,14 @@ def _user_end(user_id: int) -> None:
 
 # The hosted path on our ANTHROPIC key (`mode=hosted`) is retired: it is no longer reachable by any request
 # (it used to be an allowlisted invite path, but a hand-crafted POST could still aim Opus-class spend at our
-# key). The public paths are the token forge (our Ollama mix) and BYOK.
+# key). The public paths are the token forge (our Ollama mix, OpenRouter failover) and BYOK.
+#
+# Belt AND braces (2026-09-18): the website holds NO Anthropic credential of its own. BYOK-Anthropic users
+# pass their key per request (used once, never stored); token forges never touch Anthropic as primary OR
+# fallback. btsgen's AnthropicGenerator falls back to $ANTHROPIC_API_KEY when given no explicit key, so blank
+# it in this process — a stray construction then fails loudly instead of billing our account. (load_env()
+# only setdefault()s, so a generation/.env can't re-inject it either.)
+os.environ["ANTHROPIC_API_KEY"] = ""
 
 # --- pages --------------------------------------------------------------------------------------
 
