@@ -248,6 +248,7 @@ class OpenAICompatGenerator:
         usage: dict | None = None
         reasoning_chars = 0
         finish_reason: str | None = None
+        provider: str | None = None  # OpenRouter names the upstream that served the call (per chunk)
         with urllib.request.urlopen(req, timeout=self.timeout) as resp:
             if "text/event-stream" not in (resp.headers.get("Content-Type") or ""):
                 data = json.loads(resp.read().decode("utf-8"))
@@ -255,7 +256,7 @@ class OpenAICompatGenerator:
                     msg = data["choices"][0]
                     self.last_meta = {"finish_reason": msg.get("finish_reason"),
                                       "content_chars": len(msg["message"].get("content") or ""),
-                                      "reasoning_chars": 0}
+                                      "reasoning_chars": 0, "provider": data.get("provider")}
                 except (KeyError, IndexError, TypeError):
                     self.last_meta = {}
                 return data
@@ -274,6 +275,8 @@ class OpenAICompatGenerator:
                     continue
                 if isinstance(chunk.get("usage"), dict):
                     usage = chunk["usage"]
+                if isinstance(chunk.get("provider"), str):
+                    provider = chunk["provider"]
                 for choice in chunk.get("choices") or []:
                     delta = (choice or {}).get("delta") or {}
                     piece = delta.get("content")
@@ -288,7 +291,7 @@ class OpenAICompatGenerator:
                     if (choice or {}).get("finish_reason"):
                         finish_reason = choice["finish_reason"]
         self.last_meta = {"finish_reason": finish_reason, "content_chars": len("".join(parts)),
-                          "reasoning_chars": reasoning_chars}
+                          "reasoning_chars": reasoning_chars, "provider": provider}
         return {"choices": [{"message": {"content": "".join(parts)}}], "usage": usage}
 
     def _post_with_retry(self, payload: dict) -> dict:

@@ -264,6 +264,8 @@ class BlueprintBuilder:
         parts = [f"finish={meta.get('finish_reason') or '?'}", f"content={meta.get('content_chars', 0)}ch"]
         if meta.get("reasoning_chars"):
             parts.append(f"hidden reasoning={meta['reasoning_chars']}ch")
+        if meta.get("provider"):  # OpenRouter routes one slug across several upstreams; name the culprit
+            parts.append(f"provider={meta['provider']}")
         why = ""
         if meta.get("finish_reason") == "length":
             why = " — token budget exhausted" + (

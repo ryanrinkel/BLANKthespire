@@ -236,7 +236,7 @@ def test_extra_body_and_last_meta() -> None:
         return _FakeResp(_sse([
             {"choices": [{"delta": {"reasoning": "let me think about this at great length"}}]},
             {"choices": [{"delta": {"content": "par"}}]},
-            {"choices": [{"delta": {"content": "tial"}, "finish_reason": "length"}]},
+            {"provider": "Venice", "choices": [{"delta": {"content": "tial"}, "finish_reason": "length"}]},
             "[DONE]",
         ]))
 
@@ -249,6 +249,7 @@ def test_extra_body_and_last_meta() -> None:
     check(gen.last_meta.get("reasoning_chars") == len("let me think about this at great length"),
           "last_meta must count hidden-reasoning chars")
     check(gen.last_meta.get("content_chars") == len("partial"), "last_meta must count content chars")
+    check(gen.last_meta.get("provider") == "Venice", "last_meta must name the upstream that served the call")
 
     # A reasoning-only response (no visible content) must come back empty with the meta explaining it.
     def fake_reasoning_only(req, timeout=None):
