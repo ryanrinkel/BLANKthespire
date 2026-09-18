@@ -495,6 +495,7 @@ def _generate_art(kind: str, class_id: int, out: dict, bundle: dict, meter=None)
         dest = STATIC_FORGED_DIR / str(class_id) / f"{kind}.png"
         res = forge(class_art_from_bundle(out), out_path=dest)  # backend from BTSGEN_IMAGE_BACKEND
         if not (res.ok and res.path):
+            app.logger.warning("%s not produced for class %s: %s", kind, class_id, res.error or "no backend")
             return None
         if meter is not None:  # one image, priced by whichever backend actually answered
             meter.add_art(kind, res.model or res.backend, res.cost_usd)
@@ -632,6 +633,10 @@ def _generate_card_art(class_id: int, out: dict, bundle: dict, on_event=None, me
                     app.logger.warning("card art %s failed for class %s: %s", cid, class_id, e)
                     res = None
                 done += 1
+                if res is not None and not res.ok:
+                    why = str(res.error or "no backend")[:160]
+                    app.logger.warning("card art %s not produced for class %s: %s", cid, class_id, why)
+                    note(f"card art: {cid} not produced ({why})")
                 if res is not None and res.ok and res.path:
                     made[cid] = Path(res.path)
                     if res.cost_usd:

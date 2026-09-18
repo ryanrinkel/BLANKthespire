@@ -66,9 +66,35 @@ def forge_card_art(source, card: dict, *, backend=None, style: StyleProfile | No
             if dims:
                 res.width, res.height = dims
 
-    return _forge_asset("card", build, source, backend=backend, style=style, out_dir=out_dir,
-                        out_path=out_path, on_event=on_event, stem_suffix=_slug(card_id),
-                        enrich=False, postprocess=post)
+    res = _forge_asset("card", build, source, backend=backend, style=style, out_dir=out_dir,
+                       out_path=out_path, on_event=on_event, stem_suffix=_slug(card_id),
+                       enrich=False, postprocess=post)
+    if res.ok or not looks_moderated(res.error) or not card_flavor_line(card):
+        return res
+    # The card's own prose tripped a safety filter ("Gallows Humor — laughs hardest with a noose at his
+    # throat" was blocked by BOTH ladder rungs, 2026-09-18). The name+type alone almost always passes, and a
+    # portrait from the name beats the type doodle. One retry, no prose.
+    if on_event:
+        on_event(f"card art: '{card.get('name') or card_id}' was flagged by moderation — retrying without its flavor text")
+    bare = {k: v for k, v in card.items() if k not in _FLAVOR_KEYS}
+
+    def build_bare(art: ClassArt, st: StyleProfile, enriched_body: str | None = None) -> str:
+        return card_prompt(art, bare, st)
+
+    retry = _forge_asset("card", build_bare, source, backend=backend, style=style, out_dir=out_dir,
+                         out_path=out_path, on_event=on_event, stem_suffix=_slug(card_id),
+                         enrich=False, postprocess=post)
+    return retry if retry.ok else res
+
+
+_MODERATION_MARKERS = ("moderation", "flagged", "safety", "content policy", "blocked this request",
+                       "content_policy", "safety_violations", "rejected by the safety")
+
+
+def looks_moderated(error) -> bool:
+    """Whether a backend error reads like a content-safety block rather than a transport/param fault."""
+    e = str(error or "").lower()
+    return any(m in e for m in _MODERATION_MARKERS)
 
 
 def card_prompt(art: ClassArt, card: dict, style: StyleProfile) -> str:

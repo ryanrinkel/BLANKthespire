@@ -15,6 +15,7 @@ from btsgen.art import (CARD_PORTRAIT_SIZE, CARD_STYLE, DEFAULT_STYLE, ClassArt,
 from btsgen.art import card as card_mod
 from btsgen.art.backends import openai as openai_backend
 from btsgen.art.backends import openrouter as orb
+from btsgen.art.backends.openrouter import nearest_ratio
 from btsgen.art.png import encode_rgb
 
 _CARD = {"id": "jack_in_iron", "name": "Jack in Iron", "type": "attack", "rarity": "rare",
@@ -288,6 +289,57 @@ def test_card_kind_asks_the_openai_family_for_an_opaque_scene(tmp_path, monkeypa
     body = real(orb.OpenRouterImageBackend(), ImageRequest(prompt="x", out_path=tmp_path / "x.png", size=(1536, 1024), kind="card"),
                 model="openai/gpt-5-image-mini")
     assert "background" not in body
+
+
+def test_openai_family_snaps_to_the_ratios_openrouter_routes():
+    """Live 2026-09-18: a 16:9 splash on openai/gpt-5-image-mini 400s ("Accepted: 1:1, 3:2, 2:3, auto") and
+    every hosted splash silently fell through to the direct-OpenAI backend."""
+    assert nearest_ratio((1024, 576)) == "16:9"
+    assert nearest_ratio((1024, 576), allowed=orb.allowed_ratios("openai/gpt-5-image-mini")) == "3:2"
+    assert nearest_ratio((1024, 1536), allowed=orb.allowed_ratios("openai/gpt-image-2.5-flare")) == "2:3"
+    assert orb.allowed_ratios("black-forest-labs/flux.2-klein-4b") is None
+    assert nearest_ratio((1024, 576), allowed=orb.allowed_ratios("qwen/qwen-image-3")) == "16:9"
+    body = orb.OpenRouterImageBackend().build_payload(
+        ImageRequest(prompt="x", out_path="x.png", size=(1024, 576), kind="splash"), model="openai/gpt-5-image-mini")
+    assert body["aspect_ratio"] == "3:2"
+
+
+def test_moderated_prose_retries_once_without_the_flavor_line(tmp_path, monkeypatch):
+    """'Gallows Humor — laughs hardest with a noose at his throat' was blocked by both ladder rungs; the
+    name+type prompt alone passes. One bare retry, and the flavor text must be gone from it."""
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test")
+    prompts: list = []
+    real = orb.OpenRouterImageBackend.build_payload
+
+    def spy(self, req, **kw):
+        body = real(self, req, **kw)
+        prompts.append(body["prompt"])
+        return body
+    monkeypatch.setattr(orb.OpenRouterImageBackend, "build_payload", spy)
+    def blocked():  # a fresh error per rung: HTTPError's body is a one-shot stream
+        return HTTPError("https://openrouter.ai/api/v1/images", 400, "err", {},
+                         io.BytesIO(b'{"error":{"message":"Black Forest Labs blocked this request: it was flagged for self-harm content."}}'))
+    seen: list = []
+    _script(monkeypatch, [blocked(), blocked(), _ok_body()], seen)  # mini blocks, FLUX blocks, then bare mini ok
+    card = dict(_CARD, name="Gallows Humor", flavor="Laughs hardest with a noose at his throat.")
+    events: list = []
+    res = forge_card_art(ClassArt(class_id="pyre", name="Pyre"), card, backend="openrouter",
+                         out_dir=tmp_path, portrait_size=None, on_event=events.append)
+    assert res.ok and [m for m, _ in seen] == ["openai/gpt-5-image-mini", "black-forest-labs/flux.2-klein-4b",
+                                               "openai/gpt-5-image-mini"]
+    assert "noose" in prompts[0] and "noose" not in prompts[-1] and "Gallows Humor" in prompts[-1]
+    assert any("moderation" in e for e in events)
+    assert card_mod.looks_moderated("HTTP 400: content_policy_violation") and not card_mod.looks_moderated("HTTP 502: upstream")
+
+
+def test_non_moderation_failure_does_not_retry(tmp_path, monkeypatch):
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test")
+    seen: list = []
+    _script(monkeypatch, [_http(400), _http(400)], seen)  # both rungs 400 on a param: no bare retry
+    card = dict(_CARD, flavor="Some prose.")
+    res = forge_card_art(ClassArt(class_id="pyre", name="Pyre"), card, backend="openrouter",
+                         out_dir=tmp_path, portrait_size=None)
+    assert not res.ok and len(seen) == 2
 
 
 def test_card_ladder_skips_the_retry_on_a_hard_failure(tmp_path, monkeypatch):

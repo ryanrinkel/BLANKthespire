@@ -66,6 +66,17 @@ _KINDS = ("splash", "sprite", "card")
 
 # Ratios every mainstream image model on OpenRouter accepts; a request's pixel size snaps to the nearest.
 _RATIOS = {"1:1": 1.0, "3:2": 1.5, "2:3": 2 / 3, "4:3": 4 / 3, "3:4": 0.75, "16:9": 16 / 9, "9:16": 9 / 16}
+# Per model family, the aspect_ratio tags OpenRouter will actually route (live 2026-09-18: "OpenAI:
+# aspect_ratio: not supported. Accepted: 1:1, 3:2, 2:3, auto" for a 16:9 splash — every hosted splash was
+# silently falling through to the direct-OpenAI backend). Families not listed take any _RATIOS tag.
+_FAMILY_RATIOS = {"openai/": ("1:1", "3:2", "2:3")}
+
+
+def allowed_ratios(model: str | None) -> tuple[str, ...] | None:
+    for prefix, tags in _FAMILY_RATIOS.items():
+        if (model or "").lower().startswith(prefix):
+            return tags
+    return None
 
 _MIME = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
 
@@ -146,7 +157,7 @@ class OpenRouterImageBackend:
         model = model or self.model_for(req)
         body: dict = {
             "model": model, "prompt": req.prompt, "n": 1,
-            "aspect_ratio": nearest_ratio(req.size),
+            "aspect_ratio": nearest_ratio(req.size, allowed=allowed_ratios(model)),
             "quality": (quality or self.quality_for(req)).strip().lower(),
             "output_format": "png",
         }
@@ -276,11 +287,13 @@ def _transient(res: ImageResult | None) -> bool:
     return False
 
 
-def nearest_ratio(size: tuple[int, int]) -> str:
-    """Snap a pixel size to the closest common aspect-ratio tag (compared in log space so 2:3 vs 3:2 is symmetric)."""
+def nearest_ratio(size: tuple[int, int], allowed=None) -> str:
+    """Snap a pixel size to the closest aspect-ratio tag (compared in log space so 2:3 vs 3:2 is symmetric).
+    `allowed` restricts the candidates to what the serving model family accepts (see _FAMILY_RATIOS)."""
     w, h = size
     target = math.log(max(w, 1) / max(h, 1))
-    return min(_RATIOS, key=lambda k: abs(math.log(_RATIOS[k]) - target))
+    tags = [t for t in (allowed or _RATIOS) if t in _RATIOS] or list(_RATIOS)
+    return min(tags, key=lambda k: abs(math.log(_RATIOS[k]) - target))
 
 
 def png_dimensions(data: bytes) -> tuple[int, int] | None:
