@@ -10,8 +10,10 @@ What we learned from the 2026-09-17/18 A/B runs (memory notes `e2e-route-ab-2026
 3. **Cost truth:** OpenRouter meters real cost per call; our rate table under-counts by 30-45% and the Ollama
    rows are priced at $0. Record metered cost, price art, stop guessing.
 
-Status (2026-09-18): Steps 0-4 BUILT and committed (2e8ed40..3548f5f); Step 5 (droplet rollout, Workshop
-update of v0.2.2) NOT yet run. Deviations from the plan as written: card renders ask the OpenAI family for
+Status (2026-09-18): Steps 0-5 DONE (2e8ed40..9e6facc). Droplet rolled out 2026-09-18 22:00 UTC; live forge
+class 48 'Dead-Eye Drifter' (34 cards, 33 portraits + 1 moderated) cost $0.928 metered (LLM $0.787 on glm-5.3,
+art $0.14). Still open: Workshop item 3803255976 update to v0.2.2, and an in-game import of a class with
+`card_art_url` to prove the mod's zip download+unpack path. Deviations from the plan as written: card renders ask the OpenAI family for
 `background=opaque` (mini returned half-transparent cut-outs unasked; `BTSGEN_IMAGE_CARD_BACKGROUND=auto`
 reverts); portraits are 256-colour quantized by default (`BTSGEN_CARD_ART_COLORS=0` for lossless) because a
 lossless 1000x760 portrait is ~765 KB, not ~150 KB, so a class zip is ~14 MB opaque/quantized (~26 MB
