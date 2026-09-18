@@ -53,6 +53,7 @@ def test_splash_payload_and_result(tmp_path, monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-test")
     monkeypatch.delenv("BTSGEN_OPENROUTER_MODEL", raising=False)
     monkeypatch.delenv("BTSGEN_OPENROUTER_RESOLUTION", raising=False)
+    monkeypatch.delenv("BTSGEN_IMAGE_QUALITY", raising=False)
     seen: dict = {}
     _fake_response(monkeypatch, seen, encode_rgb(4, 2, bytes(4 * 2 * 3)), cost=0.03)
     res = forge_splash(ClassArt(class_id="cryo", name="Cryo"), backend="openrouter",
@@ -60,6 +61,8 @@ def test_splash_payload_and_result(tmp_path, monkeypatch):
     assert res.ok and res.backend == "openrouter" and res.model == orb.DEFAULT_MODEL
     assert (res.width, res.height) == (4, 2)  # measured from the returned PNG, not assumed
     assert res.cost_usd == 0.03  # metered cost from the response
+    # 2026-09-18: the splash default moved off qwen/qwen-image-3 to the A/B winner (Qwen is one env flip away)
+    assert orb.DEFAULT_MODEL == "openai/gpt-5-image-mini" and seen["quality"] == "low"
     assert seen["model"] == orb.DEFAULT_MODEL and seen["aspect_ratio"] == "16:9"
     assert seen["output_format"] == "png" and "background" not in seen and "resolution" not in seen
     assert "input_references" not in seen
@@ -75,7 +78,7 @@ def test_sprite_uses_transparent_capable_model(tmp_path, monkeypatch):
     _fake_response(monkeypatch, seen, encode_rgb(2, 2, bytes(2 * 2 * 3)))
     res = forge_sprite(ClassArt(class_id="cryo", name="Cryo"), backend="openrouter", out_dir=tmp_path)
     assert res.ok and seen["background"] == "transparent" and seen["aspect_ratio"] == "2:3"
-    assert seen["model"] == orb.DEFAULT_SPRITE_MODEL  # qwen has no alpha output; sprites route elsewhere
+    assert seen["model"] == orb.DEFAULT_SPRITE_MODEL  # the splash model has no alpha output; sprites route elsewhere
 
 
 def test_env_and_ctor_overrides(tmp_path, monkeypatch):

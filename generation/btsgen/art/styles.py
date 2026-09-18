@@ -41,3 +41,17 @@ SPRITE_STYLE = StyleProfile(
     out_format="png",
     transparent=True,
 )
+
+# One illustration per CARD (art/card.py). Deliberately the SAME prompt suffix object as DEFAULT_STYLE so a
+# class's splash, sprite and 34 card portraits read as one artwork — a card style that drifts from the splash
+# is the failure mode this profile exists to prevent. 1536x1024 snaps to "3:2", the only landscape ratio the
+# OpenAI image family accepts on OpenRouter (4:3 is rejected); the renders are then cropped to the mod's
+# 1000x760 portrait box. The negative is tighter than DEFAULT's: a card portrait sits INSIDE a frame the game
+# draws, so any painted frame/border/lettering is a defect.
+CARD_STYLE = StyleProfile(
+    name="card",
+    prompt_suffix=DEFAULT_STYLE.prompt_suffix,
+    negative="text, lettering, watermark, ui, card frame, border, logo",
+    size=(1536, 1024),
+    out_format="png",
+)

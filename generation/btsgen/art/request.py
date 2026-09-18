@@ -49,6 +49,10 @@ class ImageRequest:
     seed: int | None = None
     art: ClassArt | None = None
     transparent: bool = False  # request an alpha-channel cut-out (openai: background=transparent)
+    # Which asset this is: 'splash' | 'sprite' | 'card'. Backends resolve their model + quality PER KIND
+    # (a card is 34 images at $0.004, a splash is one) — see backends/openrouter.py. Last field with a
+    # default so positional construction stays source-compatible.
+    kind: str = "splash"
 
 
 @dataclass

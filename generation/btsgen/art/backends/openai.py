@@ -3,10 +3,18 @@
 Zero new dependencies: a single JSON POST via stdlib urllib (cloud backends lazy-load their own client;
 this one needs none). Reads the API key from the environment so the SERVER (droplet) pays per forge:
     BTSGEN_IMAGE_API_KEY  (preferred) or OPENAI_API_KEY
-    BTSGEN_IMAGE_QUALITY  low | medium (default) | high
-    BTSGEN_IMAGE_MODEL    default 'gpt-image-2' (gpt-image-1 retires 2026-10-23; -1.5 also works)
+    BTSGEN_IMAGE_QUALITY  splash quality: low | medium (default) | high
+    BTSGEN_IMAGE_MODEL    splash model, default 'gpt-image-2' (gpt-image-1 retires 2026-10-23; -1.5 also works)
     BTSGEN_IMAGE_SPRITE_MODEL  default 'gpt-image-1.5' — used for TRANSPARENT requests (sprites):
                           gpt-image-2 400s on background=transparent (verified live 2026-07-20)
+    BTSGEN_IMAGE_SPRITE_QUALITY  sprite quality (unset -> the splash quality)
+    BTSGEN_IMAGE_CARD_MODEL    card model, default 'gpt-image-1-mini' (OpenRouter's 'gpt-5-image-mini' IS
+                          this model; calling OpenAI directly is ~5% cheaper, which is why this backend
+                          is tier 2 of BTSGEN_IMAGE_BACKEND=openrouter,openai)
+    BTSGEN_IMAGE_CARD_QUALITY  card quality, default 'low' (34 images per class; low is the A/B winner)
+Model and quality resolve PER ASSET KIND (req.kind: splash | sprite | card) — same three-way split as
+backends/openrouter.py, so either backend can serve any kind.
+
 Selected with BTSGEN_IMAGE_BACKEND=openai. `available()` is false with no key, so it degrades to no
 splash (never blocks a forge). Outputs PNG so the mod's LoadPngFromBuffer reads it directly.
 
@@ -43,7 +51,20 @@ _COST = {
         ("1536x1024", "low"): 0.012, ("1536x1024", "medium"): 0.047, ("1536x1024", "high"): 0.188,
         ("1024x1536", "low"): 0.012, ("1024x1536", "medium"): 0.047, ("1024x1536", "high"): 0.188,
     },
+    # The card-art model. Anchor: OpenRouter METERED $0.0038 for 1536x1024 @ low (2026-09-18 whole-class
+    # run, 32/32 ok); direct OpenAI is ~5% cheaper, and medium/high scale by gpt-image-1.5's own ratios.
+    "gpt-image-1-mini": {
+        ("1024x1024", "low"): 0.003, ("1024x1024", "medium"): 0.011, ("1024x1024", "high"): 0.044,
+        ("1536x1024", "low"): 0.004, ("1536x1024", "medium"): 0.015, ("1536x1024", "high"): 0.059,
+        ("1024x1536", "low"): 0.004, ("1024x1536", "medium"): 0.015, ("1024x1536", "high"): 0.059,
+    },
 }
+
+DEFAULT_MODEL = "gpt-image-2"
+DEFAULT_SPRITE_MODEL = "gpt-image-1.5"
+DEFAULT_CARD_MODEL = "gpt-image-1-mini"
+DEFAULT_QUALITY = "medium"
+DEFAULT_CARD_QUALITY = "low"
 
 # Models that reject background=transparent (HTTP 400, param 'background'; hit live 2026-07-20).
 _NO_TRANSPARENT = {"gpt-image-2"}
@@ -66,10 +87,10 @@ class OpenAIImageBackend:
                                error="no API key (set BTSGEN_IMAGE_API_KEY or OPENAI_API_KEY)")
 
         size = _nearest_size(req.size)
-        quality = os.environ.get("BTSGEN_IMAGE_QUALITY", "medium").strip().lower()
-        model = os.environ.get("BTSGEN_IMAGE_MODEL", "gpt-image-2").strip()
+        quality = quality_for(req)
+        model = model_for(req)
         if req.transparent and model in _NO_TRANSPARENT:
-            model = os.environ.get("BTSGEN_IMAGE_SPRITE_MODEL", "gpt-image-1.5").strip()
+            model = (os.environ.get("BTSGEN_IMAGE_SPRITE_MODEL") or DEFAULT_SPRITE_MODEL).strip()
         payload_body = {
             "model": model, "prompt": req.prompt, "n": 1,
             "size": size, "quality": quality, "output_format": "png",
@@ -105,6 +126,38 @@ class OpenAIImageBackend:
         w, h = (int(x) for x in size.split("x"))
         return ImageResult(ok=True, backend=self.name, path=req.out_path,
                            cost_usd=_COST.get(model, {}).get((size, quality)), width=w, height=h)
+
+
+def model_for(req: ImageRequest) -> str:
+    """The model for this request's asset kind. Same three-way split as backends/openrouter.py."""
+    kind = _kind_of(req)
+    if kind == "sprite":
+        return (os.environ.get("BTSGEN_IMAGE_SPRITE_MODEL") or DEFAULT_SPRITE_MODEL).strip()
+    if kind == "card":
+        return (os.environ.get("BTSGEN_IMAGE_CARD_MODEL") or DEFAULT_CARD_MODEL).strip()
+    return (os.environ.get("BTSGEN_IMAGE_MODEL") or DEFAULT_MODEL).strip()
+
+
+def quality_for(req: ImageRequest) -> str:
+    """low | medium | high for this request's asset kind. Sprite falls back to the splash quality;
+    cards default to 'low' (34 per class — the 2026-09-18 A/B winner on value)."""
+    kind = _kind_of(req)
+    if kind == "sprite":
+        q = os.environ.get("BTSGEN_IMAGE_SPRITE_QUALITY", "").strip()
+        if q:
+            return q.lower()
+    elif kind == "card":
+        return (os.environ.get("BTSGEN_IMAGE_CARD_QUALITY", "").strip() or DEFAULT_CARD_QUALITY).lower()
+    return (os.environ.get("BTSGEN_IMAGE_QUALITY", "").strip() or DEFAULT_QUALITY).lower()
+
+
+def _kind_of(req: ImageRequest) -> str:
+    kind = (getattr(req, "kind", "") or "").strip().lower()
+    if kind not in ("splash", "sprite", "card"):
+        kind = "sprite" if req.transparent else "splash"
+    elif kind == "splash" and req.transparent:
+        kind = "sprite"
+    return kind
 
 
 def _nearest_size(size: tuple[int, int]) -> str:

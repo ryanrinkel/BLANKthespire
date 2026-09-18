@@ -10,16 +10,21 @@ Swap the image generator by changing one name (env var or arg) — see registry 
 LOOK (independently of the generator) by passing a different StyleProfile. See SPLASH_ART_PLAN.md.
 """
 from .request import ClassArt, ImageRequest, ImageResult, StyleProfile
-from .styles import DEFAULT_STYLE, SPRITE_STYLE
-from .registry import available_backends, get_backend, register
+from .styles import CARD_STYLE, DEFAULT_STYLE, SPRITE_STYLE
+from .registry import available_backends, get_backend, register, resolve_backends
 from .extract import class_art_from_bundle, class_art_from_disk, hue_from_id
 from .prompt import splash_prompt, sprite_prompt
 from .splash import forge_splash
 from .sprite import forge_sprite
+from .card import (CARD_PORTRAIT_SIZE, card_prompt, fit_to_portrait, forge_card_art,
+                   portrait_crop_box)
 
 __all__ = [
-    "ClassArt", "ImageRequest", "ImageResult", "StyleProfile", "DEFAULT_STYLE", "SPRITE_STYLE",
-    "available_backends", "get_backend", "register",
+    "ClassArt", "ImageRequest", "ImageResult", "StyleProfile",
+    "DEFAULT_STYLE", "SPRITE_STYLE", "CARD_STYLE", "CARD_PORTRAIT_SIZE",
+    "available_backends", "get_backend", "register", "resolve_backends",
     "class_art_from_bundle", "class_art_from_disk", "hue_from_id",
-    "splash_prompt", "sprite_prompt", "forge_splash", "forge_sprite",
+    "splash_prompt", "sprite_prompt", "card_prompt",
+    "forge_splash", "forge_sprite", "forge_card_art",
+    "portrait_crop_box", "fit_to_portrait",
 ]

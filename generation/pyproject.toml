@@ -7,6 +7,10 @@ requires-python = ">=3.10"
 dependencies = [
     "anthropic>=0.40",
     "jsonschema>=4.18",
+    # btsgen.art post-processing: card renders come back 3:2 and are center-cropped + resized to the
+    # mod's 1000x760 portrait box. Optional at runtime (art/card.py degrades to the raw render) but a
+    # core dep so the droplet always has it.
+    "pillow>=10",
 ]
 
 [project.optional-dependencies]

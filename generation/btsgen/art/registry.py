@@ -20,16 +20,35 @@ def available_backends() -> list[str]:
 
 
 def get_backend(backend=None):
-    """Resolve a backend. `backend` may be an ImageBackend instance (used as-is), a name string, or
-    None (-> $BTSGEN_IMAGE_BACKEND, else 'null'). Raises KeyError on an unknown name."""
+    """Resolve ONE backend — the first of resolve_backends(). `backend` may be an ImageBackend
+    instance (used as-is), a name string, or None (-> $BTSGEN_IMAGE_BACKEND, else 'null'). Raises
+    KeyError on an unknown name."""
+    return resolve_backends(backend)[0]
+
+
+def resolve_backends(backend=None) -> list:
+    """The ORDERED fallback chain. `backend` may be an instance, a name, a COMMA LIST
+    ('openrouter,openai' — also the accepted $BTSGEN_IMAGE_BACKEND form), a list/tuple of either, or
+    None. The caller (art/splash.py::_forge_asset) tries each in order and keeps the first ok result,
+    so a rate-limited or down vendor costs a retry, not the class's art. Raises KeyError naming the
+    first unknown entry (a typo in the env must be loud, not silently 'no art')."""
     _ensure_builtins()
     if backend is not None and not isinstance(backend, str):
-        return backend  # already a backend instance
-    name = backend or os.environ.get(_ENV_VAR) or "null"
-    try:
-        return _BACKENDS[name]
-    except KeyError:
-        raise KeyError(f"unknown image backend '{name}'; known: {sorted(_BACKENDS)}") from None
+        if isinstance(backend, (list, tuple)):
+            out: list = []
+            for item in backend:
+                out.extend(resolve_backends(item))
+            return out
+        return [backend]  # already a backend instance
+    raw = backend or os.environ.get(_ENV_VAR) or "null"
+    names = [n.strip() for n in str(raw).split(",") if n.strip()] or ["null"]
+    chain = []
+    for name in names:
+        try:
+            chain.append(_BACKENDS[name])
+        except KeyError:
+            raise KeyError(f"unknown image backend '{name}'; known: {sorted(_BACKENDS)}") from None
+    return chain
 
 
 def _ensure_builtins() -> None:
