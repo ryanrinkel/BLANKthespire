@@ -5,7 +5,8 @@
 > single-token pack; packs are 5/$5, 11/$10, 24/$20, 65/$50 (`web/billing.py`). "Connect your account"
 > (OpenRouter OAuth) is dropped — bring-your-own-key stays the free path, with Anthropic and OpenAI keys
 > first-class. Per-IP daily cap applies to *free-token* forges only, never to paid tokens. `mode=hosted`
-> answers 410. Web tests live in `web/tests` (Flask test client, SQLite, no network).
+> answers 410. Web tests live in `web/tests` (Flask test client, SQLite, no network). **All pricing
+> decisions in this file are superseded by `docs/plans/PRICING_NO_FREE_TOKENS_PLAN.md` (2026-09-18).**
 
 Status: DRAFT, compiled 2026-09-08 from a code read of `generation/`, `web/`, `workshop/`, the July 12 go-to-public plan, and the forge logs and ledger in `generation/scratch/`.
 
@@ -29,7 +30,7 @@ Suggested order: instrument and test first (Phase 0), fix the harness behind a f
 | Git | Clean except uncommitted `workshop/` and a `.gitignore` edit | `git status` |
 | Hosted forge path | `token` mode on Ollama Cloud: gemma4:31b brainstorm, glm-5.2 structure and cards; OpenRouter failover | `btsgen/ollama_mix.py:62-101` |
 | Cost tracking | None. `on_usage` hooks exist in btsgen but `web/forge.py` never passes them | `web/forge.py:365`, `btsgen/generator.py:99` |
-| Billing | Pay-what-you-want donations, 1 thank-you token per dollar; daily free token only when balance is 0 | `web/billing.py:39-41`, `web/models.py:28-38` |
+| Billing | Historical; the current model is fixed donation tiers with no free tokens — see `docs/plans/PRICING_NO_FREE_TOKENS_PLAN.md` | `web/billing.py:39-41`, `web/models.py:28-38` |
 | Workshop | Staged, private, never uploaded; `tags` empty, no `image.png`, no `mod_id.txt` | `workshop/workspace/` |
 | Deploy | Droplet + gunicorn (1 worker, load-bearing) + nginx + DO Managed MySQL; `/opt/btsweb/deploy.sh` not in repo | `web/deploy/gunicorn.conf.py:9` |
 | Monitoring, backups, CI | None | `.github/` has only an issue template |
@@ -121,6 +122,10 @@ Run it once before touching anything to lock the baseline, then after each fix. 
 ---
 
 ## Part 3. Pricing: free with your own key, one free token a day otherwise, $1 a token
+
+> SUPERSEDED 2026-09-18 by docs/plans/PRICING_NO_FREE_TOKENS_PLAN.md: no free tokens of any kind, fixed
+> donation tiers ($3/$5/$10/$20/$50) with the Stripe fee passed to the donor, key-or-token onboarding
+> chooser.
 
 > **SUPERSEDED 2026-09-16.** Token packs shipped on 2026-09-08 and were retired on 2026-09-16 in favour of the
 > original donation framing (Ryan's call): forging is free, one free token per UTC day (the separate-from-balance

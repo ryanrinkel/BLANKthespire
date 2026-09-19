@@ -16,10 +16,10 @@ BTSWEB_DEV_AUTH=1 uv run --project ../generation python app.py
 ```
 
 - **Offline demo** mode needs no API key (placeholder cards, exercises the whole pipeline + code + library).
-- **Use a token** forges on the server's hosted Ollama mix behind a token economy: every account gets one
-  free token per UTC day (tracked separately from the balance, so donors never lose it) plus a few starter
-  tokens. Nothing is sold: optional Stripe donations grant a thank-you token per whole dollar (`billing.py`).
-  Free-token forges are capped per IP per day; one forge per account at a time; token forges dequeue before BYOK.
+- **Use a token** forges on the server's hosted models behind a token economy. Accounts start with no
+  tokens; fixed-amount Stripe donations grant thank-you tokens ($3 → 2, $5 → 4, $10 → 10, $20 → 20,
+  $50 → 50, card fee passed through; `billing.py`). One forge per account at a time; token forges dequeue
+  before BYOK.
 - **BYOK** posts your `base_url`/`api_key`/`model` once; the key lives only in your browser's localStorage.
   An SSRF guard rejects private/loopback endpoints — to point BYOK at a localhost Ollama in local dev, set
   `BTSWEB_ALLOW_PRIVATE_URLS=1` (never in prod).
@@ -31,7 +31,7 @@ BTSWEB_DEV_AUTH=1 uv run --project ../generation python app.py
 | `app.py` | Flask routes: `POST /api/forge-class` (SSE), `GET/PATCH/DELETE /api/classes[/:id]`, static |
 | `forge.py` | wraps `btsgen.class_forge.forge_class` + `bts1.encode_class` (hosted / BYOK / fake) |
 | `auth.py` | sign-in: OAuth (Authlib: Google / Discord / GitHub) + email magic links (Resend; 15-min single-use token, GET renders / POST consumes) + `/dev-login` bypass (env-gated, fails closed in prod) |
-| `billing.py` | Stripe pay-what-you-want donations (Checkout + webhook, thank-you tokens, refund clawback) |
+| `billing.py` | Stripe fixed-amount donations (Checkout with the card fee as a second line item + webhook, thank-you tokens per tier, refund clawback) |
 | `db.py`, `models.py` | SQLAlchemy engine + `users` / `classes` / `cards` / `purchases` / `forge_usage` |
 | `static/` | split-flap landing page (`/`), sign-in chooser (`/login`) + single-page Forge app (`/app`) |
 | `deploy/` | gunicorn + nginx + systemd units, `deploy.sh` (the only deploy path), `backup.sh` |

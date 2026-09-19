@@ -75,13 +75,13 @@ BTSWEB_UNLIMITED_EMAILS=you@example.com   # accounts that forge on the token pat
 # BTSWEB_WORKSHOP_URL=https://steamcommunity.com/sharedfiles/filedetails/?id=...   # the mod's Workshop item; the
 #                                     # /download page links the STS2 Workshop hub until this is set
 # BTSWEB_MODEL_PRICES='{"glm-5.2": [in, out, cached]}'  # $/1M tokens for the hosted mix — feeds the dashboard's spend estimate
-BTSWEB_FREE_IP_DAILY_CAP=5          # free-token forges per IP per UTC day (throwaway-account farms); 0 = off
 BTSWEB_TOKEN_DAILY_CAP=1000         # global kill-switch on all token-path forges per day; 0 = off
-# --- Stripe donations (key absent = donate UI hidden, daily free token + BYOK still work) ---
+# --- Stripe donations (key absent = donate UI hidden; BYOK still works; hosted forges need tokens) ---
 STRIPE_SECRET_KEY=sk_live_...       # sk_test_... while testing; test/live are separate Stripe universes
 STRIPE_WEBHOOK_SECRET=whsec_...     # from the DASHBOARD webhook endpoint (https://blankthespire.com/webhook/stripe,
                                     # events: checkout.session.completed + charge.refunded) — NOT the CLI's secret
-# BTSWEB_DONATION_PRESETS=300,500,1000   # suggested amounts in cents shown by the UI (optional)
+# STRIPE_FEE_PCT=2.9                # Stripe's card fee, passed to the donor as a "Card processing fee"
+# STRIPE_FEE_FIXED_CENTS=30         # line item (defaults shown)
 # SENTRY_DSN=https://...             # optional: error reporting (pip install sentry-sdk[flask])
 # Do NOT set BTSWEB_DEV_AUTH in prod.
 ```
@@ -209,11 +209,10 @@ branch in `auth.py`'s `login_provider` to `auth_provider_callback` and drop the 
   `BTSWEB_FORGE_MAX_QUEUE` (12) wait in a FIFO line with live queue-position progress in the stream;
   beyond that `/api/forge-class` answers 503 up front (no token spent). Process-local — keep
   gunicorn at 1 worker or the limits silently double and the line splits.
-- Token-path guards: every account gets one free token per UTC day (tracked separately from the paid
-  balance, spent first); free-token forges are capped per IP per day (`BTSWEB_FREE_IP_DAILY_CAP`, default 5)
-  and all token forges by a global daily kill-switch (`BTSWEB_TOKEN_DAILY_CAP`, default 1000; `0` disables).
-  One forge per account at a time, across all modes; token forges dequeue ahead of BYOK forges. All of it is
-  process-local — keep gunicorn at one worker.
+- Token-path guards: there is no free token — accounts start with 0 tokens, and tokens only ever arrive as
+  a thank-you for a donation. All token forges are capped by a global daily kill-switch
+  (`BTSWEB_TOKEN_DAILY_CAP`, default 1000; `0` disables). One forge per account at a time, across all modes;
+  token forges dequeue ahead of BYOK forges. All of it is process-local — keep gunicorn at one worker.
 - A forge can never cost a token without delivering a class: every attempt is a `forge_jobs` row settled
   exactly once by the worker thread (not the browser stream), so a closed tab still gets its class saved or
   its token refunded; jobs left running by a restart are refunded at boot; a forge running past

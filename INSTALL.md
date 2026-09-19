@@ -65,9 +65,9 @@ through Proton.
 1. Go to **[blankthespire.com](https://blankthespire.com)** and sign in with Google.
 2. Type a class concept (e.g. *"a venomous plague doctor who sacrifices health to stack poison, then turns
    blood into armor"*) and click **Forge the class**. You'll get an **import code** (starts with `BTSC.`).
-   - **Use a token** forges on the site's hosted models: every account gets one free token a day, and
-     you can buy more. Or pick **Bring your own key** (Anthropic, OpenAI, and others) to forge for free
-     with your own API key — unlimited, billed by your provider.
+   - **Use a token** forges on the site's hosted models (tokens come as a thank-you for supporting the
+     site). Or pick **Bring your own key** (Anthropic, OpenAI, and others) to forge for free with your
+     own API key — unlimited, billed by your provider.
 3. **Copy the code.**
 4. In-game: main menu → **Mods / mod settings** → **BLANK the spire** → paste the code into
    **Import a class code** → **Import** → **Restart** when prompted.
