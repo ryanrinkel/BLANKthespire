@@ -134,11 +134,15 @@ Forging with your key · change
 Forging with tokens · change
 ```
 
-### 13. One-time banner for existing users (dismissible, shown for ~2 weeks after launch)
+### 13. Warning banner on the forge tab (dismissible; hidden once a key is saved; two variants by balance)
 
-NEW
+NEW (has tokens)
 ```
-Bring your own API key to forge free and unlimited, or support the forge for tokens. Tokens you already hold are untouched.
+Enter an API key or use a token to forge!
+```
+NEW (no tokens)
+```
+Enter an API key or get tokens to forge.
 ```
 
 ---

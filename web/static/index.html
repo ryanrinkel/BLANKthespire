@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Forge a Class — BLANK the spire</title>
-  <link rel="stylesheet" href="/static/style.css?v=20260918" />
+  <link rel="stylesheet" href="/static/style.css?v=20260919" />
 </head>
 <body>
   <header>
@@ -35,10 +35,12 @@
 
   <!-- Forge view -->
   <main id="view-forge" class="hidden">
-    <!-- v3 (2026-09-18): one-time notice for the accounts that had the retired daily free token. app.js
-         hides it after 2026-10-03, or once bts_v3_banner_dismissed is set. -->
-    <div id="v3-banner" class="banner hidden">
-      <span>Bring your own API key to forge free and unlimited, or support the forge for tokens. Tokens you already hold are untouched.</span>
+    <!-- v3 (2026-09-18): nothing forges for free on our models any more, so this warning nudges the account
+         to enter a key or get tokens. app.js fills the text from the token balance and hides it once a key
+         is saved, for unlimited accounts, or once bts_v3_banner_dismissed is set. -->
+    <div id="v3-banner" class="banner warn hidden" role="status">
+      <span class="banner-icon" aria-hidden="true">⚠</span>
+      <span id="v3-banner-text"></span>
       <span class="spacer"></span>
       <button id="v3-banner-x" class="banner-x" aria-label="Dismiss">×</button>
     </div>
@@ -260,7 +262,7 @@
 
   <!-- ?v= busts the 1-hour static cache on deploy: bump both whenever either file changes. render.js holds
        the class renderers shared with the public /deck page and must load first. -->
-  <script src="/static/render.js?v=20260918"></script>
-  <script src="/static/app.js?v=20260918"></script>
+  <script src="/static/render.js?v=20260919"></script>
+  <script src="/static/app.js?v=20260919"></script>
 </body>
 </html>

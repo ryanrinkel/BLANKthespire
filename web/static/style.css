@@ -182,6 +182,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .banner { display: flex; align-items: flex-start; gap: 10px; margin: 18px 0 0; padding: 12px 16px;
   border: 1px solid var(--accent2); border-radius: 12px; font-size: 13px;
   background: linear-gradient(135deg, rgba(124,92,255,.14), var(--panel)); }
+/* Warning variant: amber, matching .hint.warn, so "you need a key or tokens" reads as a caution. */
+.banner.warn { border-color: #f2b45c; color: #f8d9a6; font-weight: 600;
+  background: linear-gradient(135deg, rgba(242,180,92,.16), var(--panel)); }
+.banner-icon { flex: none; color: #f2b45c; font-size: 15px; line-height: 1.3; }
 .banner-x { flex: none; background: none; border: none; color: var(--muted); font-size: 20px;
   line-height: 1; padding: 0 4px; cursor: pointer; }
 .banner-x:hover { color: var(--ink); }

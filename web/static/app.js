@@ -101,6 +101,7 @@ function renderTokens() {
 
   renderForgeButton();
   renderChooser();
+  renderBanner();  // its wording depends on the balance
 }
 
 // Show the fields for the selected mode (token vs BYOK vs offline-fake).
@@ -203,16 +204,19 @@ function chooseToken() {
   renderChooser();
 }
 
-// --- one-time v3 notice ---------------------------------------------------------------------------
-// The daily free token went away on 2026-09-18; accounts that had it get one dismissible banner. The
-// cut-off is hardcoded so the banner retires itself without another deploy.
-const V3_BANNER_UNTIL = "2026-10-03";
-
+// --- "you need a key or a token" warning ----------------------------------------------------------
+// Since v3 (2026-09-18) nothing forges for free on our models, so the forge tab carries a dismissible
+// warning until the account has done one of the two things it asks for: saved an API key, or (for the
+// wording) holds tokens. Unlimited accounts never see it. Re-rendered whenever the token state changes.
 function renderBanner() {
   const bar = el("v3-banner");
   if (!bar) return;
-  const live = new Date().toISOString().slice(0, 10) < V3_BANNER_UNTIL;
-  bar.classList.toggle("hidden", !(ME && live && !lsGet("bts_v3_banner_dismissed")));
+  const show = !!ME && !ME.unlimited && !hasSavedKey() && !lsGet("bts_v3_banner_dismissed");
+  bar.classList.toggle("hidden", !show);
+  if (!show) return;
+  el("v3-banner-text").textContent = Number(ME.token_balance || 0) > 0
+    ? "Enter an API key or use a token to forge!"
+    : "Enter an API key or get tokens to forge.";
 }
 
 // --- BYOK cost estimate ---------------------------------------------------------------------------
@@ -387,6 +391,7 @@ function saveByok() {
     model: el("model").value.trim(),
     api_key: el("api_key").value.trim(),
   }));
+  renderBanner();  // a saved key satisfies the "enter an API key" warning
 }
 
 function currentMode() {
