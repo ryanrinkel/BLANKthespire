@@ -92,6 +92,26 @@ if (scenario === "forge") {
   console.log(await evaluate(`JSON.stringify({admin: ME && ME.admin, hash: location.hash, acct_hidden: document.getElementById('view-account').classList.contains('hidden')})`));
   console.log(await evaluate(`loadStats().then(() => 'loadStats ok: hidden=' + document.getElementById('stats').classList.contains('hidden') + ' tiles=' + document.querySelectorAll('.stat-tile').length).catch(e => 'loadStats threw: ' + e.message)`));
   await shot("account2");
+} else if (scenario === "v3") {
+  // Pricing v3: a fresh (0-token, non-unlimited) account sees the key-or-token chooser + the launch banner;
+  // "Support the forge" opens the inline tier buttons; the Account tab shows the same tiers; public pages.
+  await nav(`${base}/dev-login?email=newbie@example.com`);
+  await nav(`${base}/app`); await sleep(1200);
+  console.log(await evaluate(`JSON.stringify({balance: ME.token_balance, chip: document.getElementById('tokens').textContent, chooser_hidden: document.getElementById('chooser').classList.contains('hidden'), banner_hidden: document.getElementById('v3-banner').classList.contains('hidden'), head: document.getElementById('chooser-head')?.textContent, forge_btn: document.getElementById('forge-btn').textContent, status: document.getElementById('token-status').textContent})`));
+  await shot("v3-chooser");
+  await evaluate(`document.getElementById('choose-token').click()`); await sleep(1200);
+  console.log(await evaluate(`JSON.stringify({pref: localStorage.getItem('bts_forge_pref'), strip: document.getElementById('chooser-strip')?.textContent, donate_open: document.getElementById('forge-donate').open, tiers: [...document.querySelectorAll('#forge-donate-tiers .donate-tier')].map(b => b.textContent.trim().replace(/\\s+/g,' '))})`));
+  await shot("v3-inline-donate");
+  await evaluate(`document.getElementById('choose-byok')?.click(); document.querySelector('input[name=mode][value=byok]').click()`); await sleep(500);
+  console.log("after byok:", await evaluate(`JSON.stringify({pref: localStorage.getItem('bts_forge_pref'), strip: document.getElementById('chooser-strip')?.textContent, settings_open: document.getElementById('forge-settings').open})`));
+  await evaluate(`document.getElementById('nav-account').click()`); await sleep(1500);
+  console.log(await evaluate(`JSON.stringify({acct_tiers: document.querySelectorAll('#donate-tiers .donate-tier').length, custom_gone: !document.getElementById('donate-amount'), history: document.getElementById('purchases-empty').textContent})`));
+  await shot("v3-account");
+  await evaluate(`document.getElementById('nav-forge').click()`); await sleep(300);
+  await evaluate(`document.getElementById('v3-banner-x').click()`); await sleep(300);
+  console.log("banner dismissed:", await evaluate(`document.getElementById('v3-banner').classList.contains('hidden') + ' ' + localStorage.getItem('bts_v3_banner_dismissed')`));
+  for (const p of ["terms", "privacy", ""]) { await nav(`${base}/${p}`); await sleep(500); await shot("v3-page-" + (p || "landing")); }
+  console.log("landing pricing:", await evaluate(`[...document.querySelectorAll('.pricing li')].map(l => l.innerText.replace(/\\s+/g, ' ')).join(' || ')`));
 } else if (scenario === "pages") {
   for (const p of ["download", "help"]) { await nav(`${base}/${p}`); await shot(p); }
   const slug = await evaluate(`fetch('/api/classes').then(r => r.json()).then(d => d.classes[0].slug)`);

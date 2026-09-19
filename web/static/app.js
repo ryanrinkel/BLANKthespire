@@ -20,24 +20,28 @@ let ME_META = null;
   };
 }
 
-// Apply the server's token state ({token_balance, free_token_available}) to ME wherever it arrives: /api/me,
-// forge events (charged on start, refunded on failure), checkout return, 402s. Unlimited accounts ignore it.
+// Apply the server's token state ({token_balance}) to ME wherever it arrives: /api/me, forge events
+// (charged on start, refunded on failure), checkout return, 402s. Unlimited accounts ignore it.
 function applyTokenState(data) {
   if (!data || !ME || ME.unlimited) return false;
-  let changed = false;
-  if (typeof data.token_balance === "number") { ME.token_balance = data.token_balance; changed = true; }
-  if (typeof data.free_token_available === "boolean") {
-    ME.free_token_available = data.free_token_available; changed = true;
-  }
-  return changed;
+  if (typeof data.token_balance !== "number") return false;
+  ME.token_balance = data.token_balance;
+  return true;
 }
 
-// Tokens the account can spend right now: today's free one (if unspent) plus the paid balance.
+// Tokens the account can spend right now. v3 (2026-09-18): no daily grant any more, so this is simply
+// the thank-you balance that donations left behind.
 function spendable() {
   if (!ME) return 0;
   if (ME.unlimited) return Infinity;
-  return Number(ME.token_balance || 0) + (ME.free_token_available ? 1 : 0);
+  return Number(ME.token_balance || 0);
 }
+
+// --- browser-only preferences --------------------------------------------------------------------
+// Private windows and locked-down browsers throw on every localStorage access, so nothing here may.
+function lsGet(key) { try { return localStorage.getItem(key); } catch (_) { return null; } }
+function lsSet(key, value) { try { localStorage.setItem(key, value); } catch (_) { /* no store */ } }
+function lsDel(key) { try { localStorage.removeItem(key); } catch (_) { /* no store */ } }
 
 // --- boot ---------------------------------------------------------------------------------------
 
@@ -60,59 +64,43 @@ async function boot() {
   el("gate").classList.add("hidden");
   restoreByok();
   renderTokens();
+  restoreForgePref();
+  renderBanner();
   loadEstimate();
+  loadDonation();  // the forge tab's inline tier buttons need /api/billing before the Account tab is opened
   // #account is where a finished "link another sign-in" comes back to (auth._landing), so honour the hash.
   selectTab(location.hash === "#account" ? "account" : "forge");
   handlePurchaseReturn();
 }
 
-// Reflect the user's token state in the header chip + the "Use a token" hint, and steer the default mode:
-// nothing to spend (and not unlimited) ⇒ start on BYOK so the forge button isn't a dead end.
+// Reflect the user's token state in the header chip, the "Use a token" hint and the Account balance.
+// Steering the default mode moved into the chooser block below (restoreForgePref).
 function renderTokens() {
   if (!ME) return;
   const unlimited = !!ME.unlimited;
   const paid = Number(ME.token_balance || 0);
-  const free = !!ME.free_token_available;
-  const total = spendable();
   const chip = el("tokens");
-  if (unlimited) chip.textContent = "∞ tokens";
-  else if (free && paid > 0) chip.textContent = `1 free + ${paid} token${paid === 1 ? "" : "s"}`;
-  else if (free) chip.textContent = "1 free token";
-  else chip.textContent = `${paid} token${paid === 1 ? "" : "s"}`;
+  chip.textContent = unlimited ? "∞ tokens" : `${paid} token${paid === 1 ? "" : "s"}`;
   chip.classList.remove("hidden");
-  chip.classList.toggle("empty", !unlimited && total <= 0);
+  chip.classList.toggle("empty", !unlimited && paid <= 0);
 
   const status = el("token-status");
   if (unlimited) status.textContent = "Forges on our models. Your account forges free.";
-  else if (free) {
-    status.textContent = "Forges on our models. Uses today's free token"
-      + (paid > 0 ? ` (your ${paid} other token${paid === 1 ? "" : "s"} stay untouched).` : ".");
-  } else if (paid > 0) {
-    status.textContent = `Forges on our models. Uses 1 of your ${paid} token${paid === 1 ? "" : "s"}`
-      + " — today's free token is spent; another arrives tomorrow (UTC).";
+  else if (paid > 0) {
+    status.textContent = `Forges on our models. Uses 1 of your ${paid} token${paid === 1 ? "" : "s"}.`;
   } else {
-    status.innerHTML = "Today's free token is spent — another arrives tomorrow (UTC). "
-      + "Until then, <b>bring your own key</b> below (free, unlimited), or "
-      + '<button id="donate-cta" class="linkish" type="button">support the forge</button>.';
+    status.innerHTML = "You have no tokens. <b>Bring your own key</b> below (free, unlimited), or "
+      + '<button id="donate-cta" class="linkish" type="button">account page</button> to get some.';
     // innerHTML replaced the node — re-wire the CTA on every render.
     el("donate-cta").onclick = () => selectTab("account");
   }
 
-  // Keep the Account view's balance in lockstep wherever the numbers change (forge spend, purchase).
+  // Keep the Account view's balance in lockstep wherever the numbers change (forge spend, donation).
   const acct = el("acct-balance");
   if (acct) acct.textContent = unlimited ? "∞" : String(paid);
-  const acctFree = el("acct-free");
-  if (acctFree) {
-    acctFree.textContent = unlimited ? "Unlimited account — forges never spend tokens."
-      : free ? "Today's free token: available." : "Today's free token: spent — another arrives tomorrow (UTC).";
-  }
 
-  // If the token path is unusable, default the radio to BYOK on load.
-  if (!unlimited && total <= 0) {
-    const byok = document.querySelector('input[name="mode"][value="byok"]');
-    if (byok) { byok.checked = true; applyMode(); }
-  }
   renderForgeButton();
+  renderChooser();
 }
 
 // Show the fields for the selected mode (token vs BYOK vs offline-fake).
@@ -124,8 +112,8 @@ function applyMode() {
   renderEstimate();
 }
 
-// The forge button says what the click will cost, in the same words as the settings hint: today's free
-// token, one of the paid ones, the user's own key, or nothing at all (unlimited accounts).
+// The forge button says what the click will cost, in the same words as the settings hint: one of the
+// account's tokens, the user's own key, or nothing at all (unlimited accounts).
 function renderForgeButton() {
   const btn = el("forge-btn");
   if (!btn) return;
@@ -134,12 +122,97 @@ function renderForgeButton() {
   if (m === "byok") cost = "uses your API key";
   else if (m === "fake") cost = "offline demo";
   else if (!ME || ME.unlimited) cost = "free — unlimited account";
-  else if (ME.free_token_available) cost = "uses today's free token";
   else {
     const paid = Number(ME.token_balance || 0);
-    cost = paid > 0 ? `uses 1 of your ${paid} token${paid === 1 ? "" : "s"}` : "no tokens left";
+    cost = paid > 0 ? `uses 1 of your ${paid} token${paid === 1 ? "" : "s"}`
+      : "no tokens — get some or bring a key";
   }
   btn.textContent = `Forge the class (${cost})`;
+}
+
+// --- onboarding chooser (forge tab) ---------------------------------------------------------------
+// First visit with nothing to spend and no key on file: two cards, "use my key" vs "support the forge".
+// Once a path is picked it collapses to a one-line strip. The mode radios stay the source of truth —
+// this only steers them and remembers the pick in localStorage.bts_forge_pref.
+
+let CHOOSER_FORCED = false;  // "change" reopens the cards even for an account that now has tokens
+
+function forgePref() {
+  const p = lsGet("bts_forge_pref");
+  return p === "byok" || p === "token" ? p : null;
+}
+function setForgePref(mode) { if (mode === "byok" || mode === "token") lsSet("bts_forge_pref", mode); }
+
+// A key the user already saved counts as "decided" even without a stored preference.
+function hasSavedKey() {
+  try { return !!JSON.parse(localStorage.getItem("bts_byok") || "{}").api_key; } catch (_) { return false; }
+}
+
+function setMode(mode) {
+  const radio = document.querySelector(`input[name="mode"][value="${mode}"]`);
+  if (radio) { radio.checked = true; applyMode(); }
+}
+
+// Start on the path last chosen; with no preference and nothing to spend, BYOK is the only path that
+// isn't a dead end (the old renderTokens fallback, kept here).
+function restoreForgePref() {
+  const pref = forgePref();
+  if (pref) setMode(pref);
+  else if (ME && !ME.unlimited && spendable() <= 0) setMode("byok");
+  renderChooser();
+}
+
+function renderChooser() {
+  const box = el("chooser");
+  if (!box) return;
+  const paid = Number((ME && ME.token_balance) || 0);
+  const pref = forgePref();
+  // Undecided: nothing to spend, no key on file, nothing remembered.
+  const undecided = CHOOSER_FORCED
+    || (!!ME && !ME.unlimited && paid <= 0 && !hasSavedKey() && !pref);
+  const mode = pref || currentMode();
+  if (!ME || (!undecided && (ME.unlimited || mode === "fake"))) { box.classList.add("hidden"); return; }
+  box.classList.remove("hidden");
+  el("chooser-head").classList.toggle("hidden", !undecided);
+  el("chooser-cards").classList.toggle("hidden", !undecided);
+  const strip = el("chooser-strip");
+  strip.classList.toggle("hidden", undecided);
+  if (undecided) return;
+  strip.innerHTML = (mode === "byok" ? "Forging with your key" : "Forging with tokens")
+    + ' · <button id="chooser-change" class="linkish" type="button">change</button>';
+  // innerHTML replaced the node — re-wire on every render.
+  el("chooser-change").onclick = () => { lsDel("bts_forge_pref"); CHOOSER_FORCED = true; renderChooser(); };
+}
+
+function chooseByok() {
+  setForgePref("byok");
+  CHOOSER_FORCED = false;
+  setMode("byok");
+  el("forge-settings").open = true;   // the key fields live inside the collapsed Generation settings
+  el("provider").focus();
+  renderChooser();
+}
+
+function chooseToken() {
+  setForgePref("token");
+  CHOOSER_FORCED = false;
+  setMode("token");
+  const panel = el("forge-donate");   // tiers inline on the forge tab, not a trip to the Account tab
+  panel.open = true;
+  panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  renderChooser();
+}
+
+// --- one-time v3 notice ---------------------------------------------------------------------------
+// The daily free token went away on 2026-09-18; accounts that had it get one dismissible banner. The
+// cut-off is hardcoded so the banner retires itself without another deploy.
+const V3_BANNER_UNTIL = "2026-10-03";
+
+function renderBanner() {
+  const bar = el("v3-banner");
+  if (!bar) return;
+  const live = new Date().toISOString().slice(0, 10) < V3_BANNER_UNTIL;
+  bar.classList.toggle("hidden", !(ME && live && !lsGet("bts_v3_banner_dismissed")));
 }
 
 // --- BYOK cost estimate ---------------------------------------------------------------------------
@@ -210,7 +283,12 @@ function selectTab(which) {
   el("nav-forge").classList.toggle("active", which === "forge");
   el("nav-library").classList.toggle("active", which === "library");
   el("nav-account").classList.toggle("active", which === "account");
-  if (which === "forge") { show("view-forge"); el("forge-input").classList.remove("hidden"); }
+  if (which === "forge") {
+    show("view-forge");
+    el("forge-input").classList.remove("hidden");
+    renderChooser();
+    renderBanner();
+  }
   else if (which === "account") { show("view-account"); loadAccount(); }
   else { show("view-library"); loadLibrary(); }
 }
@@ -303,7 +381,7 @@ function restoreByok() {
   } catch (_) { applyProvider(); }
 }
 function saveByok() {
-  localStorage.setItem("bts_byok", JSON.stringify({
+  lsSet("bts_byok", JSON.stringify({
     provider: el("provider").value,
     base_url: el("base_url").value.trim(),
     model: el("model").value.trim(),
@@ -336,14 +414,11 @@ async function forge() {
   if (choice === "token") {
     if (!ME.unlimited) {
       if (spendable() <= 0) {
-        toast("No tokens to spend — wait for tomorrow's free token, or bring your own key.");
+        toast("No tokens to spend — get some, or bring your own key.");
         return;
       }
       const paid = Number(ME.token_balance || 0);
-      const msg = ME.free_token_available
-        ? `This will use today's free token${paid > 0 ? ` (your ${paid} other token${paid === 1 ? "" : "s"} stay untouched)` : ""}. Forge this class?`
-        : `This will use 1 token. You have ${paid}. Forge this class?`;
-      if (!confirm(msg)) return;
+      if (!confirm(`This will use 1 token. You have ${paid}. Forge this class?`)) return;
     }
   } else if (choice === "byok") {
     const p = currentProvider();
@@ -379,7 +454,7 @@ async function forge() {
     });
     if (!resp.ok && resp.headers.get("content-type")?.includes("application/json")) {
       const e = await resp.json();
-      // Server says out of tokens (a stale balance slipped past the pre-check) — route to the buy flow.
+      // Server says out of tokens (a stale balance slipped past the pre-check) — route to the donate flow.
       if (resp.status === 402) {
         if (applyTokenState(e)) renderTokens();
         selectTab("account");
@@ -609,6 +684,8 @@ async function openClass(id) {
   el("nav-account").classList.remove("active");
   show("view-forge");
   el("forge-input").classList.add("hidden");
+  el("chooser").classList.add("hidden");    // viewing a saved class: the forge furniture gets out of the way
+  el("v3-banner").classList.add("hidden");
   el("progress").classList.add("hidden");
   el("spinner").classList.add("hidden");
   renderClassView(cls);
@@ -631,22 +708,20 @@ async function deleteClass(id, name) {
   loadLibrary();
 }
 
-// --- account: balance, donations (pay-what-you-want Stripe Checkout), donation history -----------
+// --- account: balance, donations (fixed-tier Stripe Checkout), donation history ------------------
 
-let DONATE_CFG = null;  // last /api/billing payload — donate() validates amounts against it
+let DONATE_CFG = null;  // /api/billing payload, fetched once and rendered into both tier panels
 
 async function loadAccount() {
   el("acct-email").textContent = ME ? (ME.email || ME.name || "") : "";
   renderSignInMethods();
   try {
-    // Balance can have moved server-side (webhook credit, another tab, the daily grant) — refresh it too,
-    // along with the identities: coming back from a link flow lands here and must show the new method.
-    const [meR, billR, purR] = await Promise.all([
-      fetch("/api/me"), fetch("/api/billing"), fetch("/api/purchases"),
-    ]);
+    // Balance can have moved server-side (a webhook credit, another tab) — refresh it too, along with
+    // the identities: coming back from a link flow lands here and must show the new method.
+    const [meR, purR] = await Promise.all([fetch("/api/me"), fetch("/api/purchases")]);
     const meData = await meR.json();
     if (meData.user) { ME = meData.user; ME_META = meData; renderTokens(); renderSignInMethods(); }
-    renderDonation(await billR.json());
+    await loadDonation();
     renderPurchases((await purR.json()).purchases || []);
   } catch (_) {
     toast("Couldn't load your account — check your connection.");
@@ -700,46 +775,65 @@ function fmtMoney(cents, currency) {
   } catch (_) { return `$${((cents || 0) / 100).toFixed(2)}`; }
 }
 
-function renderDonation(cfg) {
-  DONATE_CFG = cfg || null;
-  const enabled = !!(cfg && cfg.enabled);
-  const box = el("donate");
-  if (!box) return;
-  box.classList.toggle("hidden", !enabled);
-  const note = el("donate-note");
-  if (note) note.classList.toggle("hidden", enabled);
-  if (!enabled) return;
-  const presets = el("donate-presets");
-  presets.innerHTML = "";
-  for (const cents of cfg.presets || []) {
-    const b = document.createElement("button");
-    b.className = "btn donate-preset";
-    b.type = "button";
-    b.textContent = fmtMoney(cents, cfg.currency);
-    b.onclick = (ev) => donate(cents, ev.target);
-    presets.appendChild(b);
+// Tier headlines want "$3", not "$3.00" — the fee line under them carries the cents.
+function fmtMoneyShort(cents, currency) { return fmtMoney(cents, currency).replace(/[.,]00$/, ""); }
+
+// /api/billing is static config (fixed tiers) — fetch it once, then render the same buttons into the
+// forge tab's inline panel and the Account tab.
+async function loadDonation() {
+  if (!DONATE_CFG) {
+    try {
+      const r = await fetch("/api/billing");
+      DONATE_CFG = await r.json();
+    } catch (_) { DONATE_CFG = null; }
   }
-  // Static elements, but wiring here (idempotent) keeps all donate logic in one place.
-  el("donate-btn").onclick = (ev) => {
-    const dollars = parseFloat(el("donate-amount").value);
-    donate(Math.round(dollars * 100), ev.target);
-  };
+  renderDonation(DONATE_CFG);
 }
 
-async function donate(amountCents, btn) {
-  if (!Number.isFinite(amountCents) || amountCents <= 0) { toast("Enter an amount in dollars first."); return; }
-  if (DONATE_CFG && (amountCents < DONATE_CFG.min_cents || amountCents > DONATE_CFG.max_cents)) {
-    toast(`Donations can be ${fmtMoney(DONATE_CFG.min_cents, DONATE_CFG.currency)} to `
-      + `${fmtMoney(DONATE_CFG.max_cents, DONATE_CFG.currency)}.`);
-    return;
+function renderDonation(cfg) {
+  DONATE_CFG = cfg || null;
+  renderDonatePanel("donate", "donate-tiers", "donate-note", cfg);
+  renderDonatePanel("forge-donate-box", "forge-donate-tiers", "forge-donate-note", cfg);
+}
+
+// One panel: the tier buttons, or the "switched off" note in their place.
+function renderDonatePanel(boxId, tiersId, noteId, cfg) {
+  const enabled = !!(cfg && cfg.enabled);
+  const box = el(boxId), note = el(noteId);
+  if (!box) return;
+  box.classList.toggle("hidden", !enabled);
+  if (note) note.classList.toggle("hidden", enabled);
+  if (enabled) renderTiers(el(tiersId), cfg);
+}
+
+// The shared tier component: the headline amount over a small line spelling out what the card is
+// actually charged, Stripe's pass-through fee included. Same markup on both tabs.
+function renderTiers(container, cfg) {
+  if (!container) return;
+  container.innerHTML = "";
+  for (const t of (cfg && cfg.tiers) || []) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "btn donate-tier";
+    const n = Number(t.tokens || 0);
+    b.innerHTML = `<span class="tier-label">${esc(fmtMoneyShort(t.net_cents, cfg.currency))} → `
+      + `${n} token${n === 1 ? "" : "s"}</span>`
+      + `<span class="tier-fee">${esc(fmtMoney(t.gross_cents, cfg.currency))} charged, incl. `
+      + `${esc(fmtMoney(t.fee_cents, cfg.currency))} card fee</span>`;
+    b.onclick = () => donate(t.id, b);
+    container.appendChild(b);
   }
+}
+
+async function donate(tierId, btn) {
+  if (!tierId) return;
   btn.disabled = true;
-  const label = btn.textContent;
+  const label = btn.innerHTML;
   btn.textContent = "Redirecting…";
   try {
     const r = await fetch("/api/donate", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amount_cents: amountCents }),
+      body: JSON.stringify({ tier: tierId }),
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
@@ -747,7 +841,7 @@ async function donate(amountCents, btn) {
   } catch (e) {
     toast(e.message);
     btn.disabled = false;
-    btn.textContent = label;
+    btn.innerHTML = label;
   }
 }
 
@@ -761,10 +855,17 @@ function renderPurchases(purchases) {
     const when = p.created_at
       ? new Date(p.created_at).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })
       : "";
-    // "pack" rows are from the week token packs were sold (2026-09-08..16); they stay visible as purchases.
+    // amount_cents is always the gross charge. v3 donations pass Stripe's fee to the donor, so those
+    // rows split it out; pre-v3 donations and the "pack" rows (token packs, 2026-09-08..16) have no
+    // net_cents and keep the old wording.
+    const gross = fmtMoney(p.amount_cents, p.currency);
+    const fee = typeof p.fee_cents === "number"
+      ? p.fee_cents : Number(p.amount_cents || 0) - Number(p.net_cents || 0);
     const what = p.kind === "donation"
-      ? `Donated ${fmtMoney(p.amount_cents, p.currency)}`
-      : `Bought ${p.tokens} token${p.tokens === 1 ? "" : "s"} for ${fmtMoney(p.amount_cents, p.currency)}`;
+      ? (typeof p.net_cents === "number"
+        ? `Donated ${gross} (${fmtMoney(p.net_cents, p.currency)} + ${fmtMoney(fee, p.currency)} card fee)`
+        : `Donated ${gross}`)
+      : `Bought ${p.tokens} token${p.tokens === 1 ? "" : "s"} for ${gross}`;
     li.innerHTML = `<div class="lr-main"><span class="lr-name">${esc(what)}</span>`
       + `<span class="lr-meta">+${p.tokens} token${p.tokens === 1 ? "" : "s"} · ${esc(when)}`
       + (p.status === "refunded" ? ' · <span class="refunded">refunded</span>' : "") + `</span></div>`;
@@ -790,11 +891,15 @@ async function handlePurchaseReturn() {
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
       if (d.status === "paid") {
-        if (applyTokenState(d)) renderTokens();
+        applyTokenState(d);
+        renderTokens();
         toast(d.tokens > 0
-          ? `Thank you for supporting the forge — ${d.tokens} token${d.tokens === 1 ? "" : "s"} added!`
+          ? `Thank you! ${d.tokens} token${d.tokens === 1 ? "" : "s"} added — you're ready to forge.`
           : "Thank you for supporting the forge!");
-        selectTab("account");
+        // They came here to forge, not to read the Account tab: land on the forge, token path armed.
+        setForgePref("token");
+        setMode("token");
+        selectTab("forge");
         return;
       }
     } catch (e) {
@@ -842,7 +947,9 @@ function renderStats(d) {
   const h = d.hosted || {}, u = d.users || {}, dn = d.donations || {};
   const tiles = [
     { k: "Forges", v: fmtInt(f.total), s: `${fmtInt(f.ok)} ok · ${fmtInt(f.failed)} failed · ${fmtInt(f.refunded)} refunded` },
-    { k: "Hosted (our key)", v: fmtInt(bm.token), s: `${pct(bm.token, f.total)} of forges · free ${fmtInt(bk.free)} · paid ${fmtInt(bk.paid)} · ∞ ${fmtInt(bk.unlimited)}` },
+    // bk.free only ever counts pre-v3 rows now (the daily grant is gone), so it is shown when there is one.
+    { k: "Hosted (our key)", v: fmtInt(bm.token), s: `${pct(bm.token, f.total)} of forges · paid ${fmtInt(bk.paid)} · ∞ ${fmtInt(bk.unlimited)}`
+      + (bk.free ? ` · ${fmtInt(bk.free)} legacy free` : "") },
     { k: "Bring your own key", v: fmtInt(bm.byok), s: `${pct(bm.byok, f.total)} of forges` + (bm.fake ? ` · ${fmtInt(bm.fake)} offline demo` : "") },
     { k: "People forging", v: fmtInt(u.forgers), s: `${fmtInt(u.accounts)} accounts total` },
     { k: "Hosted LLM spend", v: fmtUsd(h.est_cost_usd), s: `${fmtInt(h.calls)} calls · ${fmtTokens(h.input_tokens)} in (${fmtTokens(h.cached_tokens)} cached) · ${fmtTokens(h.output_tokens)} out` },
@@ -928,6 +1035,9 @@ el("share-link").onclick = () => copy(el("share-link").dataset.url);
 el("view-back").onclick = () => selectTab("forge");
 el("signout").onclick = async () => { await fetch("/logout", { method: "POST" }); location.href = "/"; };
 el("load-models").onclick = loadModels;
+el("choose-byok").onclick = chooseByok;
+el("choose-token").onclick = chooseToken;
+el("v3-banner-x").onclick = () => { lsSet("bts_v3_banner_dismissed", "1"); renderBanner(); };
 
 // feedback overlay: close on the × button, a backdrop click, or Escape; submit posts the rating.
 el("fb-close").onclick = closeFeedback;
@@ -962,8 +1072,14 @@ async function loadModels() {
     btn.disabled = false; btn.textContent = label;
   }
 }
+// The radios stay the source of truth: flipping one by hand is a preference the chooser remembers too.
 for (const radio of document.querySelectorAll('input[name="mode"]')) {
-  radio.onchange = applyMode;
+  radio.onchange = () => {
+    setForgePref(radio.value);
+    CHOOSER_FORCED = false;
+    applyMode();
+    renderChooser();
+  };
 }
 
 el("provider").onchange = () => { applyProvider(); saveByok(); renderEstimate(); };

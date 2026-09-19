@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Forge a Class — BLANK the spire</title>
-  <link rel="stylesheet" href="/static/style.css?v=20260917" />
+  <link rel="stylesheet" href="/static/style.css?v=20260918" />
 </head>
 <body>
   <header>
@@ -16,7 +16,7 @@
       <a class="tab" href="/download">Get the mod ⬇</a>
       <a class="tab" href="/help" title="Where do I paste my class code?">Help ?</a>
       <span class="spacer"></span>
-      <span id="tokens" class="tokens hidden" title="Tokens are spent by the 'Use a token' forge option — every account gets a free token each day."></span>
+      <span id="tokens" class="tokens hidden" title="Tokens are spent by the 'Use a token' forge option. Account tab to get more."></span>
       <span id="who" class="who"></span>
       <button id="signout" class="ghost hidden">Sign out</button>
     </nav>
@@ -35,12 +35,39 @@
 
   <!-- Forge view -->
   <main id="view-forge" class="hidden">
+    <!-- v3 (2026-09-18): one-time notice for the accounts that had the retired daily free token. app.js
+         hides it after 2026-10-03, or once bts_v3_banner_dismissed is set. -->
+    <div id="v3-banner" class="banner hidden">
+      <span>Bring your own API key to forge free and unlimited, or support the forge for tokens. Tokens you already hold are untouched.</span>
+      <span class="spacer"></span>
+      <button id="v3-banner-x" class="banner-x" aria-label="Dismiss">×</button>
+    </div>
+
+    <!-- First-run chooser: your key vs our tokens. Collapses to the one-line strip once a path is picked
+         (localStorage bts_forge_pref); the Generation settings radios stay the source of truth. -->
+    <section id="chooser" class="card chooser hidden">
+      <h2 id="chooser-head">How will you fill in the blank?</h2>
+      <div id="chooser-cards" class="chooser-cards">
+        <div class="chooser-card">
+          <h3>I have an API key</h3>
+          <p class="hint">Forging is free (but compute is not). Paste a key from Anthropic, OpenAI, OpenRouter and more — it stays in your browser.</p>
+          <button id="choose-byok" class="btn primary">Use my key</button>
+        </div>
+        <div class="chooser-card">
+          <h3>Use a token</h3>
+          <p class="hint">We run it on our models. Each token is one forge: $3 → 2 tokens, $5 → 4 tokens, $10 → 10 tokens.</p>
+          <button id="choose-token" class="btn primary">Support the forge</button>
+        </div>
+      </div>
+      <p id="chooser-strip" class="chooser-strip hidden"></p>
+    </section>
+
     <section id="forge-input" class="card">
       <label class="lbl" for="concept">Describe your class</label>
       <!-- can we add a few more contrasting examples and select one at random so the user doesn't always see the same sample text? another example might be 'the bravest toaster in the world' -->
       <textarea id="concept" rows="3" placeholder="e.g. a venomous plague doctor who sacrifices health to stack poison, then turns blood into armor"></textarea>
 
-      <details class="settings">
+      <details id="forge-settings" class="settings">
         <summary>Generation settings</summary>
         <div class="modes">
           <label><input type="radio" name="mode" value="token" checked /> Use a token</label>
@@ -82,6 +109,15 @@
           engines (the archetypes) and picks the strongest combination itself. With <b>Interactive forge</b> on,
           it pauses once your theme is mapped, shows you the candidate engines, and lets you pick up to two of
           them. You get a short timer; if you don't answer, the forge decides for you.</p>
+      </details>
+
+      <!-- Tokens without leaving the forge: the same tier buttons the Account tab builds (app.js). -->
+      <details id="forge-donate" class="settings">
+        <summary>Support the forge</summary>
+        <div id="forge-donate-box" class="donate hidden">
+          <div id="forge-donate-tiers" class="donate-tiers"></div>
+        </div>
+        <p id="forge-donate-note" class="hint hidden">Donations aren't available right now — bring your own API key to keep forging.</p>
       </details>
 
       <button id="forge-btn" class="btn primary">Forge the class</button>
@@ -133,33 +169,22 @@
     </section>
   </main>
 
-  <!-- Account view: balance, donations (pay-what-you-want), donation history -->
+  <!-- Account view: balance, donations (fixed tiers), donation history -->
   <main id="view-account" class="hidden">
     <section class="card">
       <h2>Account</h2>
       <p id="acct-email" class="muted"></p>
       <p class="acct-balance-row"><span id="acct-balance" class="acct-balance"></span> <span class="muted">tokens</span></p>
-      <p id="acct-free" class="hint"></p>
-      <p class="hint">One token forges one class with the "Use a token" option. Every account gets a
-        <b>free token each day</b>, on top of any it holds — forging never costs money. Bring your own API
-        key and it never costs a token either.</p>
+      <p class="hint">One token forges one class on our models. Bring your own API key and forging is free and unlimited — no token needed.</p>
     </section>
 
     <section class="card">
       <h2>Support the forge</h2>
-      <p class="hint">BLANK the spire is totally free, but each Forge costs money and I fear for my bank account!
-        Your donations cover the cost of tokens directly — and as a thank-you, every whole dollar adds a token
-        to your balance. Give $10 or more and we add a bonus on top: <b>$10 → 11 tokens, $20 → 24, $50 → 65</b>.</p>
+      <p class="hint">BLANK the spire is free and open source, but every hosted forge costs me real money. Your donations cover the cost of our compute.</p>
       <div id="donate" class="donate hidden">
-        <div id="donate-presets" class="donate-presets"></div>
-        <div class="donate-custom">
-          <input id="donate-amount" class="in" type="number" min="1" step="1" inputmode="numeric"
-                 placeholder="Custom amount (USD)" />
-          <button id="donate-btn" class="btn primary">Donate</button>
-        </div>
+        <div id="donate-tiers" class="donate-tiers"></div>
       </div>
-      <p id="donate-note" class="hint hidden">Donations aren't available right now — your free daily token
-        and BYOK forging both keep working.</p>
+      <p id="donate-note" class="hint hidden">Donations aren't available right now — bring your own API key to keep forging.</p>
       <p class="hint">Payments are handled by Stripe — we never see your card details.</p>
     </section>
 
@@ -235,7 +260,7 @@
 
   <!-- ?v= busts the 1-hour static cache on deploy: bump both whenever either file changes. render.js holds
        the class renderers shared with the public /deck page and must load first. -->
-  <script src="/static/render.js?v=20260917"></script>
-  <script src="/static/app.js?v=20260917"></script>
+  <script src="/static/render.js?v=20260918"></script>
+  <script src="/static/app.js?v=20260918"></script>
 </body>
 </html>
