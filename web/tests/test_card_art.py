@@ -20,7 +20,7 @@ import zipfile
 from pathlib import Path
 
 import pytest
-from conftest import H, login, sse_events
+from conftest import H, login, seed_tokens, sse_events
 
 ADMIN = "unlimited@example.com"
 
@@ -286,6 +286,7 @@ def test_the_ledger_records_metered_llm_cost(client, app_module, fake_bundle, mo
 
     monkeypatch.setattr(app_module, "forge_to_bundle", fake_forge)
     login(client, "metered@example.com")
+    seed_tokens(app_module, "metered@example.com", 1)
     ev = sse_events(client.post("/api/forge-class", json={"concept": "m", "mode": "token"}, headers=H))
     with app_module.session_scope() as s:
         row = s.query(ForgeUsage).filter_by(class_id=ev[-1][1]["id"], role="cards").one()
@@ -299,6 +300,7 @@ def test_art_rows_land_in_the_ledger_and_the_estimate_ignores_them(client, app_m
     (the 'what will this cost MY key' quote) must not see them."""
     _clear(app_module)
     login(client, "artledger@example.com")
+    seed_tokens(app_module, "artledger@example.com", 1)
     ev = sse_events(client.post("/api/forge-class", json={"concept": "art", "mode": "token"}, headers=H))
     saved = ev[-1][1]
     rows = _usage(app_module, saved["id"])

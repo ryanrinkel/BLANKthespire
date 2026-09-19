@@ -12,6 +12,7 @@ from __future__ import annotations
 import os
 import sys
 import tempfile
+import types
 from pathlib import Path
 
 import pytest
@@ -32,8 +33,7 @@ os.environ.pop("GOOGLE_CLIENT_ID", None)
 os.environ.pop("GOOGLE_CLIENT_SECRET", None)
 os.environ.pop("STRIPE_SECRET_KEY", None)          # billing disabled: routes 503, event handler still testable
 os.environ.pop("BTSWEB_ALLOW_PRIVATE_URLS", None)  # the SSRF guard must be live
-os.environ["BTSWEB_FREE_IP_DAILY_CAP"] = "2"
-os.environ["BTSWEB_TOKEN_DAILY_CAP"] = "0"
+os.environ["BTSWEB_TOKEN_DAILY_CAP"] = "0"   # global kill-switch off by default; tests that want it set it
 os.environ["BTSWEB_UNLIMITED_EMAILS"] = "unlimited@example.com"
 os.environ["BTSWEB_PUBLIC_URL"] = "http://testserver"
 os.environ["BTSWEB_GAP_LOG"] = str(_TMP / "gaps.jsonl")
@@ -73,6 +73,14 @@ def login(client, email: str = "dev@example.com") -> dict:
     r = client.get(f"/dev-login?email={email}")
     assert r.status_code == 302
     return client.get("/api/me").get_json()["user"]
+
+
+def seed_tokens(app_module, email: str, n: int) -> None:
+    """Give an account `n` tokens. Accounts start at zero (pricing v3 grants nothing), so every test that
+    drives the hosted "Use a token" path has to say out loud how it got them."""
+    from models import User
+    with app_module.session_scope() as s:
+        s.query(User).filter_by(email=email).one().token_balance = n
 
 
 def sse_events(resp) -> list[tuple[str, dict]]:
@@ -123,14 +131,39 @@ def stub_forge(app_module, fake_bundle, monkeypatch):
     return Ctl
 
 
+@pytest.fixture()
+def stripe_stub(app_module, monkeypatch):
+    """Turn billing ON with no key and no network: billing_enabled() reads the module constant, and the
+    routes resolve `billing._stripe` at call time, so both can be stood in for. Returns a controller whose
+    .sessions is the list of kwargs each Checkout create was called with."""
+    import billing
+
+    class Ctl:
+        sessions: list[dict] = []
+
+    class _Session:
+        @staticmethod
+        def create(**kw):
+            Ctl.sessions.append(kw)
+            return types.SimpleNamespace(url=f"https://stripe.test/c/cs_stub{len(Ctl.sessions)}")
+
+    class _Checkout:
+        Session = _Session
+
+    Ctl.sessions = []
+    monkeypatch.setattr(billing, "STRIPE_SECRET_KEY", "sk_test_stub")
+    monkeypatch.setattr(billing, "_stripe", types.SimpleNamespace(checkout=_Checkout))
+    return Ctl
+
+
 @pytest.fixture(autouse=True)
 def _reset_process_state(app_module):
     """Limiters, queues and per-user locks are process-local singletons — start every test clean."""
     import auth
 
-    lim = app_module.free_limiter
+    lim = app_module.token_limiter
     with lim._lock:
-        lim._day, lim._day_count, lim._ip_counts = -1, 0, {}
+        lim._day, lim._day_count = -1, 0
     auth.magic_limiter.reset()
     with app_module._user_active_lock:
         app_module._user_active.clear()

@@ -1,33 +1,39 @@
-"""Stripe donations (pay-what-you-want Checkout) + donation history.
+"""Stripe donations (fixed tiers, card fee passed through) + donation history.
 
-Pricing is DONATION-BASED (restored 2026-09-16; token packs ran 2026-09-08..16 and were retired): forging is
-FREE with your own API key, and every account gets ONE free token per UTC day on the hosted models
-(models.free_token_available — tracked separately from the balance, so a donor's thank-you tokens never
-block it). Donations are optional support; as a thank-you, each whole dollar donated grants one bonus token
-(TOKENS_PER_DOLLAR below — set to 0 to make donations pure). Larger gifts get a tiered bonus on top of that
-base: +10% from $10, +20% from $20, +30% from $50 (BONUS_TIERS below), applied to the whole-dollar count and
-floored — $10 → 11, $20 → 24, $50 → 65. The UI reads the tiers from /api/billing to show them.
+Pricing is DONATION-BASED and, since v3 (2026-09-18), has no free tier at all on our models: forging is FREE
+and UNLIMITED with your own API key, and the hosted path spends tokens received as a thank-you for a
+donation. Nothing is sold and there are no custom amounts — DONATION_TIERS below is the whole price list,
+id -> (net cents the project receives, thank-you tokens), in display order.
 
-Shape: the browser POSTs /api/donate with an amount → we create a Stripe Checkout Session and redirect the
+The donor is charged the GROSS, not the net: Stripe keeps 2.9% + 30c of every charge, so a $5 donation would
+otherwise arrive as $4.56. gross_for() solves for the smallest charge that still nets the tier amount, and
+the Checkout Session carries TWO line items — the donation at net and "Card processing fee" at the
+difference — so Stripe's own page and receipt show the split instead of one mystery number. The rates live
+in env so a Stripe price change is a config edit, not a deploy of this file.
+
+Shape: the browser POSTs /api/donate with a tier id → we create a Stripe Checkout Session and redirect the
 user to Stripe's hosted page (no card data ever touches this server). Credit lands via TWO paths that share
 one idempotent function: the /webhook/stripe endpoint (source of truth — fires even if the user never
 returns) and GET /api/checkout-status (the success-redirect fallback, so the balance updates the moment the
 user lands back on /app). purchases.stripe_session_id is UNIQUE, so double delivery can never double-credit.
-The token count is frozen in the session's metadata at checkout, so changing TOKENS_PER_DOLLAR can't
-mis-credit an in-flight donation.
+The token count is frozen in the session's metadata at checkout, so editing DONATION_TIERS can't mis-credit
+an in-flight donation.
 
-Config (all env; billing silently disables without them — dev boots keyless, the UI hides the donate flow):
+Config (all env; billing silently disables without the key — dev boots keyless, the UI hides the donate flow):
     STRIPE_SECRET_KEY        sk_test_... / sk_live_...
     STRIPE_WEBHOOK_SECRET    whsec_...  (the CLI's secret locally; the dashboard endpoint's secret in prod)
-    BTSWEB_DONATION_PRESETS  "300,500,1000" — suggested amounts in CENTS shown by the UI (optional).
+    STRIPE_FEE_PCT           percentage Stripe keeps, default "2.9" (their US card rate)
+    STRIPE_FEE_FIXED_CENTS   per-charge fixed fee, default "30"
 
 Refunds: `charge.refunded` marks the Purchase row "refunded" AND claws back that donation's still-unspent
-thank-you tokens (min(tokens, current balance) — spent tokens are gone). Refunds are operator-initiated in
-the Stripe dashboard; the 14-day window is policy (terms.html). Rows from the retired pack era keep their
-price_id ("pack_N") and still show in history as purchases.
+thank-you tokens (min(tokens, current balance) — spent tokens are gone). The refund is of the GROSS, fee
+included (terms.html says so); Purchase.amount_cents is that gross. Refunds are operator-initiated in the
+Stripe dashboard; the 14-day window is policy. Rows from the pay-what-you-want era (price_id "donation") and
+the retired pack era ("pack_N") keep their price_id, carry no net_cents, and still show in history.
 """
 from __future__ import annotations
 
+import math
 import os
 
 from flask import jsonify, request
@@ -40,40 +46,49 @@ from models import Purchase, User
 STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY", "").strip()
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "").strip()
 
-TOKENS_PER_DOLLAR = 1        # thank-you tokens per whole dollar donated
-# (min_cents, bonus_pct) in ASCENDING order — the last tier a donation reaches wins. Sent to the UI verbatim.
-BONUS_TIERS = [(1000, 10), (2000, 20), (5000, 30)]
-MIN_DONATION_CENTS = 100     # Stripe's floor is $0.50; $1 keeps the fee overhead sane
-MAX_DONATION_CENTS = 50000   # fat-finger guard
+# The stripe-python module, bound by init_billing once a key is configured (None when billing is off). It is
+# a module global rather than an init_billing local so the routes resolve it at call time — which is also
+# what lets the test suite stand a stub in its place without a live key.
+_stripe = None
+
+# The ENTIRE price list: tier id -> (net cents the project receives, thank-you tokens). Dict order is
+# display order in the UI. No custom amounts — a free-text box invites $0.50 gifts that Stripe's fixed 30c
+# eats, and fixed buttons are what the donate UI and /api/donate both speak. Up to $10 the tokens are priced
+# above cost (memory: ~$0.93 metered per hosted forge); $10 and above is one token per dollar, break-even.
+DONATION_TIERS: dict[str, tuple[int, int]] = {
+    "t3": (300, 2),
+    "t5": (500, 4),
+    "t10": (1000, 10),
+    "t20": (2000, 20),
+    "t50": (5000, 50),
+}
+
+# Stripe's cut, in env so a rate change is a config edit. Defaults are their US card rate (2.9% + 30c);
+# international cards and currency conversion cost more and we eat that difference by design.
+STRIPE_FEE_PCT = float(os.environ.get("STRIPE_FEE_PCT", "2.9"))
+STRIPE_FEE_FIXED_CENTS = int(os.environ.get("STRIPE_FEE_FIXED_CENTS", "30"))
 
 
-def _parse_presets(raw: str) -> list[int]:
-    """"300,500,1000" → [300, 500, 1000] (cents). Malformed/out-of-range entries are skipped, not fatal."""
-    presets: list[int] = []
-    for part in (raw or "").split(","):
-        try:
-            n = int(part.strip())
-        except ValueError:
-            continue
-        if MIN_DONATION_CENTS <= n <= MAX_DONATION_CENTS:
-            presets.append(n)
-    return presets
+def gross_for(net_cents: int) -> int:
+    """The smallest whole-cent charge that still nets `net_cents` after Stripe's cut: solve
+    gross - (gross * pct + fixed) = net, then round UP so rounding never eats into the donation. With the
+    default rates: 300 -> 340, 500 -> 546, 1000 -> 1061, 2000 -> 2091, 5000 -> 5181."""
+    return math.ceil((int(net_cents) + STRIPE_FEE_FIXED_CENTS) / (1 - STRIPE_FEE_PCT / 100))
 
 
-DEFAULT_PRESETS = [300, 500, 1000]
-PRESETS = _parse_presets(os.environ.get("BTSWEB_DONATION_PRESETS", "")) or list(DEFAULT_PRESETS)
+def fee_for(net_cents: int) -> int:
+    """The pass-through "Card processing fee" line item: what the donor pays on top of the tier amount."""
+    return gross_for(net_cents) - int(net_cents)
 
 
-def tokens_for(amount_cents: int) -> int:
-    """Thank-you tokens for a donation: one per WHOLE dollar (a $3.50 gift is 3 tokens), plus the tiered bonus
-    for larger gifts. Both steps floor, so $19.99 is 19 + floor(1.9) = 20 and $50 is 50 + 15 = 65."""
-    cents = int(amount_cents)
-    base = (cents // 100) * TOKENS_PER_DOLLAR
-    pct = 0
-    for min_cents, tier_pct in BONUS_TIERS:
-        if cents >= min_cents:
-            pct = tier_pct
-    return base + (base * pct) // 100
+def tier_info(tier_id: str) -> dict | None:
+    """One tier as the UI and /api/donate need it, or None for an unknown id (the 400 path)."""
+    row = DONATION_TIERS.get(tier_id)
+    if row is None:
+        return None
+    net, tokens = row
+    return {"id": tier_id, "net_cents": net, "fee_cents": fee_for(net), "gross_cents": gross_for(net),
+            "tokens": tokens}
 
 
 def billing_enabled() -> bool:
@@ -91,21 +106,35 @@ def _sget(obj, key, default=None):
     return default if val is None else val
 
 
+def _net_cents_of(meta) -> int | None:
+    """The donation half of a v3 checkout, from the session metadata. None for anything that predates the
+    two-line-item session (pack era, pay-what-you-want donations) or carries junk — history then simply
+    shows no fee split rather than inventing one."""
+    raw = _sget(meta or {}, "net_cents")
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return None
+
+
 def _credit_purchase(sess) -> tuple[bool, int]:
     """Record the donation and add its thank-you tokens in ONE transaction; idempotent via the UNIQUE session
-    id. Token count comes from the session's metadata (frozen at checkout time), never recomputed — changing
-    TOKENS_PER_DOLLAR can't mis-credit an in-flight donation. Returns (credited_now, token_balance)."""
+    id. Token count comes from the session's metadata (frozen at checkout time), never recomputed — editing
+    DONATION_TIERS can't mis-credit an in-flight donation. amount_cents is the GROSS Stripe actually charged
+    (donation + card fee); net_cents is the donation line alone. Returns (credited_now, token_balance)."""
     user_id = int(sess["metadata"]["user_id"])
     tokens = int(sess["metadata"]["tokens"])
+    meta = _sget(sess, "metadata") or {}
     try:
         with session_scope() as s:
             s.add(Purchase(
                 user_id=user_id,
                 stripe_session_id=sess["id"],
                 stripe_payment_intent=_sget(sess, "payment_intent"),
-                price_id=_sget(_sget(sess, "metadata") or {}, "price_id", "donation"),
+                price_id=_sget(meta, "price_id", "donation"),
                 tokens=tokens,
                 amount_cents=int(_sget(sess, "amount_total", 0)),
+                net_cents=_net_cents_of(meta),
                 currency=_sget(sess, "currency", "usd"),
                 status="paid",
             ))
@@ -145,60 +174,69 @@ def init_billing(app) -> None:
     boots and forges exactly as before."""
     public_base = os.environ.get("BTSWEB_PUBLIC_URL", "https://blankthespire.com").rstrip("/")
 
+    global _stripe
     if billing_enabled():
         import stripe  # lazy: the dependency is only required once billing is actually configured
         stripe.api_key = STRIPE_SECRET_KEY
+        _stripe = stripe
         if not os.environ.get("BTSWEB_PUBLIC_URL") and app.debug:
             app.logger.warning(
                 "Stripe is configured but BTSWEB_PUBLIC_URL is unset — checkout success/cancel will "
                 "redirect to %s, not this dev server.", public_base)
     else:
-        stripe = None
+        _stripe = None
         app.logger.info("billing disabled (set STRIPE_SECRET_KEY to enable donations)")
 
     @app.route("/api/billing")
     @require_login
     def api_billing():
-        """Donation config for the UI. {enabled: false} hides the donate flow (keyless dev)."""
+        """Donation config for the UI: the tier buttons, in display order, each with its gross/fee split so
+        the page never does the fee arithmetic itself. The tiers ship even when {enabled: false} (keyless
+        dev) so the UI can still describe them; only the donate flow is hidden."""
         return jsonify({
             "enabled": billing_enabled(),
-            "presets": PRESETS,
-            "min_cents": MIN_DONATION_CENTS,
-            "max_cents": MAX_DONATION_CENTS,
-            "tokens_per_dollar": TOKENS_PER_DOLLAR,
-            "bonus_tiers": [{"min_cents": c, "pct": p} for c, p in BONUS_TIERS],
             "currency": "usd",
+            "tiers": [tier_info(tid) for tid in DONATION_TIERS],
         })
 
     @app.route("/api/donate", methods=["POST"])
     @require_login
     def api_donate():
-        """Create a pay-what-you-want Checkout Session and hand back its hosted-page URL."""
+        """Create a fixed-tier Checkout Session and hand back its hosted-page URL. The body is {"tier": "t5"}
+        and nothing else — a legacy amount_cents body names no tier and so lands on the 400 below, which is
+        what we want: a stale tab must not be able to name its own price."""
         if not billing_enabled():
             return jsonify({"error": "donations aren't available right now."}), 503
         user = current_user()
+        tier_id = str((request.get_json(silent=True) or {}).get("tier", "") or "").strip()
+        tier = tier_info(tier_id)
+        if tier is None:
+            return jsonify({"error": "pick one of the donation amounts."}), 400
+        net, fee, tokens = tier["net_cents"], tier["fee_cents"], tier["tokens"]
         try:
-            amount_cents = int((request.get_json(silent=True) or {}).get("amount_cents", 0))
-        except (TypeError, ValueError):
-            amount_cents = 0
-        if not (MIN_DONATION_CENTS <= amount_cents <= MAX_DONATION_CENTS):
-            return jsonify({"error": f"donations can be ${MIN_DONATION_CENTS // 100} to "
-                                     f"${MAX_DONATION_CENTS // 100}."}), 400
-        tokens = tokens_for(amount_cents)
-        try:
-            sess = stripe.checkout.Session.create(
+            sess = _stripe.checkout.Session.create(
                 mode="payment",
                 submit_type="donate",  # Stripe's hosted button reads "Donate" instead of "Pay"
+                # Two line items so Stripe's own page and receipt show the split instead of one number the
+                # donor has to reverse-engineer. They sum to gross_for(net).
                 line_items=[{
                     "price_data": {
                         "currency": "usd",
-                        "unit_amount": amount_cents,
+                        "unit_amount": net,
                         "product_data": {"name": "Donation — BLANK the spire"},
+                    },
+                    "quantity": 1,
+                }, {
+                    "price_data": {
+                        "currency": "usd",
+                        "unit_amount": fee,
+                        "product_data": {"name": "Card processing fee"},
                     },
                     "quantity": 1,
                 }],
                 client_reference_id=str(user["id"]),
-                metadata={"user_id": str(user["id"]), "tokens": str(tokens), "price_id": "donation"},
+                metadata={"user_id": str(user["id"]), "tokens": str(tokens), "price_id": tier_id,
+                          "net_cents": str(net)},
                 customer_email=user.get("email") or None,
                 success_url=f"{public_base}/app?purchase=success&session_id={{CHECKOUT_SESSION_ID}}",
                 cancel_url=f"{public_base}/app?purchase=cancel",
@@ -214,7 +252,7 @@ def init_billing(app) -> None:
         if not billing_enabled():
             return jsonify({"error": "billing disabled"}), 503
         try:
-            event = stripe.Webhook.construct_event(
+            event = _stripe.Webhook.construct_event(
                 request.get_data(), request.headers.get("Stripe-Signature", ""), STRIPE_WEBHOOK_SECRET)
         except Exception:
             return jsonify({"error": "bad signature"}), 400
@@ -233,7 +271,7 @@ def init_billing(app) -> None:
         if not session_id:
             return jsonify({"error": "session_id is required"}), 400
         try:
-            sess = stripe.checkout.Session.retrieve(session_id)
+            sess = _stripe.checkout.Session.retrieve(session_id)
         except Exception:
             return jsonify({"error": "unknown checkout session"}), 404
         if _sget(sess, "client_reference_id") != str(user["id"]):

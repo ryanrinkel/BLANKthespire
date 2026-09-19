@@ -7,8 +7,9 @@ Run locally:
 
 Deploy: gunicorn + nginx on a plain Linux host (see DEPLOY-DIGITALOCEAN.md); set the env secrets
 ({GOOGLE,DISCORD,GITHUB}_CLIENT_ID/SECRET, OLLAMA_API_KEY, BTSWEB_DATABASE_URL, BTSWEB_SECRET_KEY, STRIPE_* — see
-DEPLOY-DIGITALOCEAN.md). Pricing: free with your own key; one free token per UTC day; optional donations
-(a thank-you token per dollar) — nothing is sold.
+DEPLOY-DIGITALOCEAN.md). Pricing: forging is free and unlimited with your own API key; a forge on OUR models
+spends one token, and tokens arrive only as a thank-you for a fixed-amount donation (billing.DONATION_TIERS).
+Nothing is sold, and there are no free tokens of any kind — not a starter grant, not one per day.
 """
 from __future__ import annotations
 
@@ -37,7 +38,7 @@ from db import db_ping, init_db, session_scope  # noqa: E402
 from forge import (ELEMENT_KINDS, VALID_FEEDBACK_CATEGORIES, ForgeError, UsageMeter,  # noqa: E402
                    append_card_feedback, append_element_feedback, forge_to_bundle, list_models)
 from models import (ForgeJob, ForgeUsage, ForgedCard, ForgedClass, Purchase, User,  # noqa: E402
-                    free_token_available, new_slug, spend_token, unspend_token)
+                    new_slug, spend_token, unspend_token)
 
 # Generated art (Track 2/3): the class splash, the combat sprite, the relic icon and the per-card portrait
 # pack (cards.zip) are all made at persist time, written to static/forged/<id>/, served by nginx, and their
@@ -137,58 +138,49 @@ init_billing(app)
 # (forge-job reconciliation runs below, once the settle helpers are defined — see _reconcile_forge_jobs.)
 
 
-# --- hosted-path guardrails: per-IP daily cap on FREE forges + a global daily kill-switch -------------
+# --- hosted-path guardrail: a global daily kill-switch on token forges --------------------------------
 
-class FreeForgeLimiter:
-    """Abuse backstop for the token path, which spends OUR provider budget.
+class TokenForgeLimiter:
+    """Budget backstop for the token path, which spends OUR provider budget.
 
-    Per IP, per UTC day, at most `ip_daily_cap` forges may be paid for with the FREE daily token — the obvious
-    abuse is a farm of throwaway Google accounts behind one address, each claiming its free forge. Paid tokens
-    (starter + thank-you) are not IP-capped (a household of donors should never hit it). On top, `daily_cap` is a global
-    kill-switch on ALL token-path forges (free or paid) so a runaway day can't run up the bill; 0 disables
-    either limit. Process-local, like forge admission — keep gunicorn at one worker.
+    One cap, `daily_cap`: the most token-path forges this process will admit in a UTC day, so a runaway day
+    (a bug, a spike, a donor with a script) can't run up an unbounded bill while nobody is watching. 0
+    disables it. BYOK forges are never counted — they cost us nothing. The old per-IP cap on the FREE daily
+    token went away with the free token itself (pricing v3): every hosted forge is now paid for with a token
+    someone donated for, so throttling by address only punished households. Process-local, like forge
+    admission — keep gunicorn at one worker.
     """
 
-    def __init__(self, ip_daily_cap: int = 5, daily_cap: int = 1000) -> None:
-        self.ip_daily_cap = ip_daily_cap
+    def __init__(self, daily_cap: int = 1000) -> None:
         self.daily_cap = daily_cap
         self._day = -1
         self._day_count = 0
-        self._ip_counts: dict[str, int] = {}
         self._lock = threading.Lock()
 
     def _roll(self, now: float) -> None:
         day = int(now // 86400)
         if day != self._day:
-            self._day, self._day_count, self._ip_counts = day, 0, {}
+            self._day, self._day_count = day, 0
 
-    def check(self, ip: str, *, free: bool) -> str | None:
-        """Admit one token-path forge from `ip` (`free` = paid with the daily free token), counting it. Returns
-        an error string if a cap is hit (nothing counted), else None."""
-        now = time.time()
+    def check(self, ip: str) -> str | None:
+        """Admit one token-path forge, counting it. Returns an error string if the day's cap is hit (nothing
+        counted), else None. `ip` is accepted for logging symmetry and is not rate-limited on."""
         with self._lock:
-            self._roll(now)
+            self._roll(time.time())
             if self.daily_cap > 0 and self._day_count >= self.daily_cap:
                 return "the hosted forge has hit its daily limit — bring your own API key to keep forging today."
-            if free and self.ip_daily_cap > 0 and self._ip_counts.get(ip, 0) >= self.ip_daily_cap:
-                return ("this network has used its free forges for today — bring your own API "
-                        "key to keep forging.")
             self._day_count += 1
-            if free:
-                self._ip_counts[ip] = self._ip_counts.get(ip, 0) + 1
             return None
 
-    def uncount(self, ip: str, *, free: bool) -> None:
+    def uncount(self, ip: str) -> None:
         """Undo a check() that admitted a forge which never ran (e.g. the token reserve failed after it)."""
         with self._lock:
             self._roll(time.time())
             self._day_count = max(0, self._day_count - 1)
-            if free and ip in self._ip_counts:
-                self._ip_counts[ip] = max(0, self._ip_counts[ip] - 1)
 
 
-free_limiter = FreeForgeLimiter(
-    ip_daily_cap=int(os.environ.get("BTSWEB_FREE_IP_DAILY_CAP", "5")),
+# Renamed from `free_limiter` with the free token: the old name would now name the wrong thing entirely.
+token_limiter = TokenForgeLimiter(
     daily_cap=int(os.environ.get("BTSWEB_TOKEN_DAILY_CAP", os.environ.get("BTSWEB_HOSTED_DAILY_CAP", "1000"))),
 )
 
@@ -782,14 +774,14 @@ def api_models():
 
 
 def _token_state(u: User) -> dict:
-    """What the browser shows: the PAID balance plus whether today's free token is still unspent."""
-    return {"token_balance": int(u.token_balance), "free_token_available": free_token_available(u)}
+    """What the browser shows: the spendable balance, and nothing else — there is no free token to report."""
+    return {"token_balance": int(u.token_balance)}
 
 
 def _reserve_token(user_id: int) -> tuple[str, dict] | None:
-    """Atomically spend one token for a hosted forge — the free daily token first, else one paid token — and
-    return (kind, token_state). None = nothing to spend (caller 402s). The read + write happen in one
-    transaction so two concurrent forges can't both spend the last token."""
+    """Atomically spend one token for a hosted forge and return (kind, token_state). None = nothing to spend
+    (caller 402s). The read + write happen in one transaction so two concurrent forges can't both spend the
+    last token."""
     with session_scope() as s:
         u = s.query(User).filter_by(id=user_id).one_or_none()
         if u is None:
@@ -826,7 +818,9 @@ def _settle_forge_job(forge_id: str, *, ok: bool, class_id: int | None = None,
         state = None
         if not ok:
             job = s.query(ForgeJob).filter_by(id=forge_id).one()
-            if job.token_kind in ("free", "paid"):
+            # "paid" is the only refundable kind. Rows stamped "free" predate pricing v3 (the token came out
+            # of a day stamp, not the balance) and crediting one would mint a token that never existed.
+            if job.token_kind == "paid":
                 u = s.query(User).filter_by(id=job.user_id).one_or_none()
                 if u is not None:
                     unspend_token(u, job.token_kind, job.token_day or "")
@@ -984,9 +978,9 @@ def forge_class_route():
     if not _user_begin(user["id"]):
         return jsonify({"error": "you already have a forge in progress — wait for it to finish."}), 429
 
-    # The "Use a token" path forges on our server-side Ollama mixture and spends one of the user's tokens —
-    # today's free token first, else a paid one — unless they're on the unlimited master list. Reserve it up
-    # front so we can 402 BEFORE streaming; a forge that then fails is refunded by the worker (see finish_failed).
+    # The "Use a token" path forges on our server-side Ollama mixture and spends one of the user's tokens,
+    # unless they're on the unlimited master list. Reserve it up front so we can 402 BEFORE streaming; a
+    # forge that then fails is refunded by the worker (see finish_failed).
     ollama_mix = mode == "token"
     unlimited = ollama_mix and is_unlimited(user.get("email", ""))
     reserved = False
@@ -994,30 +988,28 @@ def forge_class_route():
     token_day = time.strftime("%Y-%m-%d", time.gmtime())
     token_state: dict | None = None
     ip = _client_ip()
-    counted_free = False
     if ollama_mix and not unlimited:
-        # Would this forge be paid with the free token? Decide the IP cap on that BEFORE spending anything.
+        # Cheap pre-check so an empty balance 402s without touching the day's budget counter; the reserve
+        # below is the authoritative one (it's the transaction two concurrent forges race in).
         with session_scope() as s:
             u = s.query(User).filter_by(id=user["id"]).one_or_none()
-            would_be_free = bool(u is not None and free_token_available(u))
-            has_any = bool(u is not None and (would_be_free or u.token_balance > 0))
+            has_any = bool(u is not None and u.token_balance > 0)
         if not has_any:
             _user_end(user["id"])
-            return jsonify({"error": "you're out of tokens — your free daily token arrives tomorrow (UTC), "
-                                     "or bring your own API key to keep forging.",
-                            "token_balance": 0, "free_token_available": False}), 402
-        denied = free_limiter.check(ip, free=would_be_free)
+            return jsonify({"error": "you're out of tokens — get more on the Account tab, or bring your own "
+                                     "API key to keep forging.",
+                            "token_balance": 0}), 402
+        denied = token_limiter.check(ip)
         if denied:
             _user_end(user["id"])
             return jsonify({"error": denied}), 429
-        counted_free = would_be_free
         res = _reserve_token(user["id"])
-        if res is None:  # lost a race for the last token
-            free_limiter.uncount(ip, free=would_be_free)
+        if res is None:  # lost a race for the last token: give the day's budget slot back
+            token_limiter.uncount(ip)
             _user_end(user["id"])
-            return jsonify({"error": "you're out of tokens — your free daily token arrives tomorrow (UTC), "
-                                     "or bring your own API key to keep forging.",
-                            "token_balance": 0, "free_token_available": False}), 402
+            return jsonify({"error": "you're out of tokens — get more on the Account tab, or bring your own "
+                                     "API key to keep forging.",
+                            "token_balance": 0}), 402
         token_kind, token_state = res
         reserved = True
 
@@ -1048,9 +1040,8 @@ def forge_class_route():
     choice_meta: dict = {}  # what was offered / picked — stamped into the bundle for the fun experiment
 
     def refund_state(state: dict | None) -> dict:
-        """After a refund: un-count the free-forge IP cap and return the balance fields for the browser."""
-        if counted_free:
-            free_limiter.uncount(ip, free=True)
+        """The balance fields the browser needs after a refund. The day's budget counter is deliberately NOT
+        given back: the forge did reach our providers before it died, and the cap exists to bound spend."""
         return dict(state or {})
 
     def finish_failed(message: str) -> None:

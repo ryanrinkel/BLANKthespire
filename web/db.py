@@ -81,8 +81,9 @@ def _ensure_user_columns() -> None:
             conn.execute(text(
                 f"ALTER TABLE users ADD COLUMN token_balance INTEGER NOT NULL DEFAULT {int(INITIAL_TOKENS)}"))
     if "last_free_token_day" not in cols:
-        # The UTC day each account last SPENT its free daily token. NULL (the backfill for existing rows) =
-        # never, so everyone is eligible immediately.
+        # LEGACY: the free daily token is gone (pricing v3) and nothing reads this column any more. The ALTER
+        # stays because the model still declares the column — prod MySQL has it and dropping it across
+        # engines without Alembic isn't worth the risk — so a fresh-ish DB must still get it. Harmless.
         with engine.begin() as conn:
             conn.execute(text("ALTER TABLE users ADD COLUMN last_free_token_day VARCHAR(10)"))
 
@@ -108,6 +109,20 @@ def _ensure_class_columns() -> None:
         _backfill_slugs()
         with engine.begin() as conn:
             conn.execute(text("CREATE UNIQUE INDEX ix_classes_slug ON classes (slug)"))
+
+
+def _ensure_purchase_columns() -> None:
+    """Same tiny forward-only migration as _ensure_class_columns, for the `purchases` table: add `net_cents`
+    (the donation line alone, without the pass-through card fee — pricing v3) to DBs created before it.
+    Nullable with no default on purpose: rows from the pack / pay-what-you-want eras really do have no net,
+    and NULL is what makes Purchase.summary() omit the fee split for them. Idempotent; SQLite + MySQL."""
+    insp = inspect(engine)
+    if "purchases" not in insp.get_table_names():
+        return  # create_all will make it fresh with the column already present
+    cols = {c["name"] for c in insp.get_columns("purchases")}
+    if "net_cents" not in cols:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE purchases ADD COLUMN net_cents INTEGER"))
 
 
 def _ensure_forge_usage_columns() -> None:
@@ -165,6 +180,7 @@ def init_db() -> None:
     Base.metadata.create_all(engine)
     _ensure_user_columns()
     _ensure_class_columns()
+    _ensure_purchase_columns()
     _ensure_forge_usage_columns()
     _backfill_slugs()  # rows inserted by code paths that predate the slug (belt and braces)
     _ensure_identities()  # every user needs an identity row before the first sign-in of this boot

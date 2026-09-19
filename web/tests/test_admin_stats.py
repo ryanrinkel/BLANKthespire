@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from conftest import H, login, sse_events
+from conftest import H, login, seed_tokens, sse_events
 
 ADMIN = "unlimited@example.com"
 
@@ -210,6 +210,7 @@ def test_the_web_forge_is_always_staged(client, app_module, stub_forge):
 def test_usage_rows_and_result_carry_the_provider_and_totals(client, app_module, stub_forge):
     from models import ForgeUsage
     login(client, "prov@example.com")
+    seed_tokens(app_module, "prov@example.com", 1)
     ev = sse_events(client.post("/api/forge-class", headers=H, json={
         "concept": "x", "mode": "byok",
         "key": {"base_url": "https://API.OpenAI.com/v1", "api_key": "sk-x", "model": "gpt"}}))

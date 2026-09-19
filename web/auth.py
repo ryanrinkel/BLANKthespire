@@ -27,7 +27,7 @@ import requests
 from flask import jsonify, redirect, request, send_from_directory, session, url_for
 
 from db import session_scope
-from models import Identity, LoginLink, User, free_token_available
+from models import Identity, LoginLink, User
 
 GOOGLE_METADATA = "https://accounts.google.com/.well-known/openid-configuration"
 _oauth = None  # set by init_auth when at least one provider's credentials are present
@@ -307,7 +307,7 @@ def _send_magic_link(email: str, url: str) -> None:
 
 
 class MagicLinkLimiter:
-    """Abuse backstop for POST /api/auth/email/start, shaped like app.FreeForgeLimiter (one lock, bucketed
+    """Abuse backstop for POST /api/auth/email/start, shaped like app.TokenForgeLimiter (one lock, bucketed
     windows, process-local — keep gunicorn at one worker).
 
     Two caps: per normalized email, so the endpoint cannot be used to bomb one person's inbox, and per IP, so
@@ -533,8 +533,7 @@ def init_auth(app) -> None:
             with session_scope() as s:
                 row = s.query(User).filter_by(id=user["id"]).one_or_none()
                 bal = int(row.token_balance) if row is not None else 0
-                free = bool(row is not None and free_token_available(row))
-            user = {**user, "token_balance": bal, "free_token_available": free,
+            user = {**user, "token_balance": bal,
                     "unlimited": is_unlimited(user.get("email", "")),
                     "admin": is_admin(user.get("email", "")),
                     "identities": _identities_of(user["id"])}

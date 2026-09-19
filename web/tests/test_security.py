@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from conftest import DB_PATH, H, login, sse_events
+from conftest import DB_PATH, H, login, seed_tokens, sse_events
 
 
 def test_mutating_api_calls_need_the_csrf_header(client):
@@ -61,6 +61,7 @@ def test_hosted_mode_is_gone_and_unknown_modes_rejected(client):
 
 def test_deck_share_uses_unguessable_slug_and_hides_the_id(client, app_module, stub_forge):
     login(client, "share@example.com")
+    seed_tokens(app_module, "share@example.com", 1)
     ev = sse_events(client.post("/api/forge-class", json={"concept": "x", "mode": "token"}, headers=H))
     res = ev[-1][1]
     slug, cid = res["slug"], res["id"]
@@ -127,6 +128,7 @@ def test_healthz(client, app_module, monkeypatch):
 
 def test_feedback_is_rate_limited(client, app_module, stub_forge, monkeypatch):
     login(client, "fb@example.com")
+    seed_tokens(app_module, "fb@example.com", 1)
     res = sse_events(client.post("/api/forge-class", json={"concept": "x", "mode": "token"}, headers=H))[-1][1]
     card_id = res["cards"][0]["id"]
     monkeypatch.setattr(app_module, "FEEDBACK_HOURLY_CAP", 2)

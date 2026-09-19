@@ -4,12 +4,7 @@ from __future__ import annotations
 import threading
 import time
 
-from conftest import H, login, sse_events
-
-
-def _today():
-    from models import _utc_today
-    return _utc_today()
+from conftest import H, login, seed_tokens, sse_events
 
 
 def _drain_queues(app_module):
@@ -46,6 +41,7 @@ def test_token_forges_dequeue_before_byok(app_module, monkeypatch):
 def test_one_forge_per_account_at_a_time(app_module, stub_forge):
     c1 = app_module.app.test_client()
     login(c1, "busy@example.com")
+    seed_tokens(app_module, "busy@example.com", 2)
     stub_forge.gate = threading.Event()  # the stubbed forge blocks until we release it
     collected: dict = {}
 
@@ -67,6 +63,7 @@ def test_one_forge_per_account_at_a_time(app_module, stub_forge):
     # a different account is unaffected
     c3 = app_module.app.test_client()
     login(c3, "other@example.com")
+    seed_tokens(app_module, "other@example.com", 1)
     stub_forge.gate.set()
     assert sse_events(c3.post("/api/forge-class", json={"concept": "z", "mode": "token"}, headers=H))[-1][0] == "result"
     t.join(timeout=30)
@@ -78,11 +75,7 @@ def test_one_forge_per_account_at_a_time(app_module, stub_forge):
 
 
 def test_user_slot_is_released_on_early_rejections(client, app_module, stub_forge):
-    login(client, "rejected@example.com")
-    from models import User
-    with app_module.session_scope() as s:
-        u = s.query(User).filter_by(email="rejected@example.com").one()
-        u.token_balance, u.last_free_token_day = 0, _today()
+    login(client, "rejected@example.com")            # a fresh account holds nothing to spend
     assert client.post("/api/forge-class", json={"concept": "x", "mode": "token"}, headers=H).status_code == 402
     with app_module._user_active_lock:
         assert not app_module._user_active   # the 402 path gave the per-user slot back

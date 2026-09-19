@@ -15,34 +15,24 @@ class Base(DeclarativeBase):
     pass
 
 
-# Free tokens every account starts with (new sign-ins, and backfilled to existing rows on migration). One
-# token = one hosted "Use a token" forge (the Ollama gemma/glm mix on our server key). Beyond the starter
-# grant, pricing is: one FREE token per UTC day for everyone (tracked separately from the balance, see
-# free_token_available / spend_token below), plus thank-you tokens from optional donations (billing.py).
-# Nothing is sold (token packs ran 2026-09-08..16 and were retired; their Purchase rows remain).
-INITIAL_TOKENS = 5
+# Tokens an account starts with: NONE (pricing v3, 2026-09-18). One token = one hosted "Use a token" forge
+# on our server key. There is no free token of any kind any more — neither a starter grant nor the old one
+# per UTC day. The two ways to forge are: bring your own API key (free, unlimited, billed by your provider)
+# or spend a token received as a thank-you for a fixed-amount donation (billing.DONATION_TIERS). Nothing is
+# sold. Balances granted under the older models (starter 5s, per-dollar thank-yous, the retired 2026-09-08..16
+# token packs) are left exactly as they are — v3 stops granting, it never claws back.
+INITIAL_TOKENS = 0
 
 
 def _utc_today() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
 
-def free_token_available(user: "User", today: str | None = None) -> bool:
-    """True if this account has not yet spent its free daily token today (UTC). The free token lives
-    OUTSIDE token_balance: it is a once-per-day right, not a balance credit, so holding paid tokens never
-    forfeits it (the old "top up only when empty" rule punished buyers). last_free_token_day is the UTC day it
-    was last SPENT (NULL = never)."""
-    return user.last_free_token_day != (today or _utc_today())
-
-
 def spend_token(user: "User", today: str | None = None) -> str | None:
-    """Spend ONE token for a hosted forge, free-first: if today's free token is unspent, stamp the day and
-    return "free"; else decrement the paid balance and return "paid"; else return None (nothing to spend —
-    caller 402s). Call with a session-attached User inside a transaction so the read+write are atomic."""
-    today = today or _utc_today()
-    if free_token_available(user, today):
-        user.last_free_token_day = today
-        return "free"
+    """Spend ONE token for a hosted forge: decrement the balance and return "paid", or None when the balance
+    is empty (caller 402s). `today` is accepted and ignored — it dated the retired free daily token, and the
+    callers still pass it. Call with a session-attached User inside a transaction so the read+write are
+    atomic (two concurrent forges must not both spend the last token)."""
     if user.token_balance > 0:
         user.token_balance -= 1
         return "paid"
@@ -50,20 +40,11 @@ def spend_token(user: "User", today: str | None = None) -> str | None:
 
 
 def unspend_token(user: "User", kind: str, day: str | None = None) -> None:
-    """Give back a token reserved by spend_token (the forge failed). "paid" -> +1 balance. "free" -> clear the
-    day stamp, but only if it still names the day that was stamped (a rollover mid-forge means today's free
-    token is untouched already, and clearing a fresh stamp would hand out two)."""
+    """Give back a token reserved by spend_token (the forge failed): "paid" -> +1 balance. Anything else is a
+    no-op — historical ForgeJob rows still carry token_kind="free" from the retired free daily token, and
+    reconciling one of those at boot must not mint a token that never existed in the balance."""
     if kind == "paid":
         user.token_balance += 1
-    elif kind == "free":
-        if user.last_free_token_day == (day or _utc_today()):
-            user.last_free_token_day = None
-
-
-def grant_daily_token(user: "User") -> bool:
-    """RETIRED (kept for import compatibility): the free daily token is no longer a balance top-up. It is
-    tracked as a once-per-day spend right (free_token_available) so paid balances never block it."""
-    return False
 
 
 class User(Base):
@@ -82,10 +63,10 @@ class User(Base):
     # (db._ensure_user_columns) adds + backfills this column on databases that predate it.
     token_balance: Mapped[int] = mapped_column(
         Integer, default=INITIAL_TOKENS, server_default=str(INITIAL_TOKENS), nullable=False)
-    # The UTC date ("YYYY-MM-DD") this account last SPENT its free daily token (see spend_token). NULL = never.
-    # Patched into pre-existing DBs by db._ensure_user_columns. (Under the retired donation model this was the
-    # day the free token was GRANTED into the balance - same meaning, "today's free token is used up", so no
-    # data migration is needed.)
+    # LEGACY column, dead since pricing v3 (2026-09-18): the UTC date this account last spent the retired free
+    # daily token. Nothing reads or writes it any more. It stays because prod is MySQL with no Alembic and our
+    # forward-only boot migrations cannot drop a column cleanly across engines; db._ensure_user_columns keeps
+    # ADDing it to old databases, which is harmless.
     last_free_token_day: Mapped[str | None] = mapped_column(String(10), default=None, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
@@ -215,12 +196,12 @@ def new_slug() -> str:
 
 
 class Purchase(Base):
-    """One completed Stripe Checkout payment — a token pack (price_id = the pack id, e.g. "pack_11"), or a
-    legacy pay-what-you-want donation (price_id="donation"). The UNIQUE stripe_session_id is the
-    idempotency guard: the webhook and the synchronous /api/checkout-status fallback both funnel through
-    billing._credit_purchase, and a second delivery of the same session hits the constraint and credits
-    nothing. Doubles as the user-facing purchase history (a brand-new table — created by create_all on
-    boot, no _ensure_* migration needed)."""
+    """One completed Stripe Checkout payment — a fixed-tier donation (price_id = the tier id, e.g. "t5"), a
+    legacy pay-what-you-want donation (price_id="donation"), or a token pack from the retired pack era
+    (price_id="pack_11"). The UNIQUE stripe_session_id is the idempotency guard: the webhook and the
+    synchronous /api/checkout-status fallback both funnel through billing._credit_purchase, and a second
+    delivery of the same session hits the constraint and credits nothing. Doubles as the user-facing
+    purchase history."""
     __tablename__ = "purchases"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -230,22 +211,44 @@ class Purchase(Base):
     stripe_payment_intent: Mapped[str | None] = mapped_column(String(255), default=None, nullable=True)
     price_id: Mapped[str] = mapped_column(String(255), default="")
     tokens: Mapped[int] = mapped_column(Integer)               # tokens granted by this purchase
-    amount_cents: Mapped[int] = mapped_column(Integer, default=0)
+    amount_cents: Mapped[int] = mapped_column(Integer, default=0)   # GROSS: what the card was actually charged
+    # What the project keeps after Stripe's cut — the donation line item, without the pass-through card fee
+    # (pricing v3). NULL on every row that predates the two-line-item checkout (pack era, pay-what-you-want
+    # donations), which is why the history renders a fee split only when it is present. Added after the table
+    # existed ⇒ patched in by db._ensure_purchase_columns.
+    net_cents: Mapped[int | None] = mapped_column(Integer, default=None, nullable=True)
     currency: Mapped[str] = mapped_column(String(8), default="usd")
     status: Mapped[str] = mapped_column(String(32), default="paid")  # "paid" | "refunded"
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     def summary(self) -> dict:
-        """History-list shape for /api/purchases."""
+        """History-list shape for /api/purchases. amount_cents is the gross charge; net_cents/fee_cents are
+        the v3 split (both None for pre-v3 rows, which carried no fee line item)."""
+        net = int(self.net_cents) if self.net_cents is not None else None
         return {
             "id": self.id,
-            "kind": "donation" if self.price_id == "donation" else "pack",
+            "kind": "donation" if self._is_donation() else "pack",
             "tokens": self.tokens,
             "amount_cents": self.amount_cents,
+            "net_cents": net,
+            "fee_cents": (int(self.amount_cents) - net) if net is not None else None,
             "currency": self.currency,
             "status": self.status,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
+
+    def _is_donation(self) -> bool:
+        """Everything except a retired token pack is a donation: "donation" (the pay-what-you-want era) or a
+        v3 tier id ("t5"). billing is imported lazily — it imports this module, so a top-level import would
+        be a cycle."""
+        pid = self.price_id or ""
+        if pid == "donation":
+            return True
+        try:
+            from billing import DONATION_TIERS
+        except Exception:  # pragma: no cover — billing is always importable in practice
+            return False
+        return pid in DONATION_TIERS
 
 
 class ForgeUsage(Base):
@@ -261,7 +264,8 @@ class ForgeUsage(Base):
     class_id: Mapped[int | None] = mapped_column(Integer, default=None, nullable=True)  # None if the forge failed
     forge_id: Mapped[str] = mapped_column(String(32), index=True)  # groups the rows of one forge
     mode: Mapped[str] = mapped_column(String(16), default="token")  # token | byok | anthropic | fake
-    token_kind: Mapped[str | None] = mapped_column(String(10), default=None, nullable=True)  # free|paid|unlimited
+    token_kind: Mapped[str | None] = mapped_column(String(10), default=None, nullable=True)  # paid|unlimited
+    # ("free" on rows written before pricing v3 retired the free daily token.)
     # brainstorm | structure | cards | ... for LLM calls, and "art:splash" / "art:sprite" / "art:cards" for
     # the image rows (one per asset kind per forge; token columns 0, cost in metered_cost_micros). Anything
     # that only wants the LLM numbers filters role NOT LIKE 'art:%' (see app.forge_estimate).
@@ -298,7 +302,8 @@ class ForgeJob(Base):
     id: Mapped[str] = mapped_column(String(32), primary_key=True)  # the forge id (uuid hex)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     mode: Mapped[str] = mapped_column(String(16), default="token")
-    token_kind: Mapped[str | None] = mapped_column(String(10), default=None, nullable=True)  # free|paid|unlimited
+    token_kind: Mapped[str | None] = mapped_column(String(10), default=None, nullable=True)  # paid|unlimited
+    # ("free" on rows written before pricing v3 retired the free daily token.)
     token_day: Mapped[str | None] = mapped_column(String(10), default=None, nullable=True)   # UTC day reserved
     concept: Mapped[str] = mapped_column(Text, default="")
     status: Mapped[str] = mapped_column(String(16), default="running", index=True)  # running|done|failed
