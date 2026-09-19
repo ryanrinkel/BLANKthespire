@@ -6,9 +6,10 @@ Zero new dependencies (stdlib urllib, same shape as openai.py). Model and qualit
 KIND (req.kind: splash | sprite | card) — one splash costs $0.004, a class's 34 cards cost $0.13, so
 they are separate knobs. Env:
     OPENROUTER_API_KEY                 required (the same key the text side's OpenRouter config uses)
-    BTSGEN_OPENROUTER_MODEL            splash model, default 'openai/gpt-5-image-mini'
-                                       (was qwen/qwen-image-3 until 2026-09-18; the E2E legs Ryan judged
-                                       used mini@low and Qwen is still one env flip away)
+    BTSGEN_OPENROUTER_MODEL            splash model, default 'openai/gpt-5.4-image-2' (= OpenAI's
+                                       gpt-image-2, what prod's direct-OpenAI splashes used before the
+                                       2026-09-18 rollout; a night of mini@low/medium splashes on live was a
+                                       visible drop and Ryan flagged it at once — mini stays for CARDS)
     BTSGEN_OPENROUTER_SPRITE_MODEL     transparent (sprite) model, default 'openai/gpt-image-2.5-flare'
                                        — only the OpenAI GPT Image family and Sourceful Riverflow
                                        advertise background=transparent on OpenRouter (catalog 2026-09-17)
@@ -21,7 +22,7 @@ they are separate knobs. Env:
                                        model is tried; FLUX.2 Klein is 3 s, PNG, $0.015, any ratio.
                                        Unset -> the ladder is just BTSGEN_OPENROUTER_CARD_MODEL.
     BTSGEN_OPENROUTER_RESOLUTION       optional tier: 512 | 1K | 2K | 4K (unset -> provider default)
-    BTSGEN_IMAGE_QUALITY               splash quality, low (default) | medium | high — ignored by
+    BTSGEN_IMAGE_QUALITY               splash quality, medium (default) | low | high — ignored by
                                        models without a knob
     BTSGEN_IMAGE_SPRITE_QUALITY        sprite quality (unset -> the splash quality)
     BTSGEN_IMAGE_CARD_QUALITY          card quality, default 'low' (also the ladder's default when an
@@ -52,13 +53,14 @@ from urllib.request import Request, urlopen
 from ..request import ImageRequest, ImageResult
 
 _ENDPOINT = "https://openrouter.ai/api/v1/images"
-# 2026-09-18 A/B: gpt-5-image-mini @ low, 3:2 is the best value of the catalog (32/32 ok, $0.0038/image,
-# ~11 s) and is what the whole-class E2E runs Ryan judged used — for splashes AND cards.
-DEFAULT_MODEL = "openai/gpt-5-image-mini"
+# 2026-09-18 A/B: gpt-5-image-mini @ low, 3:2 is the best value of the catalog for CARD portraits (32/32 ok,
+# $0.0038/image, ~11 s). The SPLASH is the class's one hero image and mini is visibly weaker there: the full
+# gpt-image-2 @ medium ($0.044 metered, ~65 s) is what prod shipped before and stays the default.
+DEFAULT_MODEL = "openai/gpt-5.4-image-2"
 DEFAULT_SPRITE_MODEL = "openai/gpt-image-2.5-flare"
 DEFAULT_CARD_MODEL = "openai/gpt-5-image-mini"
 DEFAULT_CARD_MODELS = "openai/gpt-5-image-mini@low,black-forest-labs/flux.2-klein-4b"
-DEFAULT_QUALITY = "low"
+DEFAULT_QUALITY = "medium"
 DEFAULT_CARD_QUALITY = "low"
 _MAX_CARD_ATTEMPTS = 4  # hard bound: a stuck vendor must cost seconds, not a forge
 

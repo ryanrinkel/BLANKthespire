@@ -94,12 +94,12 @@ def _req(kind: str, tmp_path, transparent=False) -> ImageRequest:
 
 def test_openrouter_models_and_quality_per_kind(tmp_path):
     be = orb.OpenRouterImageBackend()
-    assert be.model_for(_req("splash", tmp_path)) == "openai/gpt-5-image-mini"  # was qwen before 2026-09-18
+    assert be.model_for(_req("splash", tmp_path)) == "openai/gpt-5.4-image-2"  # the full model: mini is for cards
     assert be.model_for(_req("sprite", tmp_path, transparent=True)) == orb.DEFAULT_SPRITE_MODEL
     assert be.model_for(_req("card", tmp_path)) == "openai/gpt-5-image-mini"
-    assert be.quality_for(_req("splash", tmp_path)) == "low"
+    assert be.quality_for(_req("splash", tmp_path)) == "medium"
     assert be.quality_for(_req("card", tmp_path)) == "low"
-    assert be.quality_for(_req("sprite", tmp_path, transparent=True)) == "low"  # falls back to splash
+    assert be.quality_for(_req("sprite", tmp_path, transparent=True)) == "medium"  # falls back to splash
 
 
 def test_openrouter_kind_envs_are_independent(tmp_path, monkeypatch):

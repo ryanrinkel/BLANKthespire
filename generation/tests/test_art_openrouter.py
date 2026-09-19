@@ -61,8 +61,9 @@ def test_splash_payload_and_result(tmp_path, monkeypatch):
     assert res.ok and res.backend == "openrouter" and res.model == orb.DEFAULT_MODEL
     assert (res.width, res.height) == (4, 2)  # measured from the returned PNG, not assumed
     assert res.cost_usd == 0.03  # metered cost from the response
-    # 2026-09-18: the splash default moved off qwen/qwen-image-3 to the A/B winner (Qwen is one env flip away)
-    assert orb.DEFAULT_MODEL == "openai/gpt-5-image-mini" and seen["quality"] == "low"
+    # 2026-09-18: the splash default is the full gpt-image-2 (OpenRouter slug gpt-5.4-image-2) @ medium — mini
+    # is for cards; a night of mini splashes on live was a visible drop
+    assert orb.DEFAULT_MODEL == "openai/gpt-5.4-image-2" and seen["quality"] == "medium"
     # a 16:9 style snaps to 3:2 for the OpenAI family (OpenRouter only routes 1:1 / 3:2 / 2:3 for it)
     assert seen["model"] == orb.DEFAULT_MODEL and seen["aspect_ratio"] == "3:2"
     assert seen["output_format"] == "png" and "background" not in seen and "resolution" not in seen
