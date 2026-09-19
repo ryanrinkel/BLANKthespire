@@ -29,7 +29,9 @@ they are separate knobs. Env:
                                        entry carries no @quality suffix)
 Selected with BTSGEN_IMAGE_BACKEND=openrouter; `available()` is false with no key so it degrades to
 no art (never blocks a forge). Constructor kwargs override the env so a CLI / A-B harness can pin a
-model per call: OpenRouterImageBackend(model="bytedance-seed/seedream-4.5").
+model per call: OpenRouterImageBackend(model="bytedance-seed/seedream-4.5"). `api_key=` overrides
+OPENROUTER_API_KEY for that instance — the website passes a BYOK user's own key this way so their
+forge's art is billed to them, not to the server.
 
 Reference images: req.ref_images (from StyleProfile.ref_images) are sent as base64 data URLs in
 `input_references` — this is how a house style (e.g. a Slay the Spire look) can be conditioned in.
@@ -88,13 +90,15 @@ class OpenRouterImageBackend:
 
     def __init__(self, model: str | None = None, sprite_model: str | None = None,
                  resolution: str | None = None, quality: str | None = None,
-                 card_model: str | None = None):
+                 card_model: str | None = None, api_key: str | None = None):
         self._model, self._sprite_model, self._card_model = model, sprite_model, card_model
         self._resolution, self._quality = resolution, quality
+        # An explicit key (a BYOK user's, held for one forge) beats the server's env key. The website
+        # builds one of these per bring-your-own-key forge so the art bills the same key as the text.
+        self._api_key = (api_key or "").strip() or None
 
-    @staticmethod
-    def _key() -> str | None:
-        return os.environ.get("OPENROUTER_API_KEY")
+    def _key(self) -> str | None:
+        return self._api_key or os.environ.get("OPENROUTER_API_KEY")
 
     def available(self) -> bool:
         return bool(self._key())

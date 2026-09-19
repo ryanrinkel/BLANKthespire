@@ -475,17 +475,54 @@ def _sprite_url(class_id: int, sprite_hash: str | None = None) -> str:
     return _art_url(class_id, "sprite", sprite_hash)
 
 
-def _generate_art(kind: str, class_id: int, out: dict, bundle: dict, meter=None) -> str | None:
+# Image-capable BYOK providers, by the hostname of the base_url the user chose: the art backend that can
+# take THEIR key. Everything else (Anthropic, Groq, Gemini's OpenAI shim, DeepSeek, Together, Ollama Cloud,
+# a custom endpoint) has no image API we drive, so a BYOK forge there ships with BTSWEB_BYOK_ART_FALLBACK
+# art ('null' = none; 'procedural' = the free placeholder) — never with art billed to the server's keys.
+_BYOK_ART_HOSTS = {"openrouter.ai": "openrouter", "api.openai.com": "openai"}
+
+
+def _byok_art_backend(mode: str, key: dict | None):
+    """The image backend a forge's art runs on, or None to use the server's own BTSGEN_IMAGE_BACKEND chain.
+
+    Token (and dev-only fake) forges return None: the server pays for the text, so it pays for the art.
+    A bring-your-own-key forge NEVER returns None — the user's key pays for everything or the art is
+    skipped: an OpenRouter or OpenAI key gets that vendor's backend built around the user's key (used for
+    this forge only, held in memory, never persisted — same contract as the text calls); any other
+    provider gets the fallback name. The returned instance/name goes straight to forge_splash & co as
+    `backend=`, so the server's env chain is never consulted for a BYOK forge."""
+    if mode not in ("byok", "anthropic"):
+        return None
+    fallback = (os.environ.get("BTSWEB_BYOK_ART_FALLBACK", "null").strip() or "null").lower()
+    if mode != "byok" or not isinstance(key, dict):
+        return fallback  # Anthropic has no image API
+    api_key = (key.get("api_key") or "").strip()
+    try:
+        host = (urllib.parse.urlsplit((key.get("base_url") or "").strip()).hostname or "").lower()
+    except ValueError:
+        host = ""
+    vendor = _BYOK_ART_HOSTS.get(host)
+    if not (vendor and api_key):
+        return fallback
+    from btsgen.art.backends.openai import OpenAIImageBackend          # lazy: never block app boot
+    from btsgen.art.backends.openrouter import OpenRouterImageBackend
+    cls = OpenRouterImageBackend if vendor == "openrouter" else OpenAIImageBackend
+    return cls(api_key=api_key)
+
+
+def _generate_art(kind: str, class_id: int, out: dict, bundle: dict, meter=None, backend=None) -> str | None:
     """Best-effort: render one art asset ('splash' = select-screen background, 'sprite' = the standing
     combat model) to static/forged/<id>/<kind>.png and return its content digest (or None if no backend
     is configured / generation failed). Mutates `bundle` in place to carry `<kind>_url` so the
     re-encoded import code delivers it to the mod. `meter` (a forge.UsageMeter) gets the image's model and
-    metered cost for the ledger. NEVER raises — a forge must succeed even if image generation doesn't."""
+    metered cost for the ledger. `backend` (None = the server's BTSGEN_IMAGE_BACKEND chain) is a BYOK
+    forge's own backend instance/name from _byok_art_backend. NEVER raises — a forge must succeed even if
+    image generation doesn't."""
     try:
         from btsgen.art import class_art_from_bundle, forge_splash, forge_sprite  # lazy: never block app boot
         forge = forge_sprite if kind == "sprite" else forge_splash
         dest = STATIC_FORGED_DIR / str(class_id) / f"{kind}.png"
-        res = forge(class_art_from_bundle(out), out_path=dest)  # backend from BTSGEN_IMAGE_BACKEND
+        res = forge(class_art_from_bundle(out), out_path=dest, backend=backend)
         if not (res.ok and res.path):
             app.logger.warning("%s not produced for class %s: %s", kind, class_id, res.error or "no backend")
             return None
@@ -559,7 +596,8 @@ def _card_art_id(card: dict, index: int) -> str:
     return safe or f"card_{index}"
 
 
-def _generate_card_art(class_id: int, out: dict, bundle: dict, on_event=None, meter=None) -> str | None:
+def _generate_card_art(class_id: int, out: dict, bundle: dict, on_event=None, meter=None,
+                       backend=None) -> str | None:
     """Best-effort: render one portrait per card into static/forged/<id>/cards/<card_id>.png, zip the
     successes into static/forged/<id>/cards.zip, stamp `bundle["card_art_url"]` and return the zip's
     content digest (None = nothing was produced — no backend, disabled, or every card failed).
@@ -568,6 +606,10 @@ def _generate_card_art(class_id: int, out: dict, bundle: dict, on_event=None, me
     BTSWEB_CARD_ART_BUDGET_S wall clock or BTSWEB_CARD_ART_MAX_USD metered spend. "Stops" means the
     not-yet-started cards are cancelled (in-flight ones are left to finish — killing them would waste
     an image that is already paid for) and whatever succeeded is zipped and shipped.
+
+    `backend` (None = the server's BTSGEN_IMAGE_BACKEND chain) is a BYOK forge's own image backend, so
+    the pack bills the user's key — see _byok_art_backend. The cost cap still applies: it bounds THEIR
+    surprise the same way it bounds ours.
 
     `on_event(str)` receives "card art n/N" progress for the SSE stream; `meter` (a forge.UsageMeter)
     collects the pack's model + metered cost for the forge_usage ledger. NEVER raises: identical contract
@@ -603,7 +645,7 @@ def _generate_card_art(class_id: int, out: dict, bundle: dict, on_event=None, me
         def render(card: dict, card_id: str):
             if stop.is_set():   # a cap tripped while this one sat in the queue
                 return None
-            return forge_card_art(art, card, out_path=cards_dir / f"{card_id}.png")
+            return forge_card_art(art, card, out_path=cards_dir / f"{card_id}.png", backend=backend)
 
         made: dict[str, Path] = {}
         spent = 0.0
@@ -678,7 +720,7 @@ def _generate_card_art(class_id: int, out: dict, bundle: dict, on_event=None, me
         return None
 
 
-def _persist_class(user_id: int, concept: str, out: dict, forge_meta: dict | None = None,
+def _persist_class(user_id: int, concept: str, out: dict, forge_meta: dict | None = None, art_backend=None,
                    on_event=None, meter=None) -> dict:
     """Save a forged class (+ denormalized card rows) for the user; return the detail shape. After the
     row gets its id, generate the art (best-effort) and re-encode the import code so it carries the
@@ -693,7 +735,10 @@ def _persist_class(user_id: int, concept: str, out: dict, forge_meta: dict | Non
 
     `forge_meta` (interactive forge mode) stamps how the class was made — offered/picked archetypes — into
     bundle_json for the guided-vs-unguided fun experiment. Analysis-only: stripped before encoding the
-    import code, so the mod payload is byte-identical to an autonomous forge's."""
+    import code, so the mod payload is byte-identical to an autonomous forge's.
+
+    `art_backend` (None = the server's BTSGEN_IMAGE_BACKEND chain, i.e. the token path) is the image
+    backend every asset here runs on — a BYOK forge passes its own (the user's key) or 'null'."""
     from btsgen.bts1 import VOCAB_VERSION, encode_class
     bundle = {"kind": "class", "character": out["character"], "cards": out["cards"]}
     if out.get("relic"):  # keep the stored bundle in lockstep with the encoded code (which carries the relic)
@@ -723,12 +768,12 @@ def _persist_class(user_id: int, concept: str, out: dict, forge_meta: dict | Non
 
     from concurrent.futures import ThreadPoolExecutor
     with ThreadPoolExecutor(max_workers=4) as pool:
-        f_splash = pool.submit(_generate_art, "splash", class_id, out, bundle, meter)
-        f_sprite = pool.submit(_generate_art, "sprite", class_id, out, bundle, meter)
-        f_relic = pool.submit(_generate_relic_icon, class_id, out, bundle)
+        f_splash = pool.submit(_generate_art, "splash", class_id, out, bundle, meter, art_backend)
+        f_sprite = pool.submit(_generate_art, "sprite", class_id, out, bundle, meter, art_backend)
+        f_relic = pool.submit(_generate_relic_icon, class_id, out, bundle)  # emoji fetch: free either way
         # The card pack runs INSIDE this pool (it owns a nested worker pool of its own) so the code
         # returned below already carries every URL — the mod gets one code, not a code plus a promise.
-        f_cards = pool.submit(_generate_card_art, class_id, out, bundle, on_event, meter)
+        f_cards = pool.submit(_generate_card_art, class_id, out, bundle, on_event, meter, art_backend)
         splash_digest, sprite_digest = f_splash.result(), f_sprite.result()
         relic_digest = f_relic.result()
         cards_digest = f_cards.result()
@@ -965,6 +1010,9 @@ def forge_class_route():
     fake = mode == "fake"
     hosted = False
     model = None
+    # Art follows the money: a BYOK forge's splash/sprite/card pack run on the USER's key (OpenRouter or
+    # OpenAI) or not at all — the server's image keys only ever pay for token forges.
+    art_backend = _byok_art_backend(mode, key)
 
     # Full line ⇒ turn the forge away NOW, before a token is reserved (soft cap: a race past it just
     # means one extra spot in line, never a lost token).
@@ -1068,7 +1116,7 @@ def forge_class_route():
             # on_event: the card-art step narrates itself over the same SSE stream the forge used.
             # meter: its image costs join this forge's ledger rows (written by _record_usage below).
             saved = _persist_class(user["id"], concept, out, forge_meta=forge_meta,
-                                   on_event=on_event, meter=meter)
+                                   on_event=on_event, meter=meter, art_backend=art_backend)
         except Exception as e:
             finish_failed(f"forged, but saving failed: {e}")
             return
@@ -1091,6 +1139,12 @@ def forge_class_route():
             rows = meter.rows()
             saved["usage"] = {k: sum(int(r.get(k) or 0) for r in rows)
                               for k in ("calls", "input_tokens", "cached_tokens", "output_tokens")}
+            # The art rows are on the user's key too (BYOK): images made, and the metered USD where the
+            # vendor reported one (OpenRouter does; OpenAI's is advisory, None means unknown).
+            art = meter.art_rows()
+            saved["usage"]["images"] = sum(int(r.get("calls") or 0) for r in art)
+            priced = [float(r["cost_usd"]) for r in art if r.get("cost_usd") is not None]
+            saved["usage"]["art_cost_usd"] = round(sum(priced), 4) if priced else None
         except Exception as e:  # noqa: BLE001
             app.logger.warning("usage summary failed (forge %s): %s", forge_id, e)
         q.put(("result", saved))

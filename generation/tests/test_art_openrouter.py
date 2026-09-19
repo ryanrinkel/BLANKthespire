@@ -35,6 +35,23 @@ def test_registered_and_key_gated(monkeypatch):
     assert be.available() is True
 
 
+def test_a_constructor_key_overrides_the_env_and_is_what_gets_sent(tmp_path, monkeypatch):
+    """The website builds one backend per BYOK forge around the user's own key; it must beat the server's."""
+    from btsgen.art.png import encode_rgb
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-SERVER")
+    be = orb.OpenRouterImageBackend(api_key="sk-or-USER")
+    assert be.available() and be._key() == "sk-or-USER"
+    seen: dict = {}
+    _fake_response(monkeypatch, seen, encode_rgb(4, 2, bytes(4 * 2 * 3)))
+    res = forge_splash(ClassArt(class_id="u", name="U"), backend=be, out_dir=tmp_path)
+    assert res.ok and seen["_headers"]["authorization"] == "Bearer sk-or-USER"
+    # without a key of its own, the instance still falls back to the env; blank means "not given"
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    assert orb.OpenRouterImageBackend(api_key="  ").available() is False
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-SERVER")
+    assert orb.OpenRouterImageBackend(api_key="").available() is True
+
+
 def test_no_key_is_graceful(tmp_path, monkeypatch):
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     res = forge_splash(ClassArt(class_id="x", name="X"), backend="openrouter", out_dir=tmp_path)

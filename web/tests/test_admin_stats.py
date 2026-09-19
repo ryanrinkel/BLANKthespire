@@ -215,8 +215,10 @@ def test_usage_rows_and_result_carry_the_provider_and_totals(client, app_module,
         "concept": "x", "mode": "byok",
         "key": {"base_url": "https://API.OpenAI.com/v1", "api_key": "sk-x", "model": "gpt"}}))
     saved = ev[-1][1]
-    # the stub meters two calls: 1000+500 in, 200+100 out, 300 cached
-    assert saved["usage"] == {"calls": 2, "input_tokens": 1500, "cached_tokens": 300, "output_tokens": 300}
+    # the stub meters two calls: 1000+500 in, 200+100 out, 300 cached; the art (on the user's OpenAI key)
+    # is refused by conftest's no-network net, so no image lands and no cost is known
+    assert saved["usage"] == {"calls": 2, "input_tokens": 1500, "cached_tokens": 300, "output_tokens": 300,
+                              "images": 0, "art_cost_usd": None}
     with app_module.session_scope() as s:
         rows = s.query(ForgeUsage).filter_by(class_id=saved["id"]).all()
     assert rows and all(r.provider == "api.openai.com" for r in rows)

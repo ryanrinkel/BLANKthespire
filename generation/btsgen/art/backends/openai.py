@@ -1,7 +1,8 @@
 """OpenAI image backend — the first real cloud image generator.
 
 Zero new dependencies: a single JSON POST via stdlib urllib (cloud backends lazy-load their own client;
-this one needs none). Reads the API key from the environment so the SERVER (droplet) pays per forge:
+this one needs none). Reads the API key from the environment so the SERVER (droplet) pays per forge
+(or from `api_key=` on the constructor, which is how a BYOK user's own OpenAI key pays instead):
     BTSGEN_IMAGE_API_KEY  (preferred) or OPENAI_API_KEY
     BTSGEN_IMAGE_QUALITY  splash quality: low | medium (default) | high
     BTSGEN_IMAGE_MODEL    splash model, default 'gpt-image-2' (gpt-image-1 retires 2026-10-23; -1.5 also works)
@@ -73,9 +74,13 @@ _NO_TRANSPARENT = {"gpt-image-2"}
 class OpenAIImageBackend:
     name = "openai"
 
-    @staticmethod
-    def _key() -> str | None:
-        return os.environ.get("BTSGEN_IMAGE_API_KEY") or os.environ.get("OPENAI_API_KEY")
+    def __init__(self, api_key: str | None = None):
+        # An explicit key (a BYOK user's, held for one forge) beats the server's env key — see the
+        # openrouter backend; the website builds one per bring-your-own-OpenAI-key forge.
+        self._api_key = (api_key or "").strip() or None
+
+    def _key(self) -> str | None:
+        return self._api_key or os.environ.get("BTSGEN_IMAGE_API_KEY") or os.environ.get("OPENAI_API_KEY")
 
     def available(self) -> bool:
         return bool(self._key())

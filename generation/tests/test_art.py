@@ -79,6 +79,17 @@ def test_openai_nearest_size():
     assert openai_backend._nearest_size((512, 512)) == "1024x1024"    # square
 
 
+def test_openai_constructor_key_overrides_the_env(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-SERVER")
+    monkeypatch.setenv("BTSGEN_IMAGE_API_KEY", "sk-SERVER-IMAGE")
+    assert openai_backend.OpenAIImageBackend(api_key="sk-USER")._key() == "sk-USER"
+    assert openai_backend.OpenAIImageBackend()._key() == "sk-SERVER-IMAGE"
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("BTSGEN_IMAGE_API_KEY", raising=False)
+    assert openai_backend.OpenAIImageBackend(api_key="sk-USER").available() is True
+    assert openai_backend.OpenAIImageBackend().available() is False
+
+
 def test_openai_no_key_is_graceful(tmp_path, monkeypatch):
     monkeypatch.delenv("BTSGEN_IMAGE_API_KEY", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)

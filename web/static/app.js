@@ -269,6 +269,9 @@ function estimateText(model) {
   } else {
     s += " Multiply by your provider's per-token prices — this can be a few dollars per forge on frontier models.";
   }
+  // Image calls ride the same key on the art-capable providers (see PROVIDERS.art): ~36 images per forge
+  // (splash, sprite, one portrait per card), capped server-side at about half a dollar.
+  if (currentProvider().art) s += " Plus about 36 image calls for the art, roughly $0.20–0.50.";
   return s;
 }
 
@@ -301,18 +304,21 @@ function selectTab(which) {
 // Each provider maps to a known base URL (so users pick a name, not a URL) plus a key prefix used to
 // auto-select the dropdown when it's unambiguous, the page to get a key, and a few suggested models.
 // `mode` distinguishes Anthropic (native SDK path) from the OpenAI-compatible path. "custom" has no
-// base_url — it reveals the URL field for any other OpenAI-compatible endpoint.
+// base_url — it reveals the URL field for any other OpenAI-compatible endpoint. `art: true` marks the
+// providers whose image API the server can drive with the same key (mirrors app.py's _BYOK_ART_HOSTS):
+// there the splash, sprite and card portraits are generated on the user's key; elsewhere a BYOK forge
+// ships without generated art (the mod draws its built-in card doodles) — art is never billed to us.
 const PROVIDERS = {
   anthropic:  { label: "Anthropic", mode: "anthropic", base_url: "",
                 prefix: "sk-ant-", keyFrom: "console.anthropic.com",
                 models: ["claude-sonnet-4-6", "claude-haiku-4-5", "claude-opus-4-8"] },
-  openai:     { label: "OpenAI", mode: "byok", base_url: "https://api.openai.com/v1",
+  openai:     { label: "OpenAI", mode: "byok", base_url: "https://api.openai.com/v1", art: true,
                 prefix: "sk-", keyFrom: "platform.openai.com (an API key, not a ChatGPT login)",
                 models: ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "o4-mini"] },
   ollama:     { label: "Ollama Cloud", mode: "byok", base_url: "https://ollama.com/v1",
                 prefix: "", keyFrom: "ollama.com/settings/keys",
                 models: ["glm-5.2", "gemma4:31b", "gpt-oss:120b", "qwen3.5:397b", "deepseek-v4-pro"] },
-  openrouter: { label: "OpenRouter", mode: "byok", base_url: "https://openrouter.ai/api/v1",
+  openrouter: { label: "OpenRouter", mode: "byok", base_url: "https://openrouter.ai/api/v1", art: true,
                 prefix: "sk-or-", keyFrom: "openrouter.ai/keys",
                 models: ["anthropic/claude-sonnet-4.6", "openai/gpt-4o", "google/gemini-2.5-pro"] },
   groq:       { label: "Groq", mode: "byok", base_url: "https://api.groq.com/openai/v1",
@@ -360,7 +366,13 @@ function applyProvider() {
 
   el("byok-hint").innerHTML =
     `Get an <b>API key</b> from ${esc(p.keyFrom)}. Your key is sent with this one request and kept only `
-    + `in your browser — never saved on our server.`;
+    + `in your browser — never saved on our server. `
+    + (p.art
+        ? `<b>Art included:</b> the splash, sprite and card portraits are generated on this key too `
+          + `(about $0.20–0.50 per forge at current defaults).`
+        : `<b>No generated art:</b> ${esc(p.label)} can't make images, so classes forged on this key `
+          + `ship without splash, sprite or card portraits (the game uses its built-in card doodles).`);
+  renderEstimate();
 }
 
 // Auto-select the provider from an unambiguous key prefix (sk-ant-, sk-or-, gsk_, AIza). Plain "sk-"
@@ -535,9 +547,14 @@ function renderUsage(cls) {
   const line = el("r-usage");
   const u = cls.usage;
   if (!u || currentMode() !== "byok") { line.classList.add("hidden"); return; }
+  // The art rows are the user's too: images made and, when the vendor metered it, the dollars.
+  const art = u.images
+    ? ` · ${u.images} image${u.images === 1 ? "" : "s"}`
+      + (u.art_cost_usd != null ? ` ($${Number(u.art_cost_usd).toFixed(2)} metered)` : "")
+    : "";
   line.textContent = `This forge used ${u.calls} calls · ${fmtTokens(u.input_tokens)} input tokens`
     + (u.cached_tokens ? ` (${fmtTokens(u.cached_tokens)} from cache)` : "")
-    + ` · ${fmtTokens(u.output_tokens)} output tokens on your key.`;
+    + ` · ${fmtTokens(u.output_tokens)} output tokens${art} on your key.`;
   line.classList.remove("hidden");
 }
 

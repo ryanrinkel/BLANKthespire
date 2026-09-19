@@ -313,8 +313,10 @@ def test_art_rows_land_in_the_ledger_and_the_estimate_ignores_them(client, app_m
     assert cards.metered_cost_micros == 0 and cards.est_cost_micros is None   # procedural is really free
     assert rows["art:splash"].calls == 1 and rows["art:sprite"].calls == 1
 
-    # The forge's own "this used…" summary stays an LLM number (the stub meters exactly two calls).
-    assert saved["usage"] == {"calls": 2, "input_tokens": 1500, "cached_tokens": 300, "output_tokens": 300}
+    # The forge's own "this used…" summary keeps the LLM numbers (the stub meters exactly two calls) and
+    # reports the images as a separate count — never stirred into `calls`.
+    assert saved["usage"] == {"calls": 2, "input_tokens": 1500, "cached_tokens": 300, "output_tokens": 300,
+                              "images": len(saved["cards"]) + 2, "art_cost_usd": 0.0}
     est = client.get("/api/forge-estimate").get_json()
     assert est["forges_sampled"] == 1 and est["calls"] == 2 and est["input_tokens"] == 1500
     _clear(app_module)

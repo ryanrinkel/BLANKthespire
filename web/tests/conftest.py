@@ -68,6 +68,22 @@ def client(app_module):
     return app_module.app.test_client()
 
 
+@pytest.fixture(autouse=True)
+def _no_cloud_image_calls(monkeypatch):
+    """Safety net: a BYOK forge builds a REAL OpenRouter/OpenAI image backend around the posted key (see
+    app._byok_art_backend), so any test that posts such a key would otherwise dial the vendor. Make those
+    calls fail fast instead (art is best-effort: the forge still succeeds, just without images). Tests that
+    want to see the request replace urlopen again with their own fake."""
+    from urllib.error import URLError
+    from btsgen.art.backends import openai as oaib, openrouter as orb
+
+    def refuse(request, timeout=0):
+        raise URLError("network disabled in tests")
+
+    monkeypatch.setattr(orb, "urlopen", refuse)
+    monkeypatch.setattr(oaib, "urlopen", refuse)
+
+
 def login(client, email: str = "dev@example.com") -> dict:
     """Dev sign-in; returns the /api/me user dict."""
     r = client.get(f"/dev-login?email={email}")
