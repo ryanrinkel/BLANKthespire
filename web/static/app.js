@@ -965,6 +965,13 @@ function grossFee(netCents, custom) {
   return { gross, fee: gross - netCents };
 }
 
+// Which custom-amount panels are open, by container id. Kept outside the renderer so a re-render (a fresh
+// /api/billing, a returning purchase) doesn't fold a box the user just opened, and so the forge tab and the
+// Account tab each remember their own.
+const CUSTOM_SHOWN = new Set();
+
+// Collapsed by default: one centred "Enter another custom amount" button under the tier buttons, since the
+// three fixed amounts are what most people want. Clicking it swaps in the real row.
 // "$ [ 25 ] (Get 25 tokens)" above a line spelling out the real charge. Everything past the fixed tiers is
 // one token per dollar, whole dollars only. No `custom` block in /api/billing (an older server) hides it.
 // Ids are derived from the container so the forge tab and the Account tab can both render one.
@@ -977,6 +984,12 @@ function renderCustomAmount(container, cfg) {
   const min = Number(c.min_dollars || 0), max = Number(c.max_dollars || 0);
   const per = Number(c.tokens_per_dollar || 1);
   const base = container.id;
+  if (!CUSTOM_SHOWN.has(base)) {
+    container.innerHTML = `<div class="custom-reveal"><button id="${base}-open" class="btn" type="button">`
+      + `Enter another custom amount</button></div>`;
+    el(`${base}-open`).onclick = () => { CUSTOM_SHOWN.add(base); renderCustomAmount(container, cfg); };
+    return;
+  }
   container.innerHTML =
     `<div class="custom-row"><span class="custom-cur">$</span>`
     + `<input id="${base}-input" class="in custom-amt" type="number" min="${min}" max="${max}" step="1" `
@@ -996,6 +1009,7 @@ function renderCustomAmount(container, cfg) {
   input.oninput = sync;
   btn.onclick = () => donateCustom(input.value, btn, cfg);
   sync();
+  input.focus();
 }
 
 // The typed amount as a whole number of dollars inside the allowed range, or 0 when it isn't one.

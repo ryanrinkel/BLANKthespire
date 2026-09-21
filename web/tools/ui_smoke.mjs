@@ -129,6 +129,19 @@ if (scenario === "forge") {
     const folded = box.classList.contains('hidden') && !btn.classList.contains('hidden');
     return JSON.stringify({before, shown, folded, text: box.textContent.slice(0, 120)}); })()`));
   check(est.before && est.shown && est.folded, "estimate hidden behind its button, folds on a settings change", JSON.stringify(est));
+  // Both on-demand buttons must sit centred in their box, not stretched across it.
+  const centred = await json(`(() => {
+    const out = {};
+    for (const [k, id] of [["estimate", "estimate-btn"], ["custom", "forge-donate-custom-open"]]) {
+      const b = document.getElementById(id);
+      if (!b) { out[k] = null; continue; }
+      const r = b.getBoundingClientRect(), p = b.parentElement.getBoundingClientRect();
+      out[k] = {off: Math.round((r.left - p.left) - (p.right - r.right)), w: Math.round(r.width),
+                pw: Math.round(p.width)};
+    }
+    return out; })()`);
+  check(centred.estimate && Math.abs(centred.estimate.off) <= 2 && centred.estimate.w < centred.estimate.pw - 40,
+        "estimate button centred, not stretched", JSON.stringify(centred.estimate));
   await evaluate(`document.getElementById('estimate-btn').click()`);
   await shot("forge-byok");
   // The pre-go quote (2026-09-20): an art provider renders the three-line Text/Art/Total table plus the
@@ -171,6 +184,20 @@ if (scenario === "forge") {
   if (tok.custom_hidden) {
     check(false, "custom-amount row rendered (needs /api/billing enabled + custom block)", "row hidden");
   } else {
+    // The row is collapsed behind "Enter another custom amount" (2026-09-21) — open it first.
+    const collapsed = await json(`(() => ({
+      reveal: !!document.getElementById('forge-donate-custom-open'),
+      row: !!document.getElementById('forge-donate-custom-input')}))()`);
+    check(collapsed.reveal && !collapsed.row, "custom amount collapsed behind its button",
+          JSON.stringify(collapsed));
+    const cc = await json(`(() => { const b = document.getElementById('forge-donate-custom-open');
+      const r = b.getBoundingClientRect(), p = b.parentElement.getBoundingClientRect();
+      return {off: Math.round((r.left - p.left) - (p.right - r.right)),
+              w: Math.round(r.width), pw: Math.round(p.width)}; })()`);
+    check(Math.abs(cc.off) <= 2 && cc.w < cc.pw - 40, "custom-amount button centred, not stretched",
+          JSON.stringify(cc));
+    await shot("forge-token-collapsed");
+    await evaluate(`document.getElementById('forge-donate-custom-open').click()`);
     const custom = await json(`(() => {
       const i = document.getElementById('forge-donate-custom-input');
       i.value = '25'; i.dispatchEvent(new Event('input'));
@@ -212,7 +239,7 @@ if (scenario === "forge") {
   await evaluate(`document.getElementById('choose-byok')?.click()`); await sleep(500);
   console.log("after byok:", await evaluate(`JSON.stringify({pref: localStorage.getItem('bts_forge_pref'), strip: document.getElementById('chooser-strip')?.textContent, byok_open: document.getElementById('forge-byok').open, token_open: document.getElementById('forge-token').open})`));
   await evaluate(`document.getElementById('nav-account').click()`); await sleep(1500);
-  console.log(await evaluate(`JSON.stringify({acct_tiers: document.querySelectorAll('#donate-tiers .donate-tier').length, custom_btn: document.getElementById('donate-custom-btn')?.textContent, history: document.getElementById('purchases-empty').textContent})`));
+  console.log(await evaluate(`JSON.stringify({acct_tiers: document.querySelectorAll('#donate-tiers .donate-tier').length, custom_reveal: document.getElementById('donate-custom-open')?.textContent, history: document.getElementById('purchases-empty').textContent})`));
   await shot("v3-account");
   await evaluate(`document.getElementById('nav-forge').click()`); await sleep(300);
   await evaluate(`document.getElementById('v3-banner-x').click()`); await sleep(300);

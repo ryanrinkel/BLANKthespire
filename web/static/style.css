@@ -216,11 +216,16 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 
 /* Anything past the fixed tiers: "$ [ 25 ] Get 25 tokens" over the charged-with-fee line. */
 .donate-custom { margin: 4px 0 2px; }
-.custom-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* Collapsed and open alike, the custom amount sits centred under the tier buttons. */
+.custom-reveal { display: flex; justify-content: center; }
+.custom-reveal .btn { margin-top: 4px; }
+.custom-row { display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap; }
 .custom-cur { color: var(--muted); font-size: 15px; }
 .custom-row .custom-amt { width: 110px; margin: 0; }
 .custom-row .btn { margin-top: 0; white-space: nowrap; }
-.custom-line { margin-top: 6px; }
+.custom-line { margin-top: 6px; text-align: center; }
+/* The on-demand BYOK quote: its button is centred in the key box the same way. */
+#estimate-btn { display: block; margin-left: auto; margin-right: auto; }
 
 /* --- footer (terms / privacy / support) ---------------------------------------------------------- */
 .foot { text-align: center; color: var(--muted); font-size: 12px; padding: 26px 18px 30px; }
