@@ -11,6 +11,20 @@ slot-02 Tempest backed up to `scratch/_backup_class02/`). Files: `Engine/OrbSpec
 `Engine/OrbRunner.cs`, `Engine/IForgedOrbHost.cs`; edits to CharacterSpec/ForgedCharacters/EffectRunner/ForgedCards/
 slotgen.py. See [[creative-harness-vision]] for the full build log + verification checklist.
 
+## Orb POOL INTENT stage (added 2026-09-21, not yet deployed)
+Prod class #52 "M4 Sherman, Steel Box" invented a shell-rack orb engine and then padded its pool with `lightning` +
+`frost` (a rack you can't load a "frost" into). Cause: the modality choice (base-only / mixed / all-custom) was left
+to the 34-brief blueprint call, whose only worked example is MIXED and leads with `"lightning"`. Fix, mirroring the
+keystone relic intent: a small **stage 5b** (`frontend/stage_orb.py`, brainstorm-role model, ~$0.0001/call) runs for
+orb classes only and decides FROM THE FANTASY what the class channels — `{mode, orbs:[{name,fantasy}], base_orbs, why}`
+(custom_only is the default; base_only only for literally elemental fantasies; mixed is rare). `builder.py` threads it
+as `DossierBrief.orb_intent` / `bp["orb_intent"]`; `class_forge._render_orb_intent` renders it in the blueprint brief
+as an ORDER with the exact orb names; `_validate_orb_intent_match` rejects a pool that differs (wrong modality, a
+base orb the intent didn't name, a named custom orb missing) so the repair pass fixes it. Non-fatal: if the stage
+whiffs, the blueprint picks the modality itself (the old behaviour). The hybrid splash-orb cap (1 custom) is honoured
+via `stage_orb.custom_cap_for`. Live check 2026-09-21: Sherman -> custom_only (AP Shell / HE Shell / Smoke Shell);
+storm mage -> base_only (lightning, frost); loaded-dice gambler -> custom_only (Pip / Weighted / Loaded Die).
+
 The deepest expression of the [[creative-harness-vision]] north-star: a class that invents its
 **own elements**, not just channels Lightning/Frost/Dark. Builds on Phase G (orbs as a class identity) and reuses the
 H3 trigger architecture almost wholesale (a per-turn engine bound to a compiled shell, run from a restricted vocab).

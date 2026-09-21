@@ -878,6 +878,7 @@ for a second signature under the card cap)."""
             ri = brief.relic_intent
             relic = (f'\nKeystone relic intent (its relic is designed separately — let it INFORM the card briefs\' '
                      f'feel, do not build a relic here): "{ri.get("name", "")}" — {ri.get("effect_sketch", ri.get("fantasy", ""))}')
+        orb = _render_orb_intent(getattr(brief, "orb_intent", None))
         skin = ""
         sk = getattr(brief, "skin", None) or {}
         if sk.get("imagery") or sk.get("flavor"):
@@ -925,7 +926,7 @@ for a second signature under the card cap)."""
             f'Core loop: {_s(c.core_loop)}\n'
             f'Weakness: {_s(c.weakness)}\n'
             f'{tension_label}:\n{archs}\n'
-            f'{lines}{kind_guidance}{relic}{skin}\n\n'
+            f'{lines}{kind_guidance}{relic}{orb}{skin}\n\n'
             f"{use_line}{self._pool_ask()}"
             f"{self._featured_ask(brief)}{self._recency_status()}{self._archetype_recency(c.archetype_ids)}"
             f"{self._feedback_ask(f'{c.name} {c.fantasy} {c.core_loop} {archs}')}\n"
@@ -965,6 +966,8 @@ for a second signature under the card cap)."""
             _fake_splash(bp, _kinds[1], ids[1] if len(ids) > 1 else ids[0])
         if getattr(brief, "relic_intent", None):
             bp["relic_intent"] = brief.relic_intent
+        if getattr(brief, "orb_intent", None):
+            bp["orb_intent"] = brief.orb_intent
         # Phase 2 (triad): the seed _fake_blueprint tagged BOOLEAN bridges (2-archetype shape); a triad bp needs
         # pairwise `[id1, id2]` tags. Clear the seed's bridge tags so _topup_blueprint_briefs -> _ensure_bridge_tags
         # re-tags them as valid pairs (a boolean bridge on a three-archetype class is a validation ERROR).
@@ -1824,6 +1827,8 @@ def _validate_blueprint(bp: dict) -> list[str]:
     errs += _validate_forge_persist(bp, cards)
     if "orb_pool" in bp and bp.get("orb_pool"):
         errs += _validate_orb_pool(bp.get("orb_pool"), orb_slots)
+    if isinstance(bp.get("orb_intent"), dict):
+        errs += _validate_orb_intent_match(bp.get("orb_intent"), bp.get("orb_pool") or [])
     if "status_pool" in bp and bp.get("status_pool"):
         errs += _validate_status_pool(bp.get("status_pool"))
     if "summon_pool" in bp and bp.get("summon_pool"):
@@ -2313,6 +2318,63 @@ def _validate_orb_pool(pool, orb_slots: int) -> list[str]:
             errs.append(f"orb_pool[{i}] must be a base-orb name string or a custom-orb object")
     if custom > _MAX_CUSTOM_ORBS:
         errs.append(f"at most {_MAX_CUSTOM_ORBS} custom orbs per class (got {custom})")
+    return errs
+
+
+def _render_orb_intent(oi) -> str:
+    """The ORB POOL INTENT block of the dossier-mode blueprint brief (stage_orb decided it from the fantasy). Rendered
+    as an ORDER, and _validate_orb_intent_match rejects a pool that contradicts it — so a Sherman's shell rack can't
+    quietly pick up lightning + frost to fill slots. '' when the brief carries no intent (pre-2026-09-21 behaviour)."""
+    if not isinstance(oi, dict) or not oi.get("mode"):
+        return ""
+    mode = str(oi.get("mode", "")).strip().lower()
+    customs = [o for o in (oi.get("orbs") or []) if isinstance(o, dict) and str(o.get("name", "")).strip()]
+    bases = [str(b).strip().lower() for b in (oi.get("base_orbs") or []) if str(b).strip()]
+    custom_lines = "".join(f'\n  - "{o["name"].strip()}": {str(o.get("fantasy", "")).strip() or "(design it)"}'
+                           for o in customs)
+    why = f' Why: {oi["why"]}' if oi.get("why") else ""
+    head = '\nORB POOL INTENT (decided upstream from the fantasy — OBEY IT; the validator rejects a pool that differs):'
+    if mode == "custom_only":
+        first = customs[0]["name"].strip() if customs else "the first"
+        return (head + f' this class channels ONLY its own orbs. "orb_pool" must contain EXACTLY these {len(customs)} '
+                'custom orb objects, with EXACTLY these names (design passive/evoke for each), and NO base-orb '
+                'strings — no lightning, frost or dark anywhere in the pool or the card briefs:' + custom_lines +
+                f'\n  Card briefs channel them by these names ("channel a {first} orb") or "random" (which rolls '
+                'only this pool).' + why)
+    if mode == "base_only":
+        return (head + f' this class channels only the base orbs {", ".join(bases)}. "orb_pool" is exactly '
+                f'{json.dumps(bases)} — declare NO custom orb objects.' + why)
+    return (head + f' "orb_pool" contains the base orb string(s) {json.dumps(bases)} PLUS exactly these '
+            f'{len(customs)} custom orb objects with EXACTLY these names:' + custom_lines + why)
+
+
+def _validate_orb_intent_match(oi: dict, pool) -> list[str]:
+    """The blueprint's orb_pool must realize the upstream orb intent: right modality, the named custom orbs present
+    (case-insensitive), no base orb the intent didn't name. Errors go back to the LLM as a repair pass."""
+    errs: list[str] = []
+    mode = str(oi.get("mode", "")).strip().lower()
+    if mode not in ("custom_only", "mixed", "base_only"):
+        return errs  # a malformed intent never blocks a blueprint; stage_orb validated it upstream
+    if not isinstance(pool, list) or not pool:
+        return [f"the orb intent ({mode}) requires an orb_pool, but the blueprint declares none"]
+    pool_base = {e.strip().lower() for e in pool if isinstance(e, str)}
+    pool_custom = {str(e.get("name", "")).strip().lower() for e in pool if isinstance(e, dict)}
+    want_custom = [str(o.get("name", "")).strip() for o in (oi.get("orbs") or []) if isinstance(o, dict)]
+    want_base = {str(b).strip().lower() for b in (oi.get("base_orbs") or [])}
+    if mode == "custom_only" and pool_base:
+        errs.append(f"orb intent is custom_only (the class channels only its own orbs) but orb_pool contains base "
+                    f"orb(s) {sorted(pool_base)} — remove them")
+    if mode == "base_only" and pool_custom:
+        errs.append(f"orb intent is base_only but orb_pool declares custom orb(s) {sorted(pool_custom)} — remove them")
+    if mode != "custom_only":
+        for b in sorted(want_base - pool_base):
+            errs.append(f"orb intent names base orb '{b}' but orb_pool lacks it")
+        for b in sorted(pool_base - want_base):
+            errs.append(f"orb_pool contains base orb '{b}' the orb intent did not ask for — remove it")
+    if mode != "base_only":
+        for nm in want_custom:
+            if nm and nm.lower() not in pool_custom:
+                errs.append(f"orb intent names custom orb '{nm}' but orb_pool has no custom orb with that exact name")
     return errs
 
 

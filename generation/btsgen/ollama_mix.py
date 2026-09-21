@@ -10,7 +10,7 @@ It produces the same `(blueprint_gen, card_gen_factory, relic_gen, make_gen)` tu
 and the staged `BlueprintBuilder` stay untouched and every downstream safety net is intact.
 
 Role mapping (by the contract a call carries):
-  brainstorm -> _CloudClusterContract, _RelicIntentContract     (divergent ideation — small, hot model)
+  brainstorm -> _CloudClusterContract, _RelicIntentContract, _OrbIntentContract  (divergent ideation — small, hot model)
   structure  -> _MapComposeContract, _BlueprintContract         (convergent + schema-strict — strong model)
   cards      -> the card `contract` module, _RelicContract, anything else           (strict JSON coding)
 
@@ -280,7 +280,7 @@ class _FailoverGenerator:
         return self._call("repair", messages, prev_text, errors)
 
 # Which role each call's contract belongs to (resolved by class name so we never import-couple to instances).
-_BRAINSTORM_CONTRACTS = frozenset({"_CloudClusterContract", "_RelicIntentContract"})
+_BRAINSTORM_CONTRACTS = frozenset({"_CloudClusterContract", "_RelicIntentContract", "_OrbIntentContract"})
 # map/compose joins the blueprint on the strong schema-faithful model — see module docstring. The
 # interactive forge's split halves (_MapOnlyContract/_ComposeOnlyContract) are the same convergent work.
 _STRUCTURE_CONTRACTS = frozenset({"_MapComposeContract", "_MapOnlyContract", "_ComposeOnlyContract",

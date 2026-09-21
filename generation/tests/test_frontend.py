@@ -555,3 +555,69 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+# --------------------------------------------------------------- orb intent (stage 5b, 2026-09-21)
+def test_orb_intent_stage() -> None:
+    print("orb intent: validation, cap, prompt rendering, blueprint enforcement:")
+    from btsgen.class_forge import ClassBrief, _fake_blueprint
+    from btsgen.frontend.dossier import DossierBrief
+    from btsgen.frontend.stage_orb import (_OrbIntentContract, custom_cap_for, normalize_orb_intent,
+                                           validate_orb_intent)
+    good = {"mode": "custom_only", "why": "the shells ARE the orbs", "base_orbs": [],
+            "orbs": [{"name": "AP", "fantasy": "pierce"}, {"name": "HE", "fantasy": "burst"},
+                     {"name": "Smoke", "fantasy": "screen"}]}
+    check(validate_orb_intent(good, 3) == [], f"a 3-shell custom_only intent validates: {validate_orb_intent(good, 3)}")
+    check(validate_orb_intent({**good, "base_orbs": ["frost"]}, 3) != [], "custom_only rejects a base orb")
+    check(validate_orb_intent(good, 1) != [], "the splash cap (1 custom orb) rejects three")
+    check(validate_orb_intent({"mode": "base_only", "orbs": [], "base_orbs": ["lightning"]}, 3) == [],
+          "base_only with one base orb validates")
+    check(validate_orb_intent({"mode": "mixed", "orbs": [], "base_orbs": ["lightning"]}, 3) != [],
+          "mixed needs a custom orb too")
+    check(validate_orb_intent({"mode": "custom_only", "orbs": [{"name": "frost"}], "base_orbs": []}, 3) != [],
+          "a base orb name cannot masquerade as a custom orb")
+    cand = Candidate(name="Steel Box", fantasy="a tank crew loading whatever shell the rack gives them",
+                     archetype_ids=["slot_machine", "counter_riposte"], archetype_descs=["the rack", "armor"],
+                     class_kind="orb", suggested_max_hp=80, core_loop="load shells, fire, absorb")
+    check(custom_cap_for(cand) == 3, "a primary orb class gets the full custom cap")
+    hyb = Candidate(name="H", fantasy="f", archetype_ids=["a", "b"], archetype_descs=["", ""],
+                    class_kind="status", class_kinds=["status", "orb"], suggested_max_hp=70)
+    check(custom_cap_for(hyb) == 1, "a splash-orb hybrid gets the splash cap")
+    brief = _OrbIntentContract(concept="a ww2 era sherman tank", cap=3).user_brief(cand)
+    check("sherman tank" in brief and "cap: 3" in brief, "the intent brief carries the verbatim concept + cap")
+    # the blueprint brief renders the intent as an order
+    dbrief = DossierBrief(candidate=cand, orb_intent=normalize_orb_intent(good), concept="a ww2 era sherman tank")
+    text = _BlueprintContract(mode="dossier", triad=False).user_brief(dbrief)
+    check("ORB POOL INTENT" in text and '"Smoke"' in text and "no lightning, frost or dark" in text,
+          "dossier-mode brief renders the custom_only order with the exact orb names")
+    check("ORB POOL INTENT" not in _BlueprintContract(mode="dossier", triad=False).user_brief(
+        DossierBrief(candidate=cand, concept="x")), "no intent -> no block (pre-stage behaviour)")
+    # enforcement on the offline orb fake (Test Tempest: lightning + Ember + Plasma)
+    # (the raw seed lacks the pipeline's rare/strategy top-ups, so compare against its baseline errors)
+    bp = _fake_blueprint(ClassBrief(concept="orb"))
+    base_errs = set(_validate_blueprint(bp))
+    check(not any("orb intent" in e for e in base_errs), "no intent -> no intent errors")
+
+    def added(bp_: dict) -> list[str]:
+        return [e for e in _validate_blueprint(bp_) if e not in base_errs]
+    bp["orb_intent"] = normalize_orb_intent(good)
+    errs = added(bp)
+    check(any("custom_only" in e for e in errs) and any("'AP'" in e for e in errs),
+          f"a custom_only intent rejects the mixed pool + names the missing orbs: {errs}")
+    bp["orb_intent"] = {"mode": "mixed", "base_orbs": ["lightning"], "why": "",
+                        "orbs": [{"name": "ember", "fantasy": ""}, {"name": "PLASMA", "fantasy": ""}]}
+    check(added(bp) == [], f"a matching mixed intent adds no error (names case-insensitive): {added(bp)}")
+    bp["orb_intent"] = {"mode": "base_only", "orbs": [], "base_orbs": ["lightning"], "why": ""}
+    check(added(bp) != [], "a base_only intent rejects the custom orbs")
+    bp["orb_intent"] = {"mode": "mixed", "base_orbs": ["frost"], "why": "",
+                        "orbs": [{"name": "Ember", "fantasy": ""}, {"name": "Plasma", "fantasy": ""}]}
+    check(any("lightning" in e for e in added(bp)), "a base orb the intent did not ask for is rejected")
+    # the fake pipeline threads it whenever the chosen candidate is an orb class
+    cat = load_catalog()
+    b = BlueprintBuilder(_fake_make_gen, catalog=cat, on_event=lambda m: None, auto=True, gap_log_append=None,
+                         triad=False)
+    bp2 = b.build(ClassBrief(concept="a storm-calling gambler who channels luck"))
+    d = b.last_dossier
+    if d is not None and d.chosen is not None and "orb" in (d.chosen.class_kinds or []):
+        check(bp2.get("orb_intent") is not None, "an orb-class candidate gets an orb_intent threaded into bp")
+    check(_validate_blueprint(bp2) == [], f"the pipeline bp still validates with the intent: {_validate_blueprint(bp2)}")

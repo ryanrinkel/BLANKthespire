@@ -20,6 +20,7 @@ from .dossier import Candidate, Dossier, DossierBrief
 from .stage_cloud import _CloudClusterContract, validate_cloud
 from .stage_map import (_ComposeOnlyContract, _MapComposeContract, _MapOnlyContract, validate_compose_for,
                         validate_map_for, validate_map_only)
+from .stage_orb import _OrbIntentContract, custom_cap_for, is_orb_class, normalize_orb_intent, validate_orb_intent
 from .stage_relic import _RelicIntentContract, validate_relic_intent
 
 # class_kind distinctiveness weight — a special pool (orb/summon/status) is a bolder identity than a generic
@@ -225,6 +226,16 @@ class BlueprintBuilder:
             line += f"  [{ri['effect_sketch']}]"
         self._note(line)
 
+    def _narrate_orbs(self, oi: dict) -> None:
+        mode = oi.get("mode", "?")
+        custom = ", ".join(o.get("name", "?") for o in (oi.get("orbs") or []))
+        base = ", ".join(oi.get("base_orbs") or [])
+        parts = [p for p in (f"custom: {custom}" if custom else "", f"base: {base}" if base else "") if p]
+        line = f"      orb pool: {mode}" + (f" ({'; '.join(parts)})" if parts else "")
+        if oi.get("why"):
+            line += f" - {oi['why']}"
+        self._note(line)
+
     def _run_stage(self, gen, brief, validate, label: str) -> dict:
         # Each attempt = one fresh generation + one repair. BTS_STAGE_ATTEMPTS>1 re-rolls the whole stage
         # when repair still fails — a weak/local model (e.g. a 7B on the strict blueprint dict) whiffs the
@@ -352,6 +363,22 @@ class BlueprintBuilder:
         except BlueprintBuildError as e:
             self._note(f"[5/6] relic: keystone skipped ({e}); the relic stage will design one from the class")
 
+        # stage 5b (orb classes only): the ORB POOL INTENT — decide from the fantasy what the class channels
+        # (its own shells/seeds/dice, or the base elements) BEFORE the blueprint writes the pool. Non-fatal: without
+        # it the blueprint picks the modality itself (the pre-2026-09-21 behaviour).
+        if is_orb_class(chosen):
+            cap = custom_cap_for(chosen)
+            try:
+                self._note("[5/6] orbs: deciding what this class channels (its own orbs vs the base elements)...")
+                oi = self._run_stage(self._make_gen(_OrbIntentContract(concept=concept, cap=cap), max_tokens=2000),
+                                     chosen, lambda o: validate_orb_intent(o, cap), "orb-intent")
+                oi = normalize_orb_intent(oi)
+                dossier.orb_intent = oi
+                chosen.orb_intent = oi
+                self._narrate_orbs(oi)
+            except BlueprintBuildError as e:
+                self._note(f"[5/6] orbs: intent skipped ({e}); the blueprint will pick the orb pool itself")
+
         # reframed blueprint: dossier -> bp (identical shape; downstream untouched). Validated against the
         # candidate's DECLARED strategic lines — the pool must build the packages the compose stage promised.
         self._note(f"[6/6] blueprint: translating '{chosen.name}' into card briefs, pools, and numbers...")
@@ -361,8 +388,9 @@ class BlueprintBuilder:
             declared = [l.get("strategy") for l in chosen.pair_lines if isinstance(l, dict)]
         else:
             declared = [l.get("strategy") for l in (chosen.strategic_lines or []) if isinstance(l, dict)]
-        dbrief = DossierBrief(candidate=chosen, relic_intent=dossier.relic_intent, concept=concept,
-                              skin=dossier.skin_bank or None, featured=getattr(brief, "featured", None))
+        dbrief = DossierBrief(candidate=chosen, relic_intent=dossier.relic_intent, orb_intent=dossier.orb_intent,
+                              concept=concept, skin=dossier.skin_bank or None,
+                              featured=getattr(brief, "featured", None))
         bp_contract = _BlueprintContract(mode="dossier", triad=self._triad)
         metaphors: list[str] = []
         if harness_v2.enabled():
@@ -398,6 +426,9 @@ class BlueprintBuilder:
         # thread the keystone intent so the existing relic generator designs THIS relic
         if dossier.relic_intent is not None:
             bp["relic_intent"] = dossier.relic_intent
+        # thread the orb intent so the ledger/analysis can see what was ordered (the validator already enforced it)
+        if dossier.orb_intent is not None:
+            bp["orb_intent"] = dossier.orb_intent
         # thread the flavor skin so the splash-art stage dresses the class in the theme's flavor (not mechanics)
         if dossier.skin_bank:
             bp["skin"] = dossier.skin_bank

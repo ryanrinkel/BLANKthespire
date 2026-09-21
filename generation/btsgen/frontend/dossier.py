@@ -39,6 +39,7 @@ class Candidate:
     block_reasons: list[str] = field(default_factory=list)
     spine_archetype: str | None = None   # set by the collision check when >=2 clusters map the same archetype
     relic_intent: dict | None = None     # filled by the relic-intent stage
+    orb_intent: dict | None = None       # orb classes only: filled by the orb-intent stage (stage_orb)
 
     def __post_init__(self) -> None:
         # Phase AW: keep class_kind and class_kinds consistent whichever one the caller set.
@@ -76,6 +77,7 @@ class DossierBrief:
     flavor-facet material (imagery/names) the blueprint dresses the class in (mechanics come from the driver)."""
     candidate: Candidate
     relic_intent: dict | None = None
+    orb_intent: dict | None = None   # orb classes: the decided modality + named orbs (stage_orb), rendered as an order
     concept: str = ""
     skin: dict | None = None
     featured: list | None = None   # Phase N-2 roulette picks, threaded from the ClassBrief for the brief block
@@ -98,6 +100,7 @@ class Dossier:
     candidates: list[Candidate] = field(default_factory=list)
     chosen: Candidate | None = None
     relic_intent: dict | None = None
+    orb_intent: dict | None = None
     skin_bank: dict = field(default_factory=dict)   # {subject:[driver names], flavor:[names], imagery:[...], feelings:[...]}
     featured_resonance: list[dict] = field(default_factory=list)  # [{id, why}] the cloud stage's menu shortlist (N-5)
     gaps_logged: int = 0
