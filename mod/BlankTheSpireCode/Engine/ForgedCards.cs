@@ -1796,8 +1796,8 @@ public static class ForgedCards
                                 : e.Scale == "tag_cards_owned"
                                     ? $"Deal {e.Amount} damage{dmgSuffix}, plus 1 per '{e.Tag}' card you own{ub}."
                                     : $"Deal damage equal to {ScalePhrase(e.Scale)}{dmgSuffix}{ub}.");
-                    else if (e.HasGrow) // Phase U (gap #23): {Damage} shows the CURRENT grown value (calc-var)
-                        parts.Add($"Deal {{Damage}} damage{dmgSuffix}{ub}. Grows by {e.Grow} each time it is played this combat.");
+                    else if (e.HasGrow) // Phase U (gap #23): {CalculatedDamage} (the base-game calc-var name; a bare {Damage} is unresolvable here) shows the CURRENT grown value (calc-var)
+                        parts.Add($"Deal {{CalculatedDamage}} damage{dmgSuffix}{ub}. Grows by {e.Grow} each time it is played this combat.");
                     else
                         parts.Add(e.Hits > 1
                             ? $"Deal {{Damage}} damage {{Hits}} times{dmgSuffix}{ub}."

@@ -87,11 +87,11 @@ def test_rejects(v: CardValidator) -> None:
 def test_text_bytematch() -> None:
     print("grow card text byte-matches the C# Describe:")
     desc = cardgen.describe([{"op": "damage", "amount": 8, "grow": 5}], "enemy")
-    check(desc == "Deal {Damage} damage. Grows by 5 each time it is played this combat.",
+    check(desc == "Deal {CalculatedDamage} damage. Grows by 5 each time it is played this combat.",
           f"grow describe mismatch: {desc!r}")
     # AoE suffix threads through
     aoe = cardgen.describe([{"op": "damage", "amount": 8, "grow": 5}], "all_enemies")
-    check(aoe == "Deal {Damage} damage to ALL enemies. Grows by 5 each time it is played this combat.",
+    check(aoe == "Deal {CalculatedDamage} damage to ALL enemies. Grows by 5 each time it is played this combat.",
           f"grow AoE describe mismatch: {aoe!r}")
 
 

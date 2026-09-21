@@ -482,8 +482,8 @@ def describe(effects: list[dict], target: str) -> str:
                              else f"Deal {e.get('amount', 0)} damage{dmg_suffix}, plus 1 per '{e.get('tag', '')}' card you own{ub}." if scale == "tag_cards_owned"
                              else f"Deal damage equal to {_scale_phrase(scale)}{dmg_suffix}{ub}.")
             elif e.get("grow", 0):
-                # Phase U (gap #23, Rampage): {Damage} shows the CURRENT grown value (calc-var). Byte-match ForgedCards.Describe.
-                parts.append(f"Deal {{Damage}} damage{dmg_suffix}{ub}. Grows by {e['grow']} each time it is played this combat.")
+                # Phase U (gap #23, Rampage): {CalculatedDamage} (base-game calc-var name) shows the CURRENT grown value (calc-var). Byte-match ForgedCards.Describe.
+                parts.append(f"Deal {{CalculatedDamage}} damage{dmg_suffix}{ub}. Grows by {e['grow']} each time it is played this combat.")
             elif e.get("hits", 1) > 1:
                 parts.append(f"Deal {{Damage}} damage {{Hits}} times{dmg_suffix}{ub}.")
             else:

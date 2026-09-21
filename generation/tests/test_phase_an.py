@@ -97,7 +97,7 @@ def _t_unblockable(v: CardValidator) -> None:
         ("enemy", {"op": "damage", "amount": 3, "hits": 3, "unblockable": True}, "Deal {Damage} damage {Hits} times, ignoring Block."),
         ("enemy", {"op": "damage", "amount": 1, "scale": "block", "unblockable": True}, "Deal damage equal to your Block, ignoring Block."),
         ("enemy", {"op": "damage", "amount": 1, "scale": "x", "unblockable": True}, "Deal X damage, ignoring Block."),
-        ("enemy", {"op": "damage", "amount": 8, "grow": 3, "unblockable": True}, "Deal {Damage} damage, ignoring Block. Grows by 3 each time it is played this combat."),
+        ("enemy", {"op": "damage", "amount": 8, "grow": 3, "unblockable": True}, "Deal {CalculatedDamage} damage, ignoring Block. Grows by 3 each time it is played this combat."),
         ("enemy", {"op": "damage", "amount": 7, "unblockable": False}, "Deal {Damage} damage."),
         ("enemy", {"op": "damage", "amount": 7}, "Deal {Damage} damage."),
     ]
