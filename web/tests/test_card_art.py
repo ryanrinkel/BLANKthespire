@@ -316,7 +316,8 @@ def test_art_rows_land_in_the_ledger_and_the_estimate_ignores_them(client, app_m
     # The forge's own "this used…" summary keeps the LLM numbers (the stub meters exactly two calls) and
     # reports the images as a separate count — never stirred into `calls`.
     assert saved["usage"] == {"calls": 2, "input_tokens": 1500, "cached_tokens": 300, "output_tokens": 300,
-                              "images": len(saved["cards"]) + 2, "art_cost_usd": 0.0}
+                              "images": len(saved["cards"]) + 2, "art_cost_usd": 0.0,
+                              "art_cost_metered": True}  # a token forge's art runs on OUR metered key
     est = client.get("/api/forge-estimate").get_json()
     assert est["forges_sampled"] == 1 and est["calls"] == 2 and est["input_tokens"] == 1500
     _clear(app_module)

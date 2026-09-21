@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Forge a Class — BLANK the spire</title>
-  <link rel="stylesheet" href="/static/style.css?v=20260919" />
+  <link rel="stylesheet" href="/static/style.css?v=20260920" />
 </head>
 <body>
   <header>
@@ -89,6 +89,7 @@
             <option value="openrouter">OpenRouter</option>
             <option value="groq">Groq</option>
             <option value="google">Google Gemini</option>
+            <option value="xai">xAI (Grok)</option>
             <option value="deepseek">DeepSeek</option>
             <option value="together">Together</option>
             <option value="custom">Other (OpenAI-compatible URL)</option>
@@ -101,7 +102,8 @@
             <button id="load-models" class="btn" type="button">Load available models</button>
           </div>
           <p class="hint" id="byok-hint"></p>
-          <p class="hint warn" id="byok-estimate"></p>
+          <!-- div, not p: the estimate renders a small pre-formatted Text/Art/Total table -->
+          <div class="hint warn" id="byok-estimate"></div>
         </div>
         <label class="small" style="display:block;margin-top:.6rem;">
           <input id="interactive" type="checkbox" />
@@ -263,6 +265,6 @@
   <!-- ?v= busts the 1-hour static cache on deploy: bump both whenever either file changes. render.js holds
        the class renderers shared with the public /deck page and must load first. -->
   <script src="/static/render.js?v=20260919"></script>
-  <script src="/static/app.js?v=20260919"></script>
+  <script src="/static/app.js?v=20260920"></script>
 </body>
 </html>

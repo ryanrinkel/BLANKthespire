@@ -476,10 +476,15 @@ def _sprite_url(class_id: int, sprite_hash: str | None = None) -> str:
 
 
 # Image-capable BYOK providers, by the hostname of the base_url the user chose: the art backend that can
-# take THEIR key. Everything else (Anthropic, Groq, Gemini's OpenAI shim, DeepSeek, Together, Ollama Cloud,
-# a custom endpoint) has no image API we drive, so a BYOK forge there ships with BTSWEB_BYOK_ART_FALLBACK
-# art ('null' = none; 'procedural' = the free placeholder) — never with art billed to the server's keys.
-_BYOK_ART_HOSTS = {"openrouter.ai": "openrouter", "api.openai.com": "openai"}
+# take THEIR key. Everything else (Anthropic, Groq, DeepSeek, Together, Ollama Cloud, a custom endpoint)
+# has no image API we drive, so a BYOK forge there ships with BTSWEB_BYOK_ART_FALLBACK art ('null' = none;
+# 'procedural' = the free placeholder) — never with art billed to the server's keys.
+#
+# Gemini's OpenAI shim and xAI joined on 2026-09-20: both answer an OpenAI-shaped POST /images/generations,
+# so ONE generic backend (btsgen.art.backends.openai_images.OpenAIImagesBackend) drives both from a preset
+# table. Neither meters a cost in the response, so their ledger rows carry the preset's LIST price estimate.
+_BYOK_ART_HOSTS = {"openrouter.ai": "openrouter", "api.openai.com": "openai",
+                   "generativelanguage.googleapis.com": "gemini", "api.x.ai": "xai"}
 
 
 def _byok_art_backend(mode: str, key: dict | None):
@@ -487,10 +492,10 @@ def _byok_art_backend(mode: str, key: dict | None):
 
     Token (and dev-only fake) forges return None: the server pays for the text, so it pays for the art.
     A bring-your-own-key forge NEVER returns None — the user's key pays for everything or the art is
-    skipped: an OpenRouter or OpenAI key gets that vendor's backend built around the user's key (used for
-    this forge only, held in memory, never persisted — same contract as the text calls); any other
-    provider gets the fallback name. The returned instance/name goes straight to forge_splash & co as
-    `backend=`, so the server's env chain is never consulted for a BYOK forge."""
+    skipped: an OpenRouter, OpenAI, Google Gemini or xAI key gets that vendor's backend built around the
+    user's key (used for this forge only, held in memory, never persisted — same contract as the text
+    calls); any other provider gets the fallback name. The returned instance/name goes straight to
+    forge_splash & co as `backend=`, so the server's env chain is never consulted for a BYOK forge."""
     if mode not in ("byok", "anthropic"):
         return None
     fallback = (os.environ.get("BTSWEB_BYOK_ART_FALLBACK", "null").strip() or "null").lower()
@@ -504,6 +509,9 @@ def _byok_art_backend(mode: str, key: dict | None):
     vendor = _BYOK_ART_HOSTS.get(host)
     if not (vendor and api_key):
         return fallback
+    if vendor in ("gemini", "xai"):  # the generic OpenAI-images shape, one preset row per vendor
+        from btsgen.art.backends.openai_images import PRESETS, OpenAIImagesBackend  # lazy: never block boot
+        return OpenAIImagesBackend(PRESETS[vendor], api_key=api_key)
     from btsgen.art.backends.openai import OpenAIImageBackend          # lazy: never block app boot
     from btsgen.art.backends.openrouter import OpenRouterImageBackend
     cls = OpenRouterImageBackend if vendor == "openrouter" else OpenAIImageBackend
@@ -571,7 +579,8 @@ def _generate_relic_icon(class_id: int, out: dict, bundle: dict) -> str | None:
 # half-finished pack is a strictly better outcome than none, and far better than a forge that hangs.
 CARD_ART_WORKERS = 6            # IO-bound (the backends are HTTP); the 1-vCPU droplet is fine with six
 CARD_ART_BUDGET_S = 150.0       # wall clock for the whole pack (BTSWEB_CARD_ART_BUDGET_S)
-CARD_ART_MAX_USD = 0.40         # spend cap for the whole pack (BTSWEB_CARD_ART_MAX_USD)
+CARD_ART_MAX_USD = 0.40         # spend cap for the whole pack, OUR money only (BTSWEB_CARD_ART_MAX_USD);
+                                # a BYOK pack is uncapped — see _generate_card_art / BTSWEB_BYOK_CARD_ART_MAX_USD
 CARD_ART_PROGRESS_EVERY = 4     # SSE lines: one per N cards, so the page never looks hung
 
 
@@ -608,8 +617,8 @@ def _generate_card_art(class_id: int, out: dict, bundle: dict, on_event=None, me
     an image that is already paid for) and whatever succeeded is zipped and shipped.
 
     `backend` (None = the server's BTSGEN_IMAGE_BACKEND chain) is a BYOK forge's own image backend, so
-    the pack bills the user's key — see _byok_art_backend. The cost cap still applies: it bounds THEIR
-    surprise the same way it bounds ours.
+    the pack bills the user's key — see _byok_art_backend. The COST cap is then off by default (the user
+    was quoted the whole pack up front and asked for a complete class); the wall-clock budget is not.
 
     `on_event(str)` receives "card art n/N" progress for the SSE stream; `meter` (a forge.UsageMeter)
     collects the pack's model + metered cost for the forge_usage ledger. NEVER raises: identical contract
@@ -637,7 +646,15 @@ def _generate_card_art(class_id: int, out: dict, bundle: dict, on_event=None, me
         cards_dir.mkdir(parents=True, exist_ok=True)
 
         budget_s = _env_float("BTSWEB_CARD_ART_BUDGET_S", CARD_ART_BUDGET_S)
-        max_usd = _env_float("BTSWEB_CARD_ART_MAX_USD", CARD_ART_MAX_USD)
+        # The spend cap guards OUR money. A BYOK forge's art is billed to the user's own key and the panel
+        # showed them the whole per-forge figure before they pushed go (/api/forge-estimate), so BYOK is
+        # UNCAPPED by decision (BYOK_ART_GEMINI_XAI_PLAN.md, 2026-09-19): at Gemini's flat $0.039 an image
+        # the $0.40 ceiling would truncate every single pack at 11 of ~34 cards and quietly make the quote
+        # a lie. BTSWEB_BYOK_CARD_ART_MAX_USD > 0 re-arms one if a vendor ever misbehaves. The wall-clock
+        # budget still applies to both — that one guards against a hang, not against a bill.
+        byok_key = backend is not None and not isinstance(backend, str)
+        max_usd = (_env_float("BTSWEB_BYOK_CARD_ART_MAX_USD", 0.0) if byok_key
+                   else _env_float("BTSWEB_CARD_ART_MAX_USD", CARD_ART_MAX_USD))
         deadline = time.monotonic() + budget_s if budget_s > 0 else None
         stop = threading.Event()
         total = len(cards)
@@ -906,6 +923,60 @@ MODEL_PRICES: dict[str, tuple[float, float, float]] = {
     "z-ai/glm-5.2": (0.5544, 1.7424, 0.10296),  # OpenRouter, the middle fallback tier
     "google/gemma-4-31b-it": (0.09, 0.34, 0.05),  # OpenRouter, brainstorm at every tier
 }
+
+# Every model the BYOK panel SUGGESTS (static/app.js PROVIDERS), so /api/forge-estimate can quote a dollar
+# figure on the user's own key before they push go. Same unit as MODEL_PRICES: $ per MILLION tokens,
+# (input, output, cache-read). These are the vendors' published LIST prices — advisory, never a bill.
+# A suggested model with no row here is a test failure (web/tests/test_forge_estimate.py), which is how the
+# table stays complete as the suggestion lists change. Checked 2026-09-20 unless a comment says otherwise.
+BYOK_TEXT_PRICES: dict[str, tuple[float, float, float]] = {
+    # Anthropic (the list the browser used to carry as CLAUDE_PRICES, now server-side like everything else)
+    "claude-sonnet-4-6": (3.00, 15.00, 0.30),
+    "claude-haiku-4-5": (1.00, 5.00, 0.10),
+    "claude-opus-4-8": (5.00, 25.00, 0.50),
+    "claude-opus-5": (5.00, 25.00, 0.50),    # not suggested, but the old browser table priced them and
+    "claude-sonnet-5": (2.00, 10.00, 0.20),  # people type them — keep the quote working
+    # OpenAI — developers.openai.com/api/docs/pricing, short-context standard tier
+    "gpt-4o": (2.50, 10.00, 1.25),
+    "gpt-4o-mini": (0.15, 0.60, 0.075),
+    "gpt-4.1": (2.00, 8.00, 0.50),
+    "o4-mini": (1.10, 4.40, 0.275),
+    # Google Gemini, paid tier (ai.google.dev pricing). flash-lite first in the dropdown: cheapest text on
+    # the shim, and the art bill is the same whichever text model is picked.
+    "gemini-2.5-flash-lite": (0.10, 0.40, 0.01),
+    "gemini-2.5-flash": (0.30, 2.50, 0.03),
+    "gemini-3-flash-preview": (0.50, 3.00, 0.05),
+    "gemini-2.5-pro": (1.25, 10.00, 0.125),
+    # xAI — docs.x.ai models page, <200k context tier. grok-4-fast is GONE (retired before 2026-09-20);
+    # grok-4.20-0309-non-reasoning is the only explicitly non-reasoning pick and so the first suggestion.
+    "grok-4.20-0309-non-reasoning": (1.25, 2.50, 0.20),
+    "grok-4.3": (1.25, 2.50, 0.20),
+    "grok-4.5": (2.00, 6.00, 0.30),
+    "grok-4.6": (2.00, 6.00, 0.50),
+    # OpenRouter passes vendor list prices through (the hosted slugs live in MODEL_PRICES above)
+    "anthropic/claude-sonnet-4.6": (3.00, 15.00, 0.30),
+    "openai/gpt-4o": (2.50, 10.00, 1.25),
+    "google/gemini-2.5-pro": (1.25, 10.00, 0.125),
+    # Groq — UNVERIFIED 2026-09-20: groq.com/pricing and console.groq.com/docs/models no longer publish
+    # per-token rates for these ("contact sales"), so these are the last rates Groq did publish.
+    "llama-3.3-70b-versatile": (0.59, 0.79, 0.59),
+    "moonshotai/kimi-k2-instruct": (1.00, 3.00, 1.00),
+    # Ollama Cloud — ollama.com/pricing, OFF-PEAK rates (12:00-18:00 UTC Mon-Fri costs double). Cache-read
+    # rates are not published per model there: UNVERIFIED 2026-09-20, estimated low.
+    "gpt-oss:120b": (0.15, 0.60, 0.05),
+    "qwen3.5:397b": (0.60, 3.60, 0.05),
+    "deepseek-v4-pro": (0.66, 1.98, 0.022),
+    # DeepSeek — api-docs.deepseek.com now lists deepseek-flash / deepseek-v4-pro; the API aliases
+    # deepseek-chat / deepseek-reasoner are UNVERIFIED 2026-09-20 mappings onto those two rows (peak rates,
+    # the pessimistic half of the off-peak/peak pair).
+    "deepseek-chat": (0.30, 1.20, 0.006),
+    "deepseek-reasoner": (1.32, 3.96, 0.044),
+    # Together — together.ai/pricing lists "Llama 3.3 70B" at $1.04 flat; the -Turbo slug and DeepSeek-V3
+    # are no longer on the page: UNVERIFIED 2026-09-20.
+    "meta-llama/Llama-3.3-70B-Instruct-Turbo": (1.04, 1.04, 1.04),
+    "deepseek-ai/DeepSeek-V3": (1.25, 1.25, 1.25),
+}
+MODEL_PRICES.update(BYOK_TEXT_PRICES)  # one table; BTSWEB_MODEL_PRICES below overrides either half
 try:
     MODEL_PRICES.update({k: tuple(float(x) for x in v)  # type: ignore[misc]
                          for k, v in json.loads(os.environ.get("BTSWEB_MODEL_PRICES", "{}")).items()})
@@ -1145,6 +1216,10 @@ def forge_class_route():
             saved["usage"]["images"] = sum(int(r.get("calls") or 0) for r in art)
             priced = [float(r["cost_usd"]) for r in art if r.get("cost_usd") is not None]
             saved["usage"]["art_cost_usd"] = round(sum(priced), 4) if priced else None
+            # Is that dollar figure a BILL or a TABLE? OpenRouter meters every image (and a token forge's
+            # art runs on our OpenRouter key), so those are real. OpenAI, Gemini and xAI report no cost at
+            # all, so their backends hand back a list-price estimate — the browser labels it "est.".
+            saved["usage"]["art_cost_metered"] = provider in ("openrouter.ai", "hosted")
         except Exception as e:  # noqa: BLE001
             app.logger.warning("usage summary failed (forge %s): %s", forge_id, e)
         q.put(("result", saved))
@@ -1292,18 +1367,105 @@ FORGE_ESTIMATE_SAMPLE = 30
 FORGE_ESTIMATE_FALLBACK = {"calls": 53, "input_tokens": 1_370_000,
                            "cached_tokens": 720_000, "output_tokens": 28_000}
 _ESTIMATE_FIELDS = ("calls", "input_tokens", "cached_tokens", "output_tokens")
+# A complete pack is splash + sprite + one portrait per card; a triad class runs ~34 cards. Used when the
+# ledger has no art rows to average yet.
+FORGE_ESTIMATE_FALLBACK_IMAGES = 36
+# List-price-per-image fallback for the two METERED art vendors, used only until the ledger has real rows.
+# Derived from the 2026-09-18 A/B defaults: splash $0.044 + sprite $0.015 + 34 cards @ $0.0038 = $0.19 for
+# 36 images ≈ $0.0055 each. OpenRouter meters every image, so in practice this is replaced by the measured
+# average within a few forges; OpenAI's backend only ever reports its own advisory table.
+ART_LIST_PRICE_USD = {"openrouter": 0.0055, "openai": 0.0055}
+# A vendor's art line switches from the preset/list price to the ledger's MEASURED average once this many
+# distinct sampled forges made art on that host — the plan's open question, answered: list until there is
+# enough history to beat it, then the real number (which is also what the Gemini/xAI comparison sentence
+# quotes for OpenRouter).
+ART_MEASURED_MIN_FORGES = 3
+# 60 s of caching: the payload now costs three queries plus the preset math, and it changes about as often
+# as a forge finishes. Tests (and anything that seeds the ledger) reset it by clearing `at`.
+FORGE_ESTIMATE_CACHE_S = 60
+_estimate_cache: dict = {"at": 0.0, "payload": None}
 
 
-@app.route("/api/forge-estimate")
-@require_login
-def forge_estimate():
-    """Average LLM consumption of one forge, from the last FORGE_ESTIMATE_SAMPLE successful forges in the
-    usage ledger (any mode — the staged front-end does the same work whoever pays for it). The BYOK panel
-    shows it before the user hands over a key. Falls back to measured constants on an empty ledger.
+def _art_price_blocks(images_per_forge: int, measured: dict) -> dict:
+    """The `art` block of /api/forge-estimate: one entry per vendor in _BYOK_ART_HOSTS, each answering
+    "what does a complete pack cost on a key of this kind". Gemini and xAI have no metered cost in their
+    API responses at all, so their number is the preset table (btsgen.art.backends.openai_images); the
+    OpenRouter/OpenAI entries start at ART_LIST_PRICE_USD and are replaced by the ledger's measured average
+    per image once ART_MEASURED_MIN_FORGES forges have made art there. `measured` is
+    {vendor: {"per_image_usd": float, "forges": int}} from _sampled_art_stats."""
+    out: dict[str, dict] = {}
+    n_cards = max(0, int(images_per_forge) - 2)  # splash + sprite are not portraits
+    for vendor in set(_BYOK_ART_HOSTS.values()):
+        entry: dict = {"source": "list"}
+        if vendor in ("gemini", "xai"):
+            try:
+                from btsgen.art.backends.openai_images import estimate_pack  # lazy: never block app boot
+                pack = estimate_pack(vendor, n_cards)
+                entry.update(model=pack["models"].get("card"), models=pack["models"],
+                             per_image_usd=pack["per_image_usd"].get("card"),
+                             per_image_by_kind=pack["per_image_usd"],
+                             images=pack["images"], pack_usd=round(float(pack["total_usd"]), 4))
+            except Exception as e:  # noqa: BLE001 — a quote must never 500 the panel
+                app.logger.warning("art estimate for %s unavailable: %s", vendor, e)
+                continue
+        else:
+            per = ART_LIST_PRICE_USD.get(vendor)
+            entry.update(model=None, models={}, per_image_usd=per, images=images_per_forge,
+                         pack_usd=round((per or 0.0) * images_per_forge, 4))
+        m = measured.get(vendor) or {}
+        if m.get("forges", 0) >= ART_MEASURED_MIN_FORGES and m.get("per_image_usd") is not None:
+            entry.update(source="measured", per_image_usd=round(m["per_image_usd"], 6),
+                         pack_usd=round(m["per_image_usd"] * images_per_forge, 4),
+                         forges_measured=m["forges"])
+        out[vendor] = entry
+    return out
 
-    `art:*` rows are excluded: this number answers "what will one forge put on MY provider bill" for a BYOK
-    user, and art is generated on OUR image key regardless of who pays for the tokens — folding ~35 image
-    "calls" (and their zero token counts) in would only make the quote wrong in both directions."""
+
+def _sampled_art_stats(s, forge_ids: list[str]) -> tuple[int | None, dict]:
+    """Art rows of the sampled forges, reduced to (images per forge, per-vendor measured price).
+
+    Returns (images_per_forge or None when no forge in the sample made art, {vendor: {"per_image_usd",
+    "forges"}}). `provider` on an art row is the BYOK hostname ("openrouter.ai") or "hosted" for a token
+    forge; a token forge's art runs on OUR OpenRouter key, so those rows back the openrouter average when
+    no BYOK ones exist — the hosted pack is the same pack."""
+    from sqlalchemy import func as sa_func
+    if not forge_ids:
+        return None, {}
+    rows = (s.query(ForgeUsage.forge_id, ForgeUsage.provider, ForgeUsage.calls,
+                    ForgeUsage.metered_cost_micros)
+            .filter(ForgeUsage.ok == 1, ForgeUsage.forge_id.in_(forge_ids),
+                    sa_func.coalesce(ForgeUsage.role, "").like("art:%"))
+            .all())
+    if not rows:
+        return None, {}
+    host_vendor = dict(_BYOK_ART_HOSTS)
+    per_forge_images: dict[str, int] = {}
+    # vendor -> {"usd": float, "images": int, "forges": set} for BYOK rows, plus "hosted" kept apart so it
+    # only stands in for OpenRouter when no BYOK OpenRouter forge is in the window.
+    acc: dict[str, dict] = {}
+    for r in rows:
+        calls = int(r.calls or 0)
+        per_forge_images[r.forge_id] = per_forge_images.get(r.forge_id, 0) + calls
+        vendor = host_vendor.get((r.provider or "").strip().lower())
+        if vendor is None and (r.provider or "").strip().lower() == "hosted":
+            vendor = "hosted"
+        if vendor is None or r.metered_cost_micros is None or calls <= 0:
+            continue
+        a = acc.setdefault(vendor, {"usd": 0.0, "images": 0, "forges": set()})
+        a["usd"] += int(r.metered_cost_micros) / 1_000_000
+        a["images"] += calls
+        a["forges"].add(r.forge_id)
+    hosted = acc.pop("hosted", None)
+    if hosted and "openrouter" not in acc:
+        acc["openrouter"] = hosted
+    measured = {v: {"per_image_usd": a["usd"] / a["images"], "forges": len(a["forges"])}
+                for v, a in acc.items() if a["images"] > 0}
+    images = int(round(sum(per_forge_images.values()) / len(per_forge_images))) if per_forge_images else None
+    return images, measured
+
+
+def _forge_estimate_payload() -> dict:
+    """Build (uncached) the whole pre-go quote. Split out of the route so tests can call it directly."""
     from sqlalchemy import func as sa_func
     with session_scope() as s:
         rows = (s.query(ForgeUsage.forge_id, ForgeUsage.calls, ForgeUsage.input_tokens,
@@ -1312,22 +1474,52 @@ def forge_estimate():
                         sa_func.coalesce(ForgeUsage.role, "").notlike("art:%"))
                 .order_by(ForgeUsage.created_at.desc(), ForgeUsage.id.desc())
                 .all())
-    # One query, grouped in Python: rows arrive newest-first, so the first FORGE_ESTIMATE_SAMPLE distinct
-    # forge_ids are the newest forges — and every row of those forges is summed wherever it turns up.
-    per_forge: dict[str, dict] = {}
-    for r in rows:
-        acc = per_forge.get(r.forge_id)
-        if acc is None:
-            if len(per_forge) >= FORGE_ESTIMATE_SAMPLE:
-                continue
-            acc = per_forge[r.forge_id] = dict.fromkeys(_ESTIMATE_FIELDS, 0)
-        for f in _ESTIMATE_FIELDS:
-            acc[f] += int(getattr(r, f) or 0)
+        # One query, grouped in Python: rows arrive newest-first, so the first FORGE_ESTIMATE_SAMPLE
+        # distinct forge_ids are the newest forges — and every row of those forges is summed wherever it
+        # turns up.
+        per_forge: dict[str, dict] = {}
+        for r in rows:
+            acc = per_forge.get(r.forge_id)
+            if acc is None:
+                if len(per_forge) >= FORGE_ESTIMATE_SAMPLE:
+                    continue
+                acc = per_forge[r.forge_id] = dict.fromkeys(_ESTIMATE_FIELDS, 0)
+            for f in _ESTIMATE_FIELDS:
+                acc[f] += int(getattr(r, f) or 0)
+        images, measured = _sampled_art_stats(s, list(per_forge))
     n = len(per_forge)
-    if not n:
-        return jsonify({"forges_sampled": 0, **FORGE_ESTIMATE_FALLBACK, "fallback": True})
-    avg = {f: int(round(sum(a[f] for a in per_forge.values()) / n)) for f in _ESTIMATE_FIELDS}
-    return jsonify({"forges_sampled": n, **avg, "fallback": False})
+    tokens = ({**FORGE_ESTIMATE_FALLBACK, "forges_sampled": 0, "fallback": True} if not n else
+              {**{f: int(round(sum(a[f] for a in per_forge.values()) / n)) for f in _ESTIMATE_FIELDS},
+               "forges_sampled": n, "fallback": False})
+    images_per_forge = images or FORGE_ESTIMATE_FALLBACK_IMAGES
+    return {**tokens,
+            "images_per_forge": images_per_forge,
+            "images_fallback": images is None,
+            "art": _art_price_blocks(images_per_forge, measured),
+            "text_prices": {m: list(p) for m, p in MODEL_PRICES.items()}}
+
+
+@app.route("/api/forge-estimate")
+@require_login
+def forge_estimate():
+    """What one forge will cost the user, before they push go. Three parts:
+
+    * the average LLM consumption of one forge (calls + tokens), from the last FORGE_ESTIMATE_SAMPLE
+      successful forges in the usage ledger (any mode — the staged front-end does the same work whoever
+      pays for it), falling back to measured constants on an empty ledger. `art:*` rows are excluded here:
+      folding ~36 image "calls" and their zero token counts into a TOKEN average would be wrong in both
+      directions — they get their own numbers below;
+    * `images_per_forge` + `art`: how many images a pack is and what one costs on each art-capable BYOK
+      vendor — preset list price for Gemini/xAI (neither meters a cost), the ledger's measured average for
+      OpenRouter/OpenAI once there is enough of it (see ART_MEASURED_MIN_FORGES);
+    * `text_prices`: {model: [in, out, cached]} $/M for every model the panel suggests, so the browser
+      multiplies but never owns a price table. Override any row with BTSWEB_MODEL_PRICES.
+
+    Cached FORGE_ESTIMATE_CACHE_S seconds process-wide — it is the same answer for every user."""
+    now = time.time()
+    if _estimate_cache["payload"] is None or now - _estimate_cache["at"] > FORGE_ESTIMATE_CACHE_S:
+        _estimate_cache["payload"], _estimate_cache["at"] = _forge_estimate_payload(), now
+    return jsonify(_estimate_cache["payload"])
 
 
 # --- library CRUD ------------------------------------------------------------------------------

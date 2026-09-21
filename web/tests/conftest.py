@@ -70,18 +70,19 @@ def client(app_module):
 
 @pytest.fixture(autouse=True)
 def _no_cloud_image_calls(monkeypatch):
-    """Safety net: a BYOK forge builds a REAL OpenRouter/OpenAI image backend around the posted key (see
-    app._byok_art_backend), so any test that posts such a key would otherwise dial the vendor. Make those
-    calls fail fast instead (art is best-effort: the forge still succeeds, just without images). Tests that
-    want to see the request replace urlopen again with their own fake."""
+    """Safety net: a BYOK forge builds a REAL OpenRouter / OpenAI / Gemini / xAI image backend around the
+    posted key (see app._byok_art_backend), so any test that posts such a key would otherwise dial the
+    vendor. Make those calls fail fast instead (art is best-effort: the forge still succeeds, just without
+    images). Tests that want to see the request replace urlopen again with their own fake."""
     from urllib.error import URLError
-    from btsgen.art.backends import openai as oaib, openrouter as orb
+    from btsgen.art.backends import openai as oaib, openai_images as oimg, openrouter as orb
 
     def refuse(request, timeout=0):
         raise URLError("network disabled in tests")
 
     monkeypatch.setattr(orb, "urlopen", refuse)
     monkeypatch.setattr(oaib, "urlopen", refuse)
+    monkeypatch.setattr(oimg, "urlopen", refuse)
 
 
 def login(client, email: str = "dev@example.com") -> dict:
@@ -185,4 +186,7 @@ def _reset_process_state(app_module):
         app_module._user_active.clear()
     with app_module._feedback_lock:
         app_module._feedback_hits.clear()
+    # /api/forge-estimate caches its payload for a minute process-wide; a test that seeds the ledger must
+    # never be answered from the previous test's cache.
+    app_module._estimate_cache.update(at=0.0, payload=None)
     yield

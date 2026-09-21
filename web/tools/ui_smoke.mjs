@@ -73,6 +73,29 @@ if (scenario === "forge") {
     await new Promise(r => setTimeout(r, 300)); return document.getElementById('forge-btn').textContent + ' | ' + document.getElementById('byok-estimate').textContent; })()`).then(console.log);
   await shot("forge-byok");
   console.log(await evaluate(`(() => { const m = document.getElementById('model'); m.value = 'gpt-5'; m.dispatchEvent(new Event('input')); return document.getElementById('byok-estimate').textContent; })()`));
+  // The pre-go quote (2026-09-20): an art provider renders the three-line Text/Art/Total table plus the
+  // OpenRouter comparison; a provider with no image API renders the text line and says so instead.
+  const pickProvider = (id, model) => `(() => {
+    const p = document.getElementById('provider'); p.value = ${JSON.stringify(id)};
+    p.dispatchEvent(new Event('change'));
+    const m = document.getElementById('model'); m.value = ${JSON.stringify(model)};
+    m.dispatchEvent(new Event('input'));
+    const box = document.getElementById('byok-estimate');
+    return JSON.stringify({rows: [...box.querySelectorAll('pre')].map(e => e.textContent),
+                           notes: [...box.querySelectorAll('.est-note')].map(e => e.textContent)});
+  })()`;
+  for (const [id, model, wantArt] of [["google", "gemini-2.5-flash-lite", true],
+                                      ["xai", "grok-4.20-0309-non-reasoning", true],
+                                      ["groq", "llama-3.3-70b-versatile", false]]) {
+    const got = JSON.parse(await evaluate(pickProvider(id, model)));
+    const table = (got.rows[0] || "");
+    const labels = ["Text", "Art", "Total"].filter((l) => table.includes(l));
+    const ok = wantArt ? labels.length === 3 && got.notes.some((n) => n.includes("OpenRouter key makes"))
+                       : labels.join() === "Text" && got.notes.some((n) => n.includes("No generated art"));
+    console.log(`${ok ? "OK  " : "FAIL"} estimate/${id}: [${labels}] ${JSON.stringify(got.notes).slice(0, 220)}`);
+    if (!ok) errors.push(`estimate for ${id} did not render as expected`);
+    if (id === "google") await shot("forge-byok-gemini-estimate");
+  }
   console.log(await evaluate(`(() => { document.querySelector('input[name=mode][value=token]').click(); return document.getElementById('forge-btn').textContent; })()`));
 } else if (scenario === "library") {
   await nav(`${base}/app`);

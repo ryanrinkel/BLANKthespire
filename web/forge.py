@@ -175,6 +175,57 @@ def _guard_outbound_url(base_url: str) -> None:
                              "use a public provider endpoint.")
 
 
+# --- per-host BYOK request profiles ---------------------------------------------------------------
+# The BYOK text path builds one OpenAICompatGenerator per role against whatever endpoint the user chose.
+# Most vendors need nothing extra, but two knobs are pure money on a per-token key and the hosted mixture
+# (btsgen.ollama_mix) already pays for both, so BYOK applies them by base-URL host:
+#
+#   extra_body   verbatim top-level request fields. Gemini bills HIDDEN reasoning tokens and counts them
+#                against max_tokens before any content (the glm-5.2 failure mode ollama_mix fixed), so the
+#                shim's top-level `reasoning_effort: "low"` is set. xAI's grok-4.x cannot disable reasoning
+#                at all, so it gets nothing (the dropdown suggests the non-reasoning model first instead).
+#   json_roles   pin `response_format: {"type": "json_object"}` on the structure/cards contracts (every
+#                staged contract asks for a JSON object; brainstorm is left bare, matching ollama_mix's
+#                role split). JSON grammar at the API level cuts repair churn, which on a metered key is
+#                money.
+#
+# Unknown hosts keep today's byte-for-byte request. A field an endpoint 400s on is already dropped
+# per-model by OpenAICompatGenerator's param adaptation, so a wrong guess here degrades to today's
+# behavior rather than failing the forge.
+BYOK_HOST_PROFILES = {
+    "generativelanguage.googleapis.com": {"extra_body": {"reasoning_effort": "low"}, "json_roles": True},
+    "api.x.ai": {"extra_body": {}, "json_roles": True},
+}
+_NO_PROFILE = {"extra_body": {}, "json_roles": False}
+
+
+def _byok_profile(base_url: str) -> dict:
+    """The BYOK_HOST_PROFILES entry for a base URL's host, or the inert default. Never raises."""
+    from urllib.parse import urlsplit
+    try:
+        host = (urlsplit((base_url or "").strip()).hostname or "").lower()
+    except ValueError:
+        return _NO_PROFILE
+    return BYOK_HOST_PROFILES.get(host, _NO_PROFILE)
+
+
+_JSON_OBJECT = {"type": "json_object"}
+
+
+def _json_format_for(profile: dict, contract_mod) -> dict | None:
+    """`response_format` for one stage: json_object on the structure/cards roles of a json_roles host,
+    None everywhere else. The role comes from btsgen.ollama_mix._resolve_role — the same contract-class
+    map the hosted mixture routes with, so web and generator can never drift on what "structure" means."""
+    if not profile.get("json_roles"):
+        return None
+    try:
+        from btsgen.ollama_mix import _resolve_role
+        role = _resolve_role(contract_mod)
+    except Exception:  # noqa: BLE001 — a missing/renamed helper must never break a forge
+        return None
+    return _JSON_OBJECT if role in ("structure", "cards") else None
+
+
 def _build_generators(key: dict | None, hosted: bool, fake: bool, model: str | None = None, on_usage=None):
     """Return (blueprint_gen, card_gen_factory, relic_gen) for the requested path. Raises ForgeError on bad
     config. `relic_gen` forges the class's keystone relic (non-fatal — if it fails, the class still ships,
@@ -215,14 +266,24 @@ def _build_generators(key: dict | None, hosted: bool, fake: bool, model: str | N
         _guard_outbound_url(base_url)  # same SSRF guard as the staged path — no path may skip it
         from btsgen import contract
         from btsgen.generator import OpenAICompatGenerator
+        # Per-host cost/JSON discipline (see BYOK_HOST_PROFILES). All three contracts here are
+        # structure/cards roles, so a json_roles host pins json_object on every one of them.
+        prof = _byok_profile(base_url)
+        eb = prof["extra_body"] or None
+        bp_contract, card_contract, relic_contract = _BlueprintContract(triad=False), contract, _RelicContract()
         blueprint_gen = OpenAICompatGenerator(base_url, api_key, model,
-                                              contract_mod=_BlueprintContract(triad=False), max_tokens=8000,
-                                              on_usage=on_usage)
+                                              contract_mod=bp_contract, max_tokens=8000,
+                                              on_usage=on_usage, extra_body=eb,
+                                              response_format=_json_format_for(prof, bp_contract))
         relic_gen = OpenAICompatGenerator(base_url, api_key, model,
-                                          contract_mod=_RelicContract(), max_tokens=4000, on_usage=on_usage)
+                                          contract_mod=relic_contract, max_tokens=4000, on_usage=on_usage,
+                                          extra_body=eb,
+                                          response_format=_json_format_for(prof, relic_contract))
+        card_format = _json_format_for(prof, card_contract)
         card_factory = lambda: OpenAICompatGenerator(base_url, api_key, model,  # noqa: E731
-                                                     contract_mod=contract, max_tokens=4000,
-                                                     on_usage=on_usage)
+                                                     contract_mod=card_contract, max_tokens=4000,
+                                                     on_usage=on_usage, extra_body=eb,
+                                                     response_format=card_format)
         return blueprint_gen, card_factory, relic_gen
 
     if hosted:  # REMOVED 2026-09-18: the server holds no Anthropic credential for forges. Token forges run on
@@ -367,11 +428,17 @@ def _make_gen_factory(key: dict | None, hosted: bool, fake: bool, model: str | N
             raise ForgeError("BYOK needs base_url, api_key, and model together.")
         _guard_outbound_url(base_url)
         from btsgen.generator import OpenAICompatGenerator
+        # Per-host cost/JSON discipline (see BYOK_HOST_PROFILES): extra_body on every stage (unlike the
+        # hosted mixture, BYOK runs ONE model for all three roles, so a reasoning knob is as welcome on
+        # brainstorm as anywhere), json_object only on the structure/cards stages.
+        prof = _byok_profile(base_url)
+        eb = prof["extra_body"] or None
         # 300s (vs the 180s default), matching the Ollama path: the front-end's heavy stages (map/compose,
         # reframed blueprint) can sit a long time before the first streamed chunk when the provider is loaded.
         return lambda contract_mod, *, max_tokens: OpenAICompatGenerator(
             base_url, api_key, m, contract_mod=contract_mod, max_tokens=max_tokens, timeout=300,
-            on_usage=on_usage)
+            on_usage=on_usage, extra_body=eb,
+            response_format=_json_format_for(prof, contract_mod))
     if hosted:  # see _build_generators: no server-side Anthropic credential, ever
         raise ForgeError("the server-side Anthropic path is retired — use a token or bring your own API key.")
     raise ForgeError("no generation path selected (need a BYOK key, a token, or fake).")

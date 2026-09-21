@@ -164,8 +164,13 @@ def test_forge_estimate_falls_back_on_an_empty_ledger(client, app_module):
     login(client, "estimate@example.com")
     _clear(app_module)
     body = client.get("/api/forge-estimate").get_json()
-    assert body == {"forges_sampled": 0, "calls": 53, "input_tokens": 1_370_000,
-                    "cached_tokens": 720_000, "output_tokens": 28_000, "fallback": True}
+    assert {k: body[k] for k in ("forges_sampled", "calls", "input_tokens", "cached_tokens",
+                                 "output_tokens", "fallback")} == {
+        "forges_sampled": 0, "calls": 53, "input_tokens": 1_370_000,
+        "cached_tokens": 720_000, "output_tokens": 28_000, "fallback": True}
+    # The art + price blocks answer even on an empty ledger (list prices; see test_forge_estimate.py).
+    assert body["images_per_forge"] == 36 and body["images_fallback"] is True
+    assert set(body["art"]) == set(app_module._BYOK_ART_HOSTS.values()) and body["text_prices"]
 
 
 def test_forge_estimate_requires_login(client):
@@ -218,7 +223,7 @@ def test_usage_rows_and_result_carry_the_provider_and_totals(client, app_module,
     # the stub meters two calls: 1000+500 in, 200+100 out, 300 cached; the art (on the user's OpenAI key)
     # is refused by conftest's no-network net, so no image lands and no cost is known
     assert saved["usage"] == {"calls": 2, "input_tokens": 1500, "cached_tokens": 300, "output_tokens": 300,
-                              "images": 0, "art_cost_usd": None}
+                              "images": 0, "art_cost_usd": None, "art_cost_metered": False}
     with app_module.session_scope() as s:
         rows = s.query(ForgeUsage).filter_by(class_id=saved["id"]).all()
     assert rows and all(r.provider == "api.openai.com" for r in rows)

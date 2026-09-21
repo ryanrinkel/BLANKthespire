@@ -372,6 +372,11 @@ body.landing {
 
 /* --- 2026-09-17: BYOK cost warning, class view bar, admin forge stats -------------------------- */
 .hint.warn { color: #f2b45c; }
+/* The pre-go cost quote: a Text / Art / Total table in the same amber caution tone. `pre` keeps the
+   columns aligned; it scrolls sideways rather than widening the panel on a narrow screen. */
+#byok-estimate pre { margin: 4px 0 0; font-size: 12px; line-height: 1.5; white-space: pre;
+                     overflow-x: auto; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+#byok-estimate .est-note { margin: 5px 0 0; }
 .view-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px;
             padding-bottom: 10px; border-bottom: 1px solid var(--line); font-size: 13px; }
 .view-bar .btn { padding: 6px 12px; font-size: 13px; }

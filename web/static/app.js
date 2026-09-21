@@ -220,18 +220,14 @@ function renderBanner() {
 }
 
 // --- BYOK cost estimate ---------------------------------------------------------------------------
-// /api/forge-estimate is the rolling average of recent forges (calls, input/cached/output tokens), so the
-// warning tracks the real pipeline instead of a number someone typed once. Dollar figures are only given
-// for current Claude models (Anthropic list prices per 1M tokens as of 2026-06); every other provider gets
-// the token counts and a pointer to its own price sheet — we won't guess at rates we can't verify.
+// Everything here is SERVER-COMPUTED (/api/forge-estimate) — the browser multiplies, it never owns a price
+// table (the old CLAUDE_PRICES list moved into app.py's BYOK_TEXT_PRICES on 2026-09-20). The payload is
+//   calls / input_tokens / cached_tokens / output_tokens   rolling average of recent forges
+//   images_per_forge                                       rolling average of art calls per forge
+//   art: {vendor: {model, per_image_usd, pack_usd, source}} what a complete art pack costs per key type
+//   text_prices: {model: [in, out, cached]} in $/M          every model the dropdowns suggest
+// so the quote tracks the real pipeline and the real prices instead of a number someone typed once.
 let ESTIMATE = null;
-const CLAUDE_PRICES = [  // [model id prefix, input $/M, output $/M, cache-read $/M]
-  ["claude-opus-5", 5, 25, 0.5],
-  ["claude-sonnet-5", 2, 10, 0.2],
-  ["claude-haiku-4-5", 1, 5, 0.1],
-  ["claude-opus-4", 5, 25, 0.5],
-  ["claude-sonnet-4", 3, 15, 0.3],
-];
 
 async function loadEstimate() {
   try {
@@ -246,39 +242,100 @@ function fmtTokens(n) {
   return n >= 1_000_000 ? (n / 1_000_000).toFixed(1) + "M" : n >= 1000 ? Math.round(n / 1000) + "K" : String(n);
 }
 
-function claudePrice(model) {
-  const id = String(model || "").toLowerCase();
-  for (const [prefix, inp, out, cached] of CLAUDE_PRICES) if (id.startsWith(prefix)) return { inp, out, cached };
-  return null;
+function usd(n) { return "$" + Number(n || 0).toFixed(2); }
+
+// [in, out, cached] $/M for a model id, or null when the server has no price for it. An exact hit wins;
+// otherwise the LONGEST priced id the typed model starts with, so a dated or pinned slug
+// ("gpt-4o-2024-11-20", "claude-sonnet-4-6-20260401") still prices at its family's rate.
+function modelPrice(model) {
+  const table = ESTIMATE?.text_prices, id = String(model || "").trim();
+  if (!table || !id) return null;
+  let row = table[id];
+  if (!row) {
+    let best = "";
+    for (const k in table) if (id.startsWith(k) && k.length > best.length) best = k;
+    row = best ? table[best] : null;
+  }
+  return Array.isArray(row) ? { inp: row[0], out: row[1], cached: row[2] } : null;
 }
 
-// One paragraph, reused by the hint under the key fields and the confirm dialog.
-function estimateText(model) {
-  const e = ESTIMATE;
-  if (!e) return "A forge makes roughly 50 model calls and around 1.4M input tokens — check your provider's pricing.";
-  const calls = e.calls, inp = e.input_tokens, cached = e.cached_tokens, out = e.output_tokens;
-  let s = `A forge makes about ${calls} calls: ~${fmtTokens(inp)} input tokens (~${fmtTokens(cached)} of them `
-    + `cacheable) and ~${fmtTokens(out)} output tokens.`;
-  const price = claudePrice(model);
-  if (price) {
-    const uncached = Math.max(0, inp - cached);
-    const usd = (uncached * price.inp + cached * price.cached + out * price.out) / 1_000_000;
-    const usdNoCache = (inp * price.inp + out * price.out) / 1_000_000;
-    s += ` At Anthropic list prices that is roughly $${usd.toFixed(2)} per forge with prompt caching`
-      + ` (up to $${usdNoCache.toFixed(2)} without).`;
-  } else {
-    s += " Multiply by your provider's per-token prices — this can be a few dollars per forge on frontier models.";
+// The `art` block for the selected provider, or null where a BYOK forge makes no art.
+function artFor(p) {
+  return (p && p.art && p.artKey && ESTIMATE?.art) ? (ESTIMATE.art[p.artKey] || null) : null;
+}
+
+// The whole quote as data: a header, aligned [label, what, cost] rows, and free-text notes. Both the HTML
+// panel and the plain-text confirm dialog render this, so they can never disagree.
+function estimateRows(model) {
+  const e = ESTIMATE, p = currentProvider();
+  if (!e) {
+    return { head: "", rows: [],
+             notes: ["A forge makes roughly 50 model calls and around 1.4M input tokens — check your "
+                     + "provider's pricing."] };
   }
-  // Image calls ride the same key on the art-capable providers (see PROVIDERS.art): ~36 images per forge
-  // (splash, sprite, one portrait per card), capped server-side at about half a dollar.
-  if (currentProvider().art) s += " Plus about 36 image calls for the art, roughly $0.20–0.50.";
-  return s;
+  const inp = e.input_tokens, cached = e.cached_tokens, out = e.output_tokens;
+  const rows = [], notes = [];
+  const head = `Estimated cost per forge on your ${p.label} key`;
+
+  const price = modelPrice(model);
+  const tokens = `~${e.calls} calls · ~${fmtTokens(inp)} in (~${fmtTokens(cached)} cached) · `
+    + `~${fmtTokens(out)} out`;
+  let textUsd = null;
+  if (price) {
+    textUsd = (Math.max(0, inp - cached) * price.inp + cached * price.cached + out * price.out) / 1_000_000;
+    const noCache = (inp * price.inp + out * price.out) / 1_000_000;
+    notes.push(`Text assumes prompt caching works on your key — up to ${usd(noCache)} without it.`);
+  } else {
+    notes.push("We have no price for that model — multiply the token counts by your provider's price sheet."
+      + " On frontier models a forge can be a few dollars.");
+  }
+  rows.push(["Text", `${model || "(pick a model)"}  ${tokens}`, textUsd == null ? "?" : "≈ " + usd(textUsd)]);
+
+  const art = artFor(p);
+  let artUsd = null;
+  if (art) {
+    const n = Number(e.images_per_forge || 36);
+    artUsd = art.pack_usd != null ? Number(art.pack_usd)
+           : (art.per_image_usd != null ? Number(art.per_image_usd) * n : null);
+    const per = art.per_image_usd != null ? ` × $${Number(art.per_image_usd).toFixed(3)}` : "";
+    rows.push(["Art", `${art.model || p.label + " image API"}  ${n} images (splash, sprite, ${n - 2} card `
+      + `portraits)${per}`, artUsd == null ? "?" : "≈ " + usd(artUsd)]);
+  } else if (p.mode) {
+    notes.push(`No generated art on this key — ${p.label} has no image API we can drive, so classes forged `
+      + "here ship with the game's built-in card doodles.");
+  }
+  if (textUsd != null && artUsd != null) rows.push(["Total", "", "≈ " + usd(textUsd + artUsd)]);
+
+  // Gemini and xAI bill a flat per-image list price with no cheaper model on the same API, so say what the
+  // alternative key would cost for the SAME pack — the OpenRouter number is measured from our own ledger.
+  const or = ESTIMATE.art?.openrouter;
+  if (art && (p.artKey === "gemini" || p.artKey === "xai") && or?.pack_usd != null) {
+    notes.push(`Art is generated on your key; there's no cheaper ${p.label} image model on this API. `
+      + `An OpenRouter key makes the same pack for about ${usd(or.pack_usd)}.`);
+  }
+  return { head, rows, notes };
+}
+
+// Plain text (the confirm dialog). Same numbers as the panel.
+function estimateText(model) {
+  const { head, rows, notes } = estimateRows(model);
+  const lines = [];
+  if (head) lines.push(head);
+  for (const [label, what, cost] of rows) lines.push(`  ${label.padEnd(7)}${what}${what ? "   " : ""}${cost}`);
+  return lines.concat(notes).join("\n");
 }
 
 function renderEstimate() {
   const box = el("byok-estimate");
   if (!box) return;
-  box.textContent = "⚠ " + estimateText(el("model").value.trim());
+  const { head, rows, notes } = estimateRows(el("model").value.trim());
+  // Column widths from the content, so Text / Art / Total line up without a real table.
+  const w1 = Math.max(0, ...rows.map(r => r[1].length));
+  const table = rows.map(([label, what, cost]) =>
+    esc(`  ${label.padEnd(7)}${what.padEnd(w1)}   ${cost}`)).join("\n");
+  box.innerHTML = (head ? `⚠ ${esc(head)}` : "⚠")
+    + (table ? `<pre>${table}</pre>` : "")
+    + notes.map(n => `<p class="est-note">${esc(n)}</p>`).join("");
 }
 
 function show(id) {
@@ -305,29 +362,42 @@ function selectTab(which) {
 // auto-select the dropdown when it's unambiguous, the page to get a key, and a few suggested models.
 // `mode` distinguishes Anthropic (native SDK path) from the OpenAI-compatible path. "custom" has no
 // base_url — it reveals the URL field for any other OpenAI-compatible endpoint. `art: true` marks the
-// providers whose image API the server can drive with the same key (mirrors app.py's _BYOK_ART_HOSTS):
-// there the splash, sprite and card portraits are generated on the user's key; elsewhere a BYOK forge
-// ships without generated art (the mod draws its built-in card doodles) — art is never billed to us.
+// providers whose image API the server can drive with the same key (mirrors app.py's _BYOK_ART_HOSTS —
+// OpenRouter, OpenAI and, since 2026-09-20, Google Gemini and xAI): there the splash, sprite and card
+// portraits are generated on the user's key; elsewhere a BYOK forge ships without generated art (the mod
+// draws its built-in card doodles) — art is never billed to us.
+//
+// `models` is the suggestion list, CHEAPEST FIRST (the first entry is also the placeholder): the estimate
+// under the fields prices whichever one is typed, from /api/forge-estimate's `text_prices`. Every id here
+// MUST have a price in that table — web/tests/test_forge_estimate.py parses this block and fails if one
+// doesn't, so the quote can never quietly go blank on a suggestion we ship.
 const PROVIDERS = {
   anthropic:  { label: "Anthropic", mode: "anthropic", base_url: "",
                 prefix: "sk-ant-", keyFrom: "console.anthropic.com",
                 models: ["claude-sonnet-4-6", "claude-haiku-4-5", "claude-opus-4-8"] },
-  openai:     { label: "OpenAI", mode: "byok", base_url: "https://api.openai.com/v1", art: true,
+  openai:     { label: "OpenAI", mode: "byok", base_url: "https://api.openai.com/v1", art: true, artKey: "openai",
                 prefix: "sk-", keyFrom: "platform.openai.com (an API key, not a ChatGPT login)",
                 models: ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "o4-mini"] },
   ollama:     { label: "Ollama Cloud", mode: "byok", base_url: "https://ollama.com/v1",
                 prefix: "", keyFrom: "ollama.com/settings/keys",
                 models: ["glm-5.2", "gemma4:31b", "gpt-oss:120b", "qwen3.5:397b", "deepseek-v4-pro"] },
   openrouter: { label: "OpenRouter", mode: "byok", base_url: "https://openrouter.ai/api/v1", art: true,
+                artKey: "openrouter",
                 prefix: "sk-or-", keyFrom: "openrouter.ai/keys",
                 models: ["anthropic/claude-sonnet-4.6", "openai/gpt-4o", "google/gemini-2.5-pro"] },
   groq:       { label: "Groq", mode: "byok", base_url: "https://api.groq.com/openai/v1",
                 prefix: "gsk_", keyFrom: "console.groq.com/keys",
                 models: ["llama-3.3-70b-versatile", "moonshotai/kimi-k2-instruct"] },
-  google:     { label: "Google Gemini", mode: "byok",
+  google:     { label: "Google Gemini", mode: "byok", art: true, artKey: "gemini",
                 base_url: "https://generativelanguage.googleapis.com/v1beta/openai",
                 prefix: "AIza", keyFrom: "aistudio.google.com/apikey",
-                models: ["gemini-2.5-pro", "gemini-2.5-flash"] },
+                models: ["gemini-2.5-flash-lite", "gemini-2.5-flash", "gemini-3-flash-preview",
+                         "gemini-2.5-pro"] },
+  // grok-4.x cannot turn reasoning off (hidden thinking is billed and eats max_tokens), so the
+  // explicitly non-reasoning model is suggested first — see forge.py BYOK_HOST_PROFILES.
+  xai:        { label: "xAI (Grok)", mode: "byok", base_url: "https://api.x.ai/v1", art: true, artKey: "xai",
+                prefix: "xai-", keyFrom: "console.x.ai",
+                models: ["grok-4.20-0309-non-reasoning", "grok-4.3", "grok-4.6"] },
   deepseek:   { label: "DeepSeek", mode: "byok", base_url: "https://api.deepseek.com/v1",
                 prefix: "", keyFrom: "platform.deepseek.com",
                 models: ["deepseek-chat", "deepseek-reasoner"] },
@@ -369,7 +439,7 @@ function applyProvider() {
     + `in your browser — never saved on our server. `
     + (p.art
         ? `<b>Art included:</b> the splash, sprite and card portraits are generated on this key too `
-          + `(about $0.20–0.50 per forge at current defaults).`
+          + `— the estimate below is the real per-image price for this provider.`
         : `<b>No generated art:</b> ${esc(p.label)} can't make images, so classes forged on this key `
           + `ship without splash, sprite or card portraits (the game uses its built-in card doodles).`);
   renderEstimate();
@@ -547,10 +617,13 @@ function renderUsage(cls) {
   const line = el("r-usage");
   const u = cls.usage;
   if (!u || currentMode() !== "byok") { line.classList.add("hidden"); return; }
-  // The art rows are the user's too: images made and, when the vendor metered it, the dollars.
+  // The art rows are the user's too: images made and the dollars — "metered" only when the vendor
+  // actually reported a cost (OpenRouter); Gemini/xAI/OpenAI report none, so that figure is the list-price
+  // "est." and must never read as a bill.
   const art = u.images
     ? ` · ${u.images} image${u.images === 1 ? "" : "s"}`
-      + (u.art_cost_usd != null ? ` ($${Number(u.art_cost_usd).toFixed(2)} metered)` : "")
+      + (u.art_cost_usd != null
+          ? ` ($${Number(u.art_cost_usd).toFixed(2)} ${u.art_cost_metered ? "metered" : "est."})` : "")
     : "";
   line.textContent = `This forge used ${u.calls} calls · ${fmtTokens(u.input_tokens)} input tokens`
     + (u.cached_tokens ? ` (${fmtTokens(u.cached_tokens)} from cache)` : "")
