@@ -73,8 +73,8 @@ async function boot() {
   handlePurchaseReturn();
 }
 
-// Reflect the user's token state in the header chip, the "Use a token" hint and the Account balance.
-// Steering the default mode moved into the chooser block below (restoreForgePref).
+// Reflect the user's token state in the header chip, the "Use a token" balance line and the Account
+// balance. Steering the default path moved into the chooser block below (restoreForgePref).
 function renderTokens() {
   if (!ME) return;
   const unlimited = !!ME.unlimited;
@@ -84,15 +84,11 @@ function renderTokens() {
   chip.classList.remove("hidden");
   chip.classList.toggle("empty", !unlimited && paid <= 0);
 
-  const status = el("token-status");
-  if (unlimited) status.textContent = "Forges on our models. Your account forges free.";
-  else if (paid > 0) {
-    status.textContent = `Forges on our models. Uses 1 of your ${paid} token${paid === 1 ? "" : "s"}.`;
-  } else {
-    status.innerHTML = "You have no tokens. <b>Bring your own key</b> below (free, unlimited), or "
-      + '<button id="donate-cta" class="linkish" type="button">account page</button> to get some.';
-    // innerHTML replaced the node — re-wire the CTA on every render.
-    el("donate-cta").onclick = () => selectTab("account");
+  const line = el("token-balance-line");
+  if (line) {
+    if (unlimited) line.textContent = "\u221E tokens \u2014 your account forges free.";
+    else if (paid > 0) line.textContent = `You have ${paid} token${paid === 1 ? "" : "s"}.`;
+    else line.textContent = "You have no tokens \u2014 get some below.";
   }
 
   // Keep the Account view's balance in lockstep wherever the numbers change (forge spend, donation).
@@ -104,37 +100,64 @@ function renderTokens() {
   renderBanner();  // its wording depends on the balance
 }
 
-// Show the fields for the selected mode (token vs BYOK vs offline-fake).
-function applyMode() {
-  const m = currentMode();
-  el("token-fields").style.display = m === "token" ? "" : "none";
-  el("byok-fields").style.display = m === "byok" ? "" : "none";
+// Opening one of the two payment boxes closes the other, remembers the choice, and re-renders everything
+// that depends on it. Fired from the <details> "toggle" event, so a plain click on the summary counts.
+function onPayBoxToggle(openedId, otherId, mode) {
+  const box = el(openedId);
+  if (box && box.open) {
+    const other = el(otherId);
+    if (other && other.open) other.open = false;   // fires the other box's toggle, which just re-renders
+    setForgePref(mode);
+    CHOOSER_FORCED = false;
+  }
   renderForgeButton();
+  renderChooser();
+  renderBanner();
   renderEstimate();
 }
 
-// The forge button says what the click will cost, in the same words as the settings hint: one of the
-// account's tokens, the user's own key, or nothing at all (unlimited accounts).
+// True while a forge is in flight: the button stays disabled no matter what re-renders underneath it
+// (token events arrive mid-forge and call renderTokens -> renderForgeButton).
+let FORGING = false;
+
+// The forge button is the gate: it only enables once the open box can actually pay for a forge, and it
+// says what the click will cost. Disabled, it carries a title saying what is missing.
 function renderForgeButton() {
   const btn = el("forge-btn");
   if (!btn) return;
   const m = currentMode();
-  let cost;
-  if (m === "byok") cost = "uses your API key";
-  else if (m === "fake") cost = "offline demo";
-  else if (!ME || ME.unlimited) cost = "free — unlimited account";
-  else {
-    const paid = Number(ME.token_balance || 0);
-    cost = paid > 0 ? `uses 1 of your ${paid} token${paid === 1 ? "" : "s"}`
-      : "no tokens — get some or bring a key";
+  let ok = false, label = "Forge the class", why = "";
+  if (m === "fake") {
+    ok = true;
+    label = "Forge the class (offline demo)";
+  } else if (m === "byok") {
+    if (el("api_key").value.trim() && el("model").value.trim()) {
+      ok = true;
+      label = "Forge the class (uses your API key)";
+    } else why = "Enter your API key and a model.";
+  } else if (m === "token") {
+    if (!ME || ME.unlimited) {
+      ok = true;
+      label = "Forge the class (free \u2014 unlimited account)";
+    } else {
+      const paid = Number(ME.token_balance || 0);
+      if (paid > 0) {
+        ok = true;
+        label = `Forge the class (uses 1 of your ${paid} token${paid === 1 ? "" : "s"})`;
+      } else why = "You have no tokens \u2014 get some below or bring a key.";
+    }
+  } else {
+    why = "Open 'Bring your own key' and enter a key, or 'Use a token'.";
   }
-  btn.textContent = `Forge the class (${cost})`;
+  btn.textContent = label;
+  btn.disabled = FORGING || !ok;
+  if (why) btn.title = why; else btn.removeAttribute("title");
 }
 
 // --- onboarding chooser (forge tab) ---------------------------------------------------------------
 // First visit with nothing to spend and no key on file: two cards, "use my key" vs "support the forge".
-// Once a path is picked it collapses to a one-line strip. The mode radios stay the source of truth —
-// this only steers them and remembers the pick in localStorage.bts_forge_pref.
+// Once a path is picked it collapses to a one-line strip. The open <details> box stays the source of
+// truth — this only opens one of them and remembers the pick in localStorage.bts_forge_pref.
 
 let CHOOSER_FORCED = false;  // "change" reopens the cards even for an account that now has tokens
 
@@ -149,17 +172,22 @@ function hasSavedKey() {
   try { return !!JSON.parse(localStorage.getItem("bts_byok") || "{}").api_key; } catch (_) { return false; }
 }
 
+// Open the box for `mode` and close the other one. The toggle handlers do the remembering.
 function setMode(mode) {
-  const radio = document.querySelector(`input[name="mode"][value="${mode}"]`);
-  if (radio) { radio.checked = true; applyMode(); }
+  const byok = el("forge-byok"), token = el("forge-token");
+  if (!byok || !token) return;
+  if (mode === "byok") { token.open = false; byok.open = true; }
+  else if (mode === "token") { byok.open = false; token.open = true; }
+  renderForgeButton();
 }
 
-// Start on the path last chosen; with no preference and nothing to spend, BYOK is the only path that
-// isn't a dead end (the old renderTokens fallback, kept here).
+// Start on the path last chosen — a returning user with a saved key shouldn't have to reopen the box
+// every visit. With nothing remembered both boxes stay shut and the button stays disabled until one is
+// opened (the chooser cards above are what points at them).
 function restoreForgePref() {
   const pref = forgePref();
   if (pref) setMode(pref);
-  else if (ME && !ME.unlimited && spendable() <= 0) setMode("byok");
+  renderForgeButton();
   renderChooser();
 }
 
@@ -172,7 +200,12 @@ function renderChooser() {
   const undecided = CHOOSER_FORCED
     || (!!ME && !ME.unlimited && paid <= 0 && !hasSavedKey() && !pref);
   const mode = pref || currentMode();
-  if (!ME || (!undecided && (ME.unlimited || mode === "fake"))) { box.classList.add("hidden"); return; }
+  // Nothing decided and nothing to decide about (unlimited, offline demo, or simply no box open yet on an
+  // account that isn't stuck): no strip to draw.
+  if (!ME || (!undecided && (!mode || ME.unlimited || mode === "fake"))) {
+    box.classList.add("hidden");
+    return;
+  }
   box.classList.remove("hidden");
   el("chooser-head").classList.toggle("hidden", !undecided);
   el("chooser-cards").classList.toggle("hidden", !undecided);
@@ -188,8 +221,7 @@ function renderChooser() {
 function chooseByok() {
   setForgePref("byok");
   CHOOSER_FORCED = false;
-  setMode("byok");
-  el("forge-settings").open = true;   // the key fields live inside the collapsed Generation settings
+  setMode("byok");          // opens #forge-byok, where the key fields live
   el("provider").focus();
   renderChooser();
 }
@@ -197,10 +229,8 @@ function chooseByok() {
 function chooseToken() {
   setForgePref("token");
   CHOOSER_FORCED = false;
-  setMode("token");
-  const panel = el("forge-donate");   // tiers inline on the forge tab, not a trip to the Account tab
-  panel.open = true;
-  panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  setMode("token");         // tiers inline on the forge tab, not a trip to the Account tab
+  el("forge-token").scrollIntoView({ behavior: "smooth", block: "nearest" });
   renderChooser();
 }
 
@@ -476,8 +506,14 @@ function saveByok() {
   renderBanner();  // a saved key satisfies the "enter an API key" warning
 }
 
+// What the forge button would spend, from the UI alone: the dev-only offline demo wins, then whichever
+// payment box is open. Null means nothing is selected yet (button disabled).
 function currentMode() {
-  return document.querySelector('input[name="mode"]:checked').value;
+  const fake = el("mode-fake");
+  if (fake && fake.checked) return "fake";
+  if (el("forge-byok")?.open) return "byok";
+  if (el("forge-token")?.open) return "token";
+  return null;
 }
 
 // --- forge (SSE over POST via fetch stream) ------------------------------------------------------
@@ -485,7 +521,11 @@ function currentMode() {
 async function forge() {
   const concept = el("concept").value.trim();
   if (!concept) { toast("Describe a class first."); return; }
-  const choice = currentMode();  // "token" | "byok" | "fake"
+  const choice = currentMode();  // "token" | "byok" | "fake" | null
+  if (!choice) {
+    toast("Open 'Bring your own key' and enter a key, or 'Use a token'.");
+    return;
+  }
 
   // The wire `mode` is derived: BYOK splits into Anthropic's native path vs the OpenAI-compatible path
   // based on the chosen provider, so the backend routing is unchanged.
@@ -525,7 +565,8 @@ async function forge() {
     saveByok();
   }
 
-  el("forge-btn").disabled = true;
+  FORGING = true;
+  renderForgeButton();
   el("result").classList.add("hidden");
   el("progress").classList.remove("hidden");
   el("log").textContent = "";
@@ -553,7 +594,8 @@ async function forge() {
     appendLog("✗ " + e.message);
     toast(e.message);
   } finally {
-    el("forge-btn").disabled = false;
+    FORGING = false;
+    renderForgeButton();
     el("spinner").classList.add("hidden");
     resetChoice();
   }
@@ -887,18 +929,69 @@ async function loadDonation() {
 
 function renderDonation(cfg) {
   DONATE_CFG = cfg || null;
-  renderDonatePanel("donate", "donate-tiers", "donate-note", cfg);
-  renderDonatePanel("forge-donate-box", "forge-donate-tiers", "forge-donate-note", cfg);
+  renderDonatePanel("donate", "donate-tiers", "donate-custom", "donate-note", cfg);
+  renderDonatePanel("forge-donate-box", "forge-donate-tiers", "forge-donate-custom",
+                    "forge-donate-note", cfg);
 }
 
-// One panel: the tier buttons, or the "switched off" note in their place.
-function renderDonatePanel(boxId, tiersId, noteId, cfg) {
+// One panel: the tier buttons + the custom-amount row, or the "switched off" note in their place.
+function renderDonatePanel(boxId, tiersId, customId, noteId, cfg) {
   const enabled = !!(cfg && cfg.enabled);
   const box = el(boxId), note = el(noteId);
   if (!box) return;
   box.classList.toggle("hidden", !enabled);
   if (note) note.classList.toggle("hidden", enabled);
-  if (enabled) renderTiers(el(tiersId), cfg);
+  if (enabled) { renderTiers(el(tiersId), cfg); renderCustomAmount(el(customId), cfg); }
+}
+
+// What the card is charged for a `net_cents` donation, and the fee inside it — the same arithmetic as
+// billing.gross_for(), from the rates /api/billing publishes, so the two can't drift.
+function grossFee(netCents, custom) {
+  const pct = Number(custom.fee_pct || 0), fixed = Number(custom.fee_fixed_cents || 0);
+  const gross = Math.ceil((netCents + fixed) / (1 - pct / 100));
+  return { gross, fee: gross - netCents };
+}
+
+// "$ [ 25 ] (Get 25 tokens)" above a line spelling out the real charge. Everything past the fixed tiers is
+// one token per dollar, whole dollars only. No `custom` block in /api/billing (an older server) hides it.
+// Ids are derived from the container so the forge tab and the Account tab can both render one.
+function renderCustomAmount(container, cfg) {
+  if (!container) return;
+  const c = cfg && cfg.custom;
+  container.innerHTML = "";
+  container.classList.toggle("hidden", !c);
+  if (!c) return;
+  const min = Number(c.min_dollars || 0), max = Number(c.max_dollars || 0);
+  const per = Number(c.tokens_per_dollar || 1);
+  const base = container.id;
+  container.innerHTML =
+    `<div class="custom-row"><span class="custom-cur">$</span>`
+    + `<input id="${base}-input" class="in custom-amt" type="number" min="${min}" max="${max}" step="1" `
+    + `inputmode="numeric" placeholder="${min}+" aria-label="Custom amount in dollars" />`
+    + `<button id="${base}-btn" class="btn" type="button">Get tokens</button></div>`
+    + `<p id="${base}-line" class="hint custom-line"></p>`;
+  const input = el(`${base}-input`), btn = el(`${base}-btn`), line = el(`${base}-line`);
+  const sentence = `$${min} and up: one token per dollar, whole dollars only.`;
+  const sync = () => {
+    const n = customDollars(input.value, c);
+    btn.textContent = n ? `Get ${n * per} token${n * per === 1 ? "" : "s"}` : "Get tokens";
+    if (!n) { line.textContent = sentence; return; }
+    const { gross, fee } = grossFee(n * 100, c);
+    line.textContent = `${sentence} ${fmtMoney(gross, cfg.currency)} charged, incl. `
+      + `${fmtMoney(fee, cfg.currency)} card fee`;
+  };
+  input.oninput = sync;
+  btn.onclick = () => donateCustom(input.value, btn, cfg);
+  sync();
+}
+
+// The typed amount as a whole number of dollars inside the allowed range, or 0 when it isn't one.
+function customDollars(raw, c) {
+  const s = String(raw || "").trim();
+  const n = Number(s);
+  if (!s || !Number.isInteger(n)) return 0;
+  if (n < Number(c.min_dollars || 0) || n > Number(c.max_dollars || 0)) return 0;
+  return n;
 }
 
 // The shared tier component: the headline amount over a small line spelling out what the card is
@@ -922,13 +1015,30 @@ function renderTiers(container, cfg) {
 
 async function donate(tierId, btn) {
   if (!tierId) return;
+  await startCheckout({ tier: tierId }, btn);
+}
+
+// The custom-amount button. The server re-validates; this only keeps a hopeless request off the wire.
+async function donateCustom(raw, btn, cfg) {
+  const c = (cfg && cfg.custom) || null;
+  if (!c) return;
+  const n = customDollars(raw, c);
+  if (!n) {
+    toast(`Enter a whole dollar amount between $${c.min_dollars} and $${c.max_dollars}.`);
+    return;
+  }
+  await startCheckout({ custom_dollars: n }, btn);
+}
+
+// Both donate paths: ask the server for a Stripe Checkout session and hand the browser over to it.
+async function startCheckout(payload, btn) {
   btn.disabled = true;
   const label = btn.innerHTML;
   btn.textContent = "Redirecting…";
   try {
     const r = await fetch("/api/donate", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tier: tierId }),
+      body: JSON.stringify(payload),
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
@@ -1167,24 +1277,20 @@ async function loadModels() {
     btn.disabled = false; btn.textContent = label;
   }
 }
-// The radios stay the source of truth: flipping one by hand is a preference the chooser remembers too.
-for (const radio of document.querySelectorAll('input[name="mode"]')) {
-  radio.onchange = () => {
-    setForgePref(radio.value);
-    CHOOSER_FORCED = false;
-    applyMode();
-    renderChooser();
-  };
-}
+// Which box is open IS the choice: opening one closes the other and is remembered for next visit.
+el("forge-byok").addEventListener("toggle", () => onPayBoxToggle("forge-byok", "forge-token", "byok"));
+el("forge-token").addEventListener("toggle", () => onPayBoxToggle("forge-token", "forge-byok", "token"));
+el("mode-fake").onchange = () => { renderForgeButton(); renderChooser(); };
 
-el("provider").onchange = () => { applyProvider(); saveByok(); renderEstimate(); };
-el("model").oninput = renderEstimate;
+el("provider").onchange = () => { applyProvider(); saveByok(); renderEstimate(); renderForgeButton(); };
+el("model").oninput = () => { renderEstimate(); renderForgeButton(); };
 el("stats-days").onchange = loadStats;
 
 // Sniff an unambiguous key prefix and jump the dropdown to the matching provider.
 el("api_key").oninput = () => {
   const guess = providerFromKey(el("api_key").value.trim());
   if (guess && guess !== el("provider").value) { el("provider").value = guess; applyProvider(); }
+  renderForgeButton();
 };
 
 applyProvider();

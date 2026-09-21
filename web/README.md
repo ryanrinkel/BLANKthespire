@@ -17,9 +17,9 @@ BTSWEB_DEV_AUTH=1 uv run --project ../generation python app.py
 
 - **Offline demo** mode needs no API key (placeholder cards, exercises the whole pipeline + code + library).
 - **Use a token** forges on the server's hosted models behind a token economy. Accounts start with no
-  tokens; fixed-amount Stripe donations grant thank-you tokens ($3 → 2, $5 → 4, $10 → 10, $20 → 20,
-  $50 → 50, card fee passed through; `billing.py`). One forge per account at a time; token forges dequeue
-  before BYOK.
+  tokens; Stripe donations grant thank-you tokens ($3 → 2, $5 → 4, $10 → 10, or a custom whole-dollar
+  amount from $11 to $500 at one token per dollar; card fee passed through; `billing.py`). One forge per
+  account at a time; token forges dequeue before BYOK.
 - **BYOK** posts your `base_url`/`api_key`/`model` once; the key lives only in your browser's localStorage.
   An SSRF guard rejects private/loopback endpoints — to point BYOK at a localhost Ollama in local dev, set
   `BTSWEB_ALLOW_PRIVATE_URLS=1` (never in prod).

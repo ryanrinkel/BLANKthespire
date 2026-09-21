@@ -238,17 +238,17 @@ class Purchase(Base):
         }
 
     def _is_donation(self) -> bool:
-        """Everything except a retired token pack is a donation: "donation" (the pay-what-you-want era) or a
-        v3 tier id ("t5"). billing is imported lazily — it imports this module, so a top-level import would
+        """Everything except a retired token pack is a donation: "donation" (the pay-what-you-want era), a
+        v3 tier id ("t5", including the retired $20/$50 ones) or a custom gift. billing is imported lazily — it imports this module, so a top-level import would
         be a cycle."""
         pid = self.price_id or ""
         if pid == "donation":
             return True
         try:
-            from billing import DONATION_TIERS
+            from billing import DONATION_PRICE_IDS
         except Exception:  # pragma: no cover — billing is always importable in practice
             return False
-        return pid in DONATION_TIERS
+        return pid in DONATION_PRICE_IDS
 
 
 class ForgeUsage(Base):

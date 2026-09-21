@@ -313,6 +313,13 @@ def index():
     return send_from_directory(app.static_folder, "landing.html")
 
 
+@app.route("/favicon.ico")
+def favicon():
+    """Browsers ask for /favicon.ico at the site root regardless of the <link> tags, so serve the real
+    multi-size .ico from static/img rather than letting it 404."""
+    return send_from_directory(str(WEB_DIR / "static" / "img"), "favicon.ico")
+
+
 @app.route("/app")
 def app_view():
     """The Forge a Class single-page app. Auth-gated server-side: unauthenticated users are bounced

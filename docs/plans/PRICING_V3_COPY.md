@@ -6,18 +6,19 @@ freely; keep the fenced block markers so the strings can be lifted out verbatim.
 fills in. `<b>...</b>` is bold in the page. Where an item says "delete", leave it unless you want the
 line kept.
 
-Fixed tiers used throughout (the donor is charged the gross; the fee line covers Stripe's 2.9% + 30c):
+Prices used throughout (the donor is charged the gross; the fee line covers Stripe's 2.9% + 30c):
 
 | You give | Tokens | Charged |
 |---|---|---|
 | $3 | 2 | $3.40 |
 | $5 | 4 | $5.46 |
 | $10 | 10 | $10.61 |
-| $20 | 20 | $20.91 |
-| $50 | 50 | $51.81 |
+| custom: any whole $11..$500 | one per dollar ($11 → 11, $25 → 25) | the amount + the card fee ($11 → $11.64, $25 → $26.06) |
 
-The $20 and $50 tiers are my suggestion for "anything over $10 is one token per dollar" now that there is
-no custom-amount box. Strike them here if you don't want them.
+Decided 2026-09-21: three fixed buttons plus a custom box. Below $11 the buttons are the only way to give
+(a free-text box down there invites $0.50 gifts that Stripe's fixed 30c eats) and their tokens are priced
+above cost; from $11 up the custom box runs at one token per dollar, roughly break-even. The old $20 and
+$50 buttons are retired — the custom box covers those amounts and everything between.
 
 ---
 
@@ -283,14 +284,21 @@ NEW
 BLANK the spire is free and open source, but every hosted forge costs me real money. Your donations cover the cost of our compute.
 ```
 
-### 26. Tier button label (one per tier; N and $ filled in)
+### 26. Tier button label (one per tier; N and $ filled in) — three buttons now: $3, $5, $10
 
 NEW
 ```
 $3 → 2 tokens
 ```
 
-### 27. Small line under each tier button
+### 26b. Custom amount box (next to the three buttons)
+
+NEW
+```
+Or give any amount from $11 to $500 — one token per dollar.
+```
+
+### 27. Small line under each tier button, and under the custom box once an amount is typed
 
 NEW
 ```
@@ -384,7 +392,7 @@ CURRENT
 ```
 NEW
 ```
-<b>The site is donation-based.</b> There is nothing to buy: the mod is free and open source, and every generated class is yours to use and share regardless of how it was generated. Donations are optional, one-time payments in fixed amounts processed by <b>Stripe</b> (we never see or store your card details); Stripe's card processing fee is shown separately and added to the amount charged. As a thank-you, each donation adds tokens to your balance: $3 adds 2, $5 adds 4, $10 adds 10, $20 adds 20, $50 adds 50. I will keep trying to make this more effecient!
+<b>The site is donation-based.</b> There is nothing to buy: the mod is free and open source, and every generated class is yours to use and share regardless of how it was generated. Donations are optional, one-time payments processed by <b>Stripe</b> (we never see or store your card details); Stripe's card processing fee is shown separately and added to the amount charged. As a thank-you, each donation adds tokens to your balance: $3 adds 2, $5 adds 4, $10 adds 10, and a custom amount of $11 or more (whole dollars, up to $500) adds one token per dollar. I will keep trying to make this more efficient!
 ```
 
 ### 36. Suspension bullet (wording only)
@@ -469,7 +477,7 @@ CURRENT
 ```
 NEW
 ```
-**Use a token** forges on the server's hosted models behind a token economy. Accounts start with no tokens; fixed-amount Stripe donations grant thank-you tokens ($3 → 2, $5 → 4, $10 → 10, $20 → 20, $50 → 50, card fee passed through; `billing.py`). One forge per account at a time; token forges dequeue before BYOK.
+**Use a token** forges on the server's hosted models behind a token economy. Accounts start with no tokens; Stripe donations grant thank-you tokens ($3 → 2, $5 → 4, $10 → 10, or a custom whole-dollar amount from $11 to $500 at one token per dollar, card fee passed through; `billing.py`). One forge per account at a time; token forges dequeue before BYOK.
 ```
 
 ### 43. `workshop/DESCRIPTION.bbcode`, "How to play" paragraph (must stay price-free: no amounts here)

@@ -4,7 +4,10 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Forge a Class — BLANK the spire</title>
-  <link rel="stylesheet" href="/static/style.css?v=20260920" />
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png" />
+  <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png" />
+  <link rel="stylesheet" href="/static/style.css?v=20260921" />
 </head>
 <body>
   <header>
@@ -46,7 +49,7 @@
     </div>
 
     <!-- First-run chooser: your key vs our tokens. Collapses to the one-line strip once a path is picked
-         (localStorage bts_forge_pref); the Generation settings radios stay the source of truth. -->
+         (localStorage bts_forge_pref); whichever <details> box below is open stays the source of truth. -->
     <section id="chooser" class="card chooser hidden">
       <h2 id="chooser-head">How will you fill in the blank?</h2>
       <div id="chooser-cards" class="chooser-cards">
@@ -57,7 +60,8 @@
         </div>
         <div class="chooser-card">
           <h3>Use a token</h3>
-          <p class="hint">We run it on our models. Each token is one forge: $3 → 2 tokens, $5 → 4 tokens, $10 → 10 tokens.</p>
+          <p class="hint">We run it on our models. Each token is one forge: $3 → 2 tokens, $5 → 4, $10 → 10,
+            or any whole amount from $11 at one token per dollar.</p>
           <button id="choose-token" class="btn primary">Support the forge</button>
         </div>
       </div>
@@ -69,62 +73,63 @@
       <!-- can we add a few more contrasting examples and select one at random so the user doesn't always see the same sample text? another example might be 'the bravest toaster in the world' -->
       <textarea id="concept" rows="3" placeholder="e.g. a venomous plague doctor who sacrifices health to stack poison, then turns blood into armor"></textarea>
 
-      <details id="forge-settings" class="settings">
-        <summary>Generation settings</summary>
-        <div class="modes">
-          <label><input type="radio" name="mode" value="token" checked /> Use a token</label>
-          <label><input type="radio" name="mode" value="byok" /> Bring your own key</label>
-          <!-- what is the below? should we remove? I don't think this was an intended end feature. -->
-          <label id="mode-fake-label" class="hidden"><input type="radio" name="mode" value="fake" /> Offline demo (no key)</label>
+      <!-- Always visible: the interactive toggle is a property of the forge itself, not of how it is paid for. -->
+      <label class="small" style="display:block;margin-top:.9rem;">
+        <input id="interactive" type="checkbox" />
+        Interactive forge
+      </label>
+      <p class="hint" style="margin-top:.25rem;">Normally the forge maps your theme onto the game's build
+        engines (the archetypes) and picks the strongest combination itself. With <b>Interactive forge</b> on,
+        it pauses once your theme is mapped, shows you the candidate engines, and lets you pick up to two of
+        them. You get a short timer; if you don't answer, the forge decides for you.</p>
+      <!-- dev deploys only (BTSWEB_DEV_AUTH): forges canned output with no key and no token. -->
+      <label id="mode-fake-label" class="hidden small" style="display:block;margin-top:.5rem;">
+        <input id="mode-fake" type="checkbox" /> Offline demo (no key)
+      </label>
+
+      <!-- How this forge is paid for: exactly one of the two boxes is open (app.js currentMode()). -->
+      <details id="forge-byok" class="settings">
+        <summary>Bring your own key</summary>
+        <label class="lbl small" for="provider">Provider</label>
+        <select id="provider" class="in">
+          <option value="anthropic" selected>Anthropic (Claude)</option>
+          <option value="openai">OpenAI</option>
+          <option value="ollama">Ollama Cloud</option>
+          <option value="openrouter">OpenRouter</option>
+          <option value="groq">Groq</option>
+          <option value="google">Google Gemini</option>
+          <option value="xai">xAI (Grok)</option>
+          <option value="deepseek">DeepSeek</option>
+          <option value="together">Together</option>
+          <option value="custom">Other (OpenAI-compatible URL)</option>
+        </select>
+        <input id="base_url" class="in" placeholder="Base URL — e.g. https://api.openai.com/v1" style="display:none" />
+        <input id="api_key" class="in" type="password" placeholder="API key (used once, never stored on our server)" />
+        <div class="model-row">
+          <input id="model" class="in" placeholder="Model" list="model-list" autocomplete="off" />
+          <datalist id="model-list"></datalist>
+          <button id="load-models" class="btn" type="button">Load available models</button>
         </div>
-        <div id="token-fields">
-          <p class="hint" id="token-status">Forges on our models — one token per class.</p>
-        </div>
-        <div id="byok-fields" style="display:none">
-          <label class="lbl small" for="provider">Provider</label>
-          <select id="provider" class="in">
-            <option value="anthropic" selected>Anthropic (Claude)</option>
-            <option value="openai">OpenAI</option>
-            <option value="ollama">Ollama Cloud</option>
-            <option value="openrouter">OpenRouter</option>
-            <option value="groq">Groq</option>
-            <option value="google">Google Gemini</option>
-            <option value="xai">xAI (Grok)</option>
-            <option value="deepseek">DeepSeek</option>
-            <option value="together">Together</option>
-            <option value="custom">Other (OpenAI-compatible URL)</option>
-          </select>
-          <input id="base_url" class="in" placeholder="Base URL — e.g. https://api.openai.com/v1" style="display:none" />
-          <input id="api_key" class="in" type="password" placeholder="API key (used once, never stored on our server)" />
-          <div class="model-row">
-            <input id="model" class="in" placeholder="Model" list="model-list" autocomplete="off" />
-            <datalist id="model-list"></datalist>
-            <button id="load-models" class="btn" type="button">Load available models</button>
-          </div>
-          <p class="hint" id="byok-hint"></p>
-          <!-- div, not p: the estimate renders a small pre-formatted Text/Art/Total table -->
-          <div class="hint warn" id="byok-estimate"></div>
-        </div>
-        <label class="small" style="display:block;margin-top:.6rem;">
-          <input id="interactive" type="checkbox" />
-          Interactive forge
-        </label>
-        <p class="hint" style="margin-top:.25rem;">Normally the forge maps your theme onto the game's build
-          engines (the archetypes) and picks the strongest combination itself. With <b>Interactive forge</b> on,
-          it pauses once your theme is mapped, shows you the candidate engines, and lets you pick up to two of
-          them. You get a short timer; if you don't answer, the forge decides for you.</p>
+        <p class="hint" id="byok-hint"></p>
+        <!-- div, not p: the estimate renders a small pre-formatted Text/Art/Total table -->
+        <div class="hint warn" id="byok-estimate"></div>
       </details>
 
-      <!-- Tokens without leaving the forge: the same tier buttons the Account tab builds (app.js). -->
-      <details id="forge-donate" class="settings">
-        <summary>Support the forge</summary>
+      <!-- Tokens without leaving the forge: the balance, then the same tier + custom-amount buttons the
+           Account tab builds (app.js renderDonatePanel). -->
+      <details id="forge-token" class="settings">
+        <summary>Use a token</summary>
+        <p class="hint" id="token-balance-line"></p>
         <div id="forge-donate-box" class="donate hidden">
           <div id="forge-donate-tiers" class="donate-tiers"></div>
+          <div id="forge-donate-custom" class="donate-custom hidden"></div>
         </div>
         <p id="forge-donate-note" class="hint hidden">Donations aren't available right now — bring your own API key to keep forging.</p>
       </details>
 
-      <button id="forge-btn" class="btn primary">Forge the class</button>
+      <div class="forge-actions">
+        <button id="forge-btn" class="btn primary">Forge the class</button>
+      </div>
     </section>
 
     <section id="progress" class="card hidden">
@@ -187,6 +192,7 @@
       <p class="hint">BLANK the spire is free and open source, but every hosted forge costs me real money. Your donations cover the cost of our compute.</p>
       <div id="donate" class="donate hidden">
         <div id="donate-tiers" class="donate-tiers"></div>
+        <div id="donate-custom" class="donate-custom hidden"></div>
       </div>
       <p id="donate-note" class="hint hidden">Donations aren't available right now — bring your own API key to keep forging.</p>
       <p class="hint">Payments are handled by Stripe — we never see your card details.</p>
@@ -265,6 +271,6 @@
   <!-- ?v= busts the 1-hour static cache on deploy: bump both whenever either file changes. render.js holds
        the class renderers shared with the public /deck page and must load first. -->
   <script src="/static/render.js?v=20260919"></script>
-  <script src="/static/app.js?v=20260920"></script>
+  <script src="/static/app.js?v=20260921"></script>
 </body>
 </html>

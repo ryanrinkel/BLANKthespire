@@ -1,9 +1,11 @@
-"""Stripe donations (fixed tiers, card fee passed through) + donation history.
+"""Stripe donations (three fixed tiers + a custom amount, card fee passed through) + donation history.
 
 Pricing is DONATION-BASED and, since v3 (2026-09-18), has no free tier at all on our models: forging is FREE
 and UNLIMITED with your own API key, and the hosted path spends tokens received as a thank-you for a
-donation. Nothing is sold and there are no custom amounts — DONATION_TIERS below is the whole price list,
-id -> (net cents the project receives, thank-you tokens), in display order.
+donation. Nothing is sold. The price list is DONATION_TIERS below — id -> (net cents the project receives,
+thank-you tokens), in display order — plus, since 2026-09-21, a CUSTOM amount: any whole dollar figure from
+$11 to $500, one thank-you token per dollar. The fixed buttons cover everything under $11 (and are priced
+above cost there), so the custom box starts where the per-dollar rate takes over.
 
 The donor is charged the GROSS, not the net: Stripe keeps 2.9% + 30c of every charge, so a $5 donation would
 otherwise arrive as $4.56. gross_for() solves for the smallest charge that still nets the tier amount, and
@@ -11,7 +13,8 @@ the Checkout Session carries TWO line items — the donation at net and "Card pr
 difference — so Stripe's own page and receipt show the split instead of one mystery number. The rates live
 in env so a Stripe price change is a config edit, not a deploy of this file.
 
-Shape: the browser POSTs /api/donate with a tier id → we create a Stripe Checkout Session and redirect the
+Shape: the browser POSTs /api/donate with EITHER a tier id ({"tier": "t5"}) or a whole-dollar custom amount
+({"custom_dollars": 25}) → we create a Stripe Checkout Session and redirect the
 user to Stripe's hosted page (no card data ever touches this server). Credit lands via TWO paths that share
 one idempotent function: the /webhook/stripe endpoint (source of truth — fires even if the user never
 returns) and GET /api/checkout-status (the success-redirect fallback, so the balance updates the moment the
@@ -51,17 +54,27 @@ STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "").strip()
 # what lets the test suite stand a stub in its place without a live key.
 _stripe = None
 
-# The ENTIRE price list: tier id -> (net cents the project receives, thank-you tokens). Dict order is
-# display order in the UI. No custom amounts — a free-text box invites $0.50 gifts that Stripe's fixed 30c
-# eats, and fixed buttons are what the donate UI and /api/donate both speak. Up to $10 the tokens are priced
-# above cost (memory: ~$0.93 metered per hosted forge); $10 and above is one token per dollar, break-even.
-DONATION_TIERS: dict[str, tuple[int, int]] = {
-    "t3": (300, 2),
-    "t5": (500, 4),
-    "t10": (1000, 10),
-    "t20": (2000, 20),
-    "t50": (5000, 50),
-}
+# The fixed half of the price list: tier id -> (net cents the project receives, thank-you tokens). Dict
+# order is display order in the UI. Below $11 these buttons are the ONLY way to give — a free-text box down
+# there invites $0.50 gifts that Stripe's fixed 30c eats — and their tokens are priced above cost (memory:
+# ~$0.93 metered per hosted forge). From $11 up the custom box takes over at one token per dollar, which is
+# roughly break-even, so the old $20/$50 buttons were retired on 2026-09-21 (see DONATION_PRICE_IDS).
+_LIVE_TIERS = {"t3": (300, 2), "t5": (500, 4), "t10": (1000, 10)}
+
+# The custom amount: WHOLE dollars only, $11..$500 inclusive, one thank-you token per dollar. The floor is
+# where the fixed buttons stop; the ceiling keeps a fat-fingered "5000" out of Stripe. Whole dollars only
+# means the token count is always exact and the donor never sees a cents column.
+CUSTOM_MIN_DOLLARS = 11
+CUSTOM_MAX_DOLLARS = 500
+CUSTOM_TOKENS_PER_DOLLAR = 1
+CUSTOM_PRICE_ID = "custom"          # what lands in Purchase.price_id / session metadata for a custom gift
+
+DONATION_TIERS: dict[str, tuple[int, int]] = dict(_LIVE_TIERS)
+
+# Every price id that ever meant "donation", for models.Purchase._is_donation: the live tiers, the $20/$50
+# tiers retired on 2026-09-21 (their history rows must still read as donations, not as a token pack) and the
+# custom gift. Membership here is the history question; DONATION_TIERS alone is what can still be bought.
+DONATION_PRICE_IDS = frozenset(DONATION_TIERS) | frozenset({"t20", "t50", CUSTOM_PRICE_ID})
 
 # Stripe's cut, in env so a rate change is a config edit. Defaults are their US card rate (2.9% + 30c);
 # international cards and currency conversion cost more and we eat that difference by design.
@@ -72,7 +85,7 @@ STRIPE_FEE_FIXED_CENTS = int(os.environ.get("STRIPE_FEE_FIXED_CENTS", "30"))
 def gross_for(net_cents: int) -> int:
     """The smallest whole-cent charge that still nets `net_cents` after Stripe's cut: solve
     gross - (gross * pct + fixed) = net, then round UP so rounding never eats into the donation. With the
-    default rates: 300 -> 340, 500 -> 546, 1000 -> 1061, 2000 -> 2091, 5000 -> 5181."""
+    default rates: 300 -> 340, 500 -> 546, 1000 -> 1061, and a $11 custom gift 1100 -> 1164."""
     return math.ceil((int(net_cents) + STRIPE_FEE_FIXED_CENTS) / (1 - STRIPE_FEE_PCT / 100))
 
 
@@ -89,6 +102,20 @@ def tier_info(tier_id: str) -> dict | None:
     net, tokens = row
     return {"id": tier_id, "net_cents": net, "fee_cents": fee_for(net), "gross_cents": gross_for(net),
             "tokens": tokens}
+
+
+def custom_info(dollars) -> dict | None:
+    """A custom donation in tier_info's shape, or None if `dollars` isn't a whole-dollar amount we accept
+    (the 400 path). Deliberately strict about the TYPE: the JSON value must be an int — a float like 25.5, a
+    numeric string "25", a bool (bool is an int subclass, hence the explicit check) and None all mean a page
+    or a script is sending something we never promised, so we refuse rather than guess a rounding."""
+    if isinstance(dollars, bool) or not isinstance(dollars, int):
+        return None
+    if not CUSTOM_MIN_DOLLARS <= dollars <= CUSTOM_MAX_DOLLARS:
+        return None
+    net = dollars * 100
+    return {"id": CUSTOM_PRICE_ID, "net_cents": net, "fee_cents": fee_for(net), "gross_cents": gross_for(net),
+            "tokens": dollars * CUSTOM_TOKENS_PER_DOLLAR}
 
 
 def billing_enabled() -> bool:
@@ -191,28 +218,53 @@ def init_billing(app) -> None:
     @require_login
     def api_billing():
         """Donation config for the UI: the tier buttons, in display order, each with its gross/fee split so
-        the page never does the fee arithmetic itself. The tiers ship even when {enabled: false} (keyless
-        dev) so the UI can still describe them; only the donate flow is hidden."""
+        the page never does the fee arithmetic itself, plus the custom-amount bounds. The fee rates ship
+        with the custom block so the page can PREVIEW what a typed amount will charge using gross_for's
+        formula — the server still does the real arithmetic at checkout, from the dollars alone. All of it
+        ships even when {enabled: false} (keyless dev) so the UI can still describe the prices; only the
+        donate flow is hidden."""
         return jsonify({
             "enabled": billing_enabled(),
             "currency": "usd",
             "tiers": [tier_info(tid) for tid in DONATION_TIERS],
+            "custom": {
+                "min_dollars": CUSTOM_MIN_DOLLARS,
+                "max_dollars": CUSTOM_MAX_DOLLARS,
+                "tokens_per_dollar": CUSTOM_TOKENS_PER_DOLLAR,
+                "fee_pct": STRIPE_FEE_PCT,
+                "fee_fixed_cents": STRIPE_FEE_FIXED_CENTS,
+            },
         })
 
     @app.route("/api/donate", methods=["POST"])
     @require_login
     def api_donate():
-        """Create a fixed-tier Checkout Session and hand back its hosted-page URL. The body is {"tier": "t5"}
-        and nothing else — a legacy amount_cents body names no tier and so lands on the 400 below, which is
-        what we want: a stale tab must not be able to name its own price."""
+        """Create a Checkout Session and hand back its hosted-page URL. The body is EITHER {"tier": "t5"} or
+        {"custom_dollars": 25} — never both, and nothing else. A legacy amount_cents body names neither and
+        so lands on the 400 below, which is what we want: a stale tab must not be able to name its own price
+        in cents. custom_dollars IS a price the caller names, but only as whole dollars inside the published
+        bounds, and the cents arithmetic still happens here (custom_info), never in the browser."""
         if not billing_enabled():
             return jsonify({"error": "donations aren't available right now."}), 503
         user = current_user()
-        tier_id = str((request.get_json(silent=True) or {}).get("tier", "") or "").strip()
-        tier = tier_info(tier_id)
-        if tier is None:
-            return jsonify({"error": "pick one of the donation amounts."}), 400
-        net, fee, tokens = tier["net_cents"], tier["fee_cents"], tier["tokens"]
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict):
+            body = {}
+        tier_id = str(body.get("tier", "") or "").strip()
+        if "custom_dollars" in body:
+            if tier_id:
+                return jsonify({"error": "send either a tier or a custom amount, not both."}), 400
+            chosen = custom_info(body.get("custom_dollars"))
+            if chosen is None:
+                return jsonify({
+                    "error": f"custom amounts are whole dollars from ${CUSTOM_MIN_DOLLARS} to "
+                             f"${CUSTOM_MAX_DOLLARS}."}), 400
+        else:
+            chosen = tier_info(tier_id)
+            if chosen is None:
+                return jsonify({"error": "pick one of the donation amounts."}), 400
+        price_id = chosen["id"]
+        net, fee, tokens = chosen["net_cents"], chosen["fee_cents"], chosen["tokens"]
         try:
             sess = _stripe.checkout.Session.create(
                 mode="payment",
@@ -235,7 +287,7 @@ def init_billing(app) -> None:
                     "quantity": 1,
                 }],
                 client_reference_id=str(user["id"]),
-                metadata={"user_id": str(user["id"]), "tokens": str(tokens), "price_id": tier_id,
+                metadata={"user_id": str(user["id"]), "tokens": str(tokens), "price_id": price_id,
                           "net_cents": str(net)},
                 customer_email=user.get("email") or None,
                 success_url=f"{public_base}/app?purchase=success&session_id={{CHECKOUT_SESSION_ID}}",

@@ -125,3 +125,25 @@ def test_deck_slug_with_script_tags_is_rejected(client):
         r = client.get(path)
         assert r.status_code == 404, path
         assert "<script>" not in r.get_data(as_text=True), path
+
+
+# --- favicon --------------------------------------------------------------------------------------
+
+def test_favicon_ico_is_served_from_the_site_root(client):
+    """Browsers request /favicon.ico regardless of the <link> tags, so the root path must serve the real
+    multi-size icon (not a 404, and not an HTML error page)."""
+    r = client.get("/favicon.ico")
+    assert r.status_code == 200
+    assert r.headers["Content-Type"].startswith("image/"), r.headers["Content-Type"]
+    assert r.get_data()[:4] == b"\x00\x00\x01\x00"  # ICO magic
+
+
+def test_every_static_page_links_the_favicon(app_module):
+    """Every page we serve carries the icon <link>s, so no route shows the browser's blank default."""
+    pages = sorted((app_module.WEB_DIR / "static").glob("*.html"))
+    assert len(pages) >= 10, [p.name for p in pages]
+    for page in pages:
+        html = page.read_text(encoding="utf-8")
+        assert 'rel="icon"' in html, page.name
+        assert "/static/img/favicon-32.png" in html, page.name
+        assert 'rel="apple-touch-icon"' in html, page.name
