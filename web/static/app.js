@@ -355,9 +355,22 @@ function estimateText(model) {
   return lines.concat(notes).join("\n");
 }
 
+// The quote is shown on demand: the "Estimate cost with these settings" button reveals it, and any change
+// to the provider or model (showEstimate(false) from those handlers) folds it back to the button, so the
+// numbers on screen always belong to the settings on screen.
+let ESTIMATE_SHOWN = false;
+
+function showEstimate(shown) {
+  ESTIMATE_SHOWN = !!shown;
+  renderEstimate();
+}
+
 function renderEstimate() {
-  const box = el("byok-estimate");
+  const box = el("byok-estimate"), btn = el("estimate-btn");
   if (!box) return;
+  box.classList.toggle("hidden", !ESTIMATE_SHOWN);
+  if (btn) btn.classList.toggle("hidden", ESTIMATE_SHOWN);
+  if (!ESTIMATE_SHOWN) { box.innerHTML = ""; return; }
   const { head, rows, notes } = estimateRows(el("model").value.trim());
   // Column widths from the content, so Text / Art / Total line up without a real table.
   const w1 = Math.max(0, ...rows.map(r => r[1].length));
@@ -1282,8 +1295,9 @@ el("forge-byok").addEventListener("toggle", () => onPayBoxToggle("forge-byok", "
 el("forge-token").addEventListener("toggle", () => onPayBoxToggle("forge-token", "forge-byok", "token"));
 el("mode-fake").onchange = () => { renderForgeButton(); renderChooser(); };
 
-el("provider").onchange = () => { applyProvider(); saveByok(); renderEstimate(); renderForgeButton(); };
-el("model").oninput = () => { renderEstimate(); renderForgeButton(); };
+el("provider").onchange = () => { applyProvider(); saveByok(); showEstimate(false); renderForgeButton(); };
+el("model").oninput = () => { showEstimate(false); renderForgeButton(); };
+el("estimate-btn").onclick = () => showEstimate(true);
 el("stats-days").onchange = loadStats;
 
 // Sniff an unambiguous key prefix and jump the dropdown to the matching provider.

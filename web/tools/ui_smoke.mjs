@@ -118,9 +118,19 @@ if (scenario === "forge") {
             pref: localStorage.getItem('bts_forge_pref')}; })()`);
   check(!keyed.disabled && keyed.label.includes("uses your API key") && !keyed.token_open,
         "byok box open + key + model: button enabled", JSON.stringify(keyed));
-  console.log("estimate:", (await evaluate(`document.getElementById('byok-estimate').textContent`)).slice(0, 200));
+  // The quote is behind a button (2026-09-21): hidden until clicked, and a model/provider change hides it
+  // again until the button is clicked once more.
+  const est = JSON.parse(await evaluate(`(() => {
+    const box = document.getElementById('byok-estimate'), btn = document.getElementById('estimate-btn');
+    const before = box.classList.contains('hidden') && !btn.classList.contains('hidden');
+    btn.click();
+    const shown = !box.classList.contains('hidden') && btn.classList.contains('hidden') && box.textContent.includes('Estimated cost');
+    const m = document.getElementById('model'); m.value = 'gpt-5'; m.dispatchEvent(new Event('input'));
+    const folded = box.classList.contains('hidden') && !btn.classList.contains('hidden');
+    return JSON.stringify({before, shown, folded, text: box.textContent.slice(0, 120)}); })()`));
+  check(est.before && est.shown && est.folded, "estimate hidden behind its button, folds on a settings change", JSON.stringify(est));
+  await evaluate(`document.getElementById('estimate-btn').click()`);
   await shot("forge-byok");
-  console.log(await evaluate(`(() => { const m = document.getElementById('model'); m.value = 'gpt-5'; m.dispatchEvent(new Event('input')); return document.getElementById('byok-estimate').textContent; })()`));
   // The pre-go quote (2026-09-20): an art provider renders the three-line Text/Art/Total table plus the
   // OpenRouter comparison; a provider with no image API renders the text line and says so instead.
   const pickProvider = (id, model) => `(() => {
@@ -128,6 +138,7 @@ if (scenario === "forge") {
     p.dispatchEvent(new Event('change'));
     const m = document.getElementById('model'); m.value = ${JSON.stringify(model)};
     m.dispatchEvent(new Event('input'));
+    document.getElementById('estimate-btn').click();
     const box = document.getElementById('byok-estimate');
     return JSON.stringify({rows: [...box.querySelectorAll('pre')].map(e => e.textContent),
                            notes: [...box.querySelectorAll('.est-note')].map(e => e.textContent)});

@@ -7,7 +7,7 @@
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png" />
   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/static/style.css?v=20260921" />
+  <link rel="stylesheet" href="/static/style.css?v=20260921b" />
 </head>
 <body>
   <header>
@@ -111,8 +111,11 @@
           <button id="load-models" class="btn" type="button">Load available models</button>
         </div>
         <p class="hint" id="byok-hint"></p>
+        <!-- The quote is on demand (2026-09-21): a button, then the Text/Art/Total table in its place. Changing
+             the provider or model folds it back to the button so a stale number is never on screen. -->
+        <button id="estimate-btn" class="btn" type="button">Estimate cost with these settings</button>
         <!-- div, not p: the estimate renders a small pre-formatted Text/Art/Total table -->
-        <div class="hint warn" id="byok-estimate"></div>
+        <div class="hint warn hidden" id="byok-estimate"></div>
       </details>
 
       <!-- Tokens without leaving the forge: the balance, then the same tier + custom-amount buttons the
@@ -271,6 +274,6 @@
   <!-- ?v= busts the 1-hour static cache on deploy: bump both whenever either file changes. render.js holds
        the class renderers shared with the public /deck page and must load first. -->
   <script src="/static/render.js?v=20260919"></script>
-  <script src="/static/app.js?v=20260921"></script>
+  <script src="/static/app.js?v=20260921b"></script>
 </body>
 </html>
