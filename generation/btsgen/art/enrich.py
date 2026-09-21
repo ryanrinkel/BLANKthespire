@@ -26,10 +26,13 @@ _ENDPOINT = "https://api.openai.com/v1/chat/completions"
 
 _SYSTEM = (
     "You are an art director for a dark-fantasy roguelike deckbuilder. Given a playable class's "
-    "flavor notes, write a vivid visual description for an illustrator: the character's look, "
-    "costume, props, and signature visual motifs{scene}. 2-4 sentences, at most 90 words, concrete "
-    "and paintable. If the notes name a specific real or fictional person, character, creature or thing, "
-    "describe THAT subject's actual, recognizable appearance (canonical face, hair, costume, props, setting) "
+    "flavor notes, write a vivid visual description for an illustrator: the subject's look and its "
+    "signature visual motifs{scene}. The subject may be a person, a creature, a vehicle, a machine or an "
+    "object: for a person describe face, costume and props; for anything else describe its actual form, "
+    "materials, markings and gear, and never turn it into a humanoid (a tank stays a tank, a beast stays a "
+    "beast; do not add limbs, a face or a pilot figure it does not have). 2-4 sentences, at most 90 words, "
+    "concrete and paintable. If the notes name a specific real or fictional person, character, creature or "
+    "thing, describe THAT subject's actual, recognizable appearance (canonical look, costume, props, setting) "
     "and keep the player's own words where they fit; never swap a named subject for a generic archetype or "
     "rename it. Do NOT mention composition, camera framing, art style, transparency, or "
     "backgrounds being covered by UI — those are specified separately. No text, lettering, or "
@@ -37,7 +40,7 @@ _SYSTEM = (
 )
 _SCENE = {
     "splash": ", plus the surrounding environment and mood",
-    "sprite": ". Describe the single standing figure only — no environment",
+    "sprite": ". Describe the single subject only, whole, as it looks at rest before a fight — no environment",
 }
 
 
@@ -76,7 +79,12 @@ def enrich_body(art: ClassArt, kind: str, on_event=None) -> str | None:
             {"role": "system", "content": _SYSTEM.format(scene=_SCENE.get(kind, ""))},
             {"role": "user", "content": "\n".join(notes)},
         ],
-        "max_completion_tokens": 2000,  # gpt-5-family reasoning tokens count against this too
+        # gpt-5-family REASONING tokens count against this budget, and the reply is empty when reasoning eats
+        # it all: measured 2026-09-21, gpt-5-mini spent 1.6-3.6k reasoning tokens on a WW2 tank class (military
+        # subjects make it deliberate longer) and prod's Sherman sprite silently fell back to the template. Low
+        # effort + a bigger cap keeps the ~90-word answer arriving.
+        "max_completion_tokens": 4000,
+        "reasoning_effort": "low",
     }).encode("utf-8")
     request = Request(_ENDPOINT, data=body, method="POST", headers={
         "Authorization": f"Bearer {key}", "Content-Type": "application/json"})

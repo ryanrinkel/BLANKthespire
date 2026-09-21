@@ -132,8 +132,11 @@ def test_sprite_style_is_transparent_portrait():
 def test_sprite_prompt_demands_cutout_full_body():
     art = ClassArt(class_id="cryo", name="The Cryomancer", flavor=["glacier worship"], imagery=["ice staff"])
     p = sprite_prompt(art, SPRITE_STYLE)
-    assert "transparent background" in p and "facing right" in p and "whole body" in p
+    assert "transparent background" in p and "facing right" in p and "shown whole" in p
     assert "ice staff" in p  # flavor/imagery carry over like the splash prompt
+    # Subject-neutral (2026-09-21): a vehicle/creature class must not be forced into a humanoid shape.
+    assert "anthropomorphize" in p and "head to feet" not in p.split("Draw the subject")[0].replace(
+        "a person from head to feet", "")
 
 
 def test_procedural_sprite_is_rgba_figure(tmp_path):

@@ -21,7 +21,8 @@ DEFAULT_STYLE = StyleProfile(
     out_format="png",
 )
 
-# The standing combat model (the in-battle player sprite): a single cut-out figure on alpha. Portrait
+# The combat model (the in-battle player sprite): a single cut-out subject on alpha — a person, creature, vehicle,
+# machine or object, so the wording stays subject-neutral (see prompt.sprite_prompt). Portrait
 # orientation + transparent so the mod can autocrop, resize to its ~300px stage height, and tween it.
 # Same painterly family as DEFAULT_STYLE so a class's sprite and splash read as one artwork.
 SPRITE_STYLE = StyleProfile(
@@ -30,12 +31,12 @@ SPRITE_STYLE = StyleProfile(
         "Art style: bold stylized game illustration in the manner of Slay the Spire's character art — "
         "confident dark ink outlines, flat cel-shaded color blocks with light painterly texture, simplified "
         "graphic shapes, a saturated limited palette; the same style family as the class splash. "
-        "Not photorealistic. Strong readable silhouette, grounded stance, crisp clean cut-out edges, "
-        "clear material detail on costume and props. No lettering or text anywhere."
+        "Not photorealistic. Strong readable silhouette, grounded weighty placement, crisp clean cut-out edges, "
+        "clear material detail (cloth, armor, hide, metal, machinery). No lettering or text anywhere."
     ),
     negative=(
         "background, scenery, ground plane, cast shadow, text, watermark, ui, hud, frame, logo, "
-        "signature, border, multiple characters, cropped limbs"
+        "signature, border, multiple subjects, cropped edges"
     ),
     size=(1024, 1536),
     out_format="png",

@@ -24,11 +24,11 @@ def splash_prompt(art: ClassArt, style: StyleProfile, enriched_body: str | None 
     # ~two-thirds of the screen — only the right third reads clearly. gpt-image-1 has no layout
     # controls, so composition is steered entirely by this prompt text.
     parts.append(
-        "Composition: an off-center rule-of-thirds layout with the character standing in the RIGHT "
+        "Composition: an off-center rule-of-thirds layout with the subject placed in the RIGHT "
         "third of the frame, facing inward toward the left. The left two-thirds are quiet atmospheric "
         "background (mist, scenery, mood) with no focal elements, no second character, and nothing "
         "important, as that area will be covered by menu UI. Keep the ENTIRE character inside the "
-        "frame with clear margin — the top of the head and the feet must sit well inside the edges, "
+        "frame with clear margin — the top and the base of the subject must sit well inside the edges, "
         "and nothing important may touch the top or bottom 12% of the frame, which can be cropped "
         "on different screen shapes."
     )
@@ -38,9 +38,14 @@ def splash_prompt(art: ClassArt, style: StyleProfile, enriched_body: str | None 
 
 
 def sprite_prompt(art: ClassArt, style: StyleProfile, enriched_body: str | None = None) -> str:
-    """The standing combat-model sprite: one whole figure, cut out on alpha, facing right (the player
-    side faces its enemies to the right in battle; the mod handles cropping/scaling/animation)."""
-    parts = [f'Full-body character sprite of "{art.name}", the playable hero of a dark-fantasy deckbuilder.']
+    """The combat-model sprite: one whole subject, cut out on alpha, facing right (the player side faces
+    its enemies to the right in battle; the mod handles cropping/scaling/animation).
+
+    Subject-NEUTRAL on purpose (2026-09-21): the old wording ("character ... head to feet, standing ... feet near
+    the bottom") made a Sherman tank render as a bipedal mech — the model grew legs to satisfy "feet". A class
+    can be a person, a creature, a vehicle, a machine or an object, so the pose/framing clause names the subject's
+    top and base generically and forbids anthropomorphizing."""
+    parts = [f'Full-body combat sprite of "{art.name}", the playable class of a dark-fantasy deckbuilder.']
     _append_concept(parts, art)
     if enriched_body:
         parts.append(enriched_body)
@@ -51,8 +56,11 @@ def sprite_prompt(art: ClassArt, style: StyleProfile, enriched_body: str | None 
             parts.append(f"Concept: {art.concept}.")
         _append_theme(parts, art)
     parts.append(
-        "Exactly one character, whole body visible from head to feet, standing combat-idle pose, "
-        "facing right in three-quarter view, feet near the bottom edge of the frame."
+        "Exactly one subject, shown whole from its top to its base (a person from head to feet, a vehicle from "
+        "turret to treads, a creature from crown to paws), in an idle battle-ready pose, facing right in "
+        "three-quarter view, its base resting near the bottom edge of the frame. Draw the subject as what it is: "
+        "if it is a vehicle, machine, animal, monster or object, do NOT anthropomorphize it — no added legs, arms, "
+        "torso or face it does not have, and no humanoid stand-in."
     )
     parts.append(
         "Isolated on a fully transparent background: no scenery, no ground plane, no cast shadow, "
