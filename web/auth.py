@@ -41,16 +41,23 @@ UNLIMITED_EMAILS = {
     if e.strip()
 }
 
-# Accounts that may read the operator dashboard (/api/admin/stats): comma-separated addresses in
-# BTSWEB_ADMIN_EMAILS, matched against users.email exactly like UNLIMITED_EMAILS. Empty/unset ⇒ the
-# unlimited list doubles as the admin list (it is already the "this is us" roster), so a deploy that only
-# ever set BTSWEB_UNLIMITED_EMAILS keeps working; set BTSWEB_ADMIN_EMAILS to narrow it (testers on the
-# unlimited list are not necessarily operators).
+# Accounts that may use the operator cards on the Account tab — the forge-stats dashboard AND the user
+# panel that edits token balances and grants unlimited. Comma-separated addresses in BTSWEB_ADMIN_EMAILS,
+# matched against users.email exactly like UNLIMITED_EMAILS.
+#
+# Empty/unset ⇒ NOBODY is an operator. This used to fall back to the unlimited list ("it is already the
+# 'this is us' roster"), which was tolerable while the cards were read-only but is not now that they can
+# move token balances: adding one tester to BTSWEB_UNLIMITED_EMAILS would silently have made them an
+# operator. Fail closed instead — the cost of forgetting the variable is a dashboard that does not render,
+# which is obvious and recoverable, rather than a privilege nobody meant to hand out (init_auth warns at
+# boot). Granting a tester unlimited no longer needs the env list at all: do it from the panel, which writes
+# users.unlimited_tokens and confers nothing else. Admin stays env-only by design, so no route — and no
+# operator — can widen who reaches the panel.
 ADMIN_EMAILS = {
     e.strip().lower()
     for e in os.environ.get("BTSWEB_ADMIN_EMAILS", "").split(",")
     if e.strip()
-} or set(UNLIMITED_EMAILS)
+}
 
 
 # The OAuth providers, in the order the chooser page shows them. A provider is "configured" (and gets a
@@ -102,8 +109,20 @@ def configured_providers() -> list[str]:
 
 
 def is_unlimited(email: str) -> bool:
-    """True if this email is on the unlimited-tokens master list (never decremented on the token path)."""
+    """True if this email is on the unlimited-tokens master list (never decremented on the token path).
+
+    This is the ENV half only. A user can also be granted unlimited from the operator panel, which sets
+    users.unlimited_tokens — use user_is_unlimited() when you have the row and want the effective answer."""
     return (email or "").strip().lower() in UNLIMITED_EMAILS
+
+
+def user_is_unlimited(row) -> bool:
+    """The effective answer for a users row: on the env master list OR granted the DB flag from the operator
+    panel. Env first and separate on purpose — BTSWEB_UNLIMITED_EMAILS is the break-glass path that no write
+    to the database can take away. `row` may be None (deleted mid-request) ⇒ False."""
+    if row is None:
+        return False
+    return is_unlimited(getattr(row, "email", "")) or bool(getattr(row, "unlimited_tokens", 0))
 
 
 def is_admin(email: str) -> bool:
@@ -386,6 +405,14 @@ def init_auth(app) -> None:
             "BTSWEB_DEV_AUTH is set while a real sign-in provider is configured — the dev-login bypass must "
             "never be enabled in production. Unset BTSWEB_DEV_AUTH (or the provider credentials for local dev).")
 
+    # Loud about the removed fallback: a deploy that predates BTSWEB_ADMIN_EMAILS used to get its operators
+    # from the unlimited list, and would otherwise just quietly lose both operator cards after an update.
+    if not ADMIN_EMAILS and UNLIMITED_EMAILS:
+        app.logger.warning(
+            "BTSWEB_ADMIN_EMAILS is unset, so the Account tab's operator cards (forge stats, user "
+            "management) are disabled for everyone. Set it to the operator addresses to restore them; it "
+            "no longer defaults to BTSWEB_UNLIMITED_EMAILS.")
+
     registrations = {
         "google": dict(server_metadata_url=GOOGLE_METADATA,
                        client_kwargs={"scope": "openid email profile"}),
@@ -533,8 +560,11 @@ def init_auth(app) -> None:
             with session_scope() as s:
                 row = s.query(User).filter_by(id=user["id"]).one_or_none()
                 bal = int(row.token_balance) if row is not None else 0
+                # Effective unlimited (env list or the operator-granted flag) off the SAME row we just read
+                # for the balance — one query, and it reflects a grant made seconds ago without a re-login.
+                unlimited = user_is_unlimited(row)
             user = {**user, "token_balance": bal,
-                    "unlimited": is_unlimited(user.get("email", "")),
+                    "unlimited": unlimited,
                     "admin": is_admin(user.get("email", "")),
                     "identities": _identities_of(user["id"])}
         # email_login gates signin.js's email form: mail configured, or the dev bypass standing in for it.

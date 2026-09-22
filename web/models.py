@@ -68,6 +68,13 @@ class User(Base):
     # forward-only boot migrations cannot drop a column cleanly across engines; db._ensure_user_columns keeps
     # ADDing it to old databases, which is harmless.
     last_free_token_day: Mapped[str | None] = mapped_column(String(10), default=None, nullable=True)
+    # Unlimited hosted forging WITHOUT spending tokens, granted from the operator panel (app.admin_set_unlimited)
+    # rather than from the environment. It is the DB half of auth.is_unlimited: the effective answer is
+    # "on the BTSWEB_UNLIMITED_EMAILS list OR this flag", so the env list stays the break-glass override that a
+    # bad DB write can never take away from you. Integer 0/1, matching the int-boolean convention used by
+    # ForgeJob.refunded / ForgeUsage.ok (portable across SQLite and MySQL). The boot migration
+    # (db._ensure_user_columns) adds it to databases that predate it, defaulting everyone to 0.
+    unlimited_tokens: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     classes: Mapped[list["ForgedClass"]] = relationship(
@@ -312,3 +319,43 @@ class ForgeJob(Base):
     error: Mapped[str] = mapped_column(String(500), default="")
     started_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, default=None, nullable=True)
+
+
+class AdminAction(Base):
+    """One row per operator edit made from the Account tab's user panel: who changed whom, from what to what.
+
+    Token balance is money-adjacent (Stripe grants it, forges spend it, refunds give it back), so a balance
+    that looks wrong later must be explainable — this table is the difference between "someone set it" and
+    "the billing code has a bug". Append-only: nothing updates or deletes these rows.
+
+    `old_value` / `new_value` are integers for both actions (`set_unlimited` writes 0/1), which keeps the
+    table one shape. `actor_user_id` is SET NULL rather than CASCADE: deleting an operator account must not
+    erase the history of what they did. Brand-new table ⇒ created by create_all, no boot migration needed."""
+    __tablename__ = "admin_actions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    actor_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), index=True, nullable=True)
+    actor_email: Mapped[str] = mapped_column(String(320), default="")   # denormalized: survives the FK going NULL
+    target_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), index=True, nullable=True)
+    target_email: Mapped[str] = mapped_column(String(320), default="")
+    action: Mapped[str] = mapped_column(String(32))          # set_tokens | set_unlimited
+    old_value: Mapped[int] = mapped_column(Integer, default=0)
+    new_value: Mapped[int] = mapped_column(Integer, default=0)
+    note: Mapped[str] = mapped_column(String(200), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    def summary(self) -> dict:
+        """History-list shape for /api/admin/actions."""
+        return {
+            "id": self.id,
+            "actor_email": self.actor_email,
+            "target_email": self.target_email,
+            "target_user_id": self.target_user_id,
+            "action": self.action,
+            "old_value": self.old_value,
+            "new_value": self.new_value,
+            "note": self.note,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+        }

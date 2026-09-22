@@ -32,13 +32,14 @@ if os.environ.get("BTSWEB_NO_DOTENV", "").strip() not in ("1", "true", "yes"):
     load_dotenv(WEB_DIR / ".env")  # local secrets; in prod these come from the service environment
 # (BTSWEB_NO_DOTENV=1 keeps the test suite hermetic on a box whose web/.env holds real credentials.)
 
-from auth import current_user, init_auth, is_admin, is_production, is_unlimited, require_login  # noqa: E402
+from auth import (current_user, init_auth, is_admin, is_production, is_unlimited,  # noqa: E402
+                  require_login, user_is_unlimited)
 from billing import init_billing  # noqa: E402
 from db import db_ping, init_db, session_scope  # noqa: E402
 from forge import (ELEMENT_KINDS, VALID_FEEDBACK_CATEGORIES, ForgeError, UsageMeter,  # noqa: E402
                    append_card_feedback, append_element_feedback, forge_to_bundle, list_models)
-from models import (ForgeJob, ForgeUsage, ForgedCard, ForgedClass, Purchase, User,  # noqa: E402
-                    new_slug, spend_token, unspend_token)
+from models import (AdminAction, ForgeJob, ForgeUsage, ForgedCard, ForgedClass, Identity,  # noqa: E402
+                    Purchase, User, new_slug, spend_token, unspend_token)
 
 # Generated art (Track 2/3): the class splash, the combat sprite, the relic icon and the per-card portrait
 # pack (cards.zip) are all made at persist time, written to static/forged/<id>/, served by nginx, and their
@@ -1105,21 +1106,26 @@ def forge_class_route():
         return jsonify({"error": "you already have a forge in progress — wait for it to finish."}), 429
 
     # The "Use a token" path forges on our server-side Ollama mixture and spends one of the user's tokens,
-    # unless they're on the unlimited master list. Reserve it up front so we can 402 BEFORE streaming; a
+    # unless the account is unlimited. Reserve it up front so we can 402 BEFORE streaming; a
     # forge that then fails is refunded by the worker (see finish_failed).
     ollama_mix = mode == "token"
-    unlimited = ollama_mix and is_unlimited(user.get("email", ""))
+    # Unlimited is env list OR the operator-granted users.unlimited_tokens flag, so it needs the row — read
+    # it together with the balance pre-check below rather than in a query of its own.
+    unlimited = False
     reserved = False
-    token_kind: str | None = "unlimited" if unlimited else None
+    token_kind: str | None = None
     token_day = time.strftime("%Y-%m-%d", time.gmtime())
     token_state: dict | None = None
     ip = _client_ip()
-    if ollama_mix and not unlimited:
+    if ollama_mix:
         # Cheap pre-check so an empty balance 402s without touching the day's budget counter; the reserve
         # below is the authoritative one (it's the transaction two concurrent forges race in).
         with session_scope() as s:
             u = s.query(User).filter_by(id=user["id"]).one_or_none()
+            unlimited = user_is_unlimited(u)
             has_any = bool(u is not None and u.token_balance > 0)
+        token_kind = "unlimited" if unlimited else None
+    if ollama_mix and not unlimited:
         if not has_any:
             _user_end(user["id"])
             return jsonify({"error": "you're out of tokens — get more on the Account tab, or bring your own "
@@ -1855,6 +1861,189 @@ def admin_stats():
                       "amount_cents": sum(int(p.amount_cents or 0) for p in purchases),
                       "tokens": sum(int(p.tokens or 0) for p in purchases)},
     })
+
+
+# --- operator dashboard: user management --------------------------------------------------------
+# Adjust an account's token balance, or grant it unlimited hosted forging, without a redeploy. Same gate as
+# the stats card (auth.ADMIN_EMAILS) — and notably admin itself is NOT editable here: it comes from
+# BTSWEB_ADMIN_EMAILS only, so the panel can never widen who reaches the panel. Every write is recorded in
+# admin_actions, because a token balance is money-adjacent and "who moved it" has to stay answerable.
+
+ADMIN_USERS_LIMIT = 200        # rows one listing may return (the UI also shows the unfiltered total)
+ADMIN_TOKENS_MAX = 100_000     # sanity ceiling on a balance set by hand; a typo shouldn't mint a fortune
+ADMIN_ACTIONS_LIMIT = 50
+
+
+def _admin_or_403():
+    """None when the caller may use these routes, else the (body, status) to return. @require_login has
+    already handled "not signed in" (401) by the time this runs."""
+    if not is_admin((current_user() or {}).get("email", "")):
+        return jsonify({"error": "forbidden"}), 403
+    return None
+
+
+def _log_admin_action(s, actor, target, action: str, old_value: int, new_value: int, note: str = "") -> None:
+    """Append one audit row inside the caller's transaction, so the edit and its record commit together."""
+    s.add(AdminAction(
+        actor_user_id=actor.get("id"), actor_email=(actor.get("email") or "").strip().lower(),
+        target_user_id=target.id, target_email=(target.email or "").strip().lower(),
+        action=action, old_value=int(old_value), new_value=int(new_value), note=note[:200]))
+
+
+@app.route("/api/admin/users")
+@require_login
+def admin_users():
+    """The user list behind the Account tab's management panel: one row per account with the context needed
+    to judge a token edit (how many forges, how much donated, when they joined, how they sign in).
+
+    ?q= filters on email or name (case-insensitive substring, trimmed); ?limit= caps rows (<= 200). Ordering
+    is newest account first, which is what you want when someone just donated or just wrote in. `total` is
+    the number of accounts MATCHING the filter, so the UI can say "showing 200 of 412".
+
+    Read-only. No API key has ever existed in this database (see models' module docstring) and nothing here
+    exposes concept text or class contents."""
+    denied = _admin_or_403()
+    if denied:
+        return denied
+    q = (request.args.get("q") or "").strip()
+    try:
+        limit = int(request.args.get("limit", ADMIN_USERS_LIMIT))
+    except (TypeError, ValueError):
+        limit = ADMIN_USERS_LIMIT
+    limit = max(1, min(limit, ADMIN_USERS_LIMIT))
+
+    from sqlalchemy import func as sa_func, or_
+
+    with session_scope() as s:
+        uq = s.query(User)
+        if q:
+            like = f"%{q.lower()}%"
+            uq = uq.filter(or_(sa_func.lower(User.email).like(like), sa_func.lower(User.name).like(like)))
+        total = uq.count()
+        rows = uq.order_by(User.id.desc()).limit(limit).all()
+        ids = [u.id for u in rows]
+
+        # Three grouped queries for the whole page rather than three per row.
+        forges: dict[int, int] = {}
+        donated: dict[int, int] = {}
+        idents: dict[int, list[str]] = {}
+        if ids:
+            for uid, n in (s.query(ForgeJob.user_id, sa_func.count(ForgeJob.id))
+                           .filter(ForgeJob.user_id.in_(ids)).group_by(ForgeJob.user_id).all()):
+                forges[uid] = int(n or 0)
+            for uid, cents in (s.query(Purchase.user_id, sa_func.sum(Purchase.amount_cents))
+                               .filter(Purchase.user_id.in_(ids), Purchase.status == "paid")
+                               .group_by(Purchase.user_id).all()):
+                donated[uid] = int(cents or 0)
+            for uid, provider in (s.query(Identity.user_id, Identity.provider)
+                                  .filter(Identity.user_id.in_(ids)).all()):
+                idents.setdefault(uid, []).append(provider)
+
+        users = [{
+            "id": u.id,
+            "email": u.email or "",
+            "name": u.name or "",
+            "providers": sorted(set(idents.get(u.id, []))),
+            "token_balance": int(u.token_balance or 0),
+            "unlimited": bool(u.unlimited_tokens),
+            # On the env master list ⇒ unlimited no matter what the flag says, and the UI locks the toggle:
+            # only an edit to BTSWEB_UNLIMITED_EMAILS + a redeploy can change it.
+            "unlimited_env": is_unlimited(u.email or ""),
+            "admin": is_admin(u.email or ""),
+            "forges": forges.get(u.id, 0),
+            "donated_cents": donated.get(u.id, 0),
+            "created_at": u.created_at.isoformat() if u.created_at else None,
+        } for u in rows]
+
+    return jsonify({"users": users, "total": total, "limit": limit, "q": q})
+
+
+@app.route("/api/admin/users/<int:user_id>/tokens", methods=["POST"])
+@require_login
+def admin_set_tokens(user_id: int):
+    """Set an account's token balance to `balance`, or move it by `delta`. Exactly one of the two.
+
+    The read-modify-write happens in ONE transaction so it cannot interleave with a forge spending the last
+    token (SQLite takes the write lock at BEGIN — see db._sqlite_begin — and MySQL's row lock does the same).
+    A delta is clamped into [0, ADMIN_TOKENS_MAX] rather than rejected: "take 5 away" from a balance of 3
+    should leave 0, not an error."""
+    denied = _admin_or_403()
+    if denied:
+        return denied
+    body = request.get_json(silent=True) or {}
+    has_balance, has_delta = "balance" in body, "delta" in body
+    if has_balance == has_delta:
+        return jsonify({"error": "send exactly one of balance or delta"}), 400
+    raw = body["balance"] if has_balance else body["delta"]
+    if isinstance(raw, bool) or not isinstance(raw, (int, str, float)):
+        return jsonify({"error": "balance/delta must be a whole number"}), 400
+    try:
+        amount = int(str(raw).strip())
+    except (TypeError, ValueError):
+        return jsonify({"error": "balance/delta must be a whole number"}), 400
+    if has_balance and not (0 <= amount <= ADMIN_TOKENS_MAX):
+        return jsonify({"error": f"balance must be between 0 and {ADMIN_TOKENS_MAX}"}), 400
+
+    actor = current_user() or {}
+    with session_scope() as s:
+        target = s.query(User).filter_by(id=user_id).one_or_none()
+        if target is None:
+            return jsonify({"error": "no such user"}), 404
+        old = int(target.token_balance or 0)
+        new = amount if has_balance else old + amount
+        new = max(0, min(int(new), ADMIN_TOKENS_MAX))
+        target.token_balance = new
+        if new != old:
+            _log_admin_action(s, actor, target, "set_tokens", old, new,
+                              note=str(body.get("note") or "").strip())
+    return jsonify({"id": user_id, "token_balance": new, "previous": old})
+
+
+@app.route("/api/admin/users/<int:user_id>/unlimited", methods=["POST"])
+@require_login
+def admin_set_unlimited(user_id: int):
+    """Turn users.unlimited_tokens on or off for an account: {"unlimited": true|false}.
+
+    Turning it OFF does not touch the env master list — an account on BTSWEB_UNLIMITED_EMAILS keeps forging
+    free, and the response says so in `unlimited_env` so the UI can explain why the toggle looks stuck."""
+    denied = _admin_or_403()
+    if denied:
+        return denied
+    body = request.get_json(silent=True) or {}
+    if not isinstance(body.get("unlimited"), bool):
+        return jsonify({"error": "unlimited must be true or false"}), 400
+    want = 1 if body["unlimited"] else 0
+
+    actor = current_user() or {}
+    with session_scope() as s:
+        target = s.query(User).filter_by(id=user_id).one_or_none()
+        if target is None:
+            return jsonify({"error": "no such user"}), 404
+        old = 1 if target.unlimited_tokens else 0
+        target.unlimited_tokens = want
+        env = is_unlimited(target.email or "")
+        if old != want:
+            _log_admin_action(s, actor, target, "set_unlimited", old, want,
+                              note=str(body.get("note") or "").strip())
+    return jsonify({"id": user_id, "unlimited": bool(want), "unlimited_env": env})
+
+
+@app.route("/api/admin/actions")
+@require_login
+def admin_actions():
+    """The audit trail, newest first: what was changed, for whom, by whom. Append-only; nothing edits it."""
+    denied = _admin_or_403()
+    if denied:
+        return denied
+    try:
+        limit = int(request.args.get("limit", 10))
+    except (TypeError, ValueError):
+        limit = 10
+    limit = max(1, min(limit, ADMIN_ACTIONS_LIMIT))
+    with session_scope() as s:
+        rows = s.query(AdminAction).order_by(AdminAction.id.desc()).limit(limit).all()
+        actions = [r.summary() for r in rows]
+    return jsonify({"actions": actions})
 
 
 # Refund the tokens of any forge the previous process took down with it (deploy restarts).

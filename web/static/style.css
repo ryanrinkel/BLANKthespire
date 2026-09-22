@@ -418,3 +418,22 @@ body.landing {
 .stats-table th { color: var(--muted); font-weight: 500; font-size: 12px; }
 .stats-table td.num, .stats-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .stats-wrap { overflow-x: auto; }
+
+/* Operator user panel (#admin-users). Reuses .stats-table for the grid; these rules only add what a row of
+   editable controls needs. The table scrolls sideways on a narrow window rather than crushing the inputs. */
+.stats-head input.in { width: auto; flex: 0 1 260px; margin-bottom: 0; padding: 6px 10px; font-size: 13px; }
+.admin-users-table { display: block; overflow-x: auto; white-space: nowrap; margin-top: 12px; }
+.admin-users-table .who-cell { white-space: normal; min-width: 180px; }
+.admin-users-table .sub { font-size: 12px; color: var(--muted); }
+.admin-users-table input.tok { width: 78px; margin-bottom: 0; padding: 4px 6px; font-size: 13px;
+                               text-align: right; font-variant-numeric: tabular-nums; }
+.admin-users-table input.tok:disabled { opacity: .45; }
+.admin-users-table .btn { padding: 4px 10px; font-size: 12px; }
+.admin-users-table .unl { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; }
+.admin-users-table .row-note { font-size: 12px; color: var(--muted); }
+.admin-users-table .row-note.ok { color: var(--accent); }
+.admin-users-table .row-note.err { color: var(--danger); }
+.admin-log-head { margin: 16px 0 6px; font-size: 13px; color: var(--muted); font-weight: 500; }
+.admin-log { list-style: none; margin: 0; padding: 0; font-size: 12px; color: var(--muted); }
+.admin-log li { padding: 3px 0; border-bottom: 1px solid var(--line); }
+.admin-log li:last-child { border-bottom: none; }

@@ -229,6 +229,23 @@
       <p id="stats-note" class="hint"></p>
     </section>
 
+    <!-- Admin-only (users.admin from /api/me), same gate as the stats card above: adjust an account's token
+         balance or grant it unlimited hosted forging. Rows and the audit trail are built by app.js
+         loadAdminUsers(); the card stays hidden and nothing is fetched for everyone else. Admin itself is
+         NOT editable here — it comes from BTSWEB_ADMIN_EMAILS only. -->
+    <section id="admin-users" class="card hidden">
+      <div class="stats-head">
+        <h2>Users</h2>
+        <span class="spacer"></span>
+        <input id="admin-users-q" class="in small" type="search" placeholder="Search email or name"
+               autocomplete="off" aria-label="Search users by email or name" />
+      </div>
+      <table id="admin-users-table" class="stats-table admin-users-table"></table>
+      <p id="admin-users-note" class="hint"></p>
+      <h4 class="admin-log-head">Recent changes</h4>
+      <ul id="admin-actions" class="admin-log"></ul>
+    </section>
+
     <section class="card">
       <h2>Donation history</h2>
       <p id="purchases-empty" class="muted hidden">No donations yet.</p>

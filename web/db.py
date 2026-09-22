@@ -70,8 +70,9 @@ SessionLocal = sessionmaker(bind=engine, expire_on_commit=False, future=True)
 def _ensure_user_columns() -> None:
     """Tiny forward-only migration (no Alembic): add columns introduced after the original schema to an
     existing `users` table. create_all() only CREATES missing tables — it never ALTERs an existing one — so
-    a column added to the model later (token_balance) must be patched in here. Idempotent + safe on every boot
-    for both SQLite (dev) and MySQL (prod); existing rows are backfilled to the default by the column default."""
+    a column added to the model later (token_balance, unlimited_tokens) must be patched in here. Idempotent +
+    safe on every boot for both SQLite (dev) and MySQL (prod); existing rows are backfilled to the default by
+    the column default."""
     insp = inspect(engine)
     if "users" not in insp.get_table_names():
         return  # create_all will make it fresh with the column already present
@@ -86,6 +87,11 @@ def _ensure_user_columns() -> None:
         # engines without Alembic isn't worth the risk — so a fresh-ish DB must still get it. Harmless.
         with engine.begin() as conn:
             conn.execute(text("ALTER TABLE users ADD COLUMN last_free_token_day VARCHAR(10)"))
+    if "unlimited_tokens" not in cols:
+        # The operator-granted unlimited flag (User.unlimited_tokens). Everyone who existed before it defaults
+        # to 0 — i.e. nothing changes for them: unlimited stays whatever BTSWEB_UNLIMITED_EMAILS already said.
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN unlimited_tokens INTEGER NOT NULL DEFAULT 0"))
 
 
 def _ensure_class_columns() -> None:

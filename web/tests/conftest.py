@@ -34,7 +34,10 @@ os.environ.pop("GOOGLE_CLIENT_SECRET", None)
 os.environ.pop("STRIPE_SECRET_KEY", None)          # billing disabled: routes 503, event handler still testable
 os.environ.pop("BTSWEB_ALLOW_PRIVATE_URLS", None)  # the SSRF guard must be live
 os.environ["BTSWEB_TOKEN_DAILY_CAP"] = "0"   # global kill-switch off by default; tests that want it set it
-os.environ["BTSWEB_UNLIMITED_EMAILS"] = "unlimited@example.com"
+# The two roles are pinned SEPARATELY and deliberately differ: ADMIN_EMAILS no longer falls back to the
+# unlimited list (auth.py), and tester@example.com is here to prove it — env-unlimited, never an operator.
+os.environ["BTSWEB_UNLIMITED_EMAILS"] = "unlimited@example.com,tester@example.com"
+os.environ["BTSWEB_ADMIN_EMAILS"] = "unlimited@example.com"
 os.environ["BTSWEB_PUBLIC_URL"] = "http://testserver"
 os.environ["BTSWEB_GAP_LOG"] = str(_TMP / "gaps.jsonl")
 os.environ["BTSWEB_CARD_FEEDBACK_LOG"] = str(_TMP / "feedback.jsonl")

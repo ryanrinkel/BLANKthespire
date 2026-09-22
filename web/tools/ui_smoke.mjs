@@ -221,6 +221,22 @@ if (scenario === "forge") {
   await nav(`${base}/app`); await evaluate(`document.getElementById('nav-account').click()`); await sleep(1500);
   await shot("account");
   console.log(await evaluate(`JSON.stringify({stats_hidden: document.getElementById('stats').classList.contains('hidden'), tiles: document.querySelectorAll('.stat-tile').length, chart: document.getElementById('stats-chart').innerHTML.slice(0,80), note: document.getElementById('stats-note').textContent})`));
+
+  // Operator user panel: it renders for an admin, search filters it, and both writes round-trip. The
+  // target is a throwaway account the driver signs in as first, so this never edits a real row.
+  await nav(`${base}/dev-login?email=smoke-target@example.com`);
+  await nav(`${base}/dev-login?email=unlimited@example.com`);
+  await nav(`${base}/app`); await evaluate(`document.getElementById('nav-account').click()`); await sleep(1500);
+  console.log("panel:", await evaluate(`JSON.stringify({hidden: document.getElementById('admin-users').classList.contains('hidden'), rows: document.querySelectorAll('#admin-users-table tr[data-uid]').length, note: document.getElementById('admin-users-note').textContent, log: document.getElementById('admin-actions').children.length})`));
+  await evaluate(`el('admin-users-q').value = 'smoke-target'; el('admin-users-q').dispatchEvent(new Event('input'))`); await sleep(900);
+  console.log("searched:", await evaluate(`JSON.stringify([...document.querySelectorAll('#admin-users-table tr[data-uid]')].map(r => r.querySelector('.who-cell').innerText))`));
+  await shot("admin-users");
+  // Set the balance to 7, then grant unlimited, watching the inline row notes.
+  await evaluate(`{const r = document.querySelector('#admin-users-table tr[data-uid]'); r.querySelector('.tok').value = '7'; r.querySelector('.tok-save').click();}`); await sleep(800);
+  console.log("after save:", await evaluate(`JSON.stringify({note: document.querySelector('#admin-users-table tr[data-uid] .row-note').textContent, val: document.querySelector('#admin-users-table tr[data-uid] .tok').value, log: document.getElementById('admin-actions').firstElementChild?.innerText})`));
+  await evaluate(`{const b = document.querySelector('#admin-users-table tr[data-uid] .unl-box'); b.checked = true; b.dispatchEvent(new Event('change', {bubbles: true}));}`); await sleep(800);
+  console.log("after unlimited:", await evaluate(`JSON.stringify({note: document.querySelector('#admin-users-table tr[data-uid] .row-note').textContent, log: document.getElementById('admin-actions').firstElementChild?.innerText})`));
+  await shot("admin-users-edited");
 } else if (scenario === "dbg") {
   await nav(`${base}/app#account`); await sleep(1500);
   console.log(await evaluate(`JSON.stringify({admin: ME && ME.admin, hash: location.hash, acct_hidden: document.getElementById('view-account').classList.contains('hidden')})`));

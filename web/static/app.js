@@ -877,6 +877,7 @@ async function loadAccount() {
     toast("Couldn't load your account — check your connection.");
   }
   loadStats();
+  loadAdminUsers();
 }
 
 // Which sign-ins reach this account, and what is left to add. No unlinking in v1 (see index.html).
@@ -1304,6 +1305,175 @@ async function loadModels() {
     btn.disabled = false; btn.textContent = label;
   }
 }
+// --- admin: user management ------------------------------------------------------------------------
+// Same gate as the stats card (ME.admin from /api/me): adjust a token balance, or grant unlimited hosted
+// forging, without a redeploy. Data: /api/admin/users (one row per account) and /api/admin/actions (the
+// audit trail). Nothing here can grant admin — that stays in BTSWEB_ADMIN_EMAILS.
+let ADMIN_Q_TIMER = null;
+
+async function loadAdminUsers() {
+  const card = el("admin-users");
+  if (!card) return;
+  if (!ME || !ME.admin) { card.classList.add("hidden"); return; }
+  card.classList.remove("hidden");
+  const q = el("admin-users-q").value.trim();
+  try {
+    const r = await fetch(`/api/admin/users?q=${encodeURIComponent(q)}`);
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    renderAdminUsers(await r.json());
+  } catch (e) {
+    el("admin-users-note").textContent = "Couldn't load users: " + e.message;
+  }
+  loadAdminActions();
+}
+
+function renderAdminUsers(d) {
+  const users = d.users || [];
+  // The per-row status note gets a column of its own at the END: parked next to Save it would widen that
+  // cell the moment it said anything and shunt every column after it sideways mid-edit.
+  const head = `<tr><th class="who-cell">Account</th><th class="num">Tokens</th><th></th>`
+    + `<th>Unlimited</th><th class="num">Forges</th><th class="num">Donated</th><th>Joined</th>`
+    + `<th></th></tr>`;
+  const rows = users.map((u) => {
+    // On the env master list ⇒ the toggle can't change anything, so it is checked and disabled with a
+    // reason rather than silently ignoring the click.
+    const envLocked = !!u.unlimited_env;
+    const checked = (u.unlimited || envLocked) ? " checked" : "";
+    const joined = u.created_at ? String(u.created_at).slice(0, 10) : "—";
+    const who = esc(u.email || "(no email)")
+      + (u.admin ? ` <span class="sub">· admin</span>` : "")
+      + `<div class="sub">${esc(u.name || "")}${u.name && u.providers.length ? " · " : ""}`
+      + `${esc((u.providers || []).join(", "))}</div>`;
+    return `<tr data-uid="${u.id}">`
+      + `<td class="who-cell">${who}</td>`
+      + `<td class="num"><input class="in tok" type="number" min="0" max="100000" step="1"`
+      + ` value="${Number(u.token_balance || 0)}" data-orig="${Number(u.token_balance || 0)}"`
+      + ` aria-label="Token balance for ${esc(u.email || ("user " + u.id))}" /></td>`
+      + `<td><button class="btn tok-save" type="button">Save</button></td>`
+      + `<td><label class="unl"><input type="checkbox" class="unl-box"${checked}`
+      + `${envLocked ? " disabled" : ""} /> ∞</label>`
+      + (envLocked ? `<div class="sub">via env list</div>` : "")
+      + `</td>`
+      + `<td class="num">${fmtInt(u.forges)}</td>`
+      + `<td class="num">${u.donated_cents ? fmtMoney(u.donated_cents, "usd") : "—"}</td>`
+      + `<td>${esc(joined)}</td>`
+      + `<td><span class="row-note" role="status"></span></td></tr>`;
+  }).join("");
+  el("admin-users-table").innerHTML = head
+    + (rows || `<tr><td colspan="8" class="muted">No accounts match that search.</td></tr>`);
+
+  el("admin-users-note").textContent = users.length < (d.total || 0)
+    ? `Showing ${users.length} of ${d.total} accounts — narrow the search to see the rest.`
+    : `${d.total || 0} account${(d.total || 0) === 1 ? "" : "s"}. Changing a balance takes effect on their next forge.`;
+
+  // One delegated listener per render: the rows are innerHTML, so per-row handlers would leak.
+  const table = el("admin-users-table");
+  table.onclick = (ev) => {
+    const btn = ev.target.closest(".tok-save");
+    if (btn) saveAdminTokens(btn.closest("tr"));
+  };
+  table.onchange = (ev) => {
+    if (ev.target.classList.contains("unl-box")) saveAdminUnlimited(ev.target.closest("tr"), ev.target);
+  };
+  // Enter in a token box saves that row, which is how anyone actually uses a table of number inputs.
+  table.onkeydown = (ev) => {
+    if (ev.key === "Enter" && ev.target.classList.contains("tok")) {
+      ev.preventDefault();
+      saveAdminTokens(ev.target.closest("tr"));
+    }
+  };
+}
+
+function adminRowNote(row, msg, cls) {
+  const note = row.querySelector(".row-note");
+  note.textContent = msg;
+  note.className = "row-note" + (cls ? " " + cls : "");
+}
+
+async function saveAdminTokens(row) {
+  const uid = row.dataset.uid;
+  const input = row.querySelector(".tok");
+  const btn = row.querySelector(".tok-save");
+  const want = Number(input.value);
+  if (!Number.isInteger(want) || want < 0 || want > 100000) {
+    adminRowNote(row, "0–100000 only", "err");
+    return;
+  }
+  btn.disabled = true;
+  adminRowNote(row, "Saving…", "");
+  try {
+    const r = await fetch(`/api/admin/users/${uid}/tokens`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ balance: want }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || "HTTP " + r.status);
+    input.value = data.token_balance;
+    input.dataset.orig = data.token_balance;
+    adminRowNote(row, `Saved (was ${data.previous})`, "ok");
+    // Editing your own row must move the header pill too, or it lies until the next reload.
+    if (ME && Number(uid) === Number(ME.id)) { ME.token_balance = data.token_balance; renderTokens(); }
+    loadAdminActions();
+  } catch (e) {
+    input.value = input.dataset.orig;
+    adminRowNote(row, e.message, "err");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function saveAdminUnlimited(row, box) {
+  const uid = row.dataset.uid;
+  const want = box.checked;
+  box.disabled = true;
+  adminRowNote(row, "Saving…", "");
+  try {
+    const r = await fetch(`/api/admin/users/${uid}/unlimited`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ unlimited: want }),
+    });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || "HTTP " + r.status);
+    // Turning the flag off on an env-list account leaves them unlimited anyway — say so instead of
+    // showing a cleared checkbox that the next reload will re-tick.
+    if (!want && data.unlimited_env) {
+      box.checked = true;
+      adminRowNote(row, "Still unlimited via env list", "");
+    } else {
+      adminRowNote(row, want ? "Unlimited on" : "Unlimited off", "ok");
+    }
+    if (ME && Number(uid) === Number(ME.id)) { ME.unlimited = box.checked; renderTokens(); }
+    loadAdminActions();
+  } catch (e) {
+    box.checked = !want;
+    adminRowNote(row, e.message, "err");
+  } finally {
+    box.disabled = false;
+  }
+}
+
+const ADMIN_ACTION_VERB = { set_tokens: "tokens", set_unlimited: "unlimited" };
+
+async function loadAdminActions() {
+  const list = el("admin-actions");
+  if (!list) return;
+  try {
+    const r = await fetch("/api/admin/actions?limit=10");
+    if (!r.ok) return;
+    const rows = (await r.json()).actions || [];
+    list.innerHTML = rows.length
+      ? rows.map((a) => {
+        const what = ADMIN_ACTION_VERB[a.action] || a.action;
+        const from = a.action === "set_unlimited" ? (a.old_value ? "on" : "off") : a.old_value;
+        const to = a.action === "set_unlimited" ? (a.new_value ? "on" : "off") : a.new_value;
+        const when = a.created_at ? new Date(a.created_at + "Z").toLocaleString() : "";
+        return `<li>${esc(a.actor_email || "?")} set ${what} for ${esc(a.target_email || "?")}: `
+          + `${esc(String(from))} → ${esc(String(to))}<span class="sub"> · ${esc(when)}</span></li>`;
+      }).join("")
+      : `<li class="muted">Nothing changed yet.</li>`;
+  } catch (_) { /* the audit trail is context, never a blocker */ }
+}
+
 // Which box is open IS the choice: opening one closes the other and is remembered for next visit.
 el("forge-byok").addEventListener("toggle", () => onPayBoxToggle("forge-byok", "forge-token", "byok"));
 el("forge-token").addEventListener("toggle", () => onPayBoxToggle("forge-token", "forge-byok", "token"));
@@ -1313,6 +1483,11 @@ el("provider").onchange = () => { applyProvider(); saveByok(); showEstimate(fals
 el("model").oninput = () => { showEstimate(false); renderForgeButton(); };
 el("estimate-btn").onclick = () => showEstimate(true);
 el("stats-days").onchange = loadStats;
+// Debounced so typing an address doesn't fire a query per keystroke.
+el("admin-users-q").oninput = () => {
+  clearTimeout(ADMIN_Q_TIMER);
+  ADMIN_Q_TIMER = setTimeout(loadAdminUsers, 250);
+};
 
 // Sniff an unambiguous key prefix and jump the dropdown to the matching provider.
 el("api_key").oninput = () => {

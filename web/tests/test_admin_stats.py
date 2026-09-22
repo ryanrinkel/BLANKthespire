@@ -1,6 +1,6 @@
 """The operator dashboard (/api/admin/stats), the BYOK cost estimate (/api/forge-estimate), and the admin
-flag on /api/me. conftest pins BTSWEB_UNLIMITED_EMAILS=unlimited@example.com and sets no
-BTSWEB_ADMIN_EMAILS, so the unlimited list IS the admin list here — exactly the prod default."""
+flag on /api/me. conftest pins BTSWEB_ADMIN_EMAILS=unlimited@example.com — the operator list is explicit
+and no longer defaults to the unlimited list (see auth.ADMIN_EMAILS)."""
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone

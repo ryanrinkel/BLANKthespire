@@ -71,7 +71,14 @@ OLLAMA_API_KEY=...                  # powers the "Use a token" path (our hosted 
 # (ANTHROPIC_API_KEY / BTSWEB_HOSTED_ALLOWLIST are retired: `mode=hosted` is rejected outright — the public
 #  paths are the token forge and bring-your-own-key.)
 BTSWEB_UNLIMITED_EMAILS=you@example.com   # accounts that forge on the token path without spending tokens
-# BTSWEB_ADMIN_EMAILS=you@example.com     # who sees the Account tab's forge-stats dashboard (defaults to the unlimited list)
+#                                     # (break-glass only: unlimited is also grantable per account from the
+#                                     #  operator panel, and this list is what no DB write can take away)
+BTSWEB_ADMIN_EMAILS=you@example.com   # REQUIRED for the Account tab's OPERATOR CARDS: forge stats AND the
+#                                     # user panel that edits token balances / grants unlimited. Unset ⇒ both
+#                                     # cards are off for everyone (it does NOT fall back to the unlimited
+#                                     # list any more — a tester on that list must not inherit the ability to
+#                                     # edit balances). Admin is env-only by design: no route can grant it,
+#                                     # so the panel can never widen who reaches the panel.
 # BTSWEB_WORKSHOP_URL=https://steamcommunity.com/sharedfiles/filedetails/?id=...   # the mod's Workshop item; the
 #                                     # /download page links the STS2 Workshop hub until this is set
 # BTSWEB_MODEL_PRICES='{"glm-5.2": [in, out, cached]}'  # $/1M tokens for the hosted mix — feeds the dashboard's spend estimate
