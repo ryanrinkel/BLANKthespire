@@ -339,8 +339,8 @@ def _send_magic_link(email: str, url: str) -> None:
 
 
 class MagicLinkLimiter:
-    """Abuse backstop for POST /api/auth/email/start, shaped like app.TokenForgeLimiter (one lock, bucketed
-    windows, process-local — keep gunicorn at one worker).
+    """Abuse backstop for POST /api/auth/email/start: one lock, bucketed windows, process-local — keep
+    gunicorn at one worker.
 
     Two caps: per normalized email, so the endpoint cannot be used to bomb one person's inbox, and per IP, so
     it cannot be used to bomb everyone's. Over either cap the caller still gets the same "Check your inbox."

@@ -139,52 +139,6 @@ init_billing(app)
 # (forge-job reconciliation runs below, once the settle helpers are defined — see _reconcile_forge_jobs.)
 
 
-# --- hosted-path guardrail: a global daily kill-switch on token forges --------------------------------
-
-class TokenForgeLimiter:
-    """Budget backstop for the token path, which spends OUR provider budget.
-
-    One cap, `daily_cap`: the most token-path forges this process will admit in a UTC day, so a runaway day
-    (a bug, a spike, a donor with a script) can't run up an unbounded bill while nobody is watching. 0
-    disables it. BYOK forges are never counted — they cost us nothing. The old per-IP cap on the FREE daily
-    token went away with the free token itself (pricing v3): every hosted forge is now paid for with a token
-    someone donated for, so throttling by address only punished households. Process-local, like forge
-    admission — keep gunicorn at one worker.
-    """
-
-    def __init__(self, daily_cap: int = 1000) -> None:
-        self.daily_cap = daily_cap
-        self._day = -1
-        self._day_count = 0
-        self._lock = threading.Lock()
-
-    def _roll(self, now: float) -> None:
-        day = int(now // 86400)
-        if day != self._day:
-            self._day, self._day_count = day, 0
-
-    def check(self, ip: str) -> str | None:
-        """Admit one token-path forge, counting it. Returns an error string if the day's cap is hit (nothing
-        counted), else None. `ip` is accepted for logging symmetry and is not rate-limited on."""
-        with self._lock:
-            self._roll(time.time())
-            if self.daily_cap > 0 and self._day_count >= self.daily_cap:
-                return "the hosted forge has hit its daily limit — bring your own API key to keep forging today."
-            self._day_count += 1
-            return None
-
-    def uncount(self, ip: str) -> None:
-        """Undo a check() that admitted a forge which never ran (e.g. the token reserve failed after it)."""
-        with self._lock:
-            self._roll(time.time())
-            self._day_count = max(0, self._day_count - 1)
-
-
-# Renamed from `free_limiter` with the free token: the old name would now name the wrong thing entirely.
-token_limiter = TokenForgeLimiter(
-    daily_cap=int(os.environ.get("BTSWEB_TOKEN_DAILY_CAP", os.environ.get("BTSWEB_HOSTED_DAILY_CAP", "1000"))),
-)
-
 
 def _client_ip() -> str:
     return request.headers.get("X-Forwarded-For", request.remote_addr or "?").split(",")[0].strip()
@@ -1116,10 +1070,9 @@ def forge_class_route():
     token_kind: str | None = None
     token_day = time.strftime("%Y-%m-%d", time.gmtime())
     token_state: dict | None = None
-    ip = _client_ip()
     if ollama_mix:
-        # Cheap pre-check so an empty balance 402s without touching the day's budget counter; the reserve
-        # below is the authoritative one (it's the transaction two concurrent forges race in).
+        # Cheap pre-check so an empty balance 402s before any work is queued; the reserve below is the
+        # authoritative one (it's the transaction two concurrent forges race in).
         with session_scope() as s:
             u = s.query(User).filter_by(id=user["id"]).one_or_none()
             unlimited = user_is_unlimited(u)
@@ -1131,13 +1084,8 @@ def forge_class_route():
             return jsonify({"error": "you're out of tokens — get more on the Account tab, or bring your own "
                                      "API key to keep forging.",
                             "token_balance": 0}), 402
-        denied = token_limiter.check(ip)
-        if denied:
-            _user_end(user["id"])
-            return jsonify({"error": denied}), 429
         res = _reserve_token(user["id"])
-        if res is None:  # lost a race for the last token: give the day's budget slot back
-            token_limiter.uncount(ip)
+        if res is None:  # lost a race for the last token
             _user_end(user["id"])
             return jsonify({"error": "you're out of tokens — get more on the Account tab, or bring your own "
                                      "API key to keep forging.",
@@ -1172,8 +1120,7 @@ def forge_class_route():
     choice_meta: dict = {}  # what was offered / picked — stamped into the bundle for the fun experiment
 
     def refund_state(state: dict | None) -> dict:
-        """The balance fields the browser needs after a refund. The day's budget counter is deliberately NOT
-        given back: the forge did reach our providers before it died, and the cap exists to bound spend."""
+        """The balance fields the browser needs after a refund."""
         return dict(state or {})
 
     def finish_failed(message: str) -> None:

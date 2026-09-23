@@ -100,17 +100,6 @@ def test_402_when_nothing_to_spend(client, app_module, stub_forge):
     assert "out of tokens" in body["error"]
 
 
-def test_global_daily_cap_turns_forges_away(client, app_module, stub_forge, monkeypatch):
-    """The one surviving guardrail: a budget kill-switch on the whole hosted path (0 = off in tests)."""
-    login(client, "capped@example.com")
-    seed_tokens(app_module, "capped@example.com", 5)
-    monkeypatch.setattr(app_module.token_limiter, "daily_cap", 1)
-    assert sse_events(_forge(client))[-1][0] == "result"
-    r = _forge(client)
-    assert r.status_code == 429 and "daily limit" in r.get_json()["error"]
-    assert _user(app_module, "capped@example.com").token_balance == 4   # the refused forge cost nothing
-
-
 def test_unlimited_accounts_never_spend(client, app_module, stub_forge):
     login(client, "unlimited@example.com")
     _set(app_module, "unlimited@example.com", token_balance=1)

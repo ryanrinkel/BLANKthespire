@@ -33,7 +33,6 @@ os.environ.pop("GOOGLE_CLIENT_ID", None)
 os.environ.pop("GOOGLE_CLIENT_SECRET", None)
 os.environ.pop("STRIPE_SECRET_KEY", None)          # billing disabled: routes 503, event handler still testable
 os.environ.pop("BTSWEB_ALLOW_PRIVATE_URLS", None)  # the SSRF guard must be live
-os.environ["BTSWEB_TOKEN_DAILY_CAP"] = "0"   # global kill-switch off by default; tests that want it set it
 # The two roles are pinned SEPARATELY and deliberately differ: ADMIN_EMAILS no longer falls back to the
 # unlimited list (auth.py), and tester@example.com is here to prove it — env-unlimited, never an operator.
 os.environ["BTSWEB_UNLIMITED_EMAILS"] = "unlimited@example.com,tester@example.com"
@@ -181,9 +180,6 @@ def _reset_process_state(app_module):
     """Limiters, queues and per-user locks are process-local singletons — start every test clean."""
     import auth
 
-    lim = app_module.token_limiter
-    with lim._lock:
-        lim._day, lim._day_count = -1, 0
     auth.magic_limiter.reset()
     with app_module._user_active_lock:
         app_module._user_active.clear()

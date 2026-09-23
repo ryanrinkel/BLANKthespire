@@ -82,7 +82,6 @@ BTSWEB_ADMIN_EMAILS=you@example.com   # REQUIRED for the Account tab's OPERATOR 
 # BTSWEB_WORKSHOP_URL=https://steamcommunity.com/sharedfiles/filedetails/?id=...   # the mod's Workshop item; the
 #                                     # /download page links the STS2 Workshop hub until this is set
 # BTSWEB_MODEL_PRICES='{"glm-5.2": [in, out, cached]}'  # $/1M tokens for the hosted mix — feeds the dashboard's spend estimate
-BTSWEB_TOKEN_DAILY_CAP=1000         # global kill-switch on all token-path forges per day; 0 = off
 # --- Stripe donations (key absent = donate UI hidden; BYOK still works; hosted forges need tokens) ---
 STRIPE_SECRET_KEY=sk_live_...       # sk_test_... while testing; test/live are separate Stripe universes
 STRIPE_WEBHOOK_SECRET=whsec_...     # from the DASHBOARD webhook endpoint (https://blankthespire.com/webhook/stripe,
@@ -217,9 +216,10 @@ branch in `auth.py`'s `login_provider` to `auth_provider_callback` and drop the 
   beyond that `/api/forge-class` answers 503 up front (no token spent). Process-local — keep
   gunicorn at 1 worker or the limits silently double and the line splits.
 - Token-path guards: there is no free token — accounts start with 0 tokens, and tokens only ever arrive as
-  a thank-you for a donation. All token forges are capped by a global daily kill-switch
-  (`BTSWEB_TOKEN_DAILY_CAP`, default 1000; `0` disables). One forge per account at a time, across all modes;
-  token forges dequeue ahead of BYOK forges. All of it is process-local — keep gunicorn at one worker.
+  a thank-you for a donation. There is deliberately NO global daily cap on hosted forges (removed
+  2026-09-22): a busy day must not turn donors away. The spend backstop is the provider key's own limit
+  (set it on the Ollama / OpenRouter account), not the app. One forge per account at a time, across all
+  modes; token forges dequeue ahead of BYOK forges. All of it is process-local — keep gunicorn at one worker.
 - A forge can never cost a token without delivering a class: every attempt is a `forge_jobs` row settled
   exactly once by the worker thread (not the browser stream), so a closed tab still gets its class saved or
   its token refunded; jobs left running by a restart are refunded at boot; a forge running past
