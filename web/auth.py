@@ -247,7 +247,20 @@ def _login_session(user: dict) -> None:
     session["user_id"] = user["id"]
     session["email"] = user["email"]
     session["name"] = user["name"]
+    # When this sign-in happened. Sessions are permanent (Flask's 31-day default), which is fine for forging
+    # but too long for the operator panel's writes: app._admin_or_403 refuses a balance edit from a session
+    # older than ADMIN_WRITE_MAX_AGE_S, so a stolen or left-open operator cookie is not a month of free rein.
+    session["auth_at"] = int(time.time())
     session.permanent = True
+
+
+def session_age() -> float | None:
+    """Seconds since the current session signed in, or None when the session predates the `auth_at` stamp
+    (a cookie issued before it existed) — callers that gate on freshness treat None as "too old"."""
+    at = session.get("auth_at")
+    if not isinstance(at, (int, float)) or isinstance(at, bool):
+        return None
+    return max(0.0, time.time() - float(at))
 
 
 def _identities_of(user_id: int) -> list[dict]:

@@ -344,6 +344,10 @@ class AdminAction(Base):
     old_value: Mapped[int] = mapped_column(Integer, default=0)
     new_value: Mapped[int] = mapped_column(Integer, default=0)
     note: Mapped[str] = mapped_column(String(200), default="")
+    # Where the edit came from (the client IP behind nginx). Forensics, not identity: the actor columns say
+    # who; this says from where, which is what tells a stolen operator cookie apart from the operator.
+    # Added after the table shipped, so db._ensure_admin_action_columns patches it into existing databases.
+    ip: Mapped[str] = mapped_column(String(64), default="", server_default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     def summary(self) -> dict:
@@ -351,6 +355,7 @@ class AdminAction(Base):
         return {
             "id": self.id,
             "actor_email": self.actor_email,
+            "ip": self.ip or "",
             "target_email": self.target_email,
             "target_user_id": self.target_user_id,
             "action": self.action,

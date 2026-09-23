@@ -7,6 +7,9 @@ tester@example.com is env-unlimited and nothing more, which is what the privileg
 """
 from __future__ import annotations
 
+import logging
+import time
+
 from conftest import H, login, seed_tokens, sse_events
 
 ADMIN = "unlimited@example.com"
@@ -312,3 +315,92 @@ def test_a_note_is_kept(client, app_module):
                 headers=H)
     row = [a for a in _actions(client) if a["target_email"] == "noted@example.com"][0]
     assert row["note"] == "kickstarter backer"
+
+
+# --- writes need a fresh sign-in ----------------------------------------------------------------------
+# Sessions last 31 days; a balance edit from a sign-in older than app.ADMIN_WRITE_MAX_AGE_S is refused (403
+# with reauth=true) so a stolen or left-open operator cookie is not a month of free rein. Reads are not gated.
+
+def _age_session(client, seconds: float | None) -> None:
+    """Back-date the signed-in session's auth_at stamp, or (None) remove it — a cookie from before the stamp."""
+    with client.session_transaction() as sess:
+        if seconds is None:
+            sess.pop("auth_at", None)
+        else:
+            sess["auth_at"] = int(time.time() - seconds)
+
+
+def test_a_fresh_sign_in_is_stamped(client):
+    login(client, ADMIN)
+    with client.session_transaction() as sess:
+        assert abs(time.time() - sess["auth_at"]) < 5
+
+
+def test_stale_operator_sessions_can_look_but_not_touch(client, app_module):
+    uid = _make(client, app_module, "stale@example.com")
+    _age_session(client, app_module.ADMIN_WRITE_MAX_AGE_S + 60)
+
+    r = client.post(f"/api/admin/users/{uid}/tokens", json={"balance": 5}, headers=H)
+    assert r.status_code == 403 and r.get_json()["reauth"] is True
+    r = client.post(f"/api/admin/users/{uid}/unlimited", json={"unlimited": True}, headers=H)
+    assert r.status_code == 403 and r.get_json()["reauth"] is True
+    assert _user(app_module, "stale@example.com").token_balance == 0
+    assert not _user(app_module, "stale@example.com").unlimited_tokens
+    # ...but the listing and the audit trail still answer.
+    assert client.get("/api/admin/users").status_code == 200
+    assert client.get("/api/admin/actions").status_code == 200
+
+    # Signing in again restores writing.
+    login(client, ADMIN)
+    assert client.post(f"/api/admin/users/{uid}/tokens", json={"balance": 5}, headers=H).status_code == 200
+    assert _user(app_module, "stale@example.com").token_balance == 5
+
+
+def test_a_session_without_the_stamp_must_sign_in_again(client, app_module):
+    """A cookie issued before auth_at existed has no age to check; it counts as too old."""
+    uid = _make(client, app_module, "unstamped@example.com")
+    _age_session(client, None)
+    r = client.post(f"/api/admin/users/{uid}/tokens", json={"balance": 5}, headers=H)
+    assert r.status_code == 403 and r.get_json()["reauth"] is True
+    assert _user(app_module, "unstamped@example.com").token_balance == 0
+
+
+def test_a_session_just_inside_the_limit_still_writes(client, app_module):
+    uid = _make(client, app_module, "recent@example.com")
+    _age_session(client, app_module.ADMIN_WRITE_MAX_AGE_S - 60)
+    assert client.post(f"/api/admin/users/{uid}/tokens", json={"balance": 2}, headers=H).status_code == 200
+
+
+def test_a_non_admin_with_a_fresh_session_is_still_forbidden(client, app_module):
+    """Freshness is a second gate, never a substitute for the first."""
+    uid = _make(client, app_module, "fresh-nosy@example.com")
+    login(client, "fresh-nosy@example.com")
+    r = client.post(f"/api/admin/users/{uid}/tokens", json={"balance": 5}, headers=H)
+    assert r.status_code == 403 and "reauth" not in r.get_json()
+
+
+# --- every write is also in the app log, with the operator's address ------------------------------------
+
+def test_a_write_records_the_ip_and_logs_a_line(client, app_module, caplog):
+    uid = _make(client, app_module, "traced@example.com")
+    caplog.set_level(logging.INFO, logger=app_module.app.logger.name)
+    r = client.post(f"/api/admin/users/{uid}/tokens", json={"balance": 4, "note": "why"}, headers=H,
+                    environ_base={"REMOTE_ADDR": "203.0.113.9"})
+    assert r.status_code == 200
+
+    row = [a for a in _actions(client) if a["target_email"] == "traced@example.com"][0]
+    assert row["ip"] == "203.0.113.9"
+
+    lines = [rec.getMessage() for rec in caplog.records if rec.getMessage().startswith("admin action:")]
+    assert len(lines) == 1, lines
+    line = lines[0]
+    for needle in ("set_tokens", ADMIN, "203.0.113.9", "traced@example.com", "0 -> 4", "note='why'"):
+        assert needle in line, (needle, line)
+
+
+def test_a_no_op_write_logs_nothing(client, app_module, caplog):
+    uid = _make(client, app_module, "quiet@example.com")
+    seed_tokens(app_module, "quiet@example.com", 5)
+    caplog.set_level(logging.INFO, logger=app_module.app.logger.name)
+    client.post(f"/api/admin/users/{uid}/tokens", json={"balance": 5}, headers=H)
+    assert not [rec for rec in caplog.records if rec.getMessage().startswith("admin action:")]

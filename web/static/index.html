@@ -105,6 +105,15 @@
         </select>
         <input id="base_url" class="in" placeholder="Base URL — e.g. https://api.openai.com/v1" style="display:none" />
         <input id="api_key" class="in" type="password" placeholder="API key (used once, never stored on our server)" />
+        <!-- The key-handling answer is behind a button, like the cost estimate: one line of reassurance on
+             demand rather than a paragraph in everyone's way. Keep it TRUE: the key is saved in this
+             browser's localStorage (bts_byok) so it survives a reload, travels to our server only inside the
+             forge / model-list request, and is never written to the database or the logs. -->
+        <button id="key-safety-btn" class="btn" type="button">How do we keep your API key secure?</button>
+        <p class="hint hidden" id="key-safety">By never storing it! Your key stays in this browser only — we
+          keep it there so you don't have to retype it, and clearing the box forgets it. When you forge, it
+          travels to our server just for that request and goes straight to your provider; it's never written
+          to our database or our logs. We can't leak what we don't keep.</p>
         <div class="model-row">
           <input id="model" class="in" placeholder="Model" list="model-list" autocomplete="off" />
           <datalist id="model-list"></datalist>
@@ -291,6 +300,6 @@
   <!-- ?v= busts the 1-hour static cache on deploy: bump both whenever either file changes. render.js holds
        the class renderers shared with the public /deck page and must load first. -->
   <script src="/static/render.js?v=20260919"></script>
-  <script src="/static/app.js?v=20260921c"></script>
+  <script src="/static/app.js?v=20260922"></script>
 </body>
 </html>

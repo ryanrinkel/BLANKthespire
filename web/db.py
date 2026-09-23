@@ -131,6 +131,19 @@ def _ensure_purchase_columns() -> None:
             conn.execute(text("ALTER TABLE purchases ADD COLUMN net_cents INTEGER"))
 
 
+def _ensure_admin_action_columns() -> None:
+    """Same forward-only migration for `admin_actions`: add `ip` (AdminAction.ip) to databases that made the
+    table before it had one. Rows from before it stay '' — the audit log never rewrites history. Idempotent;
+    SQLite + MySQL."""
+    insp = inspect(engine)
+    if "admin_actions" not in insp.get_table_names():
+        return  # create_all will make it fresh with the column already present
+    cols = {c["name"] for c in insp.get_columns("admin_actions")}
+    if "ip" not in cols:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE admin_actions ADD COLUMN ip VARCHAR(64) NOT NULL DEFAULT ''"))
+
+
 def _ensure_forge_usage_columns() -> None:
     """Same tiny forward-only migration as _ensure_class_columns, for the `forge_usage` table: add the
     `provider` column (where the call went — "hosted" / "anthropic" / a BYOK hostname) and
@@ -188,6 +201,7 @@ def init_db() -> None:
     _ensure_class_columns()
     _ensure_purchase_columns()
     _ensure_forge_usage_columns()
+    _ensure_admin_action_columns()
     _backfill_slugs()  # rows inserted by code paths that predate the slug (belt and braces)
     _ensure_identities()  # every user needs an identity row before the first sign-in of this boot
 

@@ -33,7 +33,7 @@ if os.environ.get("BTSWEB_NO_DOTENV", "").strip() not in ("1", "true", "yes"):
 # (BTSWEB_NO_DOTENV=1 keeps the test suite hermetic on a box whose web/.env holds real credentials.)
 
 from auth import (current_user, init_auth, is_admin, is_production, is_unlimited,  # noqa: E402
-                  require_login, user_is_unlimited)
+                  require_login, session_age, user_is_unlimited)
 from billing import init_billing  # noqa: E402
 from db import db_ping, init_db, session_scope  # noqa: E402
 from forge import (ELEMENT_KINDS, VALID_FEEDBACK_CATEGORIES, ForgeError, UsageMeter,  # noqa: E402
@@ -1872,22 +1872,43 @@ def admin_stats():
 ADMIN_USERS_LIMIT = 200        # rows one listing may return (the UI also shows the unfiltered total)
 ADMIN_TOKENS_MAX = 100_000     # sanity ceiling on a balance set by hand; a typo shouldn't mint a fortune
 ADMIN_ACTIONS_LIMIT = 50
+# How old a sign-in may be and still WRITE from the panel. Sessions last 31 days (auth._login_session), which
+# is the right lifetime for forging but not for moving token balances: past this age the write routes answer
+# 403 and the operator signs in again. Reads (the listing, the audit trail) are not gated — a stale operator
+# can still look, just not touch. 4 hours covers a working session without the cookie living on for a month.
+ADMIN_WRITE_MAX_AGE_S = int(os.environ.get("BTSWEB_ADMIN_WRITE_MAX_AGE_S", str(4 * 3600)))
 
 
-def _admin_or_403():
+def _admin_or_403(write: bool = False):
     """None when the caller may use these routes, else the (body, status) to return. @require_login has
-    already handled "not signed in" (401) by the time this runs."""
+    already handled "not signed in" (401) by the time this runs. With write=True the sign-in must also be
+    younger than ADMIN_WRITE_MAX_AGE_S; a session with no `auth_at` stamp (issued before the stamp existed)
+    counts as too old, so the very first deploy of this gate costs every operator one sign-in."""
     if not is_admin((current_user() or {}).get("email", "")):
         return jsonify({"error": "forbidden"}), 403
+    if write:
+        age = session_age()
+        if age is None or age > ADMIN_WRITE_MAX_AGE_S:
+            hours = max(1, ADMIN_WRITE_MAX_AGE_S // 3600)
+            return jsonify({"error": f"your sign-in is more than {hours}h old — sign out and back in to "
+                                     "change accounts (reading is fine).", "reauth": True}), 403
     return None
 
 
 def _log_admin_action(s, actor, target, action: str, old_value: int, new_value: int, note: str = "") -> None:
-    """Append one audit row inside the caller's transaction, so the edit and its record commit together."""
+    """Append one audit row inside the caller's transaction, so the edit and its record commit together — and
+    write the same line to the app log, so the record also lives in journald/Sentry, independent of the
+    database (a restore or a bad migration must not erase "who moved this balance")."""
+    actor_email = (actor.get("email") or "").strip().lower()
+    target_email = (target.email or "").strip().lower()
+    ip = _client_ip()
     s.add(AdminAction(
-        actor_user_id=actor.get("id"), actor_email=(actor.get("email") or "").strip().lower(),
-        target_user_id=target.id, target_email=(target.email or "").strip().lower(),
-        action=action, old_value=int(old_value), new_value=int(new_value), note=note[:200]))
+        actor_user_id=actor.get("id"), actor_email=actor_email,
+        target_user_id=target.id, target_email=target_email,
+        action=action, old_value=int(old_value), new_value=int(new_value), note=note[:200], ip=ip[:64]))
+    app.logger.info("admin action: %s by %s (uid %s) from %s on %s (uid %s): %s -> %s note=%r",
+                    action, actor_email, actor.get("id"), ip, target_email, target.id,
+                    int(old_value), int(new_value), note[:200])
 
 
 @app.route("/api/admin/users")
@@ -1967,7 +1988,7 @@ def admin_set_tokens(user_id: int):
     token (SQLite takes the write lock at BEGIN — see db._sqlite_begin — and MySQL's row lock does the same).
     A delta is clamped into [0, ADMIN_TOKENS_MAX] rather than rejected: "take 5 away" from a balance of 3
     should leave 0, not an error."""
-    denied = _admin_or_403()
+    denied = _admin_or_403(write=True)
     if denied:
         return denied
     body = request.get_json(silent=True) or {}
@@ -2006,7 +2027,7 @@ def admin_set_unlimited(user_id: int):
 
     Turning it OFF does not touch the env master list — an account on BTSWEB_UNLIMITED_EMAILS keeps forging
     free, and the response says so in `unlimited_env` so the UI can explain why the toggle looks stuck."""
-    denied = _admin_or_403()
+    denied = _admin_or_403(write=True)
     if denied:
         return denied
     body = request.get_json(silent=True) or {}

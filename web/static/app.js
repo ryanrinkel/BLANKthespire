@@ -1482,6 +1482,11 @@ el("mode-fake").onchange = () => { renderForgeButton(); renderChooser(); };
 el("provider").onchange = () => { applyProvider(); saveByok(); showEstimate(false); renderForgeButton(); };
 el("model").oninput = () => { showEstimate(false); renderForgeButton(); };
 el("estimate-btn").onclick = () => showEstimate(true);
+// The key-safety blurb is a one-way reveal: the button gives way to the answer for the rest of the visit.
+el("key-safety-btn").onclick = () => {
+  el("key-safety").classList.remove("hidden");
+  el("key-safety-btn").classList.add("hidden");
+};
 el("stats-days").onchange = loadStats;
 // Debounced so typing an address doesn't fire a query per keystroke.
 el("admin-users-q").oninput = () => {
