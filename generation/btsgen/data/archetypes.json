@@ -16,7 +16,17 @@
         "the pause before the pounce",
         "stored lightning",
         "the withheld word",
-        "the gathering wave"
+        "the gathering wave",
+        "the crouching tiger",
+        "the chess grandmaster",
+        "the savings account",
+        "the poker face",
+        "the held card",
+        "the hoarder",
+        "the stakeout",
+        "the slow fuse",
+        "the nest egg",
+        "the long con"
       ],
       "leans": [
         "control",
@@ -52,7 +62,17 @@
         "the ringing anvil",
         "the whetstone",
         "the growing edge",
-        "the quenching"
+        "the quenching",
+        "the blacksmith",
+        "the kiln",
+        "the tempered steel",
+        "the bellows",
+        "the iron heated red",
+        "the sword in the making",
+        "the foundry",
+        "the hammer falls",
+        "the anvil chorus",
+        "the crucible"
       ],
       "leans": [
         "combo",
@@ -89,7 +109,17 @@
         "the avalanche",
         "the escalating duel",
         "the crescendo",
-        "one weapon, mastered"
+        "one weapon, mastered",
+        "the bodybuilder",
+        "the rolling boulder",
+        "the growing legend",
+        "the marathon runner",
+        "the rising flood",
+        "the sequel",
+        "the drumroll",
+        "the tightening grip",
+        "the bigger hammer",
+        "the streak"
       ],
       "leans": [
         "aggro",
@@ -124,7 +154,17 @@
         "the field smithy",
         "growing keener each turn",
         "the craftsman-warrior",
-        "tools that improve as you fight"
+        "tools that improve as you fight",
+        "the mechanic",
+        "the pit crew",
+        "the field repair",
+        "the tune-up",
+        "the gunsmith",
+        "the tinkerer",
+        "the sharpening stone",
+        "the duct tape fix",
+        "the armorer's kit",
+        "the upgrade"
       ],
       "leans": [
         "control",
@@ -157,7 +197,17 @@
         "trimming to the essence",
         "the pilgrim's light pack",
         "sacrifice for sharpness",
-        "less, but keener"
+        "less, but keener",
+        "the monk",
+        "the minimalist",
+        "spring cleaning",
+        "the fast",
+        "the vow of silence",
+        "the pruned tree",
+        "the empty room",
+        "the hermit",
+        "the diet",
+        "the essential few"
       ],
       "leans": [
         "combo"
@@ -192,7 +242,17 @@
         "the wasting sickness",
         "venom in the blood",
         "the long fever",
-        "the spreading stain"
+        "the spreading stain",
+        "the plague doctor",
+        "the swamp",
+        "the snake",
+        "the mold",
+        "the slow leak",
+        "the wasp's sting",
+        "the spoiled feast",
+        "the rusting hull",
+        "the sickbed",
+        "the contaminated well"
       ],
       "leans": [
         "control"
@@ -223,7 +283,17 @@
         "the aegis",
         "the phalanx",
         "the anchor",
-        "the breakwater"
+        "the breakwater",
+        "the turtle",
+        "the castle",
+        "the riot shield",
+        "the bunker",
+        "the dam",
+        "the goalkeeper",
+        "the armored truck",
+        "the lineman",
+        "the seawall",
+        "the mountain"
       ],
       "leans": [
         "control"
@@ -254,7 +324,17 @@
         "the blood rage",
         "the war cry",
         "nothing held back",
-        "the boiling blood"
+        "the boiling blood",
+        "the bull",
+        "the bar brawl",
+        "seeing red",
+        "the wounded bear",
+        "the boxer's fists",
+        "the maul",
+        "the viking raid",
+        "the roaring furnace of muscle",
+        "the rampaging ox",
+        "the brawler"
       ],
       "leans": [
         "aggro"
@@ -286,7 +366,17 @@
         "the volley",
         "the one-two",
         "the fast break",
-        "relentless pressure"
+        "relentless pressure",
+        "the boxer's combo",
+        "the machine gun",
+        "the drummer",
+        "the jab-jab-cross",
+        "rapid fire",
+        "the woodpecker",
+        "the hailstorm",
+        "the pinball",
+        "the sewing needle",
+        "the barrage"
       ],
       "leans": [
         "aggro"
@@ -318,7 +408,17 @@
         "the charged coil",
         "the gathering current",
         "the primed battery",
-        "the elemental wheel"
+        "the elemental wheel",
+        "the lightning rod",
+        "the battery bank",
+        "the tesla coil",
+        "the water wheel",
+        "the solar panel",
+        "the prayer wheel",
+        "the charging station",
+        "the windmill",
+        "the generator",
+        "the tidal pool"
       ],
       "leans": [
         "control",
@@ -351,7 +451,17 @@
         "the dice",
         "the spin",
         "the long shot",
-        "the roll of bones"
+        "the roll of bones",
+        "the casino",
+        "roulette",
+        "the lottery ticket",
+        "the scratch card",
+        "the coin flip",
+        "the lucky charm",
+        "the loot box",
+        "the raffle",
+        "the card sharp",
+        "the horse race"
       ],
       "leans": [
         "combo"
@@ -382,7 +492,17 @@
         "the war-hound",
         "the sworn blade",
         "the shield-bearer",
-        "the raised banner"
+        "the raised banner",
+        "the pet",
+        "the loyal dog",
+        "the familiar",
+        "the sidekick",
+        "the bodyguard",
+        "the hired gun",
+        "the robot companion",
+        "the puppet",
+        "the apprentice",
+        "the faithful steed"
       ],
       "leans": [
         "aggro",
@@ -421,7 +541,17 @@
         "the calling card",
         "the personal hex",
         "the lingering burn",
-        "the extra cut"
+        "the extra cut",
+        "the tattoo",
+        "the graffiti tag",
+        "the wax seal",
+        "the branding iron",
+        "the house rules",
+        "the secret ingredient",
+        "the trademark",
+        "the family crest",
+        "the catchphrase",
+        "the autograph"
       ],
       "leans": [
         "combo",
@@ -451,7 +581,17 @@
         "the downhill run",
         "the chain reaction",
         "the flow state",
-        "the slipstream"
+        "the slipstream",
+        "the conveyor belt",
+        "the river rapids",
+        "the sprinter",
+        "the domino run",
+        "the quick draw",
+        "the fast talker",
+        "the assembly line",
+        "the speed-reader",
+        "the rushing wind",
+        "the express train"
       ],
       "leans": [
         "combo",
@@ -483,7 +623,17 @@
         "the self-cut",
         "the crimson tithe",
         "the pact",
-        "flesh for power"
+        "flesh for power",
+        "the pound of flesh",
+        "the loan shark",
+        "the candle burnt at both ends",
+        "the pawnshop",
+        "the debt",
+        "the blood donor",
+        "the hunger strike",
+        "borrowed time",
+        "the surgeon's cut",
+        "the toll"
       ],
       "leans": [
         "aggro",
@@ -518,7 +668,17 @@
         "the pried-open guard",
         "the flechette storm",
         "a thousand small cuts",
-        "the piled-on afflictions"
+        "the piled-on afflictions",
+        "the interrogation",
+        "the x-ray",
+        "the detective",
+        "the exposed nerve",
+        "the softening blow",
+        "the rust",
+        "the lockpick",
+        "the loose thread",
+        "the broken shield",
+        "the spotlight"
       ],
       "leans": [
         "aggro",
@@ -551,7 +711,17 @@
         "the tithe of the slain",
         "the leeching blade",
         "sustain through slaughter",
-        "the drinking wound"
+        "the drinking wound",
+        "the mosquito",
+        "the leech",
+        "the tick",
+        "the vampire bat",
+        "the parasite",
+        "the cannibal",
+        "the scavenger",
+        "the hungry wolf",
+        "the blood bank",
+        "the feast on the fallen"
       ],
       "leans": [
         "aggro",
@@ -584,7 +754,17 @@
         "the flywheel",
         "the rising tide",
         "interest on interest",
-        "the building storm"
+        "the building storm",
+        "the investment",
+        "the savings that compound",
+        "the beehive",
+        "the growing garden",
+        "the factory line",
+        "clockwork",
+        "the coral reef",
+        "the ant colony",
+        "the dividend",
+        "the vine that spreads"
       ],
       "leans": [
         "control",
@@ -615,7 +795,17 @@
         "the buried charge",
         "the sleeper",
         "the ticking clock",
-        "the patient trap"
+        "the patient trap",
+        "the time bomb",
+        "the slow cooker",
+        "the incubator",
+        "the egg",
+        "the wine cellar",
+        "the landmine",
+        "the delayed fuse",
+        "the planted bulb",
+        "the pressure cooker",
+        "the alarm clock"
       ],
       "leans": [
         "combo",
@@ -647,7 +837,17 @@
         "the scales",
         "the fulcrum",
         "the swinging pendulum",
-        "light and shadow"
+        "light and shadow",
+        "the thermostat",
+        "the seesaw",
+        "yin and yang",
+        "the mood swing",
+        "the volume knob",
+        "the tuning fork",
+        "the balance beam",
+        "too hot or too cold",
+        "the tightrope walker",
+        "the level bubble"
       ],
       "leans": [
         "combo"
@@ -670,7 +870,7 @@
     {
       "id": "madness_discard",
       "name": "Madness / discard-matters",
-      "description": "churn your hand - discard as fuel, cards that reward being thrown away (Reflex). Three tools: `{\"op\":\"discard\",\"amount\":1}` throws random cards from hand (a cost/enabler; pair with draw); `{\"op\":\"add_trigger\",\"trigger\":\"on_discard\",...}` is the Reflex payoff that fires when THAT card is effect-discarded (keep discard-fuel cards in hand and pitch them for value); and `{\"op\":\"scry\",\"amount\":3}` looks at the top N of your draw pile and discards any (a draw-filter that also lets you CHOOSE which fuel card to pitch - scry-discards trigger on_discard too). Ship discard income + a couple of on_discard fuel cards + a scry/churn engine.",
+      "description": "churn your hand - discard as fuel, cards that reward being thrown away (the base-game Reflex feel). Three tools: forced discard (random, or the player's choice) as a cheap enabler that pairs with draw; on-discard fuel cards that grant nothing when played but fire when THEY are discarded by an effect, so the player keeps them in hand and pitches them for value; and scry, which looks at the top few cards of the draw pile and discards any of them - a draw filter that also lets the player choose which fuel card to pitch, since a scry-discard counts as an effect-discard. Retrieving a card from the discard pile closes the loop. Ship discard income, a couple of on-discard fuel cards, and a scry/churn engine.",
       "metaphors": [
         "the gambler",
         "sifting the ashes",
@@ -681,7 +881,25 @@
         "the churn",
         "what you cast aside",
         "the overflowing hand",
-        "fuel for the fire"
+        "fuel for the fire",
+        "the poker table",
+        "the mulligan",
+        "trash it",
+        "the junk drawer",
+        "the salvage yard",
+        "the recycling bin",
+        "the cutting-room floor",
+        "the prankster",
+        "the jester's chaos",
+        "the tantrum",
+        "spilled cards",
+        "the fast shuffle",
+        "loose change tossed",
+        "the scattered deck",
+        "cast-offs",
+        "second-hand treasure",
+        "the messy desk",
+        "the fool's luck"
       ],
       "leans": [
         "combo"
@@ -716,7 +934,17 @@
         "copies upon copies",
         "the endless quiver",
         "the printing press",
-        "what burns returns"
+        "what burns returns",
+        "the photocopier",
+        "the 3d printer",
+        "the cloning vat",
+        "the mint",
+        "the bakery",
+        "the factory",
+        "the hydra's heads",
+        "the seed packet",
+        "the echo chamber",
+        "the rabbit warren"
       ],
       "leans": [
         "combo"
@@ -749,7 +977,17 @@
         "the bonfire",
         "scorched earth",
         "the last match",
-        "the funeral pyre"
+        "the funeral pyre",
+        "the rocket stage",
+        "the disposable camera",
+        "single-use",
+        "the matchbook",
+        "the one-way ticket",
+        "the kamikaze",
+        "the paper lantern set alight",
+        "the firecracker",
+        "the fuse",
+        "the cremation"
       ],
       "leans": [
         "combo"
@@ -784,7 +1022,17 @@
         "the honed technique",
         "many hands, one strike",
         "the perfected form",
-        "the drilled squad"
+        "the drilled squad",
+        "the wolf pack",
+        "the choir",
+        "the identical twins",
+        "the marching band",
+        "the collection",
+        "the matching set",
+        "the full house",
+        "the army of one",
+        "the chorus line",
+        "the same song, louder"
       ],
       "leans": [
         "aggro"
@@ -818,7 +1066,17 @@
         "the machine that upgrades itself",
         "one card, two lives",
         "grafting a cutting onto the rootstock",
-        "reforging scrap into a blade"
+        "reforging scrap into a blade",
+        "the tadpole",
+        "the phoenix",
+        "the werewolf",
+        "the transformer",
+        "the chrysalis",
+        "the seed to the tree",
+        "the recruit to the veteran",
+        "the second draft",
+        "the renovation",
+        "the evolution"
       ],
       "leans": [
         "combo"
@@ -853,7 +1111,17 @@
         "the power surge",
         "the reactor",
         "the open throttle",
-        "the full tank"
+        "the full tank",
+        "the caffeine jolt",
+        "nitro",
+        "the jet engine",
+        "the power plant",
+        "the fire hose",
+        "the volcano",
+        "payday",
+        "the bottomless wallet",
+        "the flood",
+        "the big spender"
       ],
       "leans": [
         "aggro",
@@ -887,7 +1155,17 @@
         "turning the blow",
         "the hedgehog",
         "the return strike",
-        "the rebound"
+        "the rebound",
+        "the boomerang",
+        "the mirror",
+        "the electric fence",
+        "the cactus",
+        "the porcupine",
+        "the mousetrap",
+        "the bouncer",
+        "the spiked collar",
+        "the tripwire",
+        "the goalie's punch"
       ],
       "leans": [
         "control",
@@ -921,7 +1199,17 @@
         "the do-or-die",
         "the killing window",
         "the late bloom",
-        "the razor's timing"
+        "the razor's timing",
+        "the sniper",
+        "the buzzer beater",
+        "checkmate",
+        "the coup de grace",
+        "the samurai standoff",
+        "high noon",
+        "the finishing move",
+        "the penalty kick",
+        "the knockout punch",
+        "the all-or-nothing bet"
       ],
       "leans": [
         "combo",
@@ -956,7 +1244,17 @@
         "the storm of blades",
         "the sweeping arc",
         "the many-against-one",
-        "the field of foes"
+        "the field of foes",
+        "the lawnmower",
+        "the bowling strike",
+        "the flamethrower",
+        "the stampede",
+        "the shotgun spread",
+        "the wrecking ball",
+        "the tidal wave",
+        "the crowd",
+        "the battlefield",
+        "the swarm of foes"
       ],
       "leans": [
         "aggro",
@@ -987,7 +1285,17 @@
         "the head start",
         "the sucker punch",
         "the alpha strike",
-        "the pre-emptive blow"
+        "the pre-emptive blow",
+        "the sneak attack",
+        "the assassin",
+        "shock and awe",
+        "kick the door in",
+        "the jump scare",
+        "the first-round knockout",
+        "the sprinter's start",
+        "the raid at dawn",
+        "the surprise party",
+        "the blitz"
       ],
       "leans": [
         "aggro"
@@ -1017,7 +1325,17 @@
         "use it or lose it",
         "the borrowed power",
         "the vanishing edge",
-        "the ephemeral blade"
+        "the ephemeral blade",
+        "the soap bubble",
+        "ice cream in the sun",
+        "the daily special",
+        "the expiring coupon",
+        "fresh bread",
+        "the sandcastle",
+        "the fireworks show",
+        "the morning dew",
+        "the pop-up shop",
+        "the hot streak"
       ],
       "leans": [
         "combo",
@@ -1048,7 +1366,17 @@
         "the warded skin",
         "the intangible one",
         "the absorbing veil",
-        "the charmed life"
+        "the charmed life",
+        "the matador",
+        "the bubble shield",
+        "the smoke screen",
+        "the forcefield",
+        "the slippery eel",
+        "the invisible man",
+        "the dodge",
+        "the mirage",
+        "the greased pig",
+        "the escape artist"
       ],
       "leans": [
         "control"
@@ -1080,7 +1408,17 @@
         "the glass cannon",
         "the peak moment",
         "the fleeting frenzy",
-        "the overclock"
+        "the overclock",
+        "the espresso shot",
+        "the nitro boost",
+        "the firework",
+        "the hail mary",
+        "the final sprint",
+        "the adrenaline needle",
+        "the last-minute rally",
+        "the thunderclap",
+        "the sprint finish",
+        "the flash sale"
       ],
       "leans": [
         "aggro",
@@ -1112,7 +1450,17 @@
         "the knitting wound",
         "the evergreen",
         "the slow recovery",
-        "the unkillable"
+        "the unkillable",
+        "the lizard's tail",
+        "the medic",
+        "the bandage",
+        "the first-aid kit",
+        "the hot spring",
+        "the starfish",
+        "the healing potion",
+        "the good night's sleep",
+        "the hearty meal",
+        "the cast that comes off"
       ],
       "leans": [
         "control"
