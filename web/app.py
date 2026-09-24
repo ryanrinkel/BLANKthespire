@@ -36,6 +36,7 @@ if os.environ.get("BTSWEB_NO_DOTENV", "").strip() not in ("1", "true", "yes"):
 
 from auth import (current_user, init_auth, is_admin, is_production, is_unlimited,  # noqa: E402
                   require_login, session_age, user_is_unlimited)
+import alerts as _alerts  # noqa: E402
 from billing import init_billing  # noqa: E402
 from db import db_ping, init_db, session_scope  # noqa: E402
 from forge import (ELEMENT_KINDS, VALID_FEEDBACK_CATEGORIES, ForgeError, UsageMeter,  # noqa: E402
@@ -56,6 +57,10 @@ PUBLIC_BASE_URL = os.environ.get("BTSWEB_PUBLIC_URL", "https://blankthespire.com
 STATIC_FORGED_DIR = WEB_DIR / "static" / "forged"  # gitignored (like static/releases); survives git-pull deploys
 
 app = Flask(__name__, static_folder=str(WEB_DIR / "static"), static_url_path="/static")
+
+# Operator alerts: a hosted tier or the server-keyed image endpoint answering "out of credit" emails the
+# operators (throttled, off-thread) — see alerts.py. Registered at import so every forge path is covered.
+_alerts.install()
 
 # Session-signing key. Fail closed: when a sign-in provider is configured (a production-looking deploy), a
 # missing key means anyone could forge session cookies with the public default — refuse to boot instead. The

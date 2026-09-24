@@ -79,6 +79,11 @@ BTSWEB_ADMIN_EMAILS=you@example.com   # REQUIRED for the Account tab's OPERATOR 
 #                                     # list any more — a tester on that list must not inherit the ability to
 #                                     # edit balances). Admin is env-only by design: no route can grant it,
 #                                     # so the panel can never widen who reaches the panel.
+# BTSWEB_ALERT_EMAILS=you@example.com # where the "hosted forge is out of credit" email goes (a hosted tier or the
+#                                     # server-keyed image endpoint answering HTTP 402, or a 429 that says
+#                                     # credit/quota). Unset ⇒ the BTSWEB_ADMIN_EMAILS list. Needs the two mail
+#                                     # vars above; one email per endpoint per BTSWEB_ALERT_COOLDOWN_S (default
+#                                     # 21600 = 6h). See web/alerts.py.
 # BTSWEB_WORKSHOP_URL=https://steamcommunity.com/sharedfiles/filedetails/?id=...   # the mod's Workshop item; the
 #                                     # /download page links the STS2 Workshop hub until this is set
 # BTSWEB_MODEL_PRICES='{"glm-5.2": [in, out, cached]}'  # $/1M tokens for the hosted mix — feeds the dashboard's spend estimate

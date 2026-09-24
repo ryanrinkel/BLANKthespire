@@ -52,6 +52,7 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from ... import alerts
 from ..request import ImageRequest, ImageResult
 
 _ENDPOINT = "https://openrouter.ai/api/v1/images"
@@ -211,6 +212,11 @@ class OpenRouterImageBackend:
                 payload = json.loads(resp.read().decode("utf-8"))
         except HTTPError as e:
             detail = e.read().decode("utf-8", "replace")[:400] if hasattr(e, "read") else ""
+            # Art is non-fatal, so an out-of-credit server key would otherwise fail SILENTLY (classes ship
+            # without art). Alert on the server's key only — a BYOK user's wall is theirs to notice.
+            if self._api_key is None and alerts.looks_like_credit_error(e.code, detail):
+                alerts.credit_exhausted(source="art", endpoint=_ENDPOINT, code=e.code, detail=detail,
+                                        model=model)
             return ImageResult(ok=False, backend=self.name, model=model, error=f"HTTP {e.code}: {detail}")
         except (URLError, TimeoutError) as e:
             return ImageResult(ok=False, backend=self.name, model=model, error=f"network error: {e}")

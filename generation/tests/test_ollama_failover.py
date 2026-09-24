@@ -409,6 +409,67 @@ def test_build_defaults_stage_attempts():
             os.environ["BTS_STAGE_ATTEMPTS"] = prior
 
 
+# ------------------------------------------------------------------ operator credit alert
+
+def test_402_fires_the_credit_alert_with_the_tier_facts():
+    """A credit wall on a HOSTED tier must reach a registered btsgen.alerts listener (the website mails it)
+    — with the endpoint, status, provider body and the tier/model that refused. Fired once per refusing tier,
+    never for a plain rate-limit 429, and the call still fails over exactly as before."""
+    from btsgen import alerts
+    _reset_breaker()
+    seen: list[dict] = []
+    alerts.register(seen.append)
+    try:
+        primary = _Stub("primary", EndpointHTTPError(402, "Insufficient credits. Add more at /settings/credits"),
+                        base_url=OPENROUTER)
+        gen = _chain(primary, _Stub("fallback", base_url=OLLAMA))
+        out, _ = gen.first_attempt("b")
+        check(out == "fallback:b", "a 402 must still fail the call over")
+        check(len(seen) == 1, f"one alert per refusing tier (got {len(seen)})")
+        ev = seen[0]
+        check(ev["kind"] == "credit_exhausted" and ev["source"] == "chat", "alert kind/source")
+        check(ev["endpoint"] == OPENROUTER and ev["code"] == 402, "alert names the endpoint + status")
+        check(ev["model"] == "primary" and ev["tier"] == "primary", "alert names the tier that refused")
+        check("Insufficient credits" in ev["detail"], "alert carries the provider body")
+
+        # A rate-limit 429 (no credit wording) trips the breaker as before but is NOT a credit alert.
+        _reset_breaker()
+        seen.clear()
+        gen = _chain(_Stub("primary", EndpointHTTPError(429, "usage limit reached"), base_url=OPENROUTER),
+                     _Stub("fallback", base_url=OLLAMA))
+        gen.first_attempt("b")
+        check(seen == [], "a plain 429 must not page the operator")
+
+        # ...unless the provider's body says the account is out of credit/quota.
+        _reset_breaker()
+        gen = _chain(_Stub("primary", EndpointHTTPError(429, "monthly quota exhausted"), base_url=OLLAMA),
+                     _Stub("fallback", base_url=OPENROUTER))
+        gen.first_attempt("b")
+        check(len(seen) == 1 and seen[0]["code"] == 429, "a quota-worded 429 is a credit alert")
+
+        # A crashing listener never breaks the forge.
+        def _boom(_ev):
+            raise RuntimeError("listener bug")
+        alerts.register(_boom)
+        _reset_breaker()
+        gen = _chain(_Stub("primary", EndpointHTTPError(402, "payment required"), base_url=OPENROUTER),
+                     _Stub("fallback", base_url=OLLAMA))
+        out, _ = gen.first_attempt("b")
+        check(out == "fallback:b", "a failing listener must not break the call")
+        alerts.unregister(_boom)
+    finally:
+        alerts.unregister(seen.append)
+        _reset_breaker()
+
+
+def test_looks_like_credit_error():
+    from btsgen.alerts import looks_like_credit_error
+    check(looks_like_credit_error(402, ""), "402 is always a credit wall")
+    check(not looks_like_credit_error(429, "rate limited, retry shortly"), "a busy 429 is not")
+    check(looks_like_credit_error(429, "Insufficient credits"), "a credit-worded 429 is")
+    check(not looks_like_credit_error(500, "credits"), "only 402/429 count")
+
+
 def main() -> int:
     for name, fn in sorted(globals().items()):
         if name.startswith("test_") and callable(fn):

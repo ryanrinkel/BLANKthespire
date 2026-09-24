@@ -65,6 +65,7 @@ import threading
 import time
 from pathlib import Path
 
+from . import alerts
 from . import contract as _card_contract
 from .class_forge import _BlueprintContract, _RelicContract
 from .generator import EndpointHTTPError, OpenAICompatGenerator, load_env
@@ -246,6 +247,12 @@ class _FailoverGenerator:
                 if e.code in _QUOTA_CODES:
                     # Account-level: remember it for the whole endpoint, then try the next tier.
                     _trip_breaker(tier.base_url, tier.cooldown_s, f"HTTP {e.code} from {tier.name}")
+                    # Tell the operator (the website mails it): these are OUR keys, and a credit wall is
+                    # not self-healing — without a nudge every forge quietly fails over or dies.
+                    if alerts.looks_like_credit_error(e.code, e.detail):
+                        alerts.credit_exhausted(source="chat", endpoint=tier.base_url, code=e.code,
+                                                detail=e.detail, model=getattr(tier.gen, "model", None),
+                                                tier=tier.name)
                 elif e.code in _SKIP_CODES or e.code >= 500:
                     # Model-level outage / gateway hiccup: THIS call only, no breaker.
                     _log.warning("tier %s returned HTTP %d — skipping it for this call", tier.name, e.code)
