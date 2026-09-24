@@ -1,7 +1,7 @@
 """btsgen-bench — the creative-harness benchmark (docs/plans/DEPLOYMENT_PLAN.md §2.3). CLI only, no web wiring.
 
 Forges a FIXED list of 12 concept sentences (spanning tone and mechanics) on the token path (the hosted
-mixture, OpenRouter primary, staged triad front-end) and reports the plan's metrics table from census.py:
+mixture, Ollama Cloud primary, staged triad front-end) and reports the plan's metrics table from census.py:
 
     uv run btsgen-bench --fake                      # offline smoke (fake stages + fake cards; no keys)
     uv run btsgen-bench                             # the real thing (needs OPENROUTER_API_KEY; costs cents on glm-5.3)
@@ -66,7 +66,7 @@ def _build_backends(fake: bool, ollama_config: str | None):
     role_map = ollama_mix.load_role_map(ollama_config) if ollama_config else None
     _bp, card_gen_factory, relic_gen, make_gen = ollama_mix.build_ollama_mix(role_map)
     return (card_gen_factory, relic_gen, make_gen,
-            "hosted mix (OpenRouter primary):\n" + ollama_mix.describe(role_map))
+            "hosted mix:\n" + ollama_mix.describe(role_map))
 
 
 def forge_concepts(concepts: list[str], *, fake: bool, ollama_config: str | None = None, triad: bool = True,

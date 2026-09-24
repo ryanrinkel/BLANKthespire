@@ -1,4 +1,4 @@
-"""Hosted *mixture* backend (OpenRouter primary, tiered fallback) — a parallel path to the Anthropic flow.
+"""Hosted *mixture* backend (Ollama Cloud primary, OpenRouter tiered fallback) — a parallel path to the Anthropic flow.
 
 The forge makes two kinds of LLM call: a handful of CREATIVE front-end calls (cloud/cluster, map/compose,
 relic-intent, reframed-blueprint) and ~23 strict closed-vocabulary CARD calls. The existing CLI/web paths
@@ -22,27 +22,36 @@ divergent stage (the cloud) stays on the small permissive model.
 A role spec is {model, base_url?, api_key?, response_format?, temperature?, max_tokens_cap?, extra_body?}.
 `extra_body` is merged verbatim into the request payload (e.g. {"reasoning": {"effort": "low"}} to hold a
 hybrid-reasoning model's hidden thinking to a floor — see DEFAULT_ROLE_MAP's structure role). `base_url` and
-`api_key` default to the top-level `defaults` block (OpenRouter), but a role may override them — e.g. point
+`api_key` default to the top-level `defaults` block (Ollama Cloud), but a role may override them — e.g. point
 `brainstorm` at a LOCAL `http://localhost:11434/v1` uncensored model while `cards` stay on hosted GLM.
 `${VAR}` values are expanded from the environment (so the key never sits in a committed file).
 
 TIERED FAILOVER — the top-level `fallbacks` list is an ORDERED chain of whole backends the same harness
 re-issues a failed call against. The shipped default is:
 
-    primary            OpenRouter  z-ai/glm-5.3   (the class Ryan picked in the 2026-09-18 A/B)
+    primary            Ollama Cloud glm-5.3 / gemma4:31b   (Ryan's account, 2026-09-24: "Ollama primary for
+                                                         any compatible call, OpenRouter as the backup")
+      -> openrouter-glm53   OpenRouter  z-ai/glm-5.3   (the 2026-09-18 A/B pick; different vendor + key)
       -> openrouter-glm52   OpenRouter  z-ai/glm-5.2   (covers a glm-5.3-only outage on the same key)
-      -> ollama             Ollama Cloud glm-5.2       (covers an OpenRouter credit/outage wall)
 
-A tier whose api_key expands empty is DROPPED at build time, so `OLLAMA_API_KEY` unset simply means the last
-tier does not exist and the forge behaves as an OpenRouter-only route. The singular legacy `fallback` key
+A tier whose api_key expands empty is DROPPED at build time, so `OPENROUTER_API_KEY` unset simply means the
+OpenRouter tiers do not exist. The PRIMARY degrades the same way: a role that inherits the defaults' key and
+finds it empty (no `OLLAMA_API_KEY`) is re-pointed at the first ARMED tier, which is then removed from the
+chain — so a box with only an OpenRouter key forges on OpenRouter exactly as before. The singular legacy `fallback` key
 (the three `generation/ollama_roles.*.json` files) is still accepted and wrapped into a one-item list;
 `"fallback": null` still opts out entirely.
 
 Each tier carries its OWN `extra_body`, applied to the structure+cards roles only (brainstorm is a
 non-reasoning gemma and gets none). This matters: glm-5.3 on OpenRouter 400s on `reasoning:{enabled:false}`
 ("Reasoning is mandatory") and the generator's drop-rejected-key logic cannot catch it (the message names no
-key), glm-5.2 on OpenRouter accepts it, and Ollama Cloud wants `reasoning_effort:"none"` instead. A tier that
-omits `extra_body` inherits the role's (the pre-tier behavior).
+key), glm-5.2 on OpenRouter accepts it, and Ollama Cloud wants the `reasoning_effort` spelling — "none" for
+glm-5.2, but "low" for glm-5.3, which under "none" THINKS IN THE VISIBLE CONTENT ("The user wants a JSON
+object…" until max_tokens; probe 2026-09-24) and with the knob unset burns the budget on hidden reasoning.
+A tier that omits `extra_body` inherits the role's (the pre-tier behavior).
+
+A stage that fails VALIDATION (not HTTP) on the primary is re-rolled on the next tier: the staged front-end
+calls `rotate_tier()` before its whole-stage retry, so "OpenRouter as the backup" covers a model whiff as
+well as an outage.
 
 Failure semantics, per error class:
   402 / 429          account-level quota/credit — trips a process-wide breaker KEYED BY `base_url` for that
@@ -75,10 +84,11 @@ _log = logging.getLogger("btsgen.ollama_mix")
 CLOUD_BASE_URL = "https://ollama.com/v1"
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
-# Sane built-in mix. Primary is OpenRouter glm-5.3 (2026-09-18 A/B: 36 cards, 0 skipped briefs, vs 3 skipped
-# on glm-5.2). Override any of this via --ollama-config <path.json>.
+# Sane built-in mix. Primary is Ollama Cloud (Ryan's account) on the same model families the 2026-09-18 A/B
+# picked on OpenRouter (glm-5.3: 36 cards, 0 skipped briefs, vs 3 skipped on glm-5.2); OpenRouter is the
+# metered backup. Override any of this via --ollama-config <path.json>.
 DEFAULT_ROLE_MAP: dict = {
-    "defaults": {"base_url": OPENROUTER_BASE_URL, "api_key": "${OPENROUTER_API_KEY}"},
+    "defaults": {"base_url": CLOUD_BASE_URL, "api_key": "${OLLAMA_API_KEY}"},
     # Cap any per-stage max_tokens request (the blueprint asks for 48000, sized for Claude's output caps —
     # too high for most open models). min(requested, cap) keeps requests valid without truncating real work.
     # glm-5.3 at effort "low" bills hidden reasoning as output tokens against this; the E2E leg ran clean.
@@ -93,42 +103,43 @@ DEFAULT_ROLE_MAP: dict = {
         # model otherwise emits malformed JSON (missing commas, keys inside arrays) for the complex map/compose
         # schema, which is UNPARSEABLE so the one repair attempt can't even act on it. JSON mode guarantees
         # parseable output, so any remaining SCHEMA mistake becomes a fixable validation error.
-        "brainstorm": {"model": "google/gemma-4-31b-it", "temperature": 0.9,
+        "brainstorm": {"model": "gemma4:31b", "temperature": 0.9,
                        "response_format": {"type": "json_object"}},
         # strong, schema-faithful model turns the dossier into card briefs; pin to JSON.
-        # reasoning.effort "low": glm-5.3 REQUIRES reasoning (OpenRouter 400s on `reasoning:{enabled:false}`
-        # with "Reasoning is mandatory"), and left unbounded a hybrid-reasoning model burns 10-20k tokens of
-        # hidden thinking against max_tokens on big calls (glm-5.2's triad blueprint REPAIR re-emit hit ~20k
-        # of the 24k cap, truncating the visible answer mid-JSON — "unparseable blueprint", 2 of 3 forges on
-        # 2026-08-16). "low" is the floor the model accepts. usage.include makes OpenRouter return the
-        # METERED `usage.cost` per call, which the web ledger records instead of guessing from a rate table.
-        "structure": {"model": "z-ai/glm-5.3", "response_format": {"type": "json_object"}, "temperature": 0.4,
-                      "extra_body": {"reasoning": {"effort": "low"}, "usage": {"include": True}}},
+        # reasoning_effort "low" (Ollama's spelling of the knob): left unbounded a hybrid-reasoning model burns
+        # 10-20k tokens of hidden thinking against max_tokens on big calls (glm-5.2's triad blueprint REPAIR
+        # re-emit hit ~20k of the 24k cap, truncating the visible answer mid-JSON — "unparseable blueprint",
+        # 2 of 3 forges on 2026-08-16), and "none" makes glm-5.3 narrate its reasoning INSIDE the visible
+        # content until the budget runs out (probe 2026-09-24). "low" answered in 209 tokens, clean JSON.
+        "structure": {"model": "glm-5.3", "response_format": {"type": "json_object"}, "temperature": 0.4,
+                      "extra_body": {"reasoning_effort": "low"}},
         # GLM codes the cards: strict closed-vocab JSON, low temperature, pinned to a JSON body
-        "cards": {"model": "z-ai/glm-5.3", "response_format": {"type": "json_object"}, "temperature": 0.3,
-                  "extra_body": {"reasoning": {"effort": "low"}, "usage": {"include": True}}},
+        "cards": {"model": "glm-5.3", "response_format": {"type": "json_object"}, "temperature": 0.3,
+                  "extra_body": {"reasoning_effort": "low"}},
     },
     # Ordered failover chain (see module docstring). Each tier is a whole backend: endpoint + per-role model
     # slugs + its own extra_body + its own breaker cooldown. A tier whose api_key expands empty is dropped.
     "fallbacks": [
+        # Different vendor, different key: the metered backup for an Ollama quota/outage wall, on the same
+        # model generation. reasoning.effort "low": glm-5.3 REQUIRES reasoning on OpenRouter (400s on
+        # `reasoning:{enabled:false}` with "Reasoning is mandatory") and "low" is the floor it accepts.
+        # usage.include makes OpenRouter return the METERED `usage.cost` per call, which the web ledger
+        # records instead of guessing from a rate table. 1h cooldown: an OpenRouter credit wall is not
+        # self-healing.
+        {"name": "openrouter-glm53", "base_url": OPENROUTER_BASE_URL, "api_key": "${OPENROUTER_API_KEY}",
+         "models": {"brainstorm": "google/gemma-4-31b-it", "structure": "z-ai/glm-5.3", "cards": "z-ai/glm-5.3"},
+         "extra_body": {"reasoning": {"effort": "low"}, "usage": {"include": True}}, "cooldown_s": 3600},
         # Same key, same endpoint, one model generation back: covers a glm-5.3-only outage. glm-5.2 ACCEPTS
         # `reasoning:{enabled:false}` (and is cheaper with thinking off), so this tier says so explicitly.
         # Short cooldown: an endpoint-level breaker trip here is almost always the 5.3 tier's doing.
         {"name": "openrouter-glm52", "base_url": OPENROUTER_BASE_URL, "api_key": "${OPENROUTER_API_KEY}",
          "models": {"brainstorm": "google/gemma-4-31b-it", "structure": "z-ai/glm-5.2", "cards": "z-ai/glm-5.2"},
          "extra_body": {"reasoning": {"enabled": False}, "usage": {"include": True}}, "cooldown_s": 900},
-        # Different vendor, different key: the hedge for an OpenRouter credit wall while the Ollama Pro
-        # credits last. Ollama Cloud honors `reasoning_effort:"none"` and ignores the OpenRouter-style knobs
-        # (probe-verified, scratch/probe_glm_nothink.py). 1h cooldown: Ollama session limits reset on 5h
-        # windows, so a quota trip here is worth remembering for a while.
-        {"name": "ollama", "base_url": CLOUD_BASE_URL, "api_key": "${OLLAMA_API_KEY}",
-         "models": {"brainstorm": "gemma4:31b", "structure": "glm-5.2", "cards": "glm-5.2"},
-         "extra_body": {"reasoning_effort": "none"}, "cooldown_s": 3600},
     ],
 }
 
-# The primary tier's own breaker cooldown when IT is the one that 402/429s (historically 1h — Ollama session
-# limits reset on 5h windows, and an OpenRouter credit wall is not self-healing either).
+# The primary tier's own breaker cooldown when IT is the one that 402/429s (1h — Ollama session limits reset
+# on 5h windows, so a quota trip there is worth remembering for a while).
 PRIMARY_COOLDOWN_S = 3600
 
 # Process-wide failover breaker, KEYED BY ENDPOINT (`base_url`). One quota trip diverts every role of every
@@ -280,6 +291,18 @@ class _FailoverGenerator:
             return out
         raise last_exc  # every tier refused; the last failure is the honest one to surface
 
+    def rotate_tier(self) -> str | None:
+        """Send this generator's NEXT calls to the tier after the one that answered last (that tier moves to
+        the back of this generator's chain). The staged front-end calls it before a whole-stage re-roll, so
+        a sample that failed validation on the primary is retried on the backup — a different vendor and
+        model build — instead of the same one. Returns the name of the tier now at the front, or None when
+        there is nothing to rotate to (single tier, or no call has answered yet)."""
+        if len(self._tiers) < 2 or self._last is None or self._last not in self._tiers:
+            return None
+        self._tiers.remove(self._last)
+        self._tiers.append(self._last)
+        return self._tiers[0].name
+
     def avoid_provider(self, name: str | None) -> None:
         """Forward a stage re-roll's "not that upstream again" to every tier (only OpenRouter tiers act)."""
         for t in self._tiers:
@@ -329,31 +352,6 @@ def _normalize(role_map: dict) -> dict:
     # models under load can stall long before the first chunk. Keep the hosted path's default generous
     # (vs the generator's 180s); let a role override per model.
     timeout_default = int(role_map.get("timeout", 300))
-
-    roles: dict = {}
-    for name, spec in (role_map.get("roles") or {}).items():
-        if name.startswith("_"):  # "_brainstorm_comment"-style annotation keys (see the example JSONs)
-            continue
-        s = dict(spec)
-        s["base_url"] = _expand(s.get("base_url", base_default))
-        s["api_key"] = _expand(s.get("api_key", key_default))
-        if not s.get("model"):
-            raise RuntimeError(f"hosted role '{name}' is missing a 'model'.")
-        if not s["api_key"]:
-            raise RuntimeError(
-                f"hosted role '{name}' has no API key. Set OPENROUTER_API_KEY in generation/.env "
-                "(see .env.example) or give the role an explicit api_key."
-            )
-        s["timeout"] = int(s.get("timeout", timeout_default))
-        roles[name] = s
-
-    if not roles:
-        raise RuntimeError("hosted role map has no roles.")
-    # Backfill the three roles the forge needs from whatever is present.
-    for need in ("cards", "structure", "brainstorm"):
-        if need not in roles:
-            donor = roles.get("cards") or roles.get("structure") or next(iter(roles.values()))
-            roles[need] = dict(donor)
     # `fallbacks` (the tier list) wins; the singular legacy `fallback` key is still honored; neither present
     # means inherit the built-in chain (still inert per-tier without the env vars).
     if "fallbacks" in role_map:
@@ -362,7 +360,48 @@ def _normalize(role_map: dict) -> dict:
         raw_fbs = role_map["fallback"]
     else:
         raw_fbs = DEFAULT_ROLE_MAP["fallbacks"]
-    return {"roles": roles, "max_tokens_cap": cap, "fallbacks": _normalize_fallbacks(raw_fbs)}
+    fallbacks = _normalize_fallbacks(raw_fbs)
+
+    roles: dict = {}
+    promoted: dict | None = None  # the armed tier standing in for an unarmed primary (see module docstring)
+    for name, spec in (role_map.get("roles") or {}).items():
+        if name.startswith("_"):  # "_brainstorm_comment"-style annotation keys (see the example JSONs)
+            continue
+        s = dict(spec)
+        s["base_url"] = _expand(s.get("base_url", base_default))
+        s["api_key"] = _expand(s.get("api_key", key_default))
+        if not s.get("model"):
+            raise RuntimeError(f"hosted role '{name}' is missing a 'model'.")
+        if not s["api_key"] and "api_key" not in spec and fallbacks:
+            # The role rides the defaults' endpoint and that key is unset: stand the first armed tier in as
+            # the primary for this role (its endpoint, key, model slug and extra_body — a slug is endpoint-
+            # specific, so the role's own model cannot be kept). Only a role WITHOUT its own api_key
+            # qualifies; an explicit-but-empty key is a misconfiguration and stays loud below.
+            promoted = fallbacks[0]
+            s["base_url"], s["api_key"] = promoted["base_url"], promoted["api_key"]
+            s["model"] = promoted["models"][name] if name in promoted["models"] else s["model"]
+            s["extra_body"] = _tier_extra_body(promoted, name, s)
+            _log.warning("hosted role '%s': no key for %s — using tier '%s' (%s) as the primary",
+                         name, s.get("base_url"), promoted["name"], s["model"])
+        if not s["api_key"]:
+            raise RuntimeError(
+                f"hosted role '{name}' has no API key. Set OLLAMA_API_KEY (the primary) and/or "
+                "OPENROUTER_API_KEY (the backup) in generation/.env (see .env.example), or give the role an "
+                "explicit api_key."
+            )
+        s["timeout"] = int(s.get("timeout", timeout_default))
+        roles[name] = s
+    if promoted is not None:
+        fallbacks = [fb for fb in fallbacks if fb is not promoted]
+
+    if not roles:
+        raise RuntimeError("hosted role map has no roles.")
+    # Backfill the three roles the forge needs from whatever is present.
+    for need in ("cards", "structure", "brainstorm"):
+        if need not in roles:
+            donor = roles.get("cards") or roles.get("structure") or next(iter(roles.values()))
+            roles[need] = dict(donor)
+    return {"roles": roles, "max_tokens_cap": cap, "fallbacks": fallbacks}
 
 
 # Sentinel: a tier that does not mention `extra_body` at all inherits the ROLE's (pre-tier behavior, which
@@ -373,7 +412,7 @@ _INHERIT_EXTRA_BODY = object()
 def _normalize_fallbacks(fbs) -> list[dict]:
     """Expand + validate the ORDERED failover chain. Accepts a list of tiers, a single tier dict (the legacy
     singular `fallback` key), or None/empty (failover disabled). A tier whose api_key expands empty is
-    dropped — that is how `OLLAMA_API_KEY` unset silently removes the last-resort tier."""
+    dropped — that is how `OPENROUTER_API_KEY` unset silently removes the backup tiers."""
     if not fbs:
         return []
     if isinstance(fbs, dict):  # legacy singular `fallback` block -> a one-item chain
@@ -524,9 +563,12 @@ def describe(role_map: dict | None = None) -> str:
             extras.append("json")
         if _no_think(s.get("extra_body")):
             extras.append("no-think")
-        effort = (s.get("extra_body") or {}).get("reasoning", {})
+        eb = s.get("extra_body") or {}
+        effort = eb.get("reasoning", {})
         if isinstance(effort, dict) and effort.get("effort"):
             extras.append(f"think={effort['effort']}")
+        elif eb.get("reasoning_effort") and eb["reasoning_effort"] != "none":  # Ollama's spelling of the knob
+            extras.append(f"think={eb['reasoning_effort']}")
         tail = f" ({', '.join(extras)})" if extras else ""
         lines.append(f"  {role:10s} -> {s['model']} @ {host}{tail}")
     fbs = cfg["fallbacks"]

@@ -570,6 +570,10 @@ class _ProviderFake:
     def avoid_provider(self, name):
         self.avoided.append(name)
 
+    def rotate_tier(self):
+        self.rotated = getattr(self, "rotated", 0) + 1
+        return "openrouter-glm53"
+
 
 def test_run_stage_rerolls_away_from_the_failed_provider() -> None:
     print("stage re-roll avoids the provider that produced the failed sample...")
@@ -599,6 +603,8 @@ def test_run_stage_rerolls_away_from_the_failed_provider() -> None:
           f"the forge log names the stubbing provider (notes: {notes})")
     check(any("re-rolling away from provider Wafer" in n for n in notes),
           f"the forge log says the re-roll moved provider (notes: {notes})")
+    check(getattr(gen, "rotated", 0) == 1 and any("re-rolling on tier openrouter-glm53" in n for n in notes),
+          f"the re-roll rotates to the backup tier exactly once and says so (notes: {notes})")
 
 def main() -> int:
     test_catalog_loads()

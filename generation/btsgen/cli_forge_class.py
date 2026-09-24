@@ -1,7 +1,7 @@
 """CLI: forge a whole CLASS -> a BTSC import code (the command behind the P3 website's generate endpoint).
 
     uv run btsgen-forge-class --concept "a frost mage who freezes then shatters" --fake   # offline, no key
-    uv run btsgen-forge-class --concept "..."                    # DEFAULT: hosted mixture, OpenRouter primary (OPENROUTER_API_KEY in .env)
+    uv run btsgen-forge-class --concept "..."                    # DEFAULT: hosted mixture, Ollama Cloud primary (OLLAMA_API_KEY in .env)
     uv run btsgen-forge-class --concept "..." --anthropic        # force the Anthropic path (ANTHROPIC key in .env)
     uv run btsgen-forge-class --concept "..." --base-url https://api.openai.com/v1 \
         --api-key sk-... --model gpt-4o                                                     # BYOK (any OpenAI-compatible)
@@ -65,8 +65,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--api-key", default=None, help="API key for the BYOK endpoint")
     ap.add_argument("--model", default=None, help="model id (BYOK, or override the Anthropic model)")
     ap.add_argument("--ollama", action="store_true",
-                    help="hosted mixture, OpenRouter primary: per-role model mixture with a tiered fallback "
-                         "(needs OPENROUTER_API_KEY; OLLAMA_API_KEY arms the last-resort tier); implies "
+                    help="hosted mixture, Ollama Cloud primary: per-role model mixture with a tiered fallback "
+                         "(OLLAMA_API_KEY; OPENROUTER_API_KEY arms the backup tiers, or stands in as the "
+                         "primary when the Ollama key is unset); implies "
                          "--staged. This is the DEFAULT when a hosted key is set and no other backend is chosen.")
     ap.add_argument("--ollama-config", default=None,
                     help="with the ollama path: role map JSON (see ollama_roles.example.json)")
@@ -77,7 +78,7 @@ def main(argv: list[str] | None = None) -> int:
 
     point_btsgen_at_mod_contract()
 
-    # Default backend (release): the hosted mixture (OpenRouter primary), whenever a hosted key is available
+    # Default backend (release): the hosted mixture (Ollama Cloud primary), whenever a hosted key is available
     # and the user didn't explicitly pick another path. --anthropic / --fake / BYOK flags all opt out.
     if not (args.fake or args.ollama or args.anthropic or args.base_url or args.api_key):
         from .generator import load_env
@@ -94,7 +95,7 @@ def main(argv: list[str] | None = None) -> int:
         card_gen_factory = lambda: _CardFake()  # noqa: E731
         make_gen = lambda contract_mod, *, max_tokens: _StageFake(contract_mod)  # noqa: E731
     elif args.ollama:
-        # Parallel hosted path (OpenRouter primary): a per-role model mixture (brainstorm on a small/permissive model, cards
+        # Parallel hosted path (Ollama Cloud primary): a per-role model mixture (brainstorm on a small/permissive model, cards
         # coded by a strong model). Same generator tuple as every other backend, so downstream is untouched.
         from . import ollama_mix
         role_map = ollama_mix.load_role_map(args.ollama_config) if args.ollama_config else None
@@ -104,7 +105,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"ERROR: {e}", file=sys.stderr)
             return 2
         args.staged = True  # the Ollama mixture only makes sense through the staged creative front-end
-        print("hosted mix (OpenRouter primary):\n" + ollama_mix.describe(role_map))
+        print("hosted mix:\n" + ollama_mix.describe(role_map))
     elif args.base_url or args.api_key:
         if not (args.base_url and args.api_key and args.model):
             print("ERROR: BYOK needs --base-url, --api-key, and --model together.", file=sys.stderr)

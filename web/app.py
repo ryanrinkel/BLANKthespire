@@ -999,16 +999,17 @@ def _reconcile_forge_jobs() -> int:
 # in metered_cost_micros and every money reader prefers it — the table under-counted a real forge by 30-45% in
 # the 2026-09-18 A/B, which is why it is a fallback and not the number.
 #
-# Bare slugs (`gemma4:31b`, `glm-5.2`) are OLLAMA CLOUD, the last-resort tier: they were priced at 0 for the
+# Bare slugs (`gemma4:31b`, `glm-5.3`) are OLLAMA CLOUD, the primary since 2026-09-24: they were priced at 0 for the
 # flat plan, which Ollama retired for per-token billing on 2026-08-31 — a 0 there silently reported our most
 # expensive tier as free. Namespaced slugs are OpenRouter, fetched live from GET /api/v1/models on 2026-09-18.
 # Override/extend with BTSWEB_MODEL_PRICES='{"model": [in, out, cached], ...}'. Unknown model => est_cost NULL
 # (recorded, not priced).
 MODEL_PRICES: dict[str, tuple[float, float, float]] = {
-    "gemma4:31b": (0.14, 0.40, 0.05),          # Ollama Cloud per-token list
+    "gemma4:31b": (0.14, 0.40, 0.05),          # Ollama Cloud per-token list, brainstorm on the primary
+    "glm-5.3": (1.40, 4.40, 0.26),             # Ollama Cloud per-token list (ollama.com/pricing 2026-09-24), the primary
     "glm-5.2": (1.40, 4.40, 0.26),             # Ollama Cloud per-token list
-    "z-ai/glm-5.3": (0.91, 2.86, 0.169),       # OpenRouter, the hosted primary since Step 1
-    "z-ai/glm-5.2": (0.5544, 1.7424, 0.10296),  # OpenRouter, the middle fallback tier
+    "z-ai/glm-5.3": (0.91, 2.86, 0.169),       # OpenRouter, the first backup tier (the hosted primary 2026-09-18..24)
+    "z-ai/glm-5.2": (0.5544, 1.7424, 0.10296),  # OpenRouter, the last fallback tier
     "google/gemma-4-31b-it": (0.09, 0.34, 0.05),  # OpenRouter, brainstorm at every tier
 }
 

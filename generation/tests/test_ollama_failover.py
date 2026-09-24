@@ -137,13 +137,48 @@ def test_singular_fallback_key_still_loads():
             check(ollama_mix.describe(rm), f"{name} should render a CLI banner")
 
 
-def test_missing_key_error_names_openrouter():
-    with _env(OPENROUTER_API_KEY=""):
+def test_missing_key_error_names_both_keys():
+    with _env(OPENROUTER_API_KEY="", OLLAMA_API_KEY=""):
         try:
             ollama_mix._normalize({"roles": {"cards": {"model": "m"}}, "fallback": None})
             check(False, "a role with no API key should raise")
         except RuntimeError as e:
-            check("OPENROUTER_API_KEY" in str(e), f"the no-key error must name OPENROUTER_API_KEY, got: {e}")
+            check("OLLAMA_API_KEY" in str(e) and "OPENROUTER_API_KEY" in str(e),
+                  f"the no-key error must name both hosted keys, got: {e}")
+        # No key anywhere, chain inherited: every tier is dropped AND the primary is unarmed -> still loud.
+        try:
+            ollama_mix._normalize(ollama_mix.DEFAULT_ROLE_MAP)
+            check(False, "the built-in map with no keys at all should raise")
+        except RuntimeError as e:
+            check("OLLAMA_API_KEY" in str(e), f"got: {e}")
+
+
+def test_primary_degrades_to_first_armed_tier_without_ollama_key():
+    """A box with only OPENROUTER_API_KEY must forge on OpenRouter (the first armed tier stands in as the
+    primary and leaves the chain), exactly the pre-2026-09-24 route."""
+    with _env(OPENROUTER_API_KEY="sk-or-test", OLLAMA_API_KEY=""):
+        cfg = ollama_mix._normalize(ollama_mix.DEFAULT_ROLE_MAP)
+        for role, model in (("brainstorm", "google/gemma-4-31b-it"), ("structure", "z-ai/glm-5.3"),
+                            ("cards", "z-ai/glm-5.3")):
+            s = cfg["roles"][role]
+            check(s["base_url"] == OPENROUTER and s["api_key"] == "sk-or-test" and s["model"] == model,
+                  f"{role} should be re-pointed at the openrouter-glm53 tier (got {s['model']} @ {s['base_url']})")
+        check(cfg["roles"]["structure"]["extra_body"] == {"reasoning": {"effort": "low"}, "usage": {"include": True}},
+              "the promoted role takes the tier's extra_body (OpenRouter spelling)")
+        check(cfg["roles"]["brainstorm"].get("extra_body") is None, "brainstorm never carries the knob")
+        check([fb["name"] for fb in cfg["fallbacks"]] == ["openrouter-glm52"],
+              f"the promoted tier leaves the chain (got {[fb['name'] for fb in cfg['fallbacks']]})")
+        _, card_factory, _, _ = ollama_mix.build_ollama_mix()
+        tiers = card_factory().tiers
+        check([t.name for t in tiers] == ["primary", "openrouter-glm52"] and tiers[0].gen.model == "z-ai/glm-5.3",
+              "build: OpenRouter glm-5.3 primary + glm-5.2 backup")
+    # A role with an EXPLICIT empty key is a misconfiguration, not a promotion.
+    with _env(OPENROUTER_API_KEY="sk-or-test", OLLAMA_TEST_FB_KEY=""):
+        try:
+            ollama_mix._normalize({"roles": {"cards": {"model": "m", "api_key": "${OLLAMA_TEST_FB_KEY}"}}})
+            check(False, "an explicit-but-empty role key must still raise")
+        except RuntimeError:
+            pass
 
 
 def test_build_returns_wrapper_only_when_armed():
@@ -159,30 +194,52 @@ def test_build_returns_wrapper_only_when_armed():
         check(isinstance(gen, _FailoverGenerator), "with the key, build should wrap in _FailoverGenerator")
         tiers = gen.tiers
         check(len(tiers) == 2 and tiers[0].name == "primary", "the chain is primary + one armed tier")
-        check(tiers[1].gen.model == "z-ai/glm-5.2" and "openrouter" in tiers[1].gen.base_url,
+        check(tiers[1].gen.model == "z-ai/glm-5.3" and "openrouter" in tiers[1].gen.base_url,
               "an unspecified tier defaults to the metered OpenRouter endpoint/model")
         check(tiers[1].gen.max_tokens == tiers[0].gen.max_tokens, "tiers should share the token budget")
 
 
 def test_default_chain_shape():
     with _env(OPENROUTER_API_KEY="sk-or-test", OLLAMA_API_KEY="sk-ol-test"):
-        _, card_factory, _, _ = ollama_mix.build_ollama_mix()
+        blueprint_gen, card_factory, _, make_gen = ollama_mix.build_ollama_mix()
         tiers = card_factory().tiers
-        check([t.name for t in tiers] == ["primary", "openrouter-glm52", "ollama"],
-              f"the default chain is glm-5.3 -> glm-5.2 -> ollama, got {[t.name for t in tiers]}")
-        check(tiers[0].gen.model == "z-ai/glm-5.3" and tiers[0].gen.base_url == OPENROUTER,
-              "the primary tier is OpenRouter glm-5.3")
-        check(tiers[1].gen.model == "z-ai/glm-5.2" and tiers[1].gen.base_url == OPENROUTER,
-              "the second tier is OpenRouter glm-5.2 (same endpoint, one generation back)")
-        check(tiers[2].gen.model == "glm-5.2" and tiers[2].gen.base_url == OLLAMA,
-              "the last tier is Ollama Cloud")
-        check(tiers[0].cooldown_s == 3600 and tiers[1].cooldown_s == 900 and tiers[2].cooldown_s == 3600,
-              "per-tier cooldowns: 1h primary, 15m glm-5.2, 1h ollama")
-    # OLLAMA_API_KEY unset and the last tier simply stops existing.
-    with _env(OPENROUTER_API_KEY="sk-or-test", OLLAMA_API_KEY=""):
+        check([t.name for t in tiers] == ["primary", "openrouter-glm53", "openrouter-glm52"],
+              f"the default chain is ollama -> or-glm-5.3 -> or-glm-5.2, got {[t.name for t in tiers]}")
+        check(tiers[0].gen.model == "glm-5.3" and tiers[0].gen.base_url == OLLAMA,
+              "the primary tier is Ollama Cloud glm-5.3")
+        check(tiers[1].gen.model == "z-ai/glm-5.3" and tiers[1].gen.base_url == OPENROUTER,
+              "the second tier is OpenRouter glm-5.3 (different vendor + key)")
+        check(tiers[2].gen.model == "z-ai/glm-5.2" and tiers[2].gen.base_url == OPENROUTER,
+              "the last tier is OpenRouter glm-5.2")
+        check(tiers[0].cooldown_s == 3600 and tiers[1].cooldown_s == 900 * 4 and tiers[2].cooldown_s == 900,
+              "per-tier cooldowns: 1h ollama, 1h or-glm-5.3, 15m or-glm-5.2")
+        from btsgen.frontend.stage_cloud import _CloudClusterContract
+        bt = make_gen(_CloudClusterContract(), max_tokens=100).tiers
+        check(bt[0].gen.model == "gemma4:31b" and bt[1].gen.model == "google/gemma-4-31b-it",
+              "brainstorm rides gemma4 on Ollama, gemma-4-31b-it on OpenRouter")
+    # OPENROUTER_API_KEY unset and the backup tiers simply stop existing: Ollama-only route.
+    with _env(OPENROUTER_API_KEY="", OLLAMA_API_KEY="sk-ol-test"):
         _, card_factory, _, _ = ollama_mix.build_ollama_mix()
-        check([t.name for t in card_factory().tiers] == ["primary", "openrouter-glm52"],
-              "OLLAMA_API_KEY unset should silently drop the Ollama tier")
+        gen = card_factory()
+        check(type(gen).__name__ == "OpenAICompatGenerator" and gen.model == "glm-5.3" and gen.base_url == OLLAMA,
+              "OPENROUTER_API_KEY unset should leave a plain Ollama generator")
+
+
+def test_rotate_tier_sends_the_next_call_to_the_backup():
+    _reset_breaker()
+    primary, backup, last = _Stub("primary", base_url=OLLAMA), _Stub("backup", base_url=OPENROUTER), _Stub("last")
+    gen = _chain(primary, backup, last)
+    check(gen.rotate_tier() is None, "nothing has answered yet -> nothing to rotate")
+    gen.first_attempt("a")
+    check(gen.rotate_tier() == "backup", "after the primary answers, rotation puts the backup in front")
+    out, _ = gen.first_attempt("b")
+    check(out == "backup:b" and gen.model == "backup", "the re-roll is served by the backup tier")
+    check([t.name for t in gen.tiers] == ["backup", "last", "primary"], "the primary moved to the back")
+    check(gen.rotate_tier() == "last", "rotating again walks on down the chain")
+    single = _FailoverGenerator([_Tier(_Stub("only"))])
+    single.first_attempt("c")
+    check(single.rotate_tier() is None, "a single-tier chain has nothing to rotate to")
+    _reset_breaker()
 
 
 # ------------------------------------------------------------------ error classes
@@ -323,12 +380,13 @@ def test_extra_body_is_per_tier():
     with _env(OPENROUTER_API_KEY="sk-or-test", OLLAMA_API_KEY="sk-ol-test"):
         _, card_factory, _, make_gen = ollama_mix.build_ollama_mix()
         tiers = card_factory().tiers
-        check(tiers[0].gen._extra_body == {"reasoning": {"effort": "low"}, "usage": {"include": True}},
-              "the glm-5.3 primary must send reasoning.effort=low (it 400s on reasoning.enabled=false)")
-        check(tiers[1].gen._extra_body == {"reasoning": {"enabled": False}, "usage": {"include": True}},
-              "the glm-5.2 OpenRouter tier carries its OWN extra_body, not the primary's")
-        check(tiers[2].gen._extra_body == {"reasoning_effort": "none"},
-              "the Ollama tier wants reasoning_effort=none (the OpenRouter spelling is ignored there)")
+        check(tiers[0].gen._extra_body == {"reasoning_effort": "low"},
+              "the Ollama glm-5.3 primary wants reasoning_effort=low (the OpenRouter spelling is ignored there)")
+        check(tiers[1].gen._extra_body == {"reasoning": {"effort": "low"}, "usage": {"include": True}},
+              "the OpenRouter glm-5.3 tier carries its OWN extra_body: reasoning.effort=low (it 400s on "
+              "reasoning.enabled=false) + metered usage")
+        check(tiers[2].gen._extra_body == {"reasoning": {"enabled": False}, "usage": {"include": True}},
+              "the glm-5.2 OpenRouter tier disables reasoning the OpenRouter way")
         # brainstorm rides a non-reasoning gemma on every tier and must carry no knob at all.
         bs = make_gen(_CloudClusterContract(), max_tokens=4000)
         check(all(not t.gen._extra_body for t in bs.tiers),
@@ -354,22 +412,20 @@ def test_tier_without_extra_body_inherits_the_role():
 def test_default_roles_pin_reasoning_per_provider():
     for role in ("structure", "cards"):
         eb = ollama_mix.DEFAULT_ROLE_MAP["roles"][role].get("extra_body", {})
-        check(eb.get("reasoning") == {"effort": "low"},
-              f"default {role} role must pin reasoning.effort=low (glm-5.3 400s on reasoning.enabled=false: "
-              "'Reasoning is mandatory'; unbounded thinking truncated the triad blueprint — 2026-08-16)")
-        check(eb.get("usage") == {"include": True},
-              f"default {role} role must ask OpenRouter for metered usage.cost")
-        check("reasoning_effort" not in eb,
-              f"the OpenRouter {role} role must not send Ollama's reasoning_effort spelling")
+        check(eb == {"reasoning_effort": "low"},
+              f"default {role} role (Ollama glm-5.3) must pin reasoning_effort=low — 'none' makes glm-5.3 "
+              f"narrate its reasoning in the visible content, unset burns the budget on hidden thinking (got {eb})")
     check("extra_body" not in ollama_mix.DEFAULT_ROLE_MAP["roles"]["brainstorm"],
           "brainstorm (non-reasoning gemma) must not carry the knob")
     by_name = {t["name"]: t for t in ollama_mix.DEFAULT_ROLE_MAP["fallbacks"]}
+    check(list(by_name) == ["openrouter-glm53", "openrouter-glm52"], f"chain order: {list(by_name)}")
+    t53 = by_name["openrouter-glm53"]["extra_body"]
+    check("reasoning_effort" not in t53 and t53["reasoning"] == {"effort": "low"} and t53["usage"] == {"include": True},
+          "the OpenRouter glm-5.3 tier pins reasoning.effort=low (glm-5.3 400s on reasoning.enabled=false: "
+          "'Reasoning is mandatory') and asks for metered usage.cost")
     or_tier = by_name["openrouter-glm52"]["extra_body"]
     check("reasoning_effort" not in or_tier and or_tier["reasoning"] == {"enabled": False},
           "the OpenRouter glm-5.2 tier disables reasoning the OpenRouter way, never reasoning_effort")
-    ol_tier = by_name["ollama"]["extra_body"]
-    check("reasoning" not in ol_tier and ol_tier["reasoning_effort"] == "none",
-          "the Ollama tier uses reasoning_effort=none and never the OpenRouter `reasoning` object")
 
 
 # ------------------------------------------------------------------ diagnostics + build side effects

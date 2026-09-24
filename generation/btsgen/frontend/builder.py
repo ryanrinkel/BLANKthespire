@@ -250,6 +250,7 @@ class BlueprintBuilder:
                 # upstream then sinks the whole forge). Per-generator, so a good provider's ordinary whiff
                 # does not evict it for everyone else.
                 self._avoid_last_provider(gen, label)
+                self._rotate_tier(gen, label)
             text, messages = gen.first_attempt(brief)
             self._note_stubs(gen, label)
             obj = _extract(text)
@@ -280,6 +281,16 @@ class BlueprintBuilder:
         who = ", ".join(str(s) for s in stubs)
         self._note(f"      {label}: provider {who} answered with a placeholder; blocked it and retried"
                    + (f" (answered by {meta['provider']})" if meta.get("provider") else ""))
+
+    def _rotate_tier(self, gen, label: str) -> None:
+        """Hosted route: a whole-stage re-roll goes to the NEXT failover tier (Ollama -> OpenRouter), so the
+        fresh sample comes from a different vendor/model build rather than the one that just whiffed."""
+        fn = getattr(gen, "rotate_tier", None)
+        if fn is None:
+            return
+        name = fn()
+        if name:
+            self._note(f"      {label}: re-rolling on tier {name}")
 
     def _avoid_last_provider(self, gen, label: str) -> None:
         meta = getattr(gen, "last_meta", None) or {}
