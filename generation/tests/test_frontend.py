@@ -532,8 +532,78 @@ def test_triad_frontend() -> None:
     check(not bp2.get("pair_lines"), "flag-off build declares no pair_lines")
 
 
+
+def test_relic_intent_rejects_placeholders() -> None:
+    print("relic intent validator rejects the -1 placeholder...")
+    from btsgen.frontend.stage_relic import validate_relic_intent
+    check(validate_relic_intent({"name": -1, "fantasy": -1, "effect_sketch": -1}) != [],
+          "the all -1 placeholder must not validate as a relic intent")
+    check(validate_relic_intent({"name": "Coil", "effect_sketch": -1, "fantasy": None}) != [],
+          "a real name with placeholder sketches must still fail")
+    check(validate_relic_intent({"name": "Coil", "effect_sketch": "gain 2 Block"}) == [],
+          "a genuine relic intent still validates")
+    check(validate_relic_intent({"name": "  ", "fantasy": "x"}) != [], "blank name is rejected")
+
+
+class _ProviderFake:
+    """A stage generator that records provider avoidance and hands back scripted answers with OpenRouter-style
+    last_meta, so _run_stage's re-roll/stub narration can be checked without the network."""
+
+    def __init__(self, answers: list[tuple[str, dict]]) -> None:
+        self._answers = list(answers)
+        self.avoided: list[str] = []
+        self.last_meta: dict = {}
+        self.calls: list[str] = []
+
+    def _next(self, kind: str):
+        self.calls.append(kind)
+        text, meta = self._answers.pop(0)
+        self.last_meta = meta
+        return text, [{"role": "assistant", "content": text}]
+
+    def first_attempt(self, brief):
+        return self._next("first")
+
+    def repair(self, messages, prev_text, errors):
+        return self._next("repair")
+
+    def avoid_provider(self, name):
+        self.avoided.append(name)
+
+
+def test_run_stage_rerolls_away_from_the_failed_provider() -> None:
+    print("stage re-roll avoids the provider that produced the failed sample...")
+    import os
+    notes: list[str] = []
+    b = BlueprintBuilder(_fake_make_gen, catalog=load_catalog(), on_event=notes.append, auto=True,
+                         gap_log_append=None, triad=False)
+    gen = _ProviderFake([
+        ("{}", {"provider": "Wafer", "stubs": ["ModelRun2"]}),          # attempt 1 (after an in-call stub retry)
+        ("{}", {"provider": "Wafer"}),                                  # its repair
+        ('{"ok": 1}', {"provider": "CoreWeave"}),                       # attempt 2 lands elsewhere
+    ])
+    validate = lambda obj: [] if obj.get("ok") else ["missing 'ok'"]  # noqa: E731
+    prev = os.environ.get("BTS_STAGE_ATTEMPTS")
+    os.environ["BTS_STAGE_ATTEMPTS"] = "2"
+    try:
+        out = b._run_stage(gen, object(), validate, "blueprint")
+    finally:
+        if prev is None:
+            os.environ.pop("BTS_STAGE_ATTEMPTS", None)
+        else:
+            os.environ["BTS_STAGE_ATTEMPTS"] = prev
+    check(out == {"ok": 1}, f"the second attempt's answer is returned (got {out})")
+    check(gen.calls == ["first", "repair", "first"], f"one repair, then a fresh re-roll (got {gen.calls})")
+    check(gen.avoided == ["Wafer"], f"the re-roll must avoid the provider of the failed sample (got {gen.avoided})")
+    check(any("provider ModelRun2 answered with a placeholder" in n for n in notes),
+          f"the forge log names the stubbing provider (notes: {notes})")
+    check(any("re-rolling away from provider Wafer" in n for n in notes),
+          f"the forge log says the re-roll moved provider (notes: {notes})")
+
 def main() -> int:
     test_catalog_loads()
+    test_relic_intent_rejects_placeholders()
+    test_run_stage_rerolls_away_from_the_failed_provider()
     test_buildability_flips_with_gap_status()
     test_gap_status_parses_live_log()
     test_append_vocab_gaps()

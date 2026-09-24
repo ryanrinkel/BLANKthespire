@@ -59,8 +59,14 @@ def validate_relic_intent(obj: dict) -> list[str]:
     errs: list[str] = []
     if not isinstance(obj, dict):
         return ["relic intent is not an object"]
-    if not str(obj.get("name", "")).strip():
-        errs.append("relic intent needs a non-empty name")
-    if not str(obj.get("effect_sketch", "")).strip() and not str(obj.get("fantasy", "")).strip():
-        errs.append("relic intent needs an effect_sketch or fantasy")
+    # str() would have accepted the `{"name":-1,"fantasy":-1,"effect_sketch":-1}` placeholder some OpenRouter
+    # upstreams emit (keystone relic "-1 - -1 [-1]" in live forge logs) — values must be real text.
+    def _text(key: str) -> str:
+        v = obj.get(key)
+        return v.strip() if isinstance(v, str) else ""
+
+    if not _text("name"):
+        errs.append("relic intent needs a non-empty name (a string)")
+    if not _text("effect_sketch") and not _text("fantasy"):
+        errs.append("relic intent needs an effect_sketch or fantasy (strings)")
     return errs

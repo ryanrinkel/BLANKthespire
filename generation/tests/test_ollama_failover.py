@@ -374,6 +374,26 @@ def test_default_roles_pin_reasoning_per_provider():
 
 # ------------------------------------------------------------------ diagnostics + build side effects
 
+def test_avoid_provider_reaches_every_tier():
+    print("avoid_provider forwards to every tier that understands it...")
+    from btsgen.generator import OpenAICompatGenerator
+
+    class _Contract:
+        def system_prompt(self):
+            return "S"
+
+    o1 = OpenAICompatGenerator("https://openrouter.ai/api/v1", "k", "m1", contract_mod=_Contract())
+    o2 = OpenAICompatGenerator("https://openrouter.ai/api/v1", "k", "m2", contract_mod=_Contract())
+    ollama = OpenAICompatGenerator("https://ollama.com/v1", "k", "m3", contract_mod=_Contract())
+    plain = _Stub("plain")  # no avoid_provider at all — must be skipped, not crash
+    fg = _FailoverGenerator([_Tier(o1, name="a"), _Tier(o2, name="b"), _Tier(ollama, name="c"),
+                             _Tier(plain, name="d")])
+    fg.avoid_provider("ModelRun2")
+    check(o1.avoid_providers == {"ModelRun2"} and o2.avoid_providers == {"ModelRun2"},
+          "both OpenRouter tiers must avoid the provider")
+    check(not ollama.avoid_providers, "the Ollama tier ignores OpenRouter provider names")
+
+
 def test_last_meta_delegates_to_the_answering_tier():
     _reset_breaker()
     primary, fallback = _Stub("primary", base_url=OPENROUTER), _Stub("fallback", base_url=OLLAMA)

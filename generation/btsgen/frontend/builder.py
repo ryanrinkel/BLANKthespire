@@ -244,7 +244,14 @@ class BlueprintBuilder:
         attempts = max(1, int(os.environ.get("BTS_STAGE_ATTEMPTS", "1")))
         last_errs: list[str] = [f"unparseable {label}"]
         for attempt in range(attempts):
+            if attempt:
+                # OpenRouter routes a cached prompt back to the upstream holding the cache, so without this the
+                # "fresh" re-roll lands on the very provider whose sample just failed (a placeholder-emitting
+                # upstream then sinks the whole forge). Per-generator, so a good provider's ordinary whiff
+                # does not evict it for everyone else.
+                self._avoid_last_provider(gen, label)
             text, messages = gen.first_attempt(brief)
+            self._note_stubs(gen, label)
             obj = _extract(text)
             if obj is None:
                 self._note_unparseable(gen, label)
@@ -253,6 +260,7 @@ class BlueprintBuilder:
                 self._note(f"{label}: {len(errs)} issue(s); repairing"
                            + (f" (attempt {attempt + 1}/{attempts})" if attempts > 1 else ""))
                 text, messages = gen.repair(messages, text, errs)
+                self._note_stubs(gen, label)
                 obj = _extract(text)
                 if obj is None:
                     self._note_unparseable(gen, label)
@@ -261,6 +269,25 @@ class BlueprintBuilder:
                 return obj
             last_errs = errs
         raise BlueprintBuildError(f"{label} failed: " + "; ".join(last_errs[:4]))
+
+    def _note_stubs(self, gen, label: str) -> None:
+        """Name the OpenRouter upstream(s) that answered the last call with a placeholder (`{}` / all -1);
+        the generator already blocked them and retried, so this is a forge-log breadcrumb, not a failure."""
+        meta = getattr(gen, "last_meta", None) or {}
+        stubs = meta.get("stubs") or []
+        if not stubs:
+            return
+        who = ", ".join(str(s) for s in stubs)
+        self._note(f"      {label}: provider {who} answered with a placeholder; blocked it and retried"
+                   + (f" (answered by {meta['provider']})" if meta.get("provider") else ""))
+
+    def _avoid_last_provider(self, gen, label: str) -> None:
+        meta = getattr(gen, "last_meta", None) or {}
+        bad = meta.get("provider")
+        fn = getattr(gen, "avoid_provider", None)
+        if bad and fn is not None:
+            fn(bad)
+            self._note(f"      {label}: re-rolling away from provider {bad}")
 
     def _note_unparseable(self, gen, label: str) -> None:
         """Explain WHY a stage response had no parseable JSON, from the generator's last-call diagnostics

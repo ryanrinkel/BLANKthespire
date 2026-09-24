@@ -280,6 +280,13 @@ class _FailoverGenerator:
             return out
         raise last_exc  # every tier refused; the last failure is the honest one to surface
 
+    def avoid_provider(self, name: str | None) -> None:
+        """Forward a stage re-roll's "not that upstream again" to every tier (only OpenRouter tiers act)."""
+        for t in self._tiers:
+            fn = getattr(t.gen, "avoid_provider", None)
+            if fn is not None:
+                fn(name)
+
     def first_attempt(self, brief):
         return self._call("first_attempt", brief)
 

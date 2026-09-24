@@ -14,7 +14,8 @@ import sys
 import urllib.error
 import urllib.request
 
-from btsgen.generator import OpenAICompatGenerator
+from btsgen import generator as _generator
+from btsgen.generator import OpenAICompatGenerator, looks_like_stub
 
 _PASS = 0
 _FAIL = 0
@@ -292,7 +293,105 @@ def test_extra_body_dropped_on_400() -> None:
     OpenAICompatGenerator._rejected_extra_keys.clear()
 
 
+def _or_gen(**kw) -> OpenAICompatGenerator:
+    """A generator pointed at OpenRouter (the only endpoint the provider block list applies to)."""
+    _generator._reset_ignored_providers()
+    return OpenAICompatGenerator("https://openrouter.ai/api/v1", "sk-x", "m1", contract_mod=_Contract(),
+                                 max_tokens=100, **kw)
+
+
+def _answer(text: str, provider: str) -> _FakeResp:
+    return _FakeResp(_sse([{"provider": provider, "choices": [{"delta": {"content": text},
+                                                                "finish_reason": "stop"}]}, "[DONE]"]))
+
+
+def test_looks_like_stub() -> None:
+    print("stub detector...")
+    for text in ("{}", "[]", '{"name":-1, "fantasy":-1, "effect_sketch":-1}', '{"a": "", "b": null, "c": []}',
+                 '{"name": "-1"}', "  {}  "):
+        check(looks_like_stub(text), f"{text!r} must count as a placeholder answer")
+    for text in ("", "   ", "not json", '{"name": "The Hidden Camera", "fantasy": -1}', '{"n": 0}',
+                 '{"ok": false}', '{"facets": [{"name": "x"}]}', "[1]"):
+        check(not looks_like_stub(text), f"{text!r} must NOT count as a placeholder answer")
+
+
+def test_stub_answer_blocks_provider_and_retries() -> None:
+    print("placeholder answer -> provider blocked, call retried elsewhere...")
+    captured: list[dict] = []
+    answers = [_answer("{}", "ModelRun2"), _answer('{"name": "Ever-Warm Hearthstone"}', "CoreWeave")]
+
+    def fake(req, timeout=None):
+        captured.append(json.loads(req.data.decode()))
+        return answers.pop(0)
+
+    gen = _or_gen()
+    text, _ = _with_urlopen(fake, lambda: gen.first_attempt("x"))
+    check(text == '{"name": "Ever-Warm Hearthstone"}', f"the retry's answer must be returned (got {text!r})")
+    check(len(captured) == 2, f"a placeholder answer must trigger exactly one more request (got {len(captured)})")
+    check(captured[0].get("provider") == {"ignore": ["ModelRun"]},
+          f"the first request carries only the static block list (got {captured[0].get('provider')})")
+    check(captured[1].get("provider") == {"ignore": ["ModelRun", "ModelRun2"]},
+          f"the retry must ignore the provider that stubbed (got {captured[1].get('provider')})")
+    check(gen.last_meta.get("stubs") == ["ModelRun2"] and gen.last_meta.get("provider") == "CoreWeave",
+          f"last_meta must name the stubbing provider and the one that answered (got {gen.last_meta})")
+
+    # Process-wide: a FRESH generator (another stage, another forge) skips the blocked provider too.
+    captured.clear()
+    answers.append(_answer('{"ok": true}', "CoreWeave"))
+    gen2 = OpenAICompatGenerator("https://openrouter.ai/api/v1", "sk-x", "m2", contract_mod=_Contract(),
+                                 max_tokens=100)
+    _with_urlopen(fake, lambda: gen2.first_attempt("x"))
+    check(captured[0].get("provider") == {"ignore": ["ModelRun", "ModelRun2"]},
+          "a blocked provider must be skipped by every generator in the process")
+    check("ModelRun2" in _generator.ignored_providers(), "the block must be visible via ignored_providers()")
+
+    # Bounded: STUB_RETRIES placeholder answers in a row hand the stub back instead of looping forever.
+    captured.clear()
+    _generator._reset_ignored_providers()
+    answers.extend([_answer("{}", "P1"), _answer("{}", "P2"), _answer("{}", "P3"), _answer("{}", "P4")])
+
+    gen3 = _or_gen()
+    text, _ = _with_urlopen(fake, lambda: gen3.first_attempt("x"))
+    check(text == "{}" and len(captured) == _generator.STUB_RETRIES + 1,
+          f"after STUB_RETRIES retries the placeholder is handed back (got {text!r} after {len(captured)} calls)")
+    check(gen3.last_meta.get("stubs") == ["P1", "P2", "P3"], f"every stubbing provider is recorded ({gen3.last_meta})")
+    answers.clear()
+    _generator._reset_ignored_providers()
+
+
+def test_provider_field_only_on_openrouter() -> None:
+    print("provider block list is OpenRouter-only and merges static config...")
+    captured: list[dict] = []
+
+    def fake(req, timeout=None):
+        captured.append(json.loads(req.data.decode()))
+        return _answer("{}", "Whoever")  # a stub — but off OpenRouter it must be neither blocked nor retried
+
+    gen = _gen()  # https://fake.test/v1
+    text, _ = _with_urlopen(fake, lambda: gen.first_attempt("x"))
+    check(text == "{}" and len(captured) == 1, "off OpenRouter a placeholder is returned as-is, no retry")
+    check("provider" not in captured[0], "off OpenRouter no `provider` field is sent")
+    check("stubs" not in gen.last_meta, "off OpenRouter nothing is recorded as a stub")
+    gen.avoid_provider("Whoever")
+    check(not gen.avoid_providers, "avoid_provider is a no-op off OpenRouter")
+
+    captured.clear()
+    _generator._reset_ignored_providers()
+    gen2 = _or_gen(extra_body={"provider": {"order": ["Wafer"], "ignore": ["Slow"]}, "reasoning": {"effort": "low"}})
+    gen2.avoid_provider("Wafer2")
+    gen2.avoid_provider(None)
+    _with_urlopen(lambda req, timeout=None: (captured.append(json.loads(req.data.decode())),
+                                            _answer('{"ok": 1}', "Wafer"))[1],
+                  lambda: gen2.first_attempt("x"))
+    check(captured[0].get("provider") == {"order": ["Wafer"], "ignore": ["ModelRun", "Slow", "Wafer2"]},
+          f"static provider config is kept and its ignore list extended (got {captured[0].get('provider')})")
+    check(captured[0].get("reasoning") == {"effort": "low"}, "other extra_body keys are untouched")
+
+
 def main() -> int:
+    test_looks_like_stub()
+    test_stub_answer_blocks_provider_and_retries()
+    test_provider_field_only_on_openrouter()
     test_sse_reassembly_and_usage()
     test_plain_json_fallback()
     test_transient_retry()

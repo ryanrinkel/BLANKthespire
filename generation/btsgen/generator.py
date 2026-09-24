@@ -8,6 +8,8 @@ from __future__ import annotations
 import json
 import os
 import re
+import threading
+import time
 import urllib.error
 import urllib.request
 
@@ -153,6 +155,75 @@ class AnthropicGenerator:
         return text, messages
 
 
+# ---- OpenRouter provider hygiene ------------------------------------------------------------------------
+# OpenRouter fans one model slug out over several upstream providers. Some of them answer a JSON-mode request
+# with a PLACEHOLDER instead of an answer — `{}` or `{"name":-1,"fantasy":-1,...}` with finish_reason "stop" —
+# and, because OpenRouter routes a cached prompt back to the provider holding the cache, the repair and the
+# whole-stage re-roll land on the same provider, so one bad upstream kills the whole forge ("blueprint failed:
+# missing 'name'; missing 'description'; …", 5 of 8 live forges on 2026-09-24). Provider ModelRun (gemma-4
+# fp4) does this on EVERY prompt, vanilla or not (probe 2026-09-24); the glm-5.3 culprit is unidentified.
+# Two defenses, both OpenRouter-only (the request field is OpenRouter's `provider.ignore`, which accepts the
+# provider name exactly as the response's `provider` field spells it — verified):
+#   1. a static block list for upstreams known to do this;
+#   2. a stub detector on every reply — the answering provider joins a process-wide, time-limited block list
+#      and the call is retried at once, so the retry cannot be routed back to it.
+OPENROUTER_HOST = "openrouter.ai"
+STATIC_IGNORED_PROVIDERS: tuple[str, ...] = ("ModelRun",)
+PROVIDER_IGNORE_TTL_S = 3600  # a stubbing provider is skipped for an hour, then gets another chance
+STUB_RETRIES = 2  # per call: how many placeholder answers to re-request before handing the stub back
+_IGNORED_LOCK = threading.Lock()
+_ignored_providers: dict[str, float] = {}  # provider name -> time.monotonic() deadline
+_PLACEHOLDER_SCALARS = (-1, "-1", "", None)
+
+
+def ignore_provider(name: str, seconds: float = PROVIDER_IGNORE_TTL_S) -> None:
+    """Skip OpenRouter upstream `name` on every call from this process for `seconds` (extends, never shortens)."""
+    if not name:
+        return
+    with _IGNORED_LOCK:
+        deadline = time.monotonic() + seconds
+        if deadline > _ignored_providers.get(name, 0.0):
+            _ignored_providers[name] = deadline
+
+
+def ignored_providers() -> list[str]:
+    """The static block list plus every dynamically blocked provider whose deadline has not passed."""
+    now = time.monotonic()
+    with _IGNORED_LOCK:
+        live = [n for n, d in _ignored_providers.items() if d > now]
+    return sorted(set(STATIC_IGNORED_PROVIDERS) | set(live))
+
+
+def _reset_ignored_providers() -> None:
+    """Test hook: forget every dynamically blocked provider (the static list stays)."""
+    with _IGNORED_LOCK:
+        _ignored_providers.clear()
+
+
+def _is_placeholder(value) -> bool:
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, (list, dict)):
+        return not value
+    return any(value is p or value == p for p in _PLACEHOLDER_SCALARS)
+
+
+def looks_like_stub(text: str) -> bool:
+    """True when a JSON-mode reply is a provider placeholder rather than an answer: `{}`, `[]`, or an object
+    whose every value is -1 / "-1" / "" / null / empty. Empty CONTENT is deliberately not a stub — that is the
+    reasoning-budget failure `last_meta` already diagnoses, and it is not provider-specific."""
+    s = (text or "").strip()
+    if not s:
+        return False
+    try:
+        obj = json.loads(s)
+    except json.JSONDecodeError:
+        return False
+    if isinstance(obj, dict):
+        return not obj or all(_is_placeholder(v) for v in obj.values())
+    return isinstance(obj, list) and not obj
+
+
 class EndpointHTTPError(RuntimeError):
     """A non-adaptable HTTP status from an OpenAI-compatible endpoint. Subclasses RuntimeError with the
     same message the forge log always showed, but keeps `.code` so callers can react to the status —
@@ -213,6 +284,10 @@ class OpenAICompatGenerator:
         # truncating big responses mid-JSON). Keys an endpoint 400s on are dropped per-model (see
         # `_adapt_params`), so a stricter fallback endpoint degrades gracefully instead of failing the call.
         self._extra_body = dict(extra_body) if extra_body else {}
+        # Providers THIS generator must not use, on top of the process-wide list (see `ignore_provider`):
+        # a stage re-roll adds the upstream whose answer just failed validation so the fresh sample escapes
+        # OpenRouter's prompt-cache affinity instead of being routed straight back to it.
+        self.avoid_providers: set[str] = set()
         self._contract = contract_mod or contract
         self._system = self._contract.system_prompt()
         self._token_param = ("max_completion_tokens"
@@ -220,6 +295,25 @@ class OpenAICompatGenerator:
         # Diagnostics from the LAST completed call: {"finish_reason", "content_chars", "reasoning_chars"}.
         # Callers use this to explain an unparseable response (truncated by max_tokens vs reasoning-only).
         self.last_meta: dict = {}
+
+    def _is_openrouter(self) -> bool:
+        return OPENROUTER_HOST in self.base_url
+
+    def avoid_provider(self, name: str | None) -> None:
+        """Keep `name` out of this generator's remaining calls (no-op off OpenRouter, or when unknown)."""
+        if name and self._is_openrouter():
+            self.avoid_providers.add(name)
+
+    def _provider_field(self, payload: dict) -> None:
+        """Merge the block lists into OpenRouter's `provider` request field (any static `provider` config from
+        extra_body — routing order, quantization, … — is kept and only its `ignore` list is extended)."""
+        if not self._is_openrouter():
+            return
+        block = set(ignored_providers()) | self.avoid_providers
+        base = payload.get("provider") if isinstance(payload.get("provider"), dict) else {}
+        block |= {str(n) for n in (base.get("ignore") or [])}
+        if block:
+            payload["provider"] = {**base, "ignore": sorted(block)}
 
     def _wants_usage_chunk(self) -> bool:
         """Whether to request the streamed usage chunk. `stream_options` is an OpenAI-only opt-in; once an
@@ -361,6 +455,24 @@ class OpenAICompatGenerator:
         for key, value in self._extra_body.items():
             if (self.model, key) not in OpenAICompatGenerator._rejected_extra_keys:
                 payload[key] = value
+        stubs: list[str] = []  # providers that answered THIS call with a placeholder (see looks_like_stub)
+        while True:
+            self._provider_field(payload)
+            text = self._complete_once(payload)
+            if not (self._is_openrouter() and looks_like_stub(text)):
+                break
+            bad = self.last_meta.get("provider")
+            stubs.append(bad or "?")
+            if bad:
+                ignore_provider(bad)
+            if len(stubs) > STUB_RETRIES:
+                break  # hand the stub back; the pipeline's repair/re-roll machinery takes it from here
+        if stubs:
+            self.last_meta = {**self.last_meta, "stubs": stubs}
+        return text
+
+    def _complete_once(self, payload: dict) -> str:
+        """One request (plus the single param-adaptation retry on a 400); `payload` is adapted in place."""
         try:
             data = self._post_translated(payload)
         except urllib.error.HTTPError as e:
