@@ -7,7 +7,7 @@
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png" />
   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/static/style.css?v=20260921c" />
+  <link rel="stylesheet" href="/static/style.css?v=20260924" />
 </head>
 <body>
   <header>
@@ -166,6 +166,7 @@
       </div>
       <h2 id="r-name"></h2>
       <p id="r-desc" class="muted"></p>
+      <div id="r-art" class="r-art hidden"></div>
       <div id="r-archetypes" class="archetypes hidden"></div>
       <div id="r-relic" class="relic hidden"></div>
       <div id="r-mechanics" class="mechanics hidden"></div>
@@ -184,7 +185,12 @@
   <!-- Library view -->
   <main id="view-library" class="hidden">
     <section class="card">
-      <h2>My Classes</h2>
+      <div class="lib-head">
+        <h2>My Classes</h2>
+        <span class="spacer"></span>
+        <label class="lib-toggle" title="Hide the splash, sprite and card art to scan the list faster">
+          <input type="checkbox" id="lib-show-art" checked> Show art</label>
+      </div>
       <p id="lib-empty" class="muted hidden">No classes yet — forge one!</p>
       <ul id="lib-list" class="lib"></ul>
     </section>
@@ -299,7 +305,7 @@
 
   <!-- ?v= busts the 1-hour static cache on deploy: bump both whenever either file changes. render.js holds
        the class renderers shared with the public /deck page and must load first. -->
-  <script src="/static/render.js?v=20260919"></script>
-  <script src="/static/app.js?v=20260922"></script>
+  <script src="/static/render.js?v=20260924"></script>
+  <script src="/static/app.js?v=20260924"></script>
 </body>
 </html>

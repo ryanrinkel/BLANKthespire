@@ -8,6 +8,48 @@
 const $ = (sel) => document.querySelector(sel);
 const el = (id) => document.getElementById(id);
 
+// --- art ------------------------------------------------------------------------------------------
+// "Show art" is a browser-only preference (the checkbox lives on My Classes); default on. It lives here
+// rather than app.js because the public /deck page renders the same class view without app.js. Private
+// windows throw on localStorage, so every access is guarded.
+const ART_PREF_KEY = "bts_show_art";
+function artEnabled() {
+  try { return localStorage.getItem(ART_PREF_KEY) !== "0"; } catch (_) { return true; }
+}
+function setArtEnabled(on) {
+  try { localStorage.setItem(ART_PREF_KEY, on ? "1" : "0"); } catch (_) { /* no store */ }
+  document.body.classList.toggle("no-art", !on);
+}
+document.body.classList.toggle("no-art", !artEnabled());
+
+// An art <img> that removes itself when the file is gone (btsweb-prune rotates old art off the server, and
+// a class forged without art has no URL at all — the caller skips it). Lazy: a long library only fetches
+// the rows on screen.
+function artImg(src, className, alt) {
+  const im = document.createElement("img");
+  im.className = className;
+  im.alt = alt || "";
+  im.loading = "lazy";
+  im.decoding = "async";
+  im.onerror = () => im.remove();
+  im.src = src;
+  return im;
+}
+
+// The splash + sprite strip under the class name. Thumb URLs come from the API (small WebP renders);
+// the full-size *_url fields are what the import code carries and stay out of the page.
+function renderClassArt(cls) {
+  const box = el("r-art");
+  if (!box) return;
+  box.innerHTML = "";
+  const splash = cls.splash_thumb_url, sprite = cls.sprite_thumb_url;
+  if (!artEnabled() || (!splash && !sprite)) { box.classList.add("hidden"); return; }
+  const name = cls.character?.name || cls.name || "class";
+  if (splash) box.appendChild(artImg(splash, "r-splash", `${name} splash art`));
+  if (sprite) box.appendChild(artImg(sprite, "r-sprite", `${name} combat sprite`));
+  box.classList.remove("hidden");
+}
+
 // --- result + cards ------------------------------------------------------------------------------
 
 // Fill the #result markup (r-name, r-desc, r-archetypes, r-relic, r-mechanics, r-cards, r-code) from a class
@@ -21,10 +63,12 @@ function renderClassView(cls, opts) {
   renderArchetypes(cls.archetypes);
   renderRelic(cls.relic, classId);
   renderMechanics(cls.character, classId);
+  renderClassArt(cls);
   el("r-code").value = cls.code || "";
   const wrap = el("r-cards");
   wrap.innerHTML = "";
-  for (const c of cls.cards || []) wrap.appendChild(cardEl(c, classId));
+  const art = artEnabled() ? (cls.card_art || {}) : {};  // {card id: portrait thumb URL}
+  for (const c of cls.cards || []) wrap.appendChild(cardEl(c, classId, art[c.id]));
   el("result").classList.remove("hidden");
 }
 
@@ -296,7 +340,7 @@ function hasUpgrade(c) {
     && ((Array.isArray(c.upgrade.effects) && c.upgrade.effects.length > 0) || c.upgrade.cost != null);
 }
 
-function cardEl(c, classId) {
+function cardEl(c, classId, artUrl) {
   const d = document.createElement("div");
   d.className = "cardchip r-" + (c.rarity || "common");
   d.dataset.cardId = c.id ?? "";
@@ -304,6 +348,8 @@ function cardEl(c, classId) {
     + `<div class="cc-top"><span class="cc-name"></span><span class="cc-cost"></span></div>`
     + `<div class="cc-meta">${esc(c.type)} · ${esc(c.rarity)}</div>`
     + `<div class="cc-eff"></div>`;
+  // The portrait (when the class shipped with card art) sits above the name, like the in-game card.
+  if (artUrl) d.insertBefore(artImg(artUrl, "cc-art", ""), d.querySelector(".cc-top"));
   // Name/cost/effects are painted (not baked into the innerHTML) so the upgrade toggle can repaint
   // them without rebuilding the chip — the feedback button keeps its listener and rated state.
   const paint = (view) => {

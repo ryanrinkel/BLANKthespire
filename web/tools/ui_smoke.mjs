@@ -4,7 +4,7 @@
 //     STRIPE_SECRET_KEY=sk_test_smoke PORT=5077 uv run --project ../generation python app.py
 // (the dummy Stripe key only flips /api/billing to {enabled:true} so the donate tiers + custom-amount row
 //  render; nothing in these scenarios ever hits Stripe)
-// then, from web/tools:  node ui_smoke.mjs http://127.0.0.1:5077 <outdir> forge|library|account|pages
+// then, from web/tools:  node ui_smoke.mjs http://127.0.0.1:5077 <outdir> forge|library|account|pages|art
 // (needs a package.json with {"type":"module"} next to it, or rename to .mjs — it is already .mjs).
 
 // Minimal Chrome DevTools Protocol driver (Node 24 has a global WebSocket). Usage:
@@ -269,6 +269,68 @@ if (scenario === "forge") {
   console.log(await evaluate(`JSON.stringify({name: document.getElementById('r-name').textContent, cards: document.querySelectorAll('#r-cards .cardchip').length, fb: document.querySelectorAll('.cc-fb').length, og: document.querySelector('meta[property="og:title"]')?.content, code: document.getElementById('r-code').value.slice(0,12)})`));
   await shot("deck");
   await nav(`${base}/deck/nope-not-here`); console.log("404 page:", (await evaluate(`document.body.innerText.slice(0,120)`)).replace(/\n/g, " "));
+} else if (scenario === "art") {
+  // 2026-09-24: My Classes rows lead with splash + sprite thumbnails and carry a share-link button; the
+  // "Show art" checkbox (localStorage bts_show_art) repaints the list without images and hides the art in
+  // an open class view; the opened class (and the public /deck page) shows the splash/sprite strip and
+  // one portrait per card. Needs a server with BTSGEN_IMAGE_BACKEND=procedural so a fake forge ships art.
+  await nav(`${base}/app`);
+  await evaluate(`localStorage.clear()`);
+  const forged = await evaluate(`fetch('/api/forge-class', {method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'fetch'},
+    body: JSON.stringify({concept: 'a smoke-test alchemist', mode: 'fake'})})
+    .then(r => r.text()).then(t => ({len: t.length, done: t.includes('event: result'), art: t.includes('card art')}))`);
+  check(forged.done, "fake forge finished (procedural art)", JSON.stringify(forged));
+  await evaluate(`document.getElementById('nav-library').click()`); await sleep(2500);
+  const imgOk = (sel) => `(() => { const i = li.querySelector('${sel}'); return !!i && i.complete && i.naturalWidth > 0; })()`;
+  const rows = await json(`[...document.querySelectorAll('#lib-list .lib-row')].map(li => ({
+    art: !!li.querySelector('.lr-art'), splash: ${imgOk(".lr-splash")}, sprite: ${imgOk(".lr-sprite")},
+    share: !!li.querySelector('[data-act=share]'), code: !!li.querySelector('[data-act=code]')}))`);
+  check(rows.length > 0 && rows.every((r) => r.art && r.splash && r.sprite && r.share && r.code),
+        "library rows: splash + sprite thumbs loaded, share + code buttons", JSON.stringify(rows));
+  const toggle = await json(`({checked: document.getElementById('lib-show-art').checked, no_art: document.body.classList.contains('no-art')})`);
+  check(toggle.checked && !toggle.no_art, "show art defaults on", JSON.stringify(toggle));
+  await shot("art-library");
+
+  await evaluate(`document.getElementById('lib-show-art').click()`); await sleep(400);
+  const off = await json(`({no_art: document.body.classList.contains('no-art'), imgs: document.querySelectorAll('#lib-list img').length,
+    pref: localStorage.getItem('bts_show_art'), rows: document.querySelectorAll('#lib-list .lib-row').length})`);
+  check(off.no_art && off.imgs === 0 && off.pref === "0" && off.rows === rows.length,
+        "show art off: rows repaint without images, pref stored", JSON.stringify(off));
+  await shot("art-library-off");
+
+  // an open class view rendered with art off has no strip and no portraits at all
+  await evaluate(`document.querySelector('[data-act=open]').click()`); await sleep(1500);
+  const viewOff = await json(`({strip_hidden: document.getElementById('r-art').classList.contains('hidden'),
+    portraits: document.querySelectorAll('#r-cards .cc-art').length, cards: document.querySelectorAll('#r-cards .cardchip').length})`);
+  check(viewOff.strip_hidden && viewOff.portraits === 0 && viewOff.cards > 0, "class view with art off: no strip, no portraits", JSON.stringify(viewOff));
+
+  // back on: the list repaints with images, and the opened class shows the strip + every portrait
+  await evaluate(`document.getElementById('nav-library').click()`); await sleep(800);
+  await evaluate(`document.getElementById('lib-show-art').click()`); await sleep(400);
+  check(await evaluate(`document.querySelectorAll('#lib-list img').length`) === rows.length * 2, "show art on again: images back");
+  await evaluate(`document.querySelector('[data-act=open]').click()`); await sleep(1500);
+  await evaluate(`window.scrollTo(0, document.body.scrollHeight)`); await sleep(2500);  // lazy portraits below the fold
+  await evaluate(`window.scrollTo(0, 0)`); await sleep(300);
+  const view = await json(`({strip: !document.getElementById('r-art').classList.contains('hidden'),
+    splash_w: document.querySelector('.r-splash')?.naturalWidth || 0, sprite_w: document.querySelector('.r-sprite')?.naturalWidth || 0,
+    cards: document.querySelectorAll('#r-cards .cardchip').length, portraits: document.querySelectorAll('#r-cards .cc-art').length,
+    loaded: [...document.querySelectorAll('#r-cards .cc-art')].filter((i) => i.complete && i.naturalWidth > 0).length})`);
+  check(view.strip && view.splash_w > 0 && view.sprite_w > 0 && view.portraits === view.cards && view.loaded === view.portraits,
+        "class view: strip + one loaded portrait per card", JSON.stringify(view));
+  await shot("art-viewing");
+
+  // the public share page renders the same art without a session
+  const share = await evaluate(`document.getElementById('share-link').dataset.url`);
+  check(/\/deck\/[A-Za-z0-9_-]{20,}$/.test(share), "share link shape", share);
+  await nav(share); await sleep(1500);
+  await evaluate(`window.scrollTo(0, document.body.scrollHeight)`); await sleep(2500);
+  const pub = await json(`({strip: !document.getElementById('r-art').classList.contains('hidden'),
+    splash_w: document.querySelector('.r-splash')?.naturalWidth || 0,
+    cards: document.querySelectorAll('#r-cards .cardchip').length, portraits: document.querySelectorAll('#r-cards .cc-art').length,
+    loaded: [...document.querySelectorAll('#r-cards .cc-art')].filter((i) => i.complete && i.naturalWidth > 0).length})`);
+  check(pub.strip && pub.splash_w > 0 && pub.portraits === pub.cards && pub.loaded === pub.portraits, "public deck page shows the art", JSON.stringify(pub));
+  await shot("art-deck");
 }
 console.log(errors.length ? "CONSOLE ERRORS:\n" + errors.join("\n") : "no console errors");
 ws.close(); chrome.kill();

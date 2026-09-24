@@ -13,8 +13,10 @@ Nothing is sold, and there are no free tokens of any kind — not a starter gran
 """
 from __future__ import annotations
 
+import io
 import json
 import os
+import re
 import queue
 import shutil
 import threading
@@ -25,7 +27,7 @@ from html import escape as html_escape
 from pathlib import Path
 
 from dotenv import load_dotenv
-from flask import Flask, Response, jsonify, redirect, request, send_from_directory
+from flask import Flask, Response, jsonify, redirect, request, send_file, send_from_directory
 
 WEB_DIR = Path(__file__).resolve().parent
 if os.environ.get("BTSWEB_NO_DOTENV", "").strip() not in ("1", "true", "yes"):
@@ -437,6 +439,130 @@ def _sprite_url(class_id: int, sprite_hash: str | None = None) -> str:
     return _art_url(class_id, "sprite", sprite_hash)
 
 
+# --- art thumbnails for the web UI ---------------------------------------------------------------
+# The generated files are game-sized (splash 1024x576, sprite 1024x1536, ~34 card portraits at 1000x760;
+# ~1 MB each as PNG). That is what the mod's one-time import wants, but a My Classes list or a class page
+# in the browser would pull tens of MB per class. So the UI shows small WebP thumbnails instead, built
+# with Pillow on first request and cached under static/forged/<id>/thumbs/, keyed by the art hash so a
+# regenerated asset gets a fresh thumb. Card portraits are sliced straight out of cards.zip (STORED
+# entries). When the source file is gone (btsweb-prune rotates old art off the droplet) the route 404s
+# and the <img> hides itself.
+THUMB_MAX = {"splash": (480, 270), "sprite": (256, 384), "card": (300, 228)}   # bounding boxes, px
+THUMB_QUALITY = 78
+_ART_KINDS = ("splash", "sprite")
+_STEM_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")  # the alphabet _card_art_id emits; nothing else touches disk
+
+
+def _thumb_headers(resp):
+    # The URL carries ?v=<hash>, so a thumb is immutable for as long as that URL is handed out.
+    resp.headers["Cache-Control"] = "private, max-age=31536000, immutable"
+    return resp
+
+
+def _make_thumb(src: bytes, kind: str, dest: Path) -> bool:
+    """Downscale `src` (PNG bytes) into the `kind` bounding box and write it to `dest` as WebP. False when
+    Pillow is missing or the bytes are not an image — the caller then serves the original."""
+    try:
+        from PIL import Image  # lazy: never block app boot on the imaging stack
+        with Image.open(io.BytesIO(src)) as im:
+            im.load()
+            out = im.convert("RGBA") if im.mode in ("RGBA", "LA", "P") else im.convert("RGB")
+            out.thumbnail(THUMB_MAX[kind])
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            tmp = dest.with_suffix(".tmp")
+            out.save(tmp, format="WEBP", quality=THUMB_QUALITY, method=4)
+            os.replace(tmp, dest)  # atomic: a concurrent request never sees a half-written file
+        return True
+    except Exception as e:  # noqa: BLE001 — cosmetic; the full-size file still serves
+        app.logger.warning("thumb %s for class dir %s failed: %s", kind, dest.parent.parent, e)
+        return False
+
+
+def _serve_thumb(src_bytes: bytes | None, kind: str, dest: Path):
+    """Cached thumb if it exists, else build it; falls back to the original bytes when Pillow can't."""
+    if not dest.exists() and (src_bytes is None or not _make_thumb(src_bytes, kind, dest)):
+        if src_bytes is None:
+            return jsonify({"error": "not found"}), 404
+        return _thumb_headers(Response(src_bytes, mimetype="image/png"))
+    return _thumb_headers(send_file(dest, mimetype="image/webp", max_age=31536000, conditional=True))
+
+
+def _art_thumb_response(class_id: int, kind: str, digest: str | None):
+    """Thumbnail of the class's splash or sprite PNG (404 when it was never made or has been pruned)."""
+    if kind not in _ART_KINDS or not digest:
+        return jsonify({"error": "not found"}), 404
+    src = STATIC_FORGED_DIR / str(class_id) / f"{kind}.png"
+    dest = STATIC_FORGED_DIR / str(class_id) / "thumbs" / f"{kind}-{digest[:8]}.webp"
+    if dest.exists():
+        return _serve_thumb(None, kind, dest)
+    if not src.is_file():
+        return jsonify({"error": "not found"}), 404
+    return _serve_thumb(src.read_bytes(), kind, dest)
+
+
+def _card_thumb_response(class_id: int, stem: str, digest: str | None):
+    """Thumbnail of one portrait out of cards.zip, addressed by its entry stem (the card id as
+    _card_art_id spelled it). The stem is validated against the alphabet before it names a cache file."""
+    if not digest or not _STEM_RE.match(stem or ""):
+        return jsonify({"error": "not found"}), 404
+    dest = STATIC_FORGED_DIR / str(class_id) / "thumbs" / f"card-{stem}-{digest[:8]}.webp"
+    if dest.exists():
+        return _serve_thumb(None, "card", dest)
+    pack = STATIC_FORGED_DIR / str(class_id) / "cards.zip"
+    if not pack.is_file():
+        return jsonify({"error": "not found"}), 404
+    import zipfile
+    try:
+        with zipfile.ZipFile(pack) as z:
+            if f"{stem}.png" not in z.namelist():
+                return jsonify({"error": "not found"}), 404
+            src = z.read(f"{stem}.png")
+    except zipfile.BadZipFile:
+        return jsonify({"error": "not found"}), 404
+    return _serve_thumb(src, "card", dest)
+
+
+def _card_art_map(class_id: int, cards: list, url_for_stem) -> dict[str, str]:
+    """{card id: thumb URL} for every card whose portrait is in the class's cards.zip. The zip's entry
+    names are _card_art_id spellings, so the map is rebuilt from the bundle's cards, not parsed back."""
+    pack = STATIC_FORGED_DIR / str(class_id) / "cards.zip"
+    if not pack.is_file():
+        return {}
+    import zipfile
+    try:
+        with zipfile.ZipFile(pack) as z:
+            names = set(z.namelist())
+    except zipfile.BadZipFile:
+        return {}
+    out = {}
+    for i, card in enumerate(cards or []):
+        cid = str((card or {}).get("id") or "")
+        stem = _card_art_id(card, i)
+        if cid and f"{stem}.png" in names:
+            out[cid] = url_for_stem(stem)
+    return out
+
+
+def _art_fields(cls: ForgedClass, base: str, cards: list | None = None) -> dict:
+    """The art the web UI needs on top of summary()/detail(): the full-size public URLs (what the import
+    code carries) plus the thumbnail routes under `base` ('/api/classes/<id>' for the owner,
+    '/api/deck/<slug>' for the public page). `cards` (the bundle's list) adds the per-card map, which
+    only the detail shapes want — the list view shows splash + sprite only."""
+    d: dict = {}
+    if cls.splash_hash:
+        d["splash_url"] = _splash_url(cls.id, cls.splash_hash)
+        d["splash_thumb_url"] = f"{base}/art/splash?v={cls.splash_hash[:8]}"
+    if cls.sprite_hash:
+        d["sprite_url"] = _sprite_url(cls.id, cls.sprite_hash)
+        d["sprite_thumb_url"] = f"{base}/art/sprite?v={cls.sprite_hash[:8]}"
+    if cls.card_art_hash:
+        d["card_art_url"] = _art_url(cls.id, "cards", cls.card_art_hash)
+        if cards is not None:
+            v = cls.card_art_hash[:8]
+            d["card_art"] = _card_art_map(cls.id, cards, lambda stem: f"{base}/art/card/{stem}?v={v}")
+    return d
+
+
 # Image-capable BYOK providers, by the hostname of the base_url the user chose: the art backend that can
 # take THEIR key. Everything else (Anthropic, Groq, DeepSeek, Together, Ollama Cloud, a custom endpoint)
 # has no image API we drive, so a BYOK forge there ships with BTSWEB_BYOK_ART_FALLBACK art ('null' = none;
@@ -773,14 +899,9 @@ def _persist_class(user_id: int, concept: str, out: dict, forge_meta: dict | Non
             cls.code = encode_class(json.dumps(wire, separators=(",", ":")))
 
         detail = cls.detail()
-        if splash_digest:
-            detail["splash_url"] = _splash_url(cls.id, splash_digest)
-        if sprite_digest:
-            detail["sprite_url"] = _sprite_url(cls.id, sprite_digest)
+        detail.update(_art_fields(cls, f"/api/classes/{cls.id}", detail.get("cards")))
         if relic_digest:
             detail["relic_icon_url"] = _art_url(cls.id, "relic", relic_digest)
-        if cards_digest:
-            detail["card_art_url"] = _art_url(cls.id, "cards", cards_digest)
         return detail
 
 
@@ -1497,7 +1618,7 @@ def list_classes():
                 .filter_by(user_id=user["id"])
                 .order_by(ForgedClass.updated_at.desc())
                 .all())
-        return jsonify({"classes": [c.summary() for c in rows]})
+        return jsonify({"classes": [{**c.summary(), **_art_fields(c, f"/api/classes/{c.id}")} for c in rows]})
 
 
 @app.route("/api/classes/<int:class_id>")
@@ -1508,7 +1629,35 @@ def get_class(class_id: int):
         cls = _owned(s, user["id"], class_id)
         if cls is None:
             return jsonify({"error": "not found"}), 404
-        return jsonify(cls.detail())
+        detail = cls.detail()
+        detail.update(_art_fields(cls, f"/api/classes/{cls.id}", detail.get("cards")))
+        return jsonify(detail)
+
+
+@app.route("/api/classes/<int:class_id>/art/<kind>")
+@require_login
+def class_art_thumb(class_id: int, kind: str):
+    """Owner-only splash/sprite thumbnail (see _art_thumb_response)."""
+    user = current_user()
+    with session_scope() as s:
+        cls = _owned(s, user["id"], class_id)
+        if cls is None:
+            return jsonify({"error": "not found"}), 404
+        digest = cls.splash_hash if kind == "splash" else cls.sprite_hash if kind == "sprite" else None
+    return _art_thumb_response(class_id, kind, digest)
+
+
+@app.route("/api/classes/<int:class_id>/art/card/<stem>")
+@require_login
+def class_card_thumb(class_id: int, stem: str):
+    """Owner-only portrait thumbnail for one card (see _card_thumb_response)."""
+    user = current_user()
+    with session_scope() as s:
+        cls = _owned(s, user["id"], class_id)
+        if cls is None:
+            return jsonify({"error": "not found"}), 404
+        digest = cls.card_art_hash
+    return _card_thumb_response(class_id, stem, digest)
 
 
 @app.route("/api/classes/<int:class_id>", methods=["PATCH"])
@@ -1558,13 +1707,41 @@ def deck_resolve(slug: str):
             return jsonify({"error": "not found"}), 404
         detail = cls.detail()
         detail.pop("id", None)  # public shape: never leak the internal enumerable id
-        if cls.splash_hash:
-            detail["splash_url"] = _splash_url(cls.id, cls.splash_hash)
-        if cls.sprite_hash:
-            detail["sprite_url"] = _sprite_url(cls.id, cls.sprite_hash)
-        if cls.card_art_hash:
-            detail["card_art_url"] = _art_url(cls.id, "cards", cls.card_art_hash)
+        detail.update(_art_fields(cls, f"/api/deck/{slug}", detail.get("cards")))
         return jsonify(detail)
+
+
+def _deck_class(slug: str):
+    """(class_id, splash_hash, sprite_hash, card_art_hash) for a public slug, or None."""
+    slug = (slug or "").strip()
+    if not slug or len(slug) > 32:
+        return None
+    with session_scope() as s:
+        cls = s.query(ForgedClass).filter_by(slug=slug).one_or_none()
+        if cls is None:
+            return None
+        return cls.id, cls.splash_hash, cls.sprite_hash, cls.card_art_hash
+
+
+@app.route("/api/deck/<slug>/art/<kind>")
+def deck_art_thumb(slug: str, kind: str):
+    """Public splash/sprite thumbnail for the /deck/<slug> page — the same slug-only reach as /api/deck."""
+    row = _deck_class(slug)
+    if row is None:
+        return jsonify({"error": "not found"}), 404
+    class_id, splash_hash, sprite_hash, _ = row
+    digest = splash_hash if kind == "splash" else sprite_hash if kind == "sprite" else None
+    return _art_thumb_response(class_id, kind, digest)
+
+
+@app.route("/api/deck/<slug>/art/card/<stem>")
+def deck_card_thumb(slug: str, stem: str):
+    """Public portrait thumbnail for one card of a shared class."""
+    row = _deck_class(slug)
+    if row is None:
+        return jsonify({"error": "not found"}), 404
+    class_id, _, _, card_art_hash = row
+    return _card_thumb_response(class_id, stem, card_art_hash)
 
 
 # --- feedback rate limit (free text reaches the generator's prompts) ----------------------------------

@@ -786,6 +786,8 @@ function appendLog(line) {
 
 // --- library -------------------------------------------------------------------------------------
 
+let libClasses = [];  // the last /api/classes payload, so the art toggle can repaint without a refetch
+
 async function loadLibrary() {
   let classes;
   try {
@@ -795,10 +797,16 @@ async function loadLibrary() {
     toast("Couldn't load your classes — check your connection.");
     return;
   }
+  libClasses = classes;
+  paintLibrary();
+}
+
+function paintLibrary() {
   const list = el("lib-list");
   list.innerHTML = "";
-  el("lib-empty").classList.toggle("hidden", classes.length > 0);
-  for (const c of classes) list.appendChild(libRow(c));
+  el("lib-empty").classList.toggle("hidden", libClasses.length > 0);
+  el("lib-show-art").checked = artEnabled();
+  for (const c of libClasses) list.appendChild(libRow(c));
 }
 
 function libRow(c) {
@@ -808,10 +816,23 @@ function libRow(c) {
     + `<span class="lr-meta">${c.card_count} cards · v${c.vocab_version}</span>`
     + `<div class="lr-concept muted">${esc(c.concept || "")}</div></div>`
     + `<div class="lr-actions">`
-    + `<button data-act="code">Copy code</button>`
+    + `<button data-act="share" title="Copy a public link to this class">🔗 Share link</button>`
+    + `<button data-act="code" title="Copy the in-game import code">Copy code</button>`
     + `<button data-act="rename">Rename</button>`
     + `<button data-act="open">Open</button>`
     + `<button data-act="delete" class="danger">Delete</button></div>`;
+  // Splash + sprite thumbnails lead the row (art on, and only when the class shipped with art — a BYOK
+  // forge on a text-only provider has neither, and pruned art drops the field server-side).
+  if (artEnabled() && (c.splash_thumb_url || c.sprite_thumb_url)) {
+    const art = document.createElement("div");
+    art.className = "lr-art";
+    if (c.splash_thumb_url) art.appendChild(artImg(c.splash_thumb_url, "lr-splash", `${c.name} splash art`));
+    if (c.sprite_thumb_url) art.appendChild(artImg(c.sprite_thumb_url, "lr-sprite", `${c.name} sprite`));
+    li.insertBefore(art, li.firstChild);
+  }
+  const share = li.querySelector('[data-act="share"]');
+  if (c.slug) share.onclick = () => copy(`${location.origin}/deck/${c.slug}`);
+  else share.remove();  // classes without a slug (none since the backfill) simply get no share button
   li.querySelector('[data-act="code"]').onclick = () => copyClassCode(c.id);
   li.querySelector('[data-act="rename"]').onclick = () => renameClass(c.id, c.name);
   li.querySelector('[data-act="open"]').onclick = () => openClass(c.id);
@@ -1266,6 +1287,9 @@ el("choice-skip").onclick = () => sendChoice([]);
 el("copy-code").onclick = () => copy(el("r-code").value);
 el("share-link").onclick = () => copy(el("share-link").dataset.url);
 el("view-back").onclick = () => selectTab("forge");
+// "Show art" repaints the list in place; an open class view follows via the body.no-art CSS rule, and
+// the next render (open / forge) skips the art entirely.
+el("lib-show-art").onchange = (ev) => { setArtEnabled(ev.target.checked); paintLibrary(); };
 el("signout").onclick = async () => { await fetch("/logout", { method: "POST" }); location.href = "/"; };
 el("load-models").onclick = loadModels;
 el("choose-byok").onclick = chooseByok;

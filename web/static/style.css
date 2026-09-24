@@ -144,6 +144,32 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .lr-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .lr-actions button { font-size: 12px; padding: 6px 10px; margin: 0; border-radius: 8px; cursor: pointer;
   background: var(--panel); border: 1px solid var(--line); color: var(--ink); }
+.lr-main { flex: 1 1 200px; min-width: 0; }
+.lib-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.lib-head h2 { margin: 0; }
+.lib-toggle { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted);
+  cursor: pointer; user-select: none; margin-bottom: 8px; }
+.lib-toggle input { accent-color: var(--accent2); cursor: pointer; margin: 0; }
+
+/* generated art: WebP thumbnails from /api/.../art/*; the full-size files stay with the mod's import */
+.lr-art { display: flex; gap: 6px; flex: 0 0 auto; }
+.lr-splash { width: 128px; height: 72px; object-fit: cover; border-radius: 6px; border: 1px solid var(--line);
+  background: var(--panel); }
+.lr-sprite { width: 48px; height: 72px; object-fit: contain; border-radius: 6px; border: 1px solid var(--line);
+  background: var(--panel); }
+.r-art { display: flex; gap: 14px; align-items: flex-start; margin: 10px 0 14px; }
+.r-splash { flex: 1 1 0; min-width: 0; max-width: 480px; aspect-ratio: 16 / 9; object-fit: cover;
+  border-radius: 10px; border: 1px solid var(--line); background: var(--panel2); }
+.r-sprite { flex: 0 0 auto; height: 200px; max-width: 140px; object-fit: contain; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--panel2); }
+.cc-art { display: block; width: 100%; aspect-ratio: 1000 / 760; object-fit: cover; border-radius: 6px;
+  margin-bottom: 7px; background: var(--panel); }
+body.no-art .lr-art, body.no-art .r-art, body.no-art .cc-art { display: none !important; }
+@media (max-width: 520px) {
+  .lr-art { order: -1; width: 100%; }
+  .lib-row { flex-wrap: wrap; }
+  .r-sprite { height: 140px; }
+}
 
 .toast {
   position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
