@@ -299,6 +299,11 @@ class OpenAICompatGenerator:
     def _is_openrouter(self) -> bool:
         return OPENROUTER_HOST in self.base_url
 
+    @property
+    def api_key(self) -> str:
+        """The key this generator authenticates with (the hosted router's quota gate polls Ollama with it)."""
+        return self._api_key
+
     def avoid_provider(self, name: str | None) -> None:
         """Keep `name` out of this generator's remaining calls (no-op off OpenRouter, or when unknown)."""
         if name and self._is_openrouter():

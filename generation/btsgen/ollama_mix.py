@@ -53,6 +53,12 @@ A stage that fails VALIDATION (not HTTP) on the primary is re-rolled on the next
 calls `rotate_tier()` before its whole-stage retry, so "OpenRouter as the backup" covers a model whiff as
 well as an outage.
 
+COST GATE — the Ollama tier is only the cheapest route while the subscription's included usage has room
+(see ollama_quota.py). Before every call, a tier on ollama.com is skipped — exactly like a tripped breaker —
+when `ollama_quota.saturated(api_key)` says the session window or the week is at its ceiling, or that Ollama
+has started billing per token; the call then lands on OpenRouter. The verdict comes from GET /api/usage,
+polled at most once a minute per key. BTSGEN_OLLAMA_QUOTA=0 turns the gate off.
+
 Failure semantics, per error class:
   402 / 429          account-level quota/credit — trips a process-wide breaker KEYED BY `base_url` for that
                      tier's `cooldown_s`, so EVERY tier on that endpoint is skipped (a 429 on OpenRouter
@@ -76,6 +82,7 @@ from pathlib import Path
 
 from . import alerts
 from . import contract as _card_contract
+from . import ollama_quota
 from .class_forge import _BlueprintContract, _RelicContract
 from .generator import EndpointHTTPError, OpenAICompatGenerator, load_env
 
@@ -159,6 +166,14 @@ _TRANSPORT_MARKERS = ("could not reach", "sent no data", "dropped mid-response")
 
 def _breaker_key(base_url: str) -> str:
     return (base_url or "").rstrip("/")
+
+
+def _quota_gate(tier: "_Tier") -> str | None:
+    """Why this tier should be skipped for cost (Ollama Cloud tiers only): the subscription's headroom verdict
+    from ollama_quota, or None. Tiers whose generator carries no key (test doubles) are never gated."""
+    if ollama_quota.OLLAMA_HOST not in (tier.base_url or ""):
+        return None
+    return ollama_quota.saturated(getattr(tier.gen, "api_key", "") or "")
 
 
 def _breaker_active(base_url: str | None = None) -> bool:
@@ -249,7 +264,7 @@ class _FailoverGenerator:
         # The breaker is re-read per tier, INSIDE the walk: a 402/429 from the primary trips the whole
         # endpoint, so the sibling tier sharing that base_url is skipped on this very call.
         for tier in self._tiers:
-            if _breaker_active(tier.base_url):
+            if _breaker_active(tier.base_url) or _quota_gate(tier):
                 continue
             attempted = True
             try:
@@ -549,8 +564,9 @@ def _no_think(extra_body) -> bool:
             or (isinstance(reasoning, dict) and reasoning.get("enabled") is False))
 
 
-def describe(role_map: dict | None = None) -> str:
-    """One-line-per-role/tier summary for the CLI banner (no secrets — just role -> model @ host)."""
+def describe(role_map: dict | None = None, *, quota: bool = False) -> str:
+    """One-line-per-role/tier summary for the CLI banner (no secrets — just role -> model @ host). `quota=True`
+    appends the Ollama cost gate's verdict, which polls the usage endpoint (so offline callers leave it off)."""
     cfg = _normalize(effective_role_map(role_map))
     lines = []
     for role in ("brainstorm", "structure", "cards"):
@@ -578,4 +594,9 @@ def describe(role_map: dict | None = None) -> str:
             lines.append(f"  fallback {i} -> {fb['name']}: {fb['models']['cards']} @ {host} (armed)")
     else:
         lines.append("  fallback   -> none armed (set OPENROUTER_API_KEY / OLLAMA_API_KEY for failover tiers)")
+    # The cost gate's verdict for whichever Ollama key the roles/tiers use (one line; polls the usage endpoint).
+    keys = {s["api_key"] for s in cfg["roles"].values() if ollama_quota.OLLAMA_HOST in s["base_url"]}
+    keys |= {fb["api_key"] for fb in fbs if ollama_quota.OLLAMA_HOST in fb["base_url"]}
+    for key in sorted(k for k in keys if k) if quota else []:
+        lines.append(f"  ollama quota -> {ollama_quota.status_line(key)}")
     return "\n".join(lines)

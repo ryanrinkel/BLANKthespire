@@ -66,7 +66,7 @@ def _build_backends(fake: bool, ollama_config: str | None):
     role_map = ollama_mix.load_role_map(ollama_config) if ollama_config else None
     _bp, card_gen_factory, relic_gen, make_gen = ollama_mix.build_ollama_mix(role_map)
     return (card_gen_factory, relic_gen, make_gen,
-            "hosted mix:\n" + ollama_mix.describe(role_map))
+            "hosted mix:\n" + ollama_mix.describe(role_map, quota=True))
 
 
 def forge_concepts(concepts: list[str], *, fake: bool, ollama_config: str | None = None, triad: bool = True,

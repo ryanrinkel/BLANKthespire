@@ -105,7 +105,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"ERROR: {e}", file=sys.stderr)
             return 2
         args.staged = True  # the Ollama mixture only makes sense through the staged creative front-end
-        print("hosted mix:\n" + ollama_mix.describe(role_map))
+        print("hosted mix:\n" + ollama_mix.describe(role_map, quota=True))
     elif args.base_url or args.api_key:
         if not (args.base_url and args.api_key and args.model):
             print("ERROR: BYOK needs --base-url, --api-key, and --model together.", file=sys.stderr)
