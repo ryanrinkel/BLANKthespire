@@ -4,7 +4,7 @@
 //     STRIPE_SECRET_KEY=sk_test_smoke PORT=5077 uv run --project ../generation python app.py
 // (the dummy Stripe key only flips /api/billing to {enabled:true} so the donate tiers + custom-amount row
 //  render; nothing in these scenarios ever hits Stripe)
-// then, from web/tools:  node ui_smoke.mjs http://127.0.0.1:5077 <outdir> forge|library|account|pages|art
+// then, from web/tools:  node ui_smoke.mjs http://127.0.0.1:5077 <outdir> forge|library|account|pages|art|lost
 // (needs a package.json with {"type":"module"} next to it, or rename to .mjs — it is already .mjs).
 
 // Minimal Chrome DevTools Protocol driver (Node 24 has a global WebSocket). Usage:
@@ -208,6 +208,49 @@ if (scenario === "forge") {
           "custom amount: $25 prices live", JSON.stringify(custom));
   }
   await shot("forge-token");
+} else if (scenario === "lost") {
+  // 2026-09-26: a dropped progress stream (phone locked / network hop -> Chrome's bare "network error") must
+  // read as "still forging, look in My Classes", not as a failure. window.fetch is stubbed per case so the
+  // real forge() -> consumeSSE path runs; nothing reaches the server.
+  await nav(`${base}/app`);
+  // escaped newlines: the frame is pasted into a '...' literal inside the evaluated source
+  const sse = (ev, data) => `event: ${ev}\\ndata: ${JSON.stringify(data)}\\n\\n`;
+  const run = async (name, fetchBody) => {
+    await evaluate(`(async () => {
+      document.getElementById('concept').value = 'An evil lemon';
+      currentMode = () => 'token'; window.confirm = () => true;
+      window.fetch = async () => { ${fetchBody} };
+      await forge();
+    })()`);
+    return json(`({lost: !document.getElementById('forge-lost').classList.contains('hidden'),
+      text: document.getElementById('forge-lost-text').textContent,
+      log: document.getElementById('log').textContent})`);
+  };
+  const enc = "const e = new TextEncoder();";
+  const dropped = await run("dropped", `${enc} let n = 0; return new Response(new ReadableStream({ pull(c) {
+      if (n++ === 0) c.enqueue(e.encode('${sse("progress", {message: "starting…"})}'));
+      else c.error(new TypeError('network error')); } }), {status: 200, headers: {'content-type': 'text/event-stream'}});`);
+  check(dropped.lost && /still running/.test(dropped.text) && /My Classes/.test(dropped.text) && /refunded/.test(dropped.text),
+        "mid-stream drop shows the still-running notice", JSON.stringify(dropped));
+  await shot("lost-dropped");
+  await evaluate(`document.getElementById('forge-lost-library').click()`); await sleep(600);
+  check(await evaluate(`!document.getElementById('view-library').classList.contains('hidden')`), "notice button opens My Classes");
+  await evaluate(`document.getElementById('nav-forge').click()`); await sleep(300);
+
+  const early = await run("early-eof", `${enc} return new Response(new ReadableStream({ start(c) {
+      c.enqueue(e.encode('${sse("progress", {message: "starting…"})}')); c.close(); } }), {status: 200});`);
+  check(early.lost && /still running/.test(early.text), "stream closing without a result shows the notice", JSON.stringify(early));
+
+  const unreachable = await run("unreachable", `throw new TypeError('Failed to fetch');`);
+  check(unreachable.lost && /Couldn't reach the server/.test(unreachable.text), "fetch failure shows the unreachable notice", JSON.stringify(unreachable));
+  await shot("lost-unreachable");
+
+  const bad = await run("502", `return new Response('<html>bad gateway</html>', {status: 502, headers: {'content-type': 'text/html'}});`);
+  check(!bad.lost && /HTTP 502/.test(bad.log), "a 502 page is an error, not a lost stream", JSON.stringify(bad));
+
+  const failed = await run("error-event", `${enc} return new Response(new ReadableStream({ start(c) {
+      c.enqueue(e.encode('${sse("error", {error: "blueprint failed"})}')); c.close(); } }), {status: 200});`);
+  check(!failed.lost && /blueprint failed/.test(failed.log), "a real forge error does not show the notice", JSON.stringify(failed));
 } else if (scenario === "library") {
   await nav(`${base}/app`);
   await evaluate(`document.getElementById('nav-library').click()`); await sleep(800);

@@ -583,10 +583,14 @@ async function forge() {
   el("result").classList.add("hidden");
   el("progress").classList.remove("hidden");
   el("log").textContent = "";
+  el("forge-lost").classList.add("hidden");
   resetChoice();  // clear any choice panel left over from a previous forge
   // Echo what we asked for, so a mode mishap (e.g. a stale page) is visible in the log immediately.
   appendLog(`• requested: ${body.mode}` + (body.interactive ? " · interactive" : ""));
 
+  // started = the server answered, so the forge exists (and a token is reserved); settled = the stream
+  // reached its result/error. Started but not settled means the CONNECTION died, not the forge.
+  const run = { started: false, settled: false };
   try {
     const resp = await fetch("/api/forge-class", {
       method: "POST",
@@ -602,16 +606,52 @@ async function forge() {
       }
       throw new Error(e.error || ("HTTP " + resp.status));
     }
-    await consumeSSE(resp, onForgeEvent);
+    // A non-JSON error page (an nginx 502 while the app restarts) means no forge started.
+    if (!resp.ok) throw new Error("the server answered HTTP " + resp.status + " — nothing was forged; try again");
+    run.started = true;
+    await consumeSSE(resp, (event, data) => {
+      if (event === "result" || event === "error") run.settled = true;
+      onForgeEvent(event, data);
+    });
+    if (!run.settled) throw new TypeError("the progress stream ended early");
   } catch (e) {
-    appendLog("✗ " + e.message);
-    toast(e.message);
+    if (e instanceof TypeError && !run.settled) showForgeLost(body, run.started, e.message);
+    else {
+      appendLog("✗ " + e.message);
+      toast(e.message);
+    }
   } finally {
     FORGING = false;
     renderForgeButton();
     el("spinner").classList.add("hidden");
     resetChoice();
   }
+}
+
+// The browser lost the forge's progress stream (a phone locking its screen or hopping networks is the usual
+// cause — Chrome reports it as a bare "network error"). The forge runs on the server regardless and saves
+// to the library, so say that instead of reading as a failure. Called before the finally's resetChoice, so
+// choiceState still tells us whether an engine pick was pending.
+function showForgeLost(body, started, reason) {
+  const token = body.mode === "token";
+  let text;
+  if (started) {
+    text = "Lost the connection to your forge — this happens when a phone locks or switches networks. "
+      + "The forge is still running on our server, and the class will appear in My Classes when it's done "
+      + "(usually about 5 minutes — reopen My Classes if it isn't listed yet). You don't need to keep this page open.";
+    if (choiceState && !choiceState.sent) text += " The engine pick will be made for you.";
+    if (token) text += " If the forge fails, your token is refunded automatically.";
+    appendLog("✗ lost the connection (" + reason + ") — the forge continues on the server");
+    toast("Connection lost — your class will appear in My Classes when it's done.");
+  } else {
+    text = "Couldn't reach the server (" + reason + "). Check your connection, then look in My Classes in a "
+      + "few minutes before forging again — the forge may have started anyway."
+      + (token ? " Tokens are only kept for forges that finish." : "");
+    appendLog("✗ couldn't reach the server (" + reason + ")");
+    toast("Couldn't reach the server — check your connection.");
+  }
+  el("forge-lost-text").textContent = text;
+  el("forge-lost").classList.remove("hidden");
 }
 
 async function consumeSSE(resp, handler) {
@@ -1279,6 +1319,7 @@ function renderStatsChart(daily) {
 
 el("nav-forge").onclick = () => selectTab("forge");
 el("nav-library").onclick = () => selectTab("library");
+el("forge-lost-library").onclick = () => selectTab("library");
 el("nav-account").onclick = () => selectTab("account");
 el("tokens").onclick = () => selectTab("account");  // the header chip doubles as a shortcut to buy/see balance
 el("forge-btn").onclick = forge;

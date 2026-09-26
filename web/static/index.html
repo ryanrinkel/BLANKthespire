@@ -7,7 +7,7 @@
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png" />
   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/static/style.css?v=20260924" />
+  <link rel="stylesheet" href="/static/style.css?v=20260926" />
 </head>
 <body>
   <header>
@@ -155,6 +155,15 @@
         </div>
       </div>
       <pre id="log" class="log"></pre>
+      <!-- Shown when the browser loses the progress stream (phone locked, network switch). The forge runs
+           on the server regardless, so this points at My Classes instead of reading as a failure. -->
+      <div id="forge-lost" class="banner lost hidden" role="status">
+        <span class="banner-icon" aria-hidden="true">⚠</span>
+        <div>
+          <p id="forge-lost-text"></p>
+          <button id="forge-lost-library" class="btn">Open My Classes</button>
+        </div>
+      </div>
     </section>
 
     <section id="result" class="card hidden">
@@ -305,7 +314,7 @@
 
   <!-- ?v= busts the 1-hour static cache on deploy: bump both whenever either file changes. render.js holds
        the class renderers shared with the public /deck page and must load first. -->
-  <script src="/static/render.js?v=20260924"></script>
-  <script src="/static/app.js?v=20260924"></script>
+  <script src="/static/render.js?v=20260926"></script>
+  <script src="/static/app.js?v=20260926"></script>
 </body>
 </html>
