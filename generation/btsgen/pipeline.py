@@ -32,6 +32,8 @@ class PipelineResult:
     # because an attempt-1 reach for a missing vocab token is demand signal (validator.vocab_misses)
     # regardless of whether the model then settled for a legal card.
     all_errors: list[str] = field(default_factory=list)
+    # Card-stage vocab gate decision for attempt 1 (btsgen/gate.py summary), None when the gate is off.
+    gate: dict | None = None
 
 
 # Balance repair fires only when the score clears the ceiling by this factor. The ceiling already sits
@@ -56,6 +58,7 @@ def generate_card(brief: Brief, gen: AnthropicGenerator | None = None,
     # --- attempt 1 ---
     text, messages = gen.first_attempt(brief)
     res.attempts = 1
+    _note_gate(res, gen)
     card, errors = _extract_or_error(text)
     if card is not None:
         card["source"] = "llm"  # provenance is the harness's call, not model compliance
@@ -88,6 +91,21 @@ def generate_card(brief: Brief, gen: AnthropicGenerator | None = None,
     res.all_errors += vr2.errors
     res.log.append(f"repair: still {len(vr2.errors)} error(s) -> discarded")
     return res
+
+
+def _note_gate(res: PipelineResult, gen) -> None:
+    g = getattr(gen, "last_gate", None)
+    if not isinstance(g, dict):
+        return
+    res.gate = g
+    if g.get("full"):
+        why = f" ({g['error']})" if g.get("error") else ""
+        res.log.append(f"vocab gate [{g.get('mode')}]: full prompt{why}")
+    else:
+        pct = 100 * g["chars"] / max(1, g["full_chars"])
+        fams = ", ".join(g.get("families") or []) or "core only"
+        res.log.append(f"vocab gate [{g.get('mode')}]: {fams}; {len(g.get('ops') or [])} extra op row(s); "
+                       f"prompt {pct:.0f}% of full")
 
 
 def _maybe_balance_repair(res: PipelineResult, messages: list[dict], gen, validator: CardValidator) -> None:
@@ -262,8 +280,14 @@ def _quarantine(res: PipelineResult, brief: Brief, model: str, validator: CardVa
         "repaired": res.repaired,
         "balance_repaired": res.balance_repaired,
     }
+    if res.repaired and res.all_errors:
+        # what attempt 1 got wrong — the only record of WHY a repair was needed (vocab-gate A/Bs read this)
+        meta["first_attempt_errors"] = [str(e)[:300] for e in res.all_errors[:6]]
     if res.balance_repair is not None:
         meta["balance_repair"] = res.balance_repair
+    if res.gate is not None:
+        meta["vocab_gate"] = {k: res.gate.get(k) for k in ("mode", "full", "jev_ok", "families", "ops", "chars",
+                                                            "full_chars")}
     meta_path.write_text(json.dumps(meta, indent=2) + "\n")
 
     res.card = card

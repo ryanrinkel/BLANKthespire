@@ -3147,15 +3147,17 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
     # Creative harness v2 (Fix A): the class identity rides the per-card SYSTEM prompt. The card generators
     # cache system_prompt() at construction, so bind the identity scope around card_gen_factory() only
     # (a ContextVar — thread-local, so concurrent web forges never see each other's class).
-    _scope_tok = None
+    # The same scope carries the class's declared pool kinds for the card-stage vocab gate (btsgen/gate.py,
+    # $BTS_VOCAB_GATE): a kind's CLASS-IDENTITY section rides the cached prompt core for a class that owns it and
+    # is left out for one that doesn't. Inert while the gate is off.
+    _scope = {"kinds": _declared_kinds(bp)}
     if _v2:
-        _scope_tok = _card_contract.set_class_scope(
-            {"identity": harness_v2.identity_block(bp, bp.get("catalog_metaphors"))})
+        _scope["identity"] = harness_v2.identity_block(bp, bp.get("catalog_metaphors"))
+    _scope_tok = _card_contract.set_class_scope(_scope)
     try:
         card_gen = card_gen_factory()
     finally:
-        if _scope_tok is not None:
-            _card_contract.reset_class_scope(_scope_tok)
+        _card_contract.reset_class_scope(_scope_tok)
     made: list[dict] = []  # {plan, card} in slot order
     _v2_triples: set = set()  # exemplar id-sets already dealt in this class (never the same three twice)
     _v2_arch_ids = _archetype_ids(bp)
@@ -3196,6 +3198,18 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
             res.stats["cards_ok"] += 1
             if not pres.repaired:
                 res.stats["cards_first_ok"] += 1
+        g = getattr(pres, "gate", None)
+        if isinstance(g, dict):  # only when $BTS_VOCAB_GATE is on — the A/B reads these off the forge result
+            vg = res.stats.setdefault("vocab_gate", {"mode": g.get("mode"), "cards": 0, "full_prompt": 0,
+                                                     "jev_failures": 0, "first_try_ok": 0, "chars": 0,
+                                                     "full_chars": 0, "jev_cost": 0.0})
+            vg["cards"] += 1
+            vg["full_prompt"] += bool(g.get("full"))
+            vg["jev_failures"] += g.get("jev_ok") is False
+            vg["first_try_ok"] += bool(pres.ok and not pres.repaired)
+            vg["chars"] += int(g.get("chars") or 0)
+            vg["full_chars"] += int(g.get("full_chars") or 0)
+            vg["jev_cost"] = round(vg["jev_cost"] + float(g.get("jev_cost") or 0.0), 6)
     vocab_demand: list[dict] = []  # missing-vocab reaches mined from card validation errors (see docstring)
     total = len(bp["cards"])
     for i, plan in enumerate(bp["cards"]):
@@ -3269,6 +3283,13 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
                  f"{br['score_before']:.0f} -> {br['score_after']:.0f} (budget ~{br['ceiling']:.0f})")
         note(f"card {i+1}/{total}: {pres.card.get('name')} ready "
              f"({pres.card.get('rarity')} {pres.card.get('type', '')})")
+
+    _vg = res.stats.get("vocab_gate")
+    if _vg and _vg["cards"]:
+        note(f"vocab gate [{_vg['mode']}]: {_vg['cards']} card prompt(s) at "
+             f"{100 * _vg['chars'] / max(1, _vg['full_chars']):.0f}% of the full prompt; "
+             f"{_vg['full_prompt']} sent full ({_vg['jev_failures']} Jev failure(s)); "
+             f"{_vg['first_try_ok']} valid first try")
 
     # Flush the mined vocab demand BEFORE the too-few-cards abort — a forge that died reaching for
     # missing vocabulary is the richest demand signal there is. Never let a sink failure break a forge.

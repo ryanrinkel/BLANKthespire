@@ -1011,6 +1011,8 @@ MODEL_PRICES: dict[str, tuple[float, float, float]] = {
     "z-ai/glm-5.3": (0.91, 2.86, 0.169),       # OpenRouter, the first backup tier (the hosted primary 2026-09-18..24)
     "z-ai/glm-5.2": (0.5544, 1.7424, 0.10296),  # OpenRouter, the last fallback tier
     "google/gemma-4-31b-it": (0.09, 0.34, 0.05),  # OpenRouter, brainstorm at every tier
+    "typesafe/jev-1.13": (0.042, 0.0, 0.042),  # OpenRouter Decisions API: the card vocab gate (role "gate"),
+                                               # output unmetered; its usage also carries the metered `cost`
 }
 
 # Every model the BYOK panel SUGGESTS (static/app.js PROVIDERS), so /api/forge-estimate can quote a dollar

@@ -36,6 +36,15 @@ def reset_class_scope(token) -> None:
 def class_scope() -> dict | None:
     return _v2_scope.get()
 
+
+def card_prompt_gate(system_text: str):
+    """Card-stage vocabulary gating (btsgen/gate.py, docs/plans/JEV_EVALUATION_PLAN.md Phase 1a): the generator
+    calls this ONCE at construction with the system prompt it just built, under the same class scope (whose
+    optional `kinds` = the class's declared pool kinds). None when $BTS_VOCAB_GATE is off — the prompt is then
+    exactly system_prompt(). Only the card contract defines this; relic/blueprint contracts are never gated."""
+    from . import gate
+    return gate.build(system_text, class_scope())
+
 # --- DESIGN_HEURISTICS.md loader -----------------------------------------------------------------
 # The forge's design rules live as editable prose in mod/contract/DESIGN_HEURISTICS.md (one source the
 # designer can tweak without touching code). Each rule is a block introduced by a marker comment:

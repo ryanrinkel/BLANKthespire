@@ -254,6 +254,10 @@ class _FailoverGenerator:
         return self._active().gen.last_meta
 
     @property
+    def last_gate(self) -> dict | None:  # the vocab-gate decision of the tier that answered (see gate.py)
+        return getattr(self._active().gen, "last_gate", None)
+
+    @property
     def tiers(self) -> list[_Tier]:
         return list(self._tiers)
 
@@ -504,8 +508,10 @@ def build_ollama_mix(role_map: dict | None = None, *, on_usage=None):
         ledger groups by these). The original keys are untouched, so callers reading prompt_tokens etc. work."""
         if on_usage is None:
             return None
+        # A dict that already names its role/model keeps them: the card generator's vocab gate reports its
+        # Jev calls as role "gate" through this same callback, and they must not be booked as "cards".
         return lambda u, _r=role, _m=model: on_usage(
-            {**u, "_role": _r, "_model": _m} if isinstance(u, dict) else u)
+            {"_role": _r, "_model": _m, **u} if isinstance(u, dict) else u)
 
     def _gen(role: str, contract_mod, max_tokens: int):
         spec = cfg["roles"][role]

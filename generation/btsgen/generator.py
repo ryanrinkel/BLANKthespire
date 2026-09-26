@@ -91,6 +91,35 @@ def extract_card_json(text: str) -> dict:
     return obj
 
 
+def _make_gate(contract_mod, system_text: str):
+    """The card-prompt gate for this contract, or None (flag off, or a contract that is never gated). A gate
+    that fails to build is logged and ignored: the ungated prompt is always a safe answer."""
+    fn = getattr(contract_mod, "card_prompt_gate", None)
+    if fn is None:
+        return None
+    try:
+        return fn(system_text)
+    except Exception as e:  # noqa: BLE001
+        import logging
+        logging.getLogger(__name__).warning("vocab gate unavailable: %s", e)
+        return None
+
+
+def _gated_system(gen, brief) -> str | None:
+    """The per-brief system prompt when the generator carries a gate (else None = use gen._system), and the
+    decision summary on gen.last_gate for the pipeline log. Repairs never come through here: they keep the
+    FULL cache-safe layout (gen._system)."""
+    gp = getattr(gen, "_gate", None)
+    if gp is None:
+        gen.last_gate = None
+        return None
+    from . import gate as _gate_mod
+    text = brief.describe() if hasattr(brief, "describe") else str(brief)
+    system, decision = gp.for_brief(text, on_usage=getattr(gen, "_on_usage", None))
+    gen.last_gate = _gate_mod.summary(decision, gp, system)
+    return system
+
+
 class AnthropicGenerator:
     """Prompt -> a JSON content object (as text). Content-agnostic: the `contract_mod` supplies the
     system prompt + the per-brief user/repair messages, so the SAME backend serves cards (the default
@@ -115,14 +144,29 @@ class AnthropicGenerator:
         self._on_usage = on_usage     # optional callback(resp.usage) for cost/telemetry; library ignores usage otherwise
         self._contract = contract_mod or contract
         self._system = self._contract.system_prompt()
+        # Card-stage vocab gate (off by default): the full prompt becomes the cache-safe layout (core + every
+        # add-on); first attempts get a per-brief gated prompt sharing the same core prefix.
+        self._gate = _make_gate(self._contract, self._system)
+        if self._gate is not None:
+            self._system = self._gate.full
+        self.last_gate: dict | None = None
         self._client = anthropic.Anthropic(api_key=api_key)
 
-    def _complete(self, messages: list[dict]) -> str:
+    def _system_blocks(self, system: str) -> list[dict]:
+        """One cached block, or — under the gate — two breakpoints: after the shared core and at the end of
+        the per-card tail (the plan's rule 5), so a gated card and a repair both reuse the core cache."""
+        core = self._gate.core if self._gate is not None else ""
+        if core and system.startswith(core) and len(system) > len(core):
+            return [{"type": "text", "text": core, "cache_control": {"type": "ephemeral"}},
+                    {"type": "text", "text": system[len(core):], "cache_control": {"type": "ephemeral"}}]
+        return [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}]
+
+    def _complete(self, messages: list[dict], system: str | None = None) -> str:
         feats = _model_features(self.model)
         kwargs: dict = dict(
             model=self.model,
             max_tokens=self.max_tokens,
-            system=[{"type": "text", "text": self._system, "cache_control": {"type": "ephemeral"}}],
+            system=self._system_blocks(system or self._system),
             messages=messages,
         )
         # Only attach the optional params the chosen model actually accepts (Haiku 4.5 400s on both).
@@ -144,7 +188,7 @@ class AnthropicGenerator:
 
     def first_attempt(self, brief) -> tuple[str, list[dict]]:
         messages = [{"role": "user", "content": self._contract.user_brief(brief)}]
-        text = self._complete(messages)
+        text = self._complete(messages, system=_gated_system(self, brief))
         messages.append(_assistant_msg(text))
         return text, messages
 
@@ -290,6 +334,10 @@ class OpenAICompatGenerator:
         self.avoid_providers: set[str] = set()
         self._contract = contract_mod or contract
         self._system = self._contract.system_prompt()
+        self._gate = _make_gate(self._contract, self._system)  # card-stage vocab gate; None = off (see gate.py)
+        if self._gate is not None:
+            self._system = self._gate.full
+        self.last_gate: dict | None = None
         self._token_param = ("max_completion_tokens"
                              if model in OpenAICompatGenerator._completion_token_models else "max_tokens")
         # Diagnostics from the LAST completed call: {"finish_reason", "content_chars", "reasoning_chars"}.
@@ -447,11 +495,11 @@ class OpenAICompatGenerator:
                 adapted = True
         return adapted
 
-    def _complete(self, messages: list[dict]) -> str:
+    def _complete(self, messages: list[dict], system: str | None = None) -> str:
         payload = {
             "model": self.model,
             self._token_param: self.max_tokens,
-            "messages": [{"role": "system", "content": self._system}, *messages],
+            "messages": [{"role": "system", "content": system or self._system}, *messages],
         }
         if self._response_format is not None:
             payload["response_format"] = self._response_format
@@ -500,7 +548,7 @@ class OpenAICompatGenerator:
 
     def first_attempt(self, brief) -> tuple[str, list[dict]]:
         messages = [{"role": "user", "content": self._contract.user_brief(brief)}]
-        text = self._complete(messages)
+        text = self._complete(messages, system=_gated_system(self, brief))
         messages.append(_assistant_msg(text))
         return text, messages
 
