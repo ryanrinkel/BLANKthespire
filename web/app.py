@@ -422,6 +422,14 @@ CHOICE_TIMEOUT_S = int(os.environ.get("BTSWEB_CHOICE_TIMEOUT_S", "120"))
 _pending_choices: dict[str, dict] = {}
 _choices_lock = threading.Lock()
 
+# The latest progress line of each running forge, keyed by forge id: what GET /api/forge-jobs/<id> reports to
+# a browser whose SSE stream died (phone locked, network hop) and is polling instead. Written by the worker's
+# on_event, dropped when the worker exits; single dict assignments, so no lock.
+_forge_progress: dict[str, str] = {}
+# How recent the newest job must be for GET /api/forge-jobs/latest to call it "the forge you just started" —
+# the fallback for a browser whose POST died before the first event (so it never learned the id).
+FORGE_LATEST_WINDOW_S = 300
+
 
 # Art kinds whose file is not <kind>.png. 'cards' is the per-card portrait PACK: one zip per class (~34
 # PNGs) so the mod's import does ONE download instead of ~34 synchronous ones on its UI thread.
@@ -1329,7 +1337,9 @@ def forge_class_route():
     def archetype_checkpoint(options, dossier) -> list:
         """Runs on the forge worker thread: surface the options as a 'choice' SSE event, then block
         until /api/forge/answer sets the event or the timeout fires (empty picks = the forge decides)."""
-        entry = {"event": threading.Event(), "answer": None, "user_id": user["id"]}
+        # options + deadline ride along so a browser that lost the stream can re-show the pick from a poll
+        entry = {"event": threading.Event(), "answer": None, "user_id": user["id"], "options": options,
+                 "deadline": time.time() + CHOICE_TIMEOUT_S}
         with _choices_lock:
             _pending_choices[forge_id] = entry
         q.put(("choice", {"forge_id": forge_id, "options": options, "timeout_s": CHOICE_TIMEOUT_S}))
@@ -1342,6 +1352,7 @@ def forge_class_route():
         return picks
 
     def on_event(msg: str) -> None:
+        _forge_progress[forge_id] = msg
         q.put(("progress", msg))
 
     def worker() -> None:
@@ -1386,6 +1397,7 @@ def forge_class_route():
             watchdog.cancel()
             finish_done(out)
         finally:
+            _forge_progress.pop(forge_id, None)
             _forge_release()
             _user_end(user["id"])
 
@@ -1401,6 +1413,7 @@ def forge_class_route():
                             if interactive else "starting…"}
         if reserved and token_state:
             first.update(token_state)
+        first["forge_id"] = forge_id  # what the browser polls (/api/forge-jobs/<id>) if this stream drops
         yield _sse("progress", first)
         while True:
             try:
@@ -1423,6 +1436,42 @@ def forge_class_route():
 
     headers = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
     return Response(stream(), mimetype="text/event-stream", headers=headers)
+
+
+@app.route("/api/forge-jobs/<forge_id>")
+@require_login
+def forge_job_status(forge_id: str):
+    """Where a forge stands, for a browser that lost its SSE stream and polls instead: running (with the
+    latest progress line, and the engine pick if one is waiting), done (with the class id to load) or failed
+    (with the error and whether the token came back). `latest` = this account's newest forge, but only if it
+    is still running or started in the last FORGE_LATEST_WINDOW_S — for a POST that died before the first
+    event carried the id. Owner-only: someone else's id is a 404 like a missing one."""
+    from datetime import datetime, timezone
+    user = current_user()
+    with session_scope() as s:
+        q = s.query(ForgeJob).filter_by(user_id=user["id"])
+        if forge_id == "latest":
+            job = q.order_by(ForgeJob.started_at.desc()).first()
+        else:
+            job = q.filter_by(id=forge_id).one_or_none()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        age = (now - job.started_at).total_seconds() if job is not None and job.started_at else None
+        if job is None or (forge_id == "latest" and job.status != "running"
+                           and (age is None or age > FORGE_LATEST_WINDOW_S)):
+            return jsonify({"error": "no such forge."}), 404
+        out = {"forge_id": job.id, "status": job.status, "class_id": job.class_id, "error": job.error or "",
+               "refunded": bool(job.refunded), "age_s": int(age) if age is not None else None}
+        u = s.query(User).filter_by(id=user["id"]).one_or_none()
+        if u is not None and not user_is_unlimited(u):
+            out.update(_token_state(u))  # a failed forge's refund shows up in the header chip
+    if out["status"] == "running":
+        out["message"] = _forge_progress.get(out["forge_id"], "")
+        with _choices_lock:
+            entry = _pending_choices.get(out["forge_id"])
+            if entry is not None and entry["user_id"] == user["id"] and not entry["event"].is_set():
+                out["choice"] = {"forge_id": out["forge_id"], "options": entry.get("options") or [],
+                                 "timeout_s": max(0, int(entry.get("deadline", 0) - time.time()))}
+    return jsonify(out)
 
 
 @app.route("/api/forge/answer", methods=["POST"])

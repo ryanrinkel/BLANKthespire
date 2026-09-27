@@ -95,9 +95,32 @@ function renderTokens() {
   const acct = el("acct-balance");
   if (acct) acct.textContent = unlimited ? "∞" : String(paid);
 
+  renderGetTokens();
   renderForgeButton();
   renderChooser();
   renderBanner();  // its wording depends on the balance
+}
+
+// The forge tab's tier buttons sit behind "Get tokens" (2026-09-26): folded for an account that already has
+// tokens to spend, unfolded when the balance is 0 (that's what they came for), and absent for unlimited
+// accounts. null = follow the balance; a click pins the user's choice for the rest of the visit.
+let GET_TOKENS_OPEN = null;
+
+function renderGetTokens() {
+  const btn = el("forge-get-tokens"), wrap = el("forge-donate-wrap");
+  if (!btn || !wrap || !ME) return;
+  const unlimited = !!ME.unlimited;
+  const open = !unlimited && (GET_TOKENS_OPEN ?? Number(ME.token_balance || 0) <= 0);
+  btn.parentElement.classList.toggle("hidden", unlimited);
+  wrap.classList.toggle("hidden", !open);
+  btn.textContent = open ? "Hide token options" : "Get tokens";
+  btn.setAttribute("aria-expanded", String(open));
+}
+
+// The pay boxes are a radio pair: clicking the header of the one already selected must not fold it (that
+// would leave nothing selected). Switching happens by opening the other box.
+function onPaySummaryClick(e) {
+  if (e.currentTarget.parentElement.open) e.preventDefault();
 }
 
 // Opening one of the two payment boxes closes the other, remembers the choice, and re-renders everything
@@ -590,7 +613,7 @@ async function forge() {
 
   // started = the server answered, so the forge exists (and a token is reserved); settled = the stream
   // reached its result/error. Started but not settled means the CONNECTION died, not the forge.
-  const run = { started: false, settled: false };
+  const run = { started: false, settled: false, forgeId: null };
   try {
     const resp = await fetch("/api/forge-class", {
       method: "POST",
@@ -611,11 +634,12 @@ async function forge() {
     run.started = true;
     await consumeSSE(resp, (event, data) => {
       if (event === "result" || event === "error") run.settled = true;
+      if (data && data.forge_id) run.forgeId = data.forge_id;
       onForgeEvent(event, data);
     });
     if (!run.settled) throw new TypeError("the progress stream ended early");
   } catch (e) {
-    if (e instanceof TypeError && !run.settled) showForgeLost(body, run.started, e.message);
+    if (e instanceof TypeError && !run.settled) await recoverForge(body, run, e.message);
     else {
       appendLog("✗ " + e.message);
       toast(e.message);
@@ -629,29 +653,98 @@ async function forge() {
 }
 
 // The browser lost the forge's progress stream (a phone locking its screen or hopping networks is the usual
-// cause — Chrome reports it as a bare "network error"). The forge runs on the server regardless and saves
-// to the library, so say that instead of reading as a failure. Called before the finally's resetChoice, so
-// choiceState still tells us whether an engine pick was pending.
-function showForgeLost(body, started, reason) {
+// cause — Chrome reports it as a bare "network error"). The forge runs on the server regardless, so instead
+// of reading as a failure the page says so and polls /api/forge-jobs/<id> until the job settles, then shows
+// the class (or the failure) exactly as the stream would have. Awaited inside forge()'s try, so the button
+// stays disabled and the spinner spins until then.
+const RECOVER_POLL_MS = 5000;
+const RECOVER_GIVE_UP_MS = 30 * 60 * 1000;  // past the server's 20-minute cap plus art; My Classes has it anyway
+const RECOVER_NOT_FOUND = 3;                // 404s in a row before "no forge started" (POST never landed)
+
+async function recoverForge(body, run, reason) {
   const token = body.mode === "token";
-  let text;
-  if (started) {
-    text = "Lost the connection to your forge — this happens when a phone locks or switches networks. "
-      + "The forge is still running on our server, and the class will appear in My Classes when it's done "
-      + "(usually about 5 minutes — reopen My Classes if it isn't listed yet). You don't need to keep this page open.";
-    if (choiceState && !choiceState.sent) text += " The engine pick will be made for you.";
-    if (token) text += " If the forge fails, your token is refunded automatically.";
-    appendLog("✗ lost the connection (" + reason + ") — the forge continues on the server");
-    toast("Connection lost — your class will appear in My Classes when it's done.");
+  const note = (text) => { el("forge-lost-text").textContent = text; el("forge-lost").classList.remove("hidden"); };
+  const stillRunning = () => note("Lost the connection to your forge — this happens when a phone locks or "
+    + "switches networks. It's still running on our server, and this page will pick it back up and show the "
+    + "class when it's done. If you leave, it'll be waiting in My Classes."
+    + (token ? " If the forge fails, your token is refunded automatically." : ""));
+  if (run.started) {
+    stillRunning();
+    appendLog("✗ lost the connection (" + reason + ") — the forge continues on the server; reconnecting…");
+    toast("Connection lost — reconnecting to your forge…");
   } else {
-    text = "Couldn't reach the server (" + reason + "). Check your connection, then look in My Classes in a "
-      + "few minutes before forging again — the forge may have started anyway."
-      + (token ? " Tokens are only kept for forges that finish." : "");
+    note("Couldn't reach the server (" + reason + "). Checking whether your forge started…");
     appendLog("✗ couldn't reach the server (" + reason + ")");
-    toast("Couldn't reach the server — check your connection.");
+    toast("Couldn't reach the server — checking your connection…");
   }
-  el("forge-lost-text").textContent = text;
-  el("forge-lost").classList.remove("hidden");
+
+  let id = run.forgeId || "latest";
+  let notFound = 0, lastMsg = "", found = run.started;
+  const deadline = Date.now() + RECOVER_GIVE_UP_MS;
+  while (Date.now() < deadline) {
+    await pollPause(RECOVER_POLL_MS);
+    let job;
+    try {
+      const r = await fetch(`/api/forge-jobs/${encodeURIComponent(id)}`);
+      if (r.status === 404) {
+        if (!found && ++notFound >= RECOVER_NOT_FOUND) {
+          note("No forge was started, so nothing was spent. Check your connection and forge again.");
+          appendLog("✗ the forge never started");
+          return;
+        }
+        continue;
+      }
+      if (!r.ok) continue;
+      job = await r.json();
+    } catch (_) { continue; }  // still offline: keep trying until the deadline
+    if (!found) { found = true; stillRunning(); }
+    id = job.forge_id;  // a "latest" lookup pins to the job it found
+    if (applyTokenState(job)) renderTokens();
+    if (job.status === "running") {
+      if (job.message && job.message !== lastMsg) { lastMsg = job.message; appendLog("• " + job.message); }
+      // An engine pick the stream never delivered (or delivered before it died): show it again. The answer
+      // goes back on /api/forge/answer as usual, independent of the stream.
+      if (job.choice && (!choiceState || choiceState.forgeId !== job.choice.forge_id)) renderChoice(job.choice);
+      continue;
+    }
+    el("forge-lost").classList.add("hidden");
+    if (job.status === "done" && job.class_id) {
+      try {
+        const r = await fetch(`/api/classes/${job.class_id}`);
+        if (r.ok) { appendLog("✓ done (reconnected)"); renderResult(await r.json()); return; }
+      } catch (_) { /* fall through to the pointer */ }
+      appendLog("✓ done — open it from My Classes");
+      toast("Your class is ready in My Classes.");
+      return;
+    }
+    const msg = (job.error || "the forge failed") + (job.refunded ? " — your token was refunded." : "");
+    appendLog("✗ " + msg);
+    toast(msg);
+    return;
+  }
+  note("Still no word from your forge. If it finishes, it'll appear in My Classes"
+    + (token ? "; if it fails, your token is refunded automatically." : "."));
+}
+
+// Wait `ms`, but wake as soon as the tab is visible again or the network comes back: a phone that slept
+// through the forge should see the result the moment it's picked up, not up to one poll later.
+function pollPause(ms) {
+  return new Promise((resolve) => {
+    const wake = () => {
+      if (document.visibilityState !== "visible") return;
+      clearTimeout(t);
+      document.removeEventListener("visibilitychange", wake);
+      window.removeEventListener("online", wake);
+      resolve();
+    };
+    const t = setTimeout(() => {
+      document.removeEventListener("visibilitychange", wake);
+      window.removeEventListener("online", wake);
+      resolve();
+    }, ms);
+    document.addEventListener("visibilitychange", wake);
+    window.addEventListener("online", wake);
+  });
 }
 
 async function consumeSSE(resp, handler) {
@@ -1543,6 +1636,11 @@ async function loadAdminActions() {
 el("forge-byok").addEventListener("toggle", () => onPayBoxToggle("forge-byok", "forge-token", "byok"));
 el("forge-token").addEventListener("toggle", () => onPayBoxToggle("forge-token", "forge-byok", "token"));
 el("mode-fake").onchange = () => { renderForgeButton(); renderChooser(); };
+for (const id of ["forge-byok", "forge-token"]) el(id).querySelector("summary").addEventListener("click", onPaySummaryClick);
+el("forge-get-tokens").onclick = () => {
+  GET_TOKENS_OPEN = el("forge-donate-wrap").classList.contains("hidden");
+  renderGetTokens();
+};
 
 el("provider").onchange = () => { applyProvider(); saveByok(); showEstimate(false); renderForgeButton(); };
 el("model").oninput = () => { showEstimate(false); renderForgeButton(); };

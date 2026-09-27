@@ -157,3 +157,80 @@ def test_queue_timeout_settles_without_refund_confusion(client, app_module, stub
         assert not app_module._user_active
     with app_module._forge_admit_lock:
         assert app_module._waiting_total() == 0
+
+
+# --- GET /api/forge-jobs/<id>: the poll a browser falls back to when its stream drops (2026-09-26) ---------
+
+def _first_event(raw: bytes) -> dict:
+    import json
+    text = raw.decode() if isinstance(raw, bytes) else raw
+    return json.loads(text.split("data:", 1)[1].split("\n", 1)[0])
+
+
+def test_poll_follows_a_dropped_forge_to_its_class(client, app_module, stub_forge):
+    login(client, "poll@example.com")
+    seed_tokens(app_module, "poll@example.com", 1)
+    stub_forge.gate = threading.Event()
+    first = _first_event(_post_and_disconnect(client, {"concept": "lost the phone", "mode": "token"}))
+    fid = first["forge_id"]                                   # the first event names the job to poll
+    run = client.get(f"/api/forge-jobs/{fid}").get_json()
+    assert run["status"] == "running" and run["token_balance"] == 0 and run["class_id"] is None
+    assert client.get("/api/forge-jobs/latest").get_json()["forge_id"] == fid
+    stub_forge.gate.set()
+    assert _wait(lambda: client.get(f"/api/forge-jobs/{fid}").get_json()["status"] != "running")
+    done = client.get(f"/api/forge-jobs/{fid}").get_json()
+    assert done["status"] == "done" and done["class_id"] and not done["refunded"]
+    assert client.get(f"/api/classes/{done['class_id']}").status_code == 200
+    assert fid not in app_module._forge_progress              # the live line is dropped with the worker
+    stub_forge.gate = None
+
+
+def test_poll_reports_a_failed_forge_and_its_refund(client, app_module, stub_forge):
+    login(client, "pollfail@example.com")
+    seed_tokens(app_module, "pollfail@example.com", 1)
+    stub_forge.error = "provider died"
+    fid = _first_event(_post_and_disconnect(client, {"concept": "x", "mode": "token"}))["forge_id"]
+    assert _wait(lambda: client.get(f"/api/forge-jobs/{fid}").get_json()["status"] != "running")
+    j = client.get(f"/api/forge-jobs/{fid}").get_json()
+    assert j["status"] == "failed" and j["refunded"] and "provider died" in j["error"]
+    assert j["token_balance"] == 1
+    stub_forge.error = None
+
+
+def test_poll_is_owner_only_and_latest_is_recent_only(client, app_module):
+    from models import ForgeJob, User
+    login(client, "owner@example.com")
+    with app_module.session_scope() as s:
+        uid = s.query(User).filter_by(email="owner@example.com").one().id
+        s.add(ForgeJob(id="a" * 32, user_id=uid, mode="token", token_kind="paid", status="done", class_id=1))
+    assert client.get("/api/forge-jobs/" + "a" * 32).status_code == 200
+    login(client, "stranger@example.com")
+    assert client.get("/api/forge-jobs/" + "a" * 32).status_code == 404
+    assert client.get("/api/forge-jobs/latest").status_code == 404      # stranger has no forges
+    login(client, "owner@example.com")
+    with app_module.session_scope() as s:  # an old finished forge is not "the one you just started"
+        from datetime import datetime, timedelta, timezone
+        an_hour_ago = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=1)
+        s.query(ForgeJob).filter_by(id="a" * 32).update({"started_at": an_hour_ago})
+    assert client.get("/api/forge-jobs/latest").status_code == 404
+
+
+def test_poll_surfaces_a_pending_engine_pick(client, app_module, stub_forge, monkeypatch):
+    login(client, "pollpick@example.com")
+    seed_tokens(app_module, "pollpick@example.com", 1)
+    offered = [{"id": "poison", "name": "Poison"}, {"id": "block", "name": "Block"}]
+    picked: list = []
+
+    def forge_with_pick(concept, **kw):
+        picked.append(kw["archetype_checkpoint"](offered, {}))
+        return dict(stub_forge.result)
+    monkeypatch.setattr(app_module, "forge_to_bundle", forge_with_pick)
+    fid = _first_event(_post_and_disconnect(
+        client, {"concept": "x", "mode": "token", "interactive": True}))["forge_id"]
+    assert _wait(lambda: "choice" in client.get(f"/api/forge-jobs/{fid}").get_json())
+    ch = client.get(f"/api/forge-jobs/{fid}").get_json()["choice"]
+    assert ch["forge_id"] == fid and ch["options"] == offered and 0 < ch["timeout_s"] <= 120
+    assert client.post("/api/forge/answer", json={"forge_id": fid, "archetypes": ["poison"]},
+                       headers=H).status_code == 200
+    assert _wait(lambda: client.get(f"/api/forge-jobs/{fid}").get_json()["status"] == "done")
+    assert picked == [["poison"]]

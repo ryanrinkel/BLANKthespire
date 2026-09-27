@@ -99,12 +99,15 @@ if (scenario === "forge") {
 
   // (d) the interactive toggle is a property of the forge, not of how it is paid for: it sits in the card
   // but inside neither box.
-  const where = await json(`(() => { const i = document.getElementById('interactive'); return {
+  // Since 2026-09-26 it is folded into "Advanced options" under the forge button, closed by default.
+  const where = await json(`(() => { const i = document.getElementById('interactive'); const a = document.getElementById('forge-advanced'); return {
     in_card: document.getElementById('forge-input').contains(i),
     in_byok: document.getElementById('forge-byok').contains(i),
-    in_token: document.getElementById('forge-token').contains(i)}; })()`);
-  check(where.in_card && !where.in_byok && !where.in_token,
-        "interactive checkbox is outside both payment boxes", JSON.stringify(where));
+    in_token: document.getElementById('forge-token').contains(i),
+    in_advanced: a.contains(i), advanced_open: a.open,
+    below_button: !!(document.getElementById('forge-btn').compareDocumentPosition(a) & Node.DOCUMENT_POSITION_FOLLOWING)}; })()`);
+  check(where.in_card && !where.in_byok && !where.in_token && where.in_advanced && !where.advanced_open && where.below_button,
+        "interactive checkbox is in the closed Advanced options under the button", JSON.stringify(where));
   await shot("forge-fresh");
 
   // (b) open the key box and fill it in: the button enables and says whose money it spends.
@@ -118,6 +121,17 @@ if (scenario === "forge") {
             pref: localStorage.getItem('bts_forge_pref')}; })()`);
   check(!keyed.disabled && keyed.label.includes("uses your API key") && !keyed.token_open,
         "byok box open + key + model: button enabled", JSON.stringify(keyed));
+  // The pay boxes read as a radio pair (2026-09-26): the selected one carries the accent border and a
+  // "Selected" tag, the other neither; clicking the selected header does not fold it.
+  const radio = await json(`(() => {
+    const tag = (id) => getComputedStyle(document.querySelector('#' + id + ' > summary'), '::after').content;
+    const border = (id) => getComputedStyle(document.getElementById(id)).borderTopColor;
+    document.querySelector('#forge-byok > summary').click();
+    return {byok_tag: tag('forge-byok'), token_tag: tag('forge-token'),
+            byok_border: border('forge-byok'), token_border: border('forge-token'),
+            still_open: document.getElementById('forge-byok').open}; })()`);
+  check(radio.byok_tag === '"Selected"' && radio.token_tag === "none" && radio.byok_border !== radio.token_border
+        && radio.still_open, "selected pay box is highlighted and can't be clicked shut", JSON.stringify(radio));
   // The quote is behind a button (2026-09-21): hidden until clicked, and a model/provider change hides it
   // again until the button is clicked once more.
   const est = JSON.parse(await evaluate(`(() => {
@@ -181,6 +195,19 @@ if (scenario === "forge") {
   check(!tok.byok_open && tok.disabled && tok.label === "Forge the class"
         && tok.title.includes("no tokens"),
         "token box open with 0 tokens: byok closed, button disabled", JSON.stringify(tok));
+  // "Get tokens" (2026-09-26): with 0 tokens the tiers are already unfolded; with tokens in hand they fold
+  // behind the button, which unfolds them on click.
+  const gt = await json(`(() => {
+    const wrap = document.getElementById('forge-donate-wrap'), b = document.getElementById('forge-get-tokens');
+    const zero = {shown: !wrap.classList.contains('hidden'), label: b.textContent};
+    ME.token_balance = 3; renderTokens();
+    const some = {shown: !wrap.classList.contains('hidden'), label: b.textContent};
+    b.click();
+    const clicked = {shown: !wrap.classList.contains('hidden'), label: b.textContent};
+    ME.token_balance = 0; GET_TOKENS_OPEN = null; renderTokens();
+    return {zero, some, clicked}; })()`);
+  check(gt.zero.shown && gt.zero.label === "Hide token options" && !gt.some.shown && gt.some.label === "Get tokens"
+        && gt.clicked.shown, "tier buttons fold behind Get tokens when the account has tokens", JSON.stringify(gt));
   if (tok.custom_hidden) {
     check(false, "custom-amount row rendered (needs /api/billing enabled + custom block)", "row hidden");
   } else {
@@ -210,47 +237,109 @@ if (scenario === "forge") {
   await shot("forge-token");
 } else if (scenario === "lost") {
   // 2026-09-26: a dropped progress stream (phone locked / network hop -> Chrome's bare "network error") must
-  // read as "still forging, look in My Classes", not as a failure. window.fetch is stubbed per case so the
-  // real forge() -> consumeSSE path runs; nothing reaches the server.
+  // read as "still forging", then recover on its own by polling /api/forge-jobs/<id>. window.fetch is stubbed
+  // per case: /api/forge-class plays the scripted stream, /api/forge-jobs/* answers from a scripted list of
+  // job states (404 = the number 404), everything else (the finished class) goes to the real server. Each
+  // poll waits RECOVER_POLL_MS (5 s), so this scenario takes ~a minute.
   await nav(`${base}/app`);
+  // A real class for the "done" polls to point at: the dev-only offline forge makes one in seconds.
+  const classId = await evaluate(`(async () => {
+    await (await fetch('/api/forge-class', {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({concept: 'lost-scenario seed', mode: 'fake'})})).text();
+    return (await (await fetch('/api/classes')).json()).classes[0].id; })()`);
   // escaped newlines: the frame is pasted into a '...' literal inside the evaluated source
   const sse = (ev, data) => `event: ${ev}\\ndata: ${JSON.stringify(data)}\\n\\n`;
-  const run = async (name, fetchBody) => {
-    await evaluate(`(async () => {
+  const enc = "const e = new TextEncoder();";
+  const state = () => json(`({lost: !document.getElementById('forge-lost').classList.contains('hidden'),
+    text: document.getElementById('forge-lost-text').textContent,
+    log: document.getElementById('log').textContent,
+    result: !document.getElementById('result').classList.contains('hidden'),
+    choice: !document.getElementById('choice').classList.contains('hidden'),
+    choice_opts: document.querySelectorAll('#choice-options button').length,
+    forging: FORGING, polled: window.__jobUrls})`);
+  // Start a forge against the stubs WITHOUT awaiting it; finish() awaits it and returns the end state.
+  const start = async (forgeBody, jobs) => {
+    await evaluate(`(() => {
+      document.getElementById('result').classList.add('hidden');
       document.getElementById('concept').value = 'An evil lemon';
       currentMode = () => 'token'; window.confirm = () => true;
-      window.fetch = async () => { ${fetchBody} };
-      await forge();
+      window.__realFetch = window.__realFetch || window.fetch;
+      window.__jobs = ${JSON.stringify(jobs)}; window.__jobUrls = [];
+      window.fetch = async (url, opts) => {
+        url = String(url);
+        if (url.startsWith('/api/forge-jobs/')) {
+          window.__jobUrls.push(url);
+          const j = window.__jobs.length > 1 ? window.__jobs.shift() : window.__jobs[0];
+          return j === 404 ? new Response('{"error":"no such forge."}', {status: 404})
+            : new Response(JSON.stringify(j), {status: 200, headers: {'content-type': 'application/json'}});
+        }
+        if (url === '/api/forge-class') { ${forgeBody} }
+        return window.__realFetch(url, opts);
+      };
+      window.__forgeP = forge();
     })()`);
-    return json(`({lost: !document.getElementById('forge-lost').classList.contains('hidden'),
-      text: document.getElementById('forge-lost-text').textContent,
-      log: document.getElementById('log').textContent})`);
   };
-  const enc = "const e = new TextEncoder();";
-  const dropped = await run("dropped", `${enc} let n = 0; return new Response(new ReadableStream({ pull(c) {
-      if (n++ === 0) c.enqueue(e.encode('${sse("progress", {message: "starting…"})}'));
-      else c.error(new TypeError('network error')); } }), {status: 200, headers: {'content-type': 'text/event-stream'}});`);
-  check(dropped.lost && /still running/.test(dropped.text) && /My Classes/.test(dropped.text) && /refunded/.test(dropped.text),
-        "mid-stream drop shows the still-running notice", JSON.stringify(dropped));
+  const finish = async () => { await evaluate(`window.__forgeP`); return state(); };
+  const dropStream = `${enc} let n = 0; return new Response(new ReadableStream({ pull(c) {
+      if (n++ === 0) c.enqueue(e.encode('${sse("progress", {message: "starting…", forge_id: "f1"})}'));
+      else c.error(new TypeError('network error')); } }), {status: 200, headers: {'content-type': 'text/event-stream'}});`;
+  const opts = [{id: "poison", name: "Poison", pitch: "stack it"}, {id: "block", name: "Block", pitch: "turtle"}];
+
+  // (1) drop mid-stream -> notice -> polls show progress + re-show the engine pick -> the class renders.
+  await start(dropStream, [
+    {forge_id: "f1", status: "running", message: "writing cards…",
+     choice: {forge_id: "f1", options: opts, timeout_s: 60}},
+    {forge_id: "f1", status: "running", message: "painting portraits…"},
+    {forge_id: "f1", status: "done", class_id: classId, error: "", refunded: false}]);
+  await sleep(1000);
+  const s1 = await state();
+  check(s1.lost && /pick it back up/.test(s1.text) && /My Classes/.test(s1.text) && /refunded/.test(s1.text) && s1.forging,
+        "drop: still-running notice while it reconnects", JSON.stringify(s1));
   await shot("lost-dropped");
-  await evaluate(`document.getElementById('forge-lost-library').click()`); await sleep(600);
-  check(await evaluate(`!document.getElementById('view-library').classList.contains('hidden')`), "notice button opens My Classes");
-  await evaluate(`document.getElementById('nav-forge').click()`); await sleep(300);
+  await sleep(5500);
+  const s1b = await state();
+  check(s1b.choice && s1b.choice_opts === 2 && /writing cards/.test(s1b.log),
+        "drop: a poll re-shows the pending engine pick and the progress line", JSON.stringify(s1b));
+  await shot("lost-choice");
+  const d1 = await finish();
+  check(!d1.lost && d1.result && /done \(reconnected\)/.test(d1.log) && /painting portraits/.test(d1.log)
+        && !d1.forging && d1.polled.every((u) => u.endsWith("/f1")),
+        "drop: recovers to the finished class on its own", JSON.stringify(d1));
+  await shot("lost-recovered");
 
-  const early = await run("early-eof", `${enc} return new Response(new ReadableStream({ start(c) {
-      c.enqueue(e.encode('${sse("progress", {message: "starting…"})}')); c.close(); } }), {status: 200});`);
-  check(early.lost && /still running/.test(early.text), "stream closing without a result shows the notice", JSON.stringify(early));
+  // (2) the stream just ends without a result, and the forge failed: the error and refund show, no notice.
+  await start(`${enc} return new Response(new ReadableStream({ start(c) {
+      c.enqueue(e.encode('${sse("progress", {message: "starting…", forge_id: "f2"})}')); c.close(); } }), {status: 200});`,
+    [{forge_id: "f2", status: "failed", class_id: null, error: "blueprint failed", refunded: true}]);
+  const d2 = await finish();
+  check(!d2.lost && /blueprint failed — your token was refunded/.test(d2.log), "early EOF then failure: error + refund", JSON.stringify(d2));
 
-  const unreachable = await run("unreachable", `throw new TypeError('Failed to fetch');`);
-  check(unreachable.lost && /Couldn't reach the server/.test(unreachable.text), "fetch failure shows the unreachable notice", JSON.stringify(unreachable));
+  // (3) the POST never got an answer, and no forge exists: three 404s on "latest" -> "nothing was spent".
+  await start(`throw new TypeError('Failed to fetch');`, [404]);
+  await sleep(800);
+  const s3 = await state();
+  check(s3.lost && /Couldn't reach the server/.test(s3.text), "unreachable: checking notice", JSON.stringify(s3));
+  const d3 = await finish();
+  check(d3.lost && /No forge was started/.test(d3.text) && d3.polled.length === 3 && d3.polled.every((u) => u.endsWith("/latest")),
+        "unreachable + nothing started: says so after 3 polls", JSON.stringify(d3));
   await shot("lost-unreachable");
 
-  const bad = await run("502", `return new Response('<html>bad gateway</html>', {status: 502, headers: {'content-type': 'text/html'}});`);
-  check(!bad.lost && /HTTP 502/.test(bad.log), "a 502 page is an error, not a lost stream", JSON.stringify(bad));
+  // (4) the POST died but the forge DID start: "latest" finds it, pins to its id, and recovers.
+  await start(`throw new TypeError('Failed to fetch');`, [
+    {forge_id: "f4", status: "running", message: "mapping your theme…"},
+    {forge_id: "f4", status: "done", class_id: classId, error: "", refunded: false}]);
+  const d4 = await finish();
+  check(d4.result && !d4.lost && d4.polled[0].endsWith("/latest") && d4.polled[1].endsWith("/f4"),
+        "unreachable but started: found via latest, then recovers", JSON.stringify(d4));
 
-  const failed = await run("error-event", `${enc} return new Response(new ReadableStream({ start(c) {
-      c.enqueue(e.encode('${sse("error", {error: "blueprint failed"})}')); c.close(); } }), {status: 200});`);
-  check(!failed.lost && /blueprint failed/.test(failed.log), "a real forge error does not show the notice", JSON.stringify(failed));
+  // (5) a non-JSON 502 page and (6) a real error event stay plain errors: no notice, no polling.
+  await start(`return new Response('<html>bad gateway</html>', {status: 502, headers: {'content-type': 'text/html'}});`, [404]);
+  const d5 = await finish();
+  check(!d5.lost && /HTTP 502/.test(d5.log) && d5.polled.length === 0, "a 502 page is an error, not a lost stream", JSON.stringify(d5));
+  await start(`${enc} return new Response(new ReadableStream({ start(c) {
+      c.enqueue(e.encode('${sse("error", {error: "blueprint failed"})}')); c.close(); } }), {status: 200});`, [404]);
+  const d6 = await finish();
+  check(!d6.lost && /blueprint failed/.test(d6.log) && d6.polled.length === 0, "a real forge error does not poll", JSON.stringify(d6));
 } else if (scenario === "library") {
   await nav(`${base}/app`);
   await evaluate(`document.getElementById('nav-library').click()`); await sleep(800);

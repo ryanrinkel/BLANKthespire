@@ -7,7 +7,7 @@
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png" />
   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/static/style.css?v=20260926" />
+  <link rel="stylesheet" href="/static/style.css?v=20260926b" />
 </head>
 <body>
   <header>
@@ -73,22 +73,11 @@
       <!-- can we add a few more contrasting examples and select one at random so the user doesn't always see the same sample text? another example might be 'the bravest toaster in the world' -->
       <textarea id="concept" rows="3" placeholder="e.g. a venomous plague doctor who sacrifices health to stack poison, then turns blood into armor"></textarea>
 
-      <!-- Always visible: the interactive toggle is a property of the forge itself, not of how it is paid for. -->
-      <label class="small" style="display:block;margin-top:.9rem;">
-        <input id="interactive" type="checkbox" />
-        Interactive forge
-      </label>
-      <p class="hint" style="margin-top:.25rem;">Normally the forge maps your theme onto the game's build
-        engines (the archetypes) and picks the strongest combination itself. With <b>Interactive forge</b> on,
-        it pauses once your theme is mapped, shows you the candidate engines, and lets you pick up to two of
-        them. You get a short timer; if you don't answer, the forge decides for you.</p>
-      <!-- dev deploys only (BTSWEB_DEV_AUTH): forges canned output with no key and no token. -->
-      <label id="mode-fake-label" class="hidden small" style="display:block;margin-top:.5rem;">
-        <input id="mode-fake" type="checkbox" /> Offline demo (no key)
-      </label>
-
-      <!-- How this forge is paid for: exactly one of the two boxes is open (app.js currentMode()). -->
-      <details id="forge-byok" class="settings">
+      <!-- How this forge is paid for: exactly one of the two boxes is open (app.js currentMode()). They behave
+           like a radio pair: the open one is highlighted with a filled dot, and clicking its own header does
+           not close it (app.js onPaySummaryClick) — switch by opening the other. -->
+      <p class="lbl pay-lbl">How do you want to pay for this forge? <span class="muted">Pick one.</span></p>
+      <details id="forge-byok" class="settings pay">
         <summary>Bring your own key</summary>
         <label class="lbl small" for="provider">Provider</label>
         <select id="provider" class="in">
@@ -129,19 +118,46 @@
 
       <!-- Tokens without leaving the forge: the balance, then the same tier + custom-amount buttons the
            Account tab builds (app.js renderDonatePanel). -->
-      <details id="forge-token" class="settings">
+      <details id="forge-token" class="settings pay">
         <summary>Use a token</summary>
         <p class="hint" id="token-balance-line"></p>
-        <div id="forge-donate-box" class="donate hidden">
-          <div id="forge-donate-tiers" class="donate-tiers"></div>
-          <div id="forge-donate-custom" class="donate-custom hidden"></div>
+        <!-- The tiers fold behind "Get tokens" (2026-09-26) so someone spending a token they already hold
+             isn't looking at a price list. Open by default only when the balance is 0 (app.js
+             renderGetTokens); unlimited accounts never see either. -->
+        <div class="get-tokens-row">
+          <button id="forge-get-tokens" class="btn" type="button" aria-expanded="false"
+                  aria-controls="forge-donate-wrap">Get tokens</button>
         </div>
-        <p id="forge-donate-note" class="hint hidden">Donations aren't available right now — bring your own API key to keep forging.</p>
+        <div id="forge-donate-wrap" class="hidden">
+          <div id="forge-donate-box" class="donate hidden">
+            <div id="forge-donate-tiers" class="donate-tiers"></div>
+            <div id="forge-donate-custom" class="donate-custom hidden"></div>
+          </div>
+          <p id="forge-donate-note" class="hint hidden">Donations aren't available right now — bring your own API key to keep forging.</p>
+        </div>
       </details>
 
       <div class="forge-actions">
         <button id="forge-btn" class="btn primary">Forge the class</button>
       </div>
+
+      <!-- Options most people never touch, folded under the button. The interactive toggle is a property of
+           the forge itself, not of how it is paid for, so it lives here rather than in either pay box. -->
+      <details id="forge-advanced" class="advanced">
+        <summary>Advanced options</summary>
+        <label class="small" style="display:block;margin-top:.6rem;">
+          <input id="interactive" type="checkbox" />
+          Interactive forge
+        </label>
+        <p class="hint" style="margin-top:.25rem;">Normally the forge maps your theme onto the game's build
+          engines (the archetypes) and picks the strongest combination itself. With <b>Interactive forge</b> on,
+          it pauses once your theme is mapped, shows you the candidate engines, and lets you pick up to two of
+          them. You get a short timer; if you don't answer, the forge decides for you.</p>
+        <!-- dev deploys only (BTSWEB_DEV_AUTH): forges canned output with no key and no token. -->
+        <label id="mode-fake-label" class="hidden small" style="display:block;margin-top:.5rem;">
+          <input id="mode-fake" type="checkbox" /> Offline demo (no key)
+        </label>
+      </details>
     </section>
 
     <section id="progress" class="card hidden">
@@ -314,7 +330,7 @@
 
   <!-- ?v= busts the 1-hour static cache on deploy: bump both whenever either file changes. render.js holds
        the class renderers shared with the public /deck page and must load first. -->
-  <script src="/static/render.js?v=20260926"></script>
-  <script src="/static/app.js?v=20260926"></script>
+  <script src="/static/render.js?v=20260926b"></script>
+  <script src="/static/app.js?v=20260926b"></script>
 </body>
 </html>
