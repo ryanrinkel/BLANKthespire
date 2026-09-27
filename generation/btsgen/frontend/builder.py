@@ -22,6 +22,7 @@ from .stage_map import (_ComposeOnlyContract, _MapComposeContract, _MapOnlyContr
                         validate_map_for, validate_map_only)
 from .stage_orb import _OrbIntentContract, custom_cap_for, is_orb_class, normalize_orb_intent, validate_orb_intent
 from .stage_relic import _RelicIntentContract, validate_relic_intent
+from . import request as request_mod
 
 # class_kind distinctiveness weight — a special pool (orb/summon/status) is a bolder identity than a generic
 # normal class, so the "distinctive-among-buildable" picker leans toward it (when it's buildable).
@@ -236,13 +237,24 @@ class BlueprintBuilder:
             line += f" - {oi['why']}"
         self._note(line)
 
-    def _run_stage(self, gen, brief, validate, label: str) -> dict:
+    def _run_stage(self, gen, brief, validate, label: str, soft=None) -> dict:
         # Each attempt = one fresh generation + one repair. BTS_STAGE_ATTEMPTS>1 re-rolls the whole stage
         # when repair still fails — a weak/local model (e.g. a 7B on the strict blueprint dict) whiffs the
         # top-level structure often enough that a fresh re-roll beats hammering the same broken output.
         # Default 1 reproduces the historical single-attempt-with-repair behaviour exactly (Anthropic/web path).
+        # `soft` (optional) is a second validator whose errors GO THROUGH the repair round but never fail the
+        # stage: the player's explicit asks (frontend.request) — worth one more model call, never a dead forge.
         attempts = max(1, int(os.environ.get("BTS_STAGE_ATTEMPTS", "1")))
         last_errs: list[str] = [f"unparseable {label}"]
+
+        def _soft(o) -> list[str]:
+            if soft is None or o is None:
+                return []
+            try:
+                return list(soft(o) or [])
+            except Exception:  # noqa: BLE001 — a soft check must never break the stage
+                return []
+
         for attempt in range(attempts):
             if attempt:
                 # OpenRouter routes a cached prompt back to the upstream holding the cache, so without this the
@@ -257,15 +269,20 @@ class BlueprintBuilder:
             if obj is None:
                 self._note_unparseable(gen, label)
             errs = validate(obj) if obj is not None else [f"unparseable {label}"]
-            if errs:
-                self._note(f"{label}: {len(errs)} issue(s); repairing"
+            soft_errs = _soft(obj)
+            if errs or soft_errs:
+                self._note(f"{label}: {len(errs) + len(soft_errs)} issue(s); repairing"
                            + (f" (attempt {attempt + 1}/{attempts})" if attempts > 1 else ""))
-                text, messages = gen.repair(messages, text, errs)
+                text, messages = gen.repair(messages, text, errs + soft_errs)
                 self._note_stubs(gen, label)
                 obj = _extract(text)
                 if obj is None:
                     self._note_unparseable(gen, label)
                 errs = validate(obj) if obj is not None else [f"unparseable {label}"]
+                if not errs:
+                    for e in _soft(obj):
+                        self._note(f"      {label}: still not honored after repair — {e}; accepting the output "
+                                   "(the picker will do its best)")
             if not errs:
                 return obj
             last_errs = errs
@@ -330,6 +347,15 @@ class BlueprintBuilder:
         dossier = Dossier(theme=concept)
         self.last_dossier = dossier
 
+        # The player's EXPLICIT asks ("an orb class", "a summoner", "poison") — read from the concept up front,
+        # BEFORE the mechanics-free cloud stage can lose them. They pin archetypes into the catalog window,
+        # ride the map/compose prompts as a HARD RULE, and restrict the picker (see frontend.request).
+        try:
+            dossier.requirements = request_mod.detect_requests(concept, self._catalog)
+        except Exception:  # noqa: BLE001 — detection is an enhancement; never break the forge
+            dossier.requirements = []
+        self._narrate_requests(dossier)
+
         # Phase N-4: read the cross-forge usage ledger ONCE (guarded) — steers map/compose away from recent
         # repeats and feeds the picker's novelty tie-breaker. A missing/corrupt ledger -> empty window.
         try:
@@ -363,13 +389,18 @@ class BlueprintBuilder:
         self._note("[2/6] map: matching each thread to the game's mechanical archetypes...")
         payload = {"concept": concept, "clusters": dossier.clusters,
                    "catalog_block": self._catalog.prompt_block(), "n": self._n, "_catalog": self._catalog,
-                   "recency": self._recency_line}
+                   "recency": self._recency_line,
+                   # the explicit asks: the HARD RULE line for compose, the map-only line, and the ids (fakes)
+                   "request_line": request_mod.request_line(dossier.requirements),
+                   "map_line": request_mod.map_line(dossier.requirements),
+                   "request_ids": request_mod.requested_ids(dossier.requirements)}
         self._apply_window(payload, dossier, concept)
         if interactive:
             mc = self._map_compose_interactive(payload, dossier)  # narrates mappings before the pick
         else:
             mc = self._run_stage(self._make_gen(_MapComposeContract(self._triad), max_tokens=12000),
-                                 payload, validate_map_for(self._triad), "map/compose")
+                                 payload, validate_map_for(self._triad), "map/compose",
+                                 soft=request_mod.request_validator(dossier.requirements))
         dossier.mappings = list(mc.get("mappings") or [])
         dossier.candidates = [self._catalog.hydrate_candidate(c) for c in (mc.get("candidates") or [])]
         self._apply_collision_check(dossier)
@@ -389,6 +420,7 @@ class BlueprintBuilder:
             raise BlueprintBuildError("no candidate could be chosen")
         dossier.chosen = chosen
         self._narrate_choice(chosen)
+        self._narrate_honored(chosen, dossier)
 
         # stage 5: keystone relic INTENT (non-fatal — feeds the real relic generator via bp)
         try:
@@ -470,8 +502,54 @@ class BlueprintBuilder:
         # thread the flavor skin so the splash-art stage dresses the class in the theme's flavor (not mechanics)
         if dossier.skin_bank:
             bp["skin"] = dossier.skin_bank
+        # record the explicit asks + whether the chosen class honors them (for the ledger / report / analysis)
+        if dossier.requirements:
+            bp["explicit_request"] = {
+                "requirements": [r.as_dict() for r in dossier.requirements],
+                "honored": request_mod.honored_count(dossier.requirements, chosen.archetype_ids),
+                "of": len(dossier.requirements),
+            }
         self._enrich_archetypes(bp, dossier)
         return bp
+
+    # --- the player's explicit asks (frontend.request) ------------------------------------------------
+    def _narrate_requests(self, dossier: Dossier) -> None:
+        for r in (dossier.requirements or []):
+            self._note(f"      you asked for {r.label} (\"{r.evidence}\") -> every candidate must carry one of: "
+                       + ", ".join(r.archetype_ids))
+
+    def _narrate_honored(self, chosen: Candidate, dossier: Dossier) -> None:
+        reqs = dossier.requirements or []
+        if not reqs:
+            return
+        have = set(chosen.archetype_ids)
+        for r in reqs:
+            hit = [a for a in r.archetype_ids if a in have]
+            if hit:
+                self._note(f"      your ask honored: {r.label} -> {', '.join(hit)}")
+            else:
+                self._note(f"      your ask NOT honored: {r.label} — no candidate carried "
+                           f"{', '.join(r.archetype_ids)}; forging the closest")
+
+    def _request_filter(self, pool: list[Candidate], dossier: Dossier) -> list[Candidate]:
+        """Keep the candidates that honor the player's explicit asks — all of them when any candidate does,
+        else the ones honoring the most (never an empty pool). Runs BEFORE the cold rule: an explicit ask
+        outranks the anti-convergence pressure, and the cold rule waives itself inside the honoring set."""
+        reqs = dossier.requirements or []
+        if not reqs or not pool:
+            return pool
+        best = max(request_mod.honored_count(reqs, c.archetype_ids) for c in pool)
+        if best <= 0:
+            self._note("      your ask: no candidate carries the requested engine(s); picking the closest")
+            return pool
+        kept = [c for c in pool if request_mod.honored_count(reqs, c.archetype_ids) == best]
+        if best < len(reqs):
+            self._note(f"      your ask: no candidate honors all {len(reqs)} asks; picking among those "
+                       f"honoring {best}")
+        elif len(kept) < len(pool):
+            self._note(f"      your ask: {len(kept)} of {len(pool)} candidate(s) carry the requested "
+                       "engine(s); picking among those")
+        return kept
 
     # --- Creative harness v2 (Fix C): the catalog window + cold set ------------------------------------
     def _apply_window(self, payload: dict, dossier: Dossier, concept: str) -> None:
@@ -484,7 +562,9 @@ class BlueprintBuilder:
             from .. import ledger
             usage = ledger.archetype_usage(ledger.read_window(ledger.USAGE_WINDOW))
             seed = harness_v2.seed_for(concept)
-            window, cold_in = self._catalog.window_ids(dossier.clusters, seed, usage)
+            # the player's explicit asks are PINNED into the window: the map stage can't pick what it can't see
+            window, cold_in = self._catalog.window_ids(dossier.clusters, seed, usage,
+                                                       pinned=request_mod.requested_ids(dossier.requirements))
             self._cold_ids = set(self._catalog.cold_set(usage, seed))
             self._window_ids = list(window)
             payload["catalog_block"] = self._catalog.prompt_block(window, cold_in)
@@ -609,7 +689,8 @@ class BlueprintBuilder:
 
         cpayload = {**payload, "mappings": dossier.mappings, "picked": dossier.picked_archetypes}
         co = self._run_stage(self._make_gen(_ComposeOnlyContract(self._triad), max_tokens=12000),
-                             cpayload, validate_compose_for(dossier.picked_archetypes, self._triad), "compose")
+                             cpayload, validate_compose_for(dossier.picked_archetypes, self._triad), "compose",
+                             soft=request_mod.request_validator(dossier.requirements))
         return {"mappings": dossier.mappings, "candidates": list(co.get("candidates") or []),
                 "gaps": list(mo.get("gaps") or []) + list(co.get("gaps") or [])}
 
@@ -640,7 +721,19 @@ class BlueprintBuilder:
                 o["resonance"].append(f"'{cluster}' — {met}")
             elif cluster or met:
                 o["resonance"].append(met or f"'{cluster}'")
-        options = sorted(by_id.values(), key=lambda o: (-len(o["resonance"]), not o["buildable"]))
+        # The player's explicit asks are always on the menu (as wildcards if the map stage missed them), first.
+        requested = request_mod.requested_ids(dossier.requirements)
+        for aid in requested:
+            e = self._catalog.by_id.get(aid)
+            if e is None or aid in by_id:
+                continue
+            by_id[aid] = {"id": aid, "name": e.name, "description": e.description, "class_kind": e.class_kind,
+                          "buildable": e.buildable, "block_reasons": list(e.block_reasons), "wildcard": True,
+                          "title": "", "pitch": "", "resonance": [], "metaphors": list(e.metaphors[:3])}
+        for o in by_id.values():
+            o["requested"] = o["id"] in requested
+        options = sorted(by_id.values(),
+                         key=lambda o: (not o["requested"], -len(o["resonance"]), not o["buildable"]))
         if len(options) < 4:
             pool = [e for e in self._catalog.entries if e.buildable and e.id not in by_id]
             pool.sort(key=lambda e: -_KIND_WEIGHT.get(e.class_kind, 0.0))
@@ -702,6 +795,7 @@ class BlueprintBuilder:
         pool = buildable if buildable else cands
         if not buildable:
             self._note("front-end: no fully-buildable candidate; picking the closest (some cards may substitute)")
+        pool = self._request_filter(pool, dossier)
         pool = self._cold_filter(pool, dossier)
         # Phase N-4: log the novelty penalty per candidate so the recency pressure is visible in the log.
         if self._recency_window:
@@ -767,13 +861,15 @@ class BlueprintBuilder:
         goes neutral and the picker degrades to pure distinctiveness (old behavior).
 
         Interactive mode: an explicit player pick IS the driver — their choice outranks what the theme's
-        facets suggest, so fidelity scores candidates by how much of their engine comes from the pick."""
+        facets suggest, so fidelity scores candidates by how much of their engine comes from the pick.
+        Likewise an explicit ask in the concept ("an orb class"): its satisfying archetypes are drivers too."""
+        requested = set(request_mod.requested_ids(dossier.requirements))
         if dossier.picked_archetypes:
-            return set(dossier.picked_archetypes)
+            return set(dossier.picked_archetypes) | requested
         driver_facets = {str(f.get("name", "")).strip().lower()
                          for f in (dossier.facets or []) if str(f.get("role", "")).lower() == "driver"}
         if not driver_facets:
-            return set()
+            return requested
         cl_facet = {str(cl.get("name", "")).strip().lower(): str(cl.get("facet", "")).strip().lower()
                     for cl in (dossier.clusters or [])}
 
@@ -781,7 +877,7 @@ class BlueprintBuilder:
             f = (facet_name or "").strip().lower()
             return any(d and (d in f or f in d) for d in driver_facets)
 
-        out: set[str] = set()
+        out: set[str] = set(requested)
         for m in (dossier.mappings or []):
             aid = m.get("archetype_id")
             if aid and _is_driver(cl_facet.get(str(m.get("cluster", "")).strip().lower(), "")):

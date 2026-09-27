@@ -854,7 +854,10 @@ function renderChoice(data) {
     // headline = the themed title the map stage wrote ("Rich in Energy"); wildcards have no themed
     // title, so their engine name stays the headline.
     const title = o.title || o.name;
+    // an engine the player asked for by name in their concept ("an orb class") — the front-end pinned it
+    // onto the menu (frontend.request); say so, since it may have no themed title/pitch of its own.
     b.innerHTML = `<strong>${esc(title)}</strong>`
+      + (o.requested ? `<span class="co-req">you asked for this</span>` : "")
       + (o.buildable ? "" : `<span class="co-warn">needs new vocab — some cards may substitute</span>`)
       + (why ? `<em>${esc(why)}</em>` : "");
     b.onclick = () => toggleChoiceOpt(b, String(o.id));

@@ -697,3 +697,188 @@ def test_orb_intent_stage() -> None:
     if d is not None and d.chosen is not None and "orb" in (d.chosen.class_kinds or []):
         check(bp2.get("orb_intent") is not None, "an orb-class candidate gets an orb_intent threaded into bp")
     check(_validate_blueprint(bp2) == [], f"the pipeline bp still validates with the intent: {_validate_blueprint(bp2)}")
+
+
+# --------------------------------------------------------------- explicit requests (frontend.request)
+SHERMAN = ("an m4 sherman tank, an orb class that loads one of thee different 'shells' as orbs. HE shells "
+           "that help with aoe damage. AP shells that help with single target damage. Smoke shells that "
+           "help with defence.")
+
+
+def test_explicit_requests() -> None:
+    print("explicit asks in the concept are detected, pinned, prompted, validated, and honored by the picker:")
+    import os
+    from collections import Counter
+    from btsgen.frontend import request as R
+    from btsgen.frontend.stage_map import _ComposeOnlyContract, _MapComposeContract, _MapOnlyContract
+    cat = load_catalog()
+    reqs = R.detect_requests(SHERMAN, cat)
+    check([r.kind or r.archetype_ids[0] for r in reqs] == ["orb", "horde_breaker"],
+          f"the Sherman prompt asks for an orb class first, then AoE: {[(r.kind, r.archetype_ids) for r in reqs]}")
+    check(set(reqs[0].archetype_ids) == {e.id for e in cat.entries if e.class_kind == "orb"},
+          "an orb-kind ask is satisfied by every orb archetype in the catalog")
+    check(len(R.detect_requests(SHERMAN, cat, cap=1)) == 1, "the cap trims to the leading asks")
+    check(R.detect_requests("a ww2 era sherman tank", cat) == [], "a plain theme is not a request")
+    check(R.detect_requests("a haunted lighthouse keeper", cat) == [], "no mechanic words -> no request")
+    check(R.detect_requests("a knight who does not use orbs, just a big sword", cat) == [],
+          "a negated mention is not a request")
+    check(R.detect_requests("block the sun with a parasol; draw a crowd; strike a pose; forge ahead", cat) == [],
+          "everyday words (block/draw/strike/forge) are not requests")
+    check([r.kind for r in R.detect_requests("a necromancer who raises the dead", cat)] == ["summon"],
+          "a necromancer asks for a summon class")
+    two = R.detect_requests("a poison-dagger assassin who discards cards for speed", cat)
+    check([r.archetype_ids for r in two] == [["poison_attrition"], ["madness_discard"]],
+          f"two archetype asks in order of appearance: {[r.archetype_ids for r in two]}")
+    check([r.kind for r in R.detect_requests("an orb gambler", cat)] == ["orb"],
+          "a 'gambler' inside an orb ask folds into the orb kind (slot_machine already satisfies it)")
+    check(R.detect_requests("", cat) == [], "empty concept -> no requests")
+
+    # prompt lines + validator
+    line = R.request_line(reqs)
+    check("HARD RULE" in line and "orb_channel, slot_machine" in line and "horde_breaker" in line,
+          f"the request line names every satisfying id: {line}")
+    check(R.request_line([]) == "" and R.map_line([]) == "", "no asks -> no prompt lines")
+    v = R.request_validator(reqs)
+    check(v({"candidates": [{"archetype_ids": ["block_bulwark", "forge_ramp"]}]}) != [],
+          "a compose output with no orb candidate fails the soft check")
+    check(v({"candidates": [{"archetype_ids": ["block_bulwark", "forge_ramp"]},
+                            {"archetype_ids": ["slot_machine", "horde_breaker", "block_bulwark"]}]}) == [],
+          "one candidate honoring every ask satisfies the soft check")
+    check(R.request_validator([])({"candidates": []}) == [], "no asks -> the soft check is silent")
+    payload = {"concept": SHERMAN, "clusters": [], "catalog_block": "x", "n": 3,
+               "request_line": line, "map_line": R.map_line(reqs), "request_ids": R.requested_ids(reqs)}
+    check("HARD RULE" in _MapComposeContract(True).user_brief(payload)
+          and "HARD RULE" in _ComposeOnlyContract(True).user_brief({**payload, "mappings": [], "picked": []})
+          and "EXPLICITLY asked" in _MapOnlyContract().user_brief(payload),
+          "all three map/compose briefs carry the ask")
+
+    # the catalog window pins the requested ids (harness v2) even when no cluster word matches them
+    window, _cold = cat.window_ids([{"name": "Armor", "feeling": "riveted", "concepts": ["steel", "tracks"]}],
+                                   seed=7, usage=Counter(), pinned=R.requested_ids(reqs))
+    check(all(i in window for i in ("orb_channel", "slot_machine", "horde_breaker")) and len(window) <= C.WINDOW_MAX,
+          f"pinned ids are in the window within the size cap: {window}")
+    check(window[:3] == ["orb_channel", "slot_machine", "horde_breaker"], "pinned ids lead the window")
+
+    # the picker restricts itself to honoring candidates: a normal-kind candidate with FULL cluster fidelity
+    # loses to an orb candidate with none, because the ask outranks the clusters
+    b = BlueprintBuilder(_fake_make_gen, catalog=cat, auto=True, triad=False, on_event=lambda m: None)
+    d = Dossier(theme=SHERMAN, requirements=reqs,
+                facets=[{"name": "Armor", "role": "driver"}],
+                clusters=[{"name": "Riveted", "facet": "Armor"}],
+                mappings=[{"cluster": "Riveted", "archetype_id": "block_bulwark"},
+                          {"cluster": "Riveted", "archetype_id": "forge_ramp"}])
+    faithful_normal = Candidate(name="Wall", fantasy="", archetype_ids=["block_bulwark", "forge_ramp"],
+                                archetype_descs=["", ""], class_kind="normal", buildable=True)
+    orb_only = Candidate(name="Rack", fantasy="", archetype_ids=["orb_channel", "untouchable_ward"],
+                         archetype_descs=["", ""], class_kind="orb", buildable=True)
+    d.candidates = [faithful_normal, orb_only]
+    check(b._pick(d) is orb_only, "an honoring candidate beats a faithful-but-normal one")
+    # best effort: none honors everything -> the one honoring the most wins; none honors -> normal scoring
+    orb_aoe = Candidate(name="Barrage", fantasy="", archetype_ids=["slot_machine", "horde_breaker"],
+                        archetype_descs=["", ""], class_kind="orb", buildable=True)
+    d.candidates = [faithful_normal, orb_only, orb_aoe]
+    check(b._pick(d) is orb_aoe, "the candidate honoring BOTH asks wins")
+    d.candidates = [faithful_normal]
+    check(b._pick(d) is faithful_normal, "no honoring candidate -> the forge still picks (the closest)")
+    # an unbuildable honoring candidate never beats a buildable one
+    broken = Candidate(name="Broken", fantasy="", archetype_ids=["orb_channel", "countdown_ripen"],
+                       archetype_descs=["", ""], class_kind="orb", buildable=False)
+    d.candidates = [faithful_normal, broken]
+    check(b._pick(d) is faithful_normal, "buildability still comes first")
+
+    # end-to-end on the offline fakes: the Sherman concept forges an ORB class with orb slots
+    notes: list[str] = []
+    bt = BlueprintBuilder(_fake_make_gen, catalog=cat, auto=True, gap_log_append=None, triad=True,
+                          on_event=notes.append)
+    bp = bt.build(ClassBrief(concept=SHERMAN))
+    chosen = bt.last_dossier.chosen
+    check("orb" in (chosen.class_kinds or []), f"the chosen candidate is an orb class: {chosen.archetype_ids}")
+    check(int(bp.get("orb_slots", 0) or 0) > 0, f"the blueprint declares orb slots: {bp.get('orb_slots')}")
+    check(bp.get("explicit_request", {}).get("honored") == 2 and bp["explicit_request"]["of"] == 2,
+          f"the bp records both asks honored: {bp.get('explicit_request')}")
+    check(any("you asked for an ORB class" in n for n in notes) and any("your ask honored" in n for n in notes),
+          "the forge log narrates the ask and its outcome")
+    # the same concept under harness v2 (the droplet's mode) pins the orb archetypes into the window
+    prev = os.environ.get("BTS_HARNESS_V2")
+    os.environ["BTS_HARNESS_V2"] = "1"
+    try:
+        bv = BlueprintBuilder(_fake_make_gen, catalog=cat, auto=True, gap_log_append=None, triad=True,
+                              on_event=lambda m: None)
+        bp2 = bv.build(ClassBrief(concept=SHERMAN))
+        check(all(i in bv._window_ids for i in ("orb_channel", "slot_machine", "horde_breaker")),
+              f"v2 window carries the pinned asks: {bv._window_ids}")
+        check("orb" in (bv.last_dossier.chosen.class_kinds or []) and int(bp2.get("orb_slots", 0) or 0) > 0,
+              "v2 path forges the orb class too")
+    finally:
+        if prev is None:
+            os.environ.pop("BTS_HARNESS_V2", None)
+        else:
+            os.environ["BTS_HARNESS_V2"] = prev
+    # a concept with no ask leaves the bp untouched
+    bp3 = BlueprintBuilder(_fake_make_gen, catalog=cat, auto=True, gap_log_append=None, triad=False,
+                           on_event=lambda m: None).build(ClassBrief(concept="a haunted lighthouse keeper"))
+    check("explicit_request" not in bp3, "no ask -> no explicit_request on the bp")
+
+    # interactive mode: the requested engines are on the menu first (even if the map stage missed them)
+    bi = BlueprintBuilder(_fake_make_gen, catalog=cat, auto=True, gap_log_append=None, triad=False,
+                          archetype_checkpoint=lambda options, dossier: [], on_event=lambda m: None)
+    d0 = Dossier(theme=SHERMAN, requirements=reqs,
+                 mappings=[{"cluster": "Armor", "archetype_id": "block_bulwark", "metaphor": "m",
+                            "title": "T", "pitch": "P"}])
+    opts = bi._archetype_options(d0)
+    check([o["id"] for o in opts[:3]] == ["orb_channel", "slot_machine", "horde_breaker"]
+          and all(o["requested"] for o in opts[:3]) and not opts[3]["requested"],
+          f"requested engines lead the menu, flagged: {[(o['id'], o.get('requested')) for o in opts]}")
+
+
+def test_soft_validator_repairs_then_accepts() -> None:
+    print("the soft request check goes through one repair round but never fails the stage:")
+    import json
+    from btsgen.frontend.stage_map import _MapComposeContract
+    cat = load_catalog()
+
+    def _lines(ids):
+        pairs = [(ids[0], ids[1]), (ids[0], ids[2]), (ids[1], ids[2])]
+        return [{"pair": list(p), "strategy": s, "line": "l", "win_condition": "w"}
+                for p, s in zip(pairs, ("aggro", "control", "combo"))]
+
+    class _Stubborn(_StageFake):
+        """Ignores the ask on the first try; `honors_on_repair` decides whether the repair complies."""
+        honors_on_repair = True
+        calls: list[str] = []
+
+        def _emit(self, brief) -> str:
+            out = self._contract.fake_output(brief)
+            for c in out["candidates"]:
+                c["archetype_ids"] = ["block_bulwark", "forge_ramp", "power_ramp"]
+                c["pair_lines"] = _lines(c["archetype_ids"])
+            return json.dumps(out)
+
+        def repair(self, messages, prev_text, errors):
+            type(self).calls.append("repair")
+            check(any("EXPLICITLY asked" in e for e in errors), f"the repair message carries the ask: {errors}")
+            obj = json.loads(prev_text)
+            if self.honors_on_repair:
+                obj["candidates"][0]["archetype_ids"] = ["orb_channel", "forge_ramp", "power_ramp"]
+                obj["candidates"][0]["pair_lines"] = _lines(obj["candidates"][0]["archetype_ids"])
+            text = json.dumps(obj)
+            return text, messages + [{"role": "assistant", "content": text}]
+
+    def make_gen(contract_mod, *, max_tokens):
+        return _Stubborn(contract_mod) if isinstance(contract_mod, _MapComposeContract) else _StageFake(contract_mod)
+
+    notes: list[str] = []
+    b = BlueprintBuilder(make_gen, catalog=cat, auto=True, gap_log_append=None, triad=True, on_event=notes.append)
+    b.build(ClassBrief(concept="an orb class"))
+    check(_Stubborn.calls == ["repair"], f"exactly one repair round: {_Stubborn.calls}")
+    check("orb" in (b.last_dossier.chosen.class_kinds or []), "the repaired candidate (orb) is chosen")
+    # never honors: the stage still returns (no BlueprintBuildError) and the log says so
+    _Stubborn.calls.clear()
+    _Stubborn.honors_on_repair = False
+    notes.clear()
+    b2 = BlueprintBuilder(make_gen, catalog=cat, auto=True, gap_log_append=None, triad=True, on_event=notes.append)
+    bp = b2.build(ClassBrief(concept="an orb class"))
+    check(bp is not None and "orb" not in (b2.last_dossier.chosen.class_kinds or []),
+          "a stubborn model does not kill the forge")
+    check(any("still not honored after repair" in n for n in notes) and any("NOT honored" in n for n in notes),
+          f"the log says the ask was not honored: {[n for n in notes if 'honored' in n]}")

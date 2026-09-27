@@ -97,6 +97,9 @@ class Dossier:
     # Empty picked = auto (skipped / timed out / non-interactive) — the picker falls back to theme fidelity.
     offered_archetypes: list[str] = field(default_factory=list)
     picked_archetypes: list[str] = field(default_factory=list)
+    # Explicit mechanical asks read from the concept (frontend.request): [Requirement]. Each is satisfied by a
+    # candidate carrying one of its archetype ids; the picker restricts itself to the honoring candidates.
+    requirements: list = field(default_factory=list)
     candidates: list[Candidate] = field(default_factory=list)
     chosen: Candidate | None = None
     relic_intent: dict | None = None

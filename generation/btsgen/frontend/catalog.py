@@ -260,11 +260,12 @@ class ArchetypeCatalog:
         return ledger.cold_archetypes([e.id for e in self.entries], usage, min(kk, n), seed)
 
     def window_ids(self, clusters, seed: int, usage: Counter, *, size: int = WINDOW_SIZE,
-                   min_cold: int = WINDOW_MIN_COLD) -> tuple[list[str], list[str]]:
-        """(window ids, cold ids inside the window). Cluster matches first (token overlap between the cloud
-        stage's cluster names/feelings/concepts and each archetype's name/description/metaphors, best first),
-        then enough of the cold set to hold `min_cold`, then a seeded random fill up to `size`. A catalog no
-        larger than `size` is returned whole."""
+                   min_cold: int = WINDOW_MIN_COLD, pinned=()) -> tuple[list[str], list[str]]:
+        """(window ids, cold ids inside the window). `pinned` ids first (the player's EXPLICIT asks — the map
+        stage can't pick what it can't see), then cluster matches (token overlap between the cloud stage's
+        cluster names/feelings/concepts and each archetype's name/description/metaphors, best first), then
+        enough of the cold set to hold `min_cold`, then a seeded random fill up to `size`. A catalog no larger
+        than `size` is returned whole."""
         from .. import harness_v2
         ids = [e.id for e in self.entries]
         cold = self.cold_set(usage, seed)
@@ -278,8 +279,15 @@ class ArchetypeCatalog:
             scored.append((len(want & have), e.id))
         order = {i: k for k, i in enumerate(harness_v2.seeded_shuffle(ids, seed, "window"))}
         scored.sort(key=lambda t: (-t[0], order[t[1]]))
-        matched = [i for sc, i in scored if sc > 0][:max(0, size - min_cold)]
-        window = list(matched)
+        window: list[str] = []
+        for p in (pinned or ()):
+            if p in self.by_id and p not in window:
+                window.append(p)
+        for sc, i in scored:
+            if sc <= 0 or len(window) >= max(0, size - min_cold):
+                break
+            if i not in window:
+                window.append(i)
         for c in cold:  # top up the cold quota (cold matches already in the window count)
             if sum(1 for i in window if i in cold) >= min_cold:
                 break

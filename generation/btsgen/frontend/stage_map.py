@@ -233,10 +233,12 @@ class _MapComposeContract:
                             "in tension, each with 2-3 strategic_lines covering at least 2 distinct strategies, "
                             "each line with a win_condition).")
         cold_line = str(payload.get("cold_line", "")).strip()
+        request_line = str(payload.get("request_line", "")).strip()  # the player's explicit ask (frontend.request)
         return (
             'Theme: "' + str(concept).strip() + '"\n\n'
             "THE CONCEPT CLUSTERS:\n" + json.dumps(clusters, indent=2) + "\n\n"
             "THE ARCHETYPE CATALOG (use these ids only):\n" + catalog_block + "\n\n"
+            + (request_line + "\n\n" if request_line else "")
             + (recency + "\n\n" if recency else "")
             + (cold_line + "\n\n" if cold_line else "")
             + compose_line + " Prefer BUILDABLE archetypes. Return only the JSON object."
@@ -259,6 +261,10 @@ class _MapComposeContract:
         window = [str(i) for i in (payload.get("window_ids") or []) if str(i) in set(bids)]
         if window:
             bids = window + [b for b in bids if b not in window]
+        # The player's explicit asks (payload["request_ids"]) lead, as the real model honors the HARD RULE.
+        req = [str(i) for i in (payload.get("request_ids") or []) if str(i) in set(bids)]
+        if req:
+            bids = req + [b for b in bids if b not in req]
         # Phase 2 (triad): a fake candidate carries THREE archetype ids + pair_lines; legacy stays two + lines.
         fill = (bids + ["poison_attrition", "block_bulwark", "power_ramp"])
         a, b, cc = fill[:3]
@@ -352,10 +358,12 @@ class _MapOnlyContract:
         catalog_block = payload.get("catalog_block") or ""
         concept = payload.get("concept", "")
         recency = str(payload.get("recency", "")).strip()
+        map_line = str(payload.get("map_line", "")).strip()  # the player's explicit ask (frontend.request)
         return (
             'Theme: "' + str(concept).strip() + '"\n\n'
             "THE CONCEPT CLUSTERS:\n" + json.dumps(clusters, indent=2) + "\n\n"
             "THE ARCHETYPE CATALOG (use these ids only):\n" + catalog_block + "\n\n"
+            + (map_line + "\n\n" if map_line else "")
             + (recency + "\n\n" if recency else "")
             + "Map every cluster to 1-2 archetypes, each with a resonance line, a themed 2-4 word title, and "
             "a ONE-sentence pitch saying how the deck wins (strategy first, theme as seasoning). "
@@ -372,6 +380,9 @@ class _MapOnlyContract:
     def fake_output(self, payload) -> dict:
         catalog = payload.get("_catalog")
         bids = sorted(catalog.buildable_ids()) if catalog is not None else ["poison_attrition", "block_bulwark"]
+        # The player's explicit asks lead the mapping, as the real model honors the map_line.
+        req = [str(i) for i in (payload.get("request_ids") or []) if str(i) in set(bids)]
+        bids = req + [b for b in bids if b not in req]
         a, b = (bids + ["poison_attrition", "block_bulwark"])[:2]
         clusters = payload.get("clusters") or [{"name": "Core"}, {"name": "Cost"}, {"name": "Payoff"}]
         cnames = [str(c.get("name", f"c{i}")) for i, c in enumerate(clusters)]
@@ -499,12 +510,14 @@ class _ComposeOnlyContract:
             compose_line = (f"Compose {n} DISTINCT candidate builds (2 archetypes each, in tension, each with 2-3 "
                             "strategic_lines covering at least 2 distinct strategies, each line with a "
                             "win_condition).")
+        request_line = str(payload.get("request_line", "")).strip()  # the player's explicit ask (frontend.request)
         return (
             'Theme: "' + str(concept).strip() + '"\n\n'
             "THE CONCEPT CLUSTERS:\n" + json.dumps(clusters, indent=2) + "\n\n"
             "HOW THE CLUSTERS MAPPED:\n" + json.dumps(mappings, indent=2) + "\n\n"
             "THE ARCHETYPE CATALOG (use these ids only):\n" + catalog_block + "\n\n"
             + pick_line + "\n\n"
+            + (request_line + "\n\n" if request_line else "")
             + (recency + "\n\n" if recency else "")
             + (str(payload.get("cold_line", "")).strip() + "\n\n" if str(payload.get("cold_line", "")).strip() else "")
             + compose_line + " Prefer BUILDABLE archetypes. Return only the JSON object."
@@ -521,6 +534,9 @@ class _ComposeOnlyContract:
         catalog = payload.get("_catalog")
         bids = sorted(catalog.buildable_ids()) if catalog is not None else ["poison_attrition", "block_bulwark"]
         picked = [str(p) for p in (payload.get("picked") or [])]
+        # The player's explicit asks lead the fill (after their picks), as the real model honors the HARD RULE.
+        req = [str(i) for i in (payload.get("request_ids") or []) if str(i) in set(bids) and str(i) not in picked]
+        bids = req + [b for b in bids if b not in req]
         fill = [b for b in bids + ["poison_attrition", "block_bulwark", "power_ramp"] if b not in picked]
         if self.triad:
             # Phase 2 (triad): fill each candidate's triangle to THREE, honoring every pick.
