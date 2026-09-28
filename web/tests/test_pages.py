@@ -45,9 +45,14 @@ def test_download_leads_with_the_workshop_and_keeps_the_zip(client, app_module):
 
 
 def test_workshop_url_env_default(app_module):
-    """The default points at the STS2 Workshop hub until the item itself is uploaded."""
-    assert app_module.WORKSHOP_URL.startswith("https://steamcommunity.com/")
-    assert "2868840" in app_module.WORKSHOP_URL
+    """The default points at the BLANK the spire Workshop item itself, not the game's Workshop hub."""
+    assert app_module.WORKSHOP_URL == "https://steamcommunity.com/sharedfiles/filedetails/?id=3803255976"
+
+
+def test_workshop_short_link_redirects_to_the_item(client, app_module):
+    r = client.get("/workshop")
+    assert r.status_code == 302
+    assert r.headers["Location"] == app_module.WORKSHOP_URL
 
 
 def test_download_links_to_help(client):

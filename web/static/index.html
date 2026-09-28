@@ -38,12 +38,13 @@
 
   <!-- Forge view -->
   <main id="view-forge" class="hidden">
-    <!-- v3 (2026-09-18): nothing forges for free on our models any more, so this warning nudges the account
-         to enter a key or get tokens. app.js fills the text from the token balance and hides it once a key
-         is saved, for unlimited accounts, or once bts_v3_banner_dismissed is set. -->
+    <!-- Welcome banner (2026-09-28): forged classes only play with the Steam Workshop mod installed, so every
+         signed-in account sees this until it is dismissed (bts_mod_banner_dismissed). The key-or-tokens
+         nudge it replaced lives on in the chooser below. -->
     <div id="v3-banner" class="banner warn hidden" role="status">
       <span class="banner-icon" aria-hidden="true">⚠</span>
-      <span id="v3-banner-text"></span>
+      <span id="v3-banner-text">BLANK the spire needs its Steam Workshop mod to play your forged classes.
+        <a href="/workshop" target="_blank" rel="noopener">Subscribe to the mod on Steam Workshop</a>.</span>
       <span class="spacer"></span>
       <button id="v3-banner-x" class="banner-x" aria-label="Dismiss">×</button>
     </div>

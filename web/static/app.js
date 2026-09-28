@@ -257,19 +257,14 @@ function chooseToken() {
   renderChooser();
 }
 
-// --- "you need a key or a token" warning ----------------------------------------------------------
-// Since v3 (2026-09-18) nothing forges for free on our models, so the forge tab carries a dismissible
-// warning until the account has done one of the two things it asks for: saved an API key, or (for the
-// wording) holds tokens. Unlimited accounts never see it. Re-rendered whenever the token state changes.
+// --- "get the mod" welcome banner -----------------------------------------------------------------
+// Forged classes only play with the Steam Workshop mod installed, so every signed-in account sees this
+// (text + link are static in index.html) until it is dismissed. It replaced the v3 "enter a key or get
+// tokens" nudge on 2026-09-28; the chooser still covers that. New dismiss key so everyone sees it once.
 function renderBanner() {
   const bar = el("v3-banner");
   if (!bar) return;
-  const show = !!ME && !ME.unlimited && !hasSavedKey() && !lsGet("bts_v3_banner_dismissed");
-  bar.classList.toggle("hidden", !show);
-  if (!show) return;
-  el("v3-banner-text").textContent = Number(ME.token_balance || 0) > 0
-    ? "Enter an API key or use a token to forge!"
-    : "Enter an API key or get tokens to forge.";
+  bar.classList.toggle("hidden", !(ME && !lsGet("bts_mod_banner_dismissed")));
 }
 
 // --- BYOK cost estimate ---------------------------------------------------------------------------
@@ -1498,7 +1493,7 @@ el("signout").onclick = async () => { await fetch("/logout", { method: "POST" })
 el("load-models").onclick = loadModels;
 el("choose-byok").onclick = chooseByok;
 el("choose-token").onclick = chooseToken;
-el("v3-banner-x").onclick = () => { lsSet("bts_v3_banner_dismissed", "1"); renderBanner(); };
+el("v3-banner-x").onclick = () => { lsSet("bts_mod_banner_dismissed", "1"); renderBanner(); };
 
 // feedback overlay: close on the × button, a backdrop click, or Escape; submit posts the rating.
 el("fb-close").onclick = closeFeedback;

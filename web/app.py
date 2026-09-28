@@ -292,10 +292,10 @@ def app_view():
 
 
 # Where the mod actually comes from. The Workshop listing is the headline install path (subscribers get
-# BaseLib automatically as a Workshop dependency); until the item itself is uploaded this points at the
-# game's Workshop hub, so override it with the item URL the first upload mints.
+# BaseLib automatically as a Workshop dependency). Item 3803255976 is the BLANK the spire upload; the env var
+# can still override it.
 WORKSHOP_URL = os.environ.get(
-    "BTSWEB_WORKSHOP_URL", "https://steamcommunity.com/app/2868840/workshop/").strip()
+    "BTSWEB_WORKSHOP_URL", "https://steamcommunity.com/sharedfiles/filedetails/?id=3803255976").strip()
 GITHUB_URL = "https://github.com/ryanrinkel/BLANKthespire"
 
 
@@ -317,6 +317,13 @@ def mod_version() -> str:
 
 
 _REPO_ROOT = WEB_DIR.parent
+
+
+@app.route("/workshop")
+def workshop():
+    """Short link to the mod's Workshop item, so static pages (the forge tab's welcome banner) can point at it
+    without templating WORKSHOP_URL in."""
+    return redirect(WORKSHOP_URL)
 
 
 @app.route("/download")

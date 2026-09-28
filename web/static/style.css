@@ -244,6 +244,7 @@ body.no-art .lr-art, body.no-art .r-art, body.no-art .cc-art { display: none !im
 /* Warning variant: amber, matching .hint.warn, so "you need a key or tokens" reads as a caution. */
 .banner.warn { border-color: #f2b45c; color: #f8d9a6; font-weight: 600;
   background: linear-gradient(135deg, rgba(242,180,92,.16), var(--panel)); }
+.banner.warn a { color: #ffe3b3; text-decoration: underline; }
 .banner-icon { flex: none; color: #f2b45c; font-size: 15px; line-height: 1.3; }
 .banner-x { flex: none; background: none; border: none; color: var(--muted); font-size: 20px;
   line-height: 1; padding: 0 4px; cursor: pointer; }
