@@ -226,6 +226,44 @@ def _json_format_for(profile: dict, contract_mod) -> dict | None:
     return _JSON_OBJECT if role in ("structure", "cards") else None
 
 
+# --- two-model BYOK -------------------------------------------------------------------------------
+# A BYOK key names up to two models, split where the money is: `model` DESIGNS the class (the brainstorm +
+# structure roles — cloud/cluster, map/compose, relic/orb intent, the blueprint: ~5 calls where the class's
+# taste is decided) and `card_model` CODES it (the cards role — every card + the relic in strict closed-vocab
+# JSON: ~44 calls, ~97% of a forge's input tokens on the 2026-09 ledger). `card_model` blank = one model for
+# everything, byte-for-byte the old single-model forge.
+
+def _key_models(key: dict) -> tuple[str, str]:
+    """(design model, card-coding model) for a BYOK key; the card model falls back to the design model."""
+    design = str(key.get("model") or "").strip()
+    return design, (str(key.get("card_model") or "").strip() or design)
+
+
+def _role_of(contract_mod) -> str:
+    """btsgen.ollama_mix's role for a contract (brainstorm | structure | cards). Never raises."""
+    try:
+        from btsgen.ollama_mix import _resolve_role
+        return _resolve_role(contract_mod)
+    except Exception:  # noqa: BLE001 — a missing/renamed helper must never break a forge
+        return "cards"
+
+
+def _tagged(on_usage, role: str, model: str):
+    """Wrap `on_usage` so every payload carries the role + model that produced it — a two-model forge then
+    lands in the ledger (and the post-forge summary) as one row per (role, model), like the hosted mixture's.
+    Anthropic usage objects are flattened to the dict shape UsageMeter already reads."""
+    if on_usage is None:
+        return None
+
+    def cb(u):
+        if not isinstance(u, dict):  # anthropic.types.Usage
+            u = {"input_tokens": getattr(u, "input_tokens", 0) or 0,
+                 "output_tokens": getattr(u, "output_tokens", 0) or 0,
+                 "cache_read_input_tokens": getattr(u, "cache_read_input_tokens", 0) or 0}
+        on_usage({**u, "_role": role, "_model": model})
+    return cb
+
+
 def _build_generators(key: dict | None, hosted: bool, fake: bool, model: str | None = None, on_usage=None):
     """Return (blueprint_gen, card_gen_factory, relic_gen) for the requested path. Raises ForgeError on bad
     config. `relic_gen` forges the class's keystone relic (non-fatal — if it fails, the class still ships,
@@ -238,7 +276,8 @@ def _build_generators(key: dict | None, hosted: bool, fake: bool, model: str | N
         return None, (lambda: _CardFake()), None  # forge_class emits a _fake_relic offline (no relic_gen)
 
     if key and key.get("provider") == "anthropic":  # BYOK — the user's own Anthropic key
-        api_key, model = key.get("api_key"), key.get("model")
+        api_key = key.get("api_key")
+        model, card_model = _key_models(key)
         if not (api_key and model):
             raise ForgeError("Anthropic BYOK needs api_key and model together.")
         from btsgen.generator import AnthropicGenerator
@@ -251,16 +290,19 @@ def _build_generators(key: dict | None, hosted: bool, fake: bool, model: str | N
         try:
             blueprint_gen = AnthropicGenerator(model=model, api_key=api_key,
                                                contract_mod=_BlueprintContract(triad=False), max_tokens=48000,
-                                               on_usage=on_usage)
+                                               on_usage=_tagged(on_usage, "structure", model))
         except RuntimeError as e:
             raise ForgeError(f"Anthropic generation unavailable: {e}") from e
-        relic_gen = AnthropicGenerator(model=model, api_key=api_key,
-                                       contract_mod=_RelicContract(), max_tokens=6000, on_usage=on_usage)
-        return (blueprint_gen, (lambda: AnthropicGenerator(model=model, api_key=api_key, on_usage=on_usage)),
+        card_usage = _tagged(on_usage, "cards", card_model)
+        relic_gen = AnthropicGenerator(model=card_model, api_key=api_key,
+                                       contract_mod=_RelicContract(), max_tokens=6000, on_usage=card_usage)
+        return (blueprint_gen,
+                (lambda: AnthropicGenerator(model=card_model, api_key=api_key, on_usage=card_usage)),
                 relic_gen)
 
     if key:  # BYOK — any OpenAI-compatible /chat/completions endpoint
-        base_url, api_key, model = key.get("base_url"), key.get("api_key"), key.get("model")
+        base_url, api_key = key.get("base_url"), key.get("api_key")
+        model, card_model = _key_models(key)
         if not (base_url and api_key and model):
             raise ForgeError("BYOK needs base_url, api_key, and model together.")
         _guard_outbound_url(base_url)  # same SSRF guard as the staged path — no path may skip it
@@ -273,16 +315,17 @@ def _build_generators(key: dict | None, hosted: bool, fake: bool, model: str | N
         bp_contract, card_contract, relic_contract = _BlueprintContract(triad=False), contract, _RelicContract()
         blueprint_gen = OpenAICompatGenerator(base_url, api_key, model,
                                               contract_mod=bp_contract, max_tokens=8000,
-                                              on_usage=on_usage, extra_body=eb,
+                                              on_usage=_tagged(on_usage, "structure", model), extra_body=eb,
                                               response_format=_json_format_for(prof, bp_contract))
-        relic_gen = OpenAICompatGenerator(base_url, api_key, model,
-                                          contract_mod=relic_contract, max_tokens=4000, on_usage=on_usage,
+        card_usage = _tagged(on_usage, "cards", card_model)
+        relic_gen = OpenAICompatGenerator(base_url, api_key, card_model,
+                                          contract_mod=relic_contract, max_tokens=4000, on_usage=card_usage,
                                           extra_body=eb,
                                           response_format=_json_format_for(prof, relic_contract))
         card_format = _json_format_for(prof, card_contract)
-        card_factory = lambda: OpenAICompatGenerator(base_url, api_key, model,  # noqa: E731
+        card_factory = lambda: OpenAICompatGenerator(base_url, api_key, card_model,  # noqa: E731
                                                      contract_mod=card_contract, max_tokens=4000,
-                                                     on_usage=on_usage, extra_body=eb,
+                                                     on_usage=card_usage, extra_body=eb,
                                                      response_format=card_format)
         return blueprint_gen, card_factory, relic_gen
 
@@ -416,29 +459,39 @@ def _make_gen_factory(key: dict | None, hosted: bool, fake: bool, model: str | N
         from btsgen.frontend.fakes import _StageFake
         return lambda contract_mod, *, max_tokens: _StageFake(contract_mod)
     if key and key.get("provider") == "anthropic":
-        api_key, m = key.get("api_key"), key.get("model")
-        if not (api_key and m):
+        api_key = key.get("api_key")
+        design, cards = _key_models(key)
+        if not (api_key and design):
             raise ForgeError("Anthropic BYOK needs api_key and model together.")
         from btsgen.generator import AnthropicGenerator
-        return lambda contract_mod, *, max_tokens: AnthropicGenerator(
-            model=m, api_key=api_key, contract_mod=contract_mod, max_tokens=max_tokens, on_usage=on_usage)
+
+        def make_anthropic(contract_mod, *, max_tokens):
+            role = _role_of(contract_mod)
+            m = cards if role == "cards" else design
+            return AnthropicGenerator(model=m, api_key=api_key, contract_mod=contract_mod, max_tokens=max_tokens,
+                                      on_usage=_tagged(on_usage, role, m))
+        return make_anthropic
     if key:
-        base_url, api_key, m = key.get("base_url"), key.get("api_key"), key.get("model")
-        if not (base_url and api_key and m):
+        base_url, api_key = key.get("base_url"), key.get("api_key")
+        design, cards = _key_models(key)
+        if not (base_url and api_key and design):
             raise ForgeError("BYOK needs base_url, api_key, and model together.")
         _guard_outbound_url(base_url)
         from btsgen.generator import OpenAICompatGenerator
         # Per-host cost/JSON discipline (see BYOK_HOST_PROFILES): extra_body on every stage (unlike the
-        # hosted mixture, BYOK runs ONE model for all three roles, so a reasoning knob is as welcome on
-        # brainstorm as anywhere), json_object only on the structure/cards stages.
+        # hosted mixture, BYOK brainstorms on its design model, not a non-reasoning gemma, so a reasoning
+        # knob is as welcome there as anywhere), json_object only on the structure/cards stages.
         prof = _byok_profile(base_url)
         eb = prof["extra_body"] or None
         # 300s (vs the 180s default), matching the Ollama path: the front-end's heavy stages (map/compose,
         # reframed blueprint) can sit a long time before the first streamed chunk when the provider is loaded.
-        return lambda contract_mod, *, max_tokens: OpenAICompatGenerator(
-            base_url, api_key, m, contract_mod=contract_mod, max_tokens=max_tokens, timeout=300,
-            on_usage=on_usage, extra_body=eb,
-            response_format=_json_format_for(prof, contract_mod))
+        def make_compat(contract_mod, *, max_tokens):
+            role = _role_of(contract_mod)
+            m = cards if role == "cards" else design
+            return OpenAICompatGenerator(base_url, api_key, m, contract_mod=contract_mod, max_tokens=max_tokens,
+                                         timeout=300, on_usage=_tagged(on_usage, role, m), extra_body=eb,
+                                         response_format=_json_format_for(prof, contract_mod))
+        return make_compat
     if hosted:  # see _build_generators: no server-side Anthropic credential, ever
         raise ForgeError("the server-side Anthropic path is retired — use a token or bring your own API key.")
     raise ForgeError("no generation path selected (need a BYOK key, a token, or fake).")

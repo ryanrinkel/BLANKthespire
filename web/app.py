@@ -1171,7 +1171,8 @@ def forge_class_route():
         k = body.get("key") or {}
         key = {"provider": "anthropic",
                "api_key": (k.get("api_key") or "").strip(),
-               "model": (k.get("model") or "").strip()}
+               "model": (k.get("model") or "").strip(),
+               "card_model": (k.get("card_model") or "").strip()}  # blank = the design model codes too
 
     if not concept:
         return jsonify({"error": "describe a class first."}), 400
@@ -1512,6 +1513,15 @@ FORGE_ESTIMATE_SAMPLE = 30
 FORGE_ESTIMATE_FALLBACK = {"calls": 53, "input_tokens": 1_370_000,
                            "cached_tokens": 720_000, "output_tokens": 28_000}
 _ESTIMATE_FIELDS = ("calls", "input_tokens", "cached_tokens", "output_tokens")
+# A BYOK key can name two models (forge._key_models): one DESIGNS the class (brainstorm + structure roles),
+# one CODES the cards (cards role). The quote prices each on its own model, so it needs the per-forge split.
+# Measured from role-tagged forges in the sample (token forges always are; BYOK forges since two-model
+# BYOK); until there are any, the design role's share of each field from the prod ledger (27 token forges,
+# 2026-09-10..28): ~4.6 of ~48.5 calls, 45K of 1.40M input, 6K of 1.16M cached, 13.7K of 23.7K output.
+ESTIMATE_DESIGN_ROLES = ("brainstorm", "structure")
+ESTIMATE_SLOT_ROLES = ESTIMATE_DESIGN_ROLES + ("cards",)
+FORGE_ESTIMATE_FALLBACK_DESIGN_SHARE = {"calls": 0.095, "input_tokens": 0.032,
+                                        "cached_tokens": 0.005, "output_tokens": 0.58}
 # A complete pack is splash + sprite + one portrait per card; a triad class runs ~34 cards. Used when the
 # ledger has no art rows to average yet.
 FORGE_ESTIMATE_FALLBACK_IMAGES = 36
@@ -1613,7 +1623,7 @@ def _forge_estimate_payload() -> dict:
     """Build (uncached) the whole pre-go quote. Split out of the route so tests can call it directly."""
     from sqlalchemy import func as sa_func
     with session_scope() as s:
-        rows = (s.query(ForgeUsage.forge_id, ForgeUsage.calls, ForgeUsage.input_tokens,
+        rows = (s.query(ForgeUsage.forge_id, ForgeUsage.role, ForgeUsage.calls, ForgeUsage.input_tokens,
                         ForgeUsage.cached_tokens, ForgeUsage.output_tokens)
                 .filter(ForgeUsage.ok == 1,
                         sa_func.coalesce(ForgeUsage.role, "").notlike("art:%"))
@@ -1623,14 +1633,22 @@ def _forge_estimate_payload() -> dict:
         # distinct forge_ids are the newest forges — and every row of those forges is summed wherever it
         # turns up.
         per_forge: dict[str, dict] = {}
+        # The design/cards split, summed over the sampled forges whose rows carry a pipeline role (a legacy
+        # single-model BYOK row is booked under its mode, "byok"/"anthropic", and says nothing about it).
+        slot_sum = {"design": dict.fromkeys(_ESTIMATE_FIELDS, 0), "cards": dict.fromkeys(_ESTIMATE_FIELDS, 0)}
         for r in rows:
             acc = per_forge.get(r.forge_id)
             if acc is None:
                 if len(per_forge) >= FORGE_ESTIMATE_SAMPLE:
                     continue
                 acc = per_forge[r.forge_id] = dict.fromkeys(_ESTIMATE_FIELDS, 0)
+            role = r.role or ""
+            slot = (slot_sum["design"] if role in ESTIMATE_DESIGN_ROLES
+                    else slot_sum["cards"] if role in ESTIMATE_SLOT_ROLES else None)
             for f in _ESTIMATE_FIELDS:
                 acc[f] += int(getattr(r, f) or 0)
+                if slot is not None:
+                    slot[f] += int(getattr(r, f) or 0)
         images, measured = _sampled_art_stats(s, list(per_forge))
     n = len(per_forge)
     tokens = ({**FORGE_ESTIMATE_FALLBACK, "forges_sampled": 0, "fallback": True} if not n else
@@ -1638,10 +1656,24 @@ def _forge_estimate_payload() -> dict:
                "forges_sampled": n, "fallback": False})
     images_per_forge = images or FORGE_ESTIMATE_FALLBACK_IMAGES
     return {**tokens,
+            "slots": _estimate_slots(tokens, slot_sum),
             "images_per_forge": images_per_forge,
             "images_fallback": images is None,
             "art": _art_price_blocks(images_per_forge, measured),
             "text_prices": {m: list(p) for m, p in MODEL_PRICES.items()}}
+
+
+def _estimate_slots(tokens: dict, slot_sum: dict) -> dict:
+    """Split the averaged per-forge totals into {"design": {...}, "cards": {...}} by the design roles' share
+    of each field, so the two halves always add back up to the totals the quote shows. The share is the
+    sample's own where it has role-tagged calls, FORGE_ESTIMATE_FALLBACK_DESIGN_SHARE where it has none."""
+    design, cards = {}, {}
+    for f in _ESTIMATE_FIELDS:
+        d, c = slot_sum["design"][f], slot_sum["cards"][f]
+        share = d / (d + c) if d + c else FORGE_ESTIMATE_FALLBACK_DESIGN_SHARE[f]
+        design[f] = int(round(tokens[f] * share))
+        cards[f] = tokens[f] - design[f]
+    return {"design": design, "cards": cards}
 
 
 @app.route("/api/forge-estimate")
@@ -1657,6 +1689,8 @@ def forge_estimate():
     * `images_per_forge` + `art`: how many images a pack is and what one costs on each art-capable BYOK
       vendor — preset list price for Gemini/xAI (neither meters a cost), the ledger's measured average for
       OpenRouter/OpenAI once there is enough of it (see ART_MEASURED_MIN_FORGES);
+    * `slots`: those totals split into `design` (brainstorm + structure) and `cards`, so a two-model BYOK
+      key prices each half on its own model (see _estimate_slots);
     * `text_prices`: {model: [in, out, cached]} $/M for every model the panel suggests, so the browser
       multiplies but never owns a price table. Override any row with BTSWEB_MODEL_PRICES.
 

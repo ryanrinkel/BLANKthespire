@@ -143,45 +143,50 @@ if (scenario === "forge") {
     const folded = box.classList.contains('hidden') && !btn.classList.contains('hidden');
     return JSON.stringify({before, shown, folded, text: box.textContent.slice(0, 120)}); })()`));
   check(est.before && est.shown && est.folded, "estimate hidden behind its button, folds on a settings change", JSON.stringify(est));
-  // Both on-demand buttons must sit centred in their box, not stretched across it.
-  const centred = await json(`(() => {
-    const out = {};
-    for (const [k, id] of [["estimate", "estimate-btn"], ["custom", "forge-donate-custom-open"]]) {
-      const b = document.getElementById(id);
-      if (!b) { out[k] = null; continue; }
-      const r = b.getBoundingClientRect(), p = b.parentElement.getBoundingClientRect();
-      out[k] = {off: Math.round((r.left - p.left) - (p.right - r.right)), w: Math.round(r.width),
-                pw: Math.round(p.width)};
-    }
-    return out; })()`);
-  check(centred.estimate && Math.abs(centred.estimate.off) <= 2 && centred.estimate.w < centred.estimate.pw - 40,
-        "estimate button centred, not stretched", JSON.stringify(centred.estimate));
+  // 2026-09-28: the estimate is a link in the box's footer, beside the art chip.
+  const foot = await json(`(() => { const b = document.getElementById('estimate-btn');
+    return {in_foot: b.parentElement.classList.contains('byok-foot'), linkish: b.classList.contains('linkish'),
+            chip: document.getElementById('byok-art').textContent}; })()`);
+  check(foot.in_foot && foot.linkish && ["No generated art", "Art included"].includes(foot.chip),
+        "estimate link + art chip in the footer", JSON.stringify(foot));
   await evaluate(`document.getElementById('estimate-btn').click()`);
   await shot("forge-byok");
-  // The pre-go quote (2026-09-20): an art provider renders the three-line Text/Art/Total table plus the
-  // OpenRouter comparison; a provider with no image API renders the text line and says so instead.
-  const pickProvider = (id, model) => `(() => {
+  // The pre-go quote (2026-09-28): a table with one row per model (one "Design + cards" row when the card
+  // box is blank), an Art row, and a Total; at most one note. An art provider with a cheaper OpenRouter
+  // route says so; a provider with no image API says "not on this provider" in the Art row.
+  const pickProvider = (id, model, cardModel = "") => `(() => {
     const p = document.getElementById('provider'); p.value = ${JSON.stringify(id)};
     p.dispatchEvent(new Event('change'));
     const m = document.getElementById('model'); m.value = ${JSON.stringify(model)};
     m.dispatchEvent(new Event('input'));
+    const c = document.getElementById('card_model'); c.value = ${JSON.stringify(cardModel)};
+    c.dispatchEvent(new Event('input'));
     document.getElementById('estimate-btn').click();
     const box = document.getElementById('byok-estimate');
-    return JSON.stringify({rows: [...box.querySelectorAll('pre')].map(e => e.textContent),
+    return JSON.stringify({labels: [...box.querySelectorAll('.est-table th')].map(e => e.textContent),
+                           rows: [...box.querySelectorAll('.est-table tr')].map(e => e.textContent),
                            notes: [...box.querySelectorAll('.est-note')].map(e => e.textContent)});
   })()`;
-  for (const [id, model, wantArt] of [["google", "gemini-2.5-flash-lite", true],
-                                      ["xai", "grok-4.20-0309-non-reasoning", true],
-                                      ["groq", "llama-3.3-70b-versatile", false]]) {
-    const got = JSON.parse(await evaluate(pickProvider(id, model)));
-    const table = (got.rows[0] || "");
-    const labels = ["Text", "Art", "Total"].filter((l) => table.includes(l));
-    const ok = wantArt ? labels.length === 3 && got.notes.some((n) => n.includes("OpenRouter key makes"))
-                       : labels.join() === "Text" && got.notes.some((n) => n.includes("No generated art"));
-    console.log(`${ok ? "OK  " : "FAIL"} estimate/${id}: [${labels}] ${JSON.stringify(got.notes).slice(0, 220)}`);
+  for (const [id, model, cardModel, want] of [
+      ["google", "gemini-2.5-flash-lite", "", ["Design + cards", "Art", "Total"]],
+      ["xai", "grok-4.20-0309-non-reasoning", "", ["Design + cards", "Art", "Total"]],
+      ["groq", "llama-3.3-70b-versatile", "", ["Design + cards", "Art", "Total"]],
+      ["anthropic", "claude-opus-4-8", "claude-haiku-4-5", ["Design", "Card coding", "Art", "Total"]]]) {
+    const got = JSON.parse(await evaluate(pickProvider(id, model, cardModel)));
+    const noteOk = id === "google" || id === "xai" ? got.notes.some((n) => n.includes("OpenRouter key makes"))
+                 : got.notes.length <= 1;
+    const artOk = id === "groq" || id === "anthropic" ? got.rows.some((r) => r.includes("not on this provider")) : true;
+    const priced = !got.rows.some((r) => r.includes("?"));
+    const ok = got.labels.join() === want.join() && noteOk && artOk && priced;
+    console.log(`${ok ? "OK  " : "FAIL"} estimate/${id}: ${JSON.stringify(got.rows)} ${JSON.stringify(got.notes)}`);
     if (!ok) errors.push(`estimate for ${id} did not render as expected`);
     if (id === "google") await shot("forge-byok-gemini-estimate");
+    if (id === "anthropic") await shot("forge-byok-two-models");
   }
+  // The confirm dialog carries both models and the same total.
+  const confirmText = await evaluate(`estimateText()`);
+  check(confirmText.includes("Design: claude-opus-4-8 · Cards: claude-haiku-4-5") && confirmText.includes("≈ $"),
+        "confirm text names both models and a total", JSON.stringify(confirmText));
   // (c) opening the token box closes the key box; with no tokens the button goes back to disabled, and
   // the custom-amount row prices a typed $25 live.
   await evaluate(`document.getElementById('forge-token').open = true`); await sleep(400);
@@ -235,6 +240,25 @@ if (scenario === "forge") {
           "custom amount: $25 prices live", JSON.stringify(custom));
   }
   await shot("forge-token");
+} else if (scenario === "byok-narrow") {
+  // The BYOK box at phone width: both two-column rows stack, nothing scrolls sideways.
+  await send("Emulation.setDeviceMetricsOverride", { width: 390, height: 1400, deviceScaleFactor: 1, mobile: true });
+  await nav(`${base}/dev-login?email=smoke-narrow@example.com`);
+  await nav(`${base}/app`);
+  await evaluate(`(() => { document.getElementById('forge-byok').open = true;
+    const p = document.getElementById('provider'); p.value = 'openrouter'; p.dispatchEvent(new Event('change'));
+    const k = document.getElementById('api_key'); k.value = 'sk-or-smoke'; k.dispatchEvent(new Event('input'));
+    const m = document.getElementById('model'); m.value = 'anthropic/claude-sonnet-4.6'; m.dispatchEvent(new Event('input'));
+    const c = document.getElementById('card_model'); c.value = 'openai/gpt-4o'; c.dispatchEvent(new Event('input'));
+    document.getElementById('estimate-btn').click(); })()`);
+  await sleep(300);
+  const narrow = await json(`({scrollW: document.documentElement.scrollWidth, w: window.innerWidth,
+    stacked: document.getElementById('card_model').getBoundingClientRect().top
+             > document.getElementById('model').getBoundingClientRect().bottom})`);
+  check(narrow.scrollW <= narrow.w && narrow.stacked, "byok box stacks at 390px with no sideways scroll",
+        JSON.stringify(narrow));
+  await evaluate(`document.getElementById('forge-byok').scrollIntoView()`);
+  await shot("byok-narrow");
 } else if (scenario === "lost") {
   // 2026-09-26: a dropped progress stream (phone locked / network hop -> Chrome's bare "network error") must
   // read as "still forging", then recover on its own by polling /api/forge-jobs/<id>. window.fetch is stubbed

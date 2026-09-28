@@ -80,41 +80,66 @@
       <p class="lbl pay-lbl">How do you want to pay for this forge? <span class="muted">Pick one.</span></p>
       <details id="forge-byok" class="settings pay">
         <summary>Bring your own key</summary>
-        <label class="lbl small" for="provider">Provider</label>
-        <select id="provider" class="in">
-          <option value="anthropic" selected>Anthropic (Claude)</option>
-          <option value="openai">OpenAI</option>
-          <option value="ollama">Ollama Cloud</option>
-          <option value="openrouter">OpenRouter</option>
-          <option value="groq">Groq</option>
-          <option value="google">Google Gemini</option>
-          <option value="xai">xAI (Grok)</option>
-          <option value="deepseek">DeepSeek</option>
-          <option value="together">Together</option>
-          <option value="custom">Other (OpenAI-compatible URL)</option>
-        </select>
-        <input id="base_url" class="in" placeholder="Base URL — e.g. https://api.openai.com/v1" style="display:none" />
-        <input id="api_key" class="in" type="password" placeholder="API key (used once, never stored on our server)" />
-        <!-- The key-handling answer is behind a button, like the cost estimate: one line of reassurance on
-             demand rather than a paragraph in everyone's way. Keep it TRUE: the key is saved in this
-             browser's localStorage (bts_byok) so it survives a reload, travels to our server only inside the
-             forge / model-list request, and is never written to the database or the logs. -->
-        <button id="key-safety-btn" class="btn" type="button">How do we keep your API key secure?</button>
-        <p class="hint hidden" id="key-safety">By never storing it! Your key stays in this browser only — we
-          keep it there so you don't have to retype it, and clearing the box forgets it. When you forge, it
-          goes straight to your provider; it's never written to our database or our logs. We can't leak what
-          we don't keep.</p>
-        <div class="model-row">
-          <input id="model" class="in" placeholder="Model" list="model-list" autocomplete="off" />
-          <datalist id="model-list"></datalist>
-          <button id="load-models" class="btn" type="button">Load available models</button>
+        <div class="byok-grid">
+          <div>
+            <label class="lbl small" for="provider">Provider</label>
+            <select id="provider" class="in">
+              <option value="anthropic" selected>Anthropic (Claude)</option>
+              <option value="openai">OpenAI</option>
+              <option value="ollama">Ollama Cloud</option>
+              <option value="openrouter">OpenRouter</option>
+              <option value="groq">Groq</option>
+              <option value="google">Google Gemini</option>
+              <option value="xai">xAI (Grok)</option>
+              <option value="deepseek">DeepSeek</option>
+              <option value="together">Together</option>
+              <option value="custom">Other (OpenAI-compatible URL)</option>
+            </select>
+          </div>
+          <div>
+            <label class="lbl small" for="api_key">API key</label>
+            <input id="api_key" class="in" type="password" placeholder="Paste your key" autocomplete="off" />
+          </div>
         </div>
-        <p class="hint" id="byok-hint"></p>
-        <!-- The quote is on demand (2026-09-21): a button, then the Text/Art/Total table in its place. Changing
-             the provider or model folds it back to the button so a stale number is never on screen. -->
-        <button id="estimate-btn" class="btn" type="button">Estimate cost with these settings</button>
-        <!-- div, not p: the estimate renders a small pre-formatted Text/Art/Total table -->
-        <div class="hint warn hidden" id="byok-estimate"></div>
+        <input id="base_url" class="in" placeholder="Base URL — e.g. https://api.openai.com/v1" style="display:none" />
+        <!-- One line: where to get a key, then the key-handling answer behind a link. Keep the answer TRUE:
+             the key is saved in this browser's localStorage (bts_byok) so it survives a reload, travels to
+             our server only inside the forge / model-list request, and is never written to the database or
+             the logs. -->
+        <p class="hint byok-line"><span id="byok-hint"></span> ·
+          <button id="key-safety-btn" class="linkish" type="button">Your key stays in this browser</button></p>
+        <p class="hint hidden" id="key-safety">We never store it. It's kept in this browser so you don't have to
+          retype it (clear the box to forget it), and when you forge it goes straight to your provider — it's
+          never written to our database or our logs.</p>
+
+        <!-- Two models, split where the money is (forge._key_models): the design model makes the few calls
+             that shape the class, the card model writes every card (~95% of the tokens). Blank card model =
+             the design model does both. Both inputs share one suggestion list. -->
+        <div class="byok-models-head">
+          <span class="lbl small">Models</span>
+          <button id="load-models" class="linkish" type="button">Load my model list</button>
+        </div>
+        <div class="byok-grid">
+          <div>
+            <label class="lbl small" for="model">Design</label>
+            <input id="model" class="in" placeholder="Model" list="model-list" autocomplete="off" />
+            <p class="hint">A few calls that shape the class. Use your smartest model.</p>
+          </div>
+          <div>
+            <label class="lbl small" for="card_model">Card coding</label>
+            <input id="card_model" class="in" placeholder="Same as design" list="model-list" autocomplete="off" />
+            <p class="hint">Writes every card in strict JSON — most of the cost. A reliable coder is enough.</p>
+          </div>
+        </div>
+        <datalist id="model-list"></datalist>
+
+        <div class="byok-foot">
+          <span id="byok-art" class="chip"></span>
+          <!-- The quote is on demand: a link, then the table in its place. Changing the provider or either
+               model folds it back so a stale number is never on screen. -->
+          <button id="estimate-btn" class="linkish" type="button">Estimate cost</button>
+        </div>
+        <div class="estimate hidden" id="byok-estimate"></div>
       </details>
 
       <!-- Tokens without leaving the forge: the balance, then the same tier + custom-amount buttons the

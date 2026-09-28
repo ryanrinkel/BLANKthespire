@@ -312,70 +312,90 @@ function artFor(p) {
   return (p && p.art && p.artKey && ESTIMATE?.art) ? (ESTIMATE.art[p.artKey] || null) : null;
 }
 
-// The whole quote as data: a header, aligned [label, what, cost] rows, and free-text notes. Both the HTML
-// panel and the plain-text confirm dialog render this, so they can never disagree.
-function estimateRows(model) {
-  const e = ESTIMATE, p = currentProvider();
-  if (!e) {
-    return { head: "", rows: [],
-             notes: ["A forge makes roughly 50 model calls and around 1.4M input tokens — check your "
-                     + "provider's pricing."] };
-  }
-  const inp = e.input_tokens, cached = e.cached_tokens, out = e.output_tokens;
-  const rows = [], notes = [];
-  const head = `Estimated cost per forge on your ${p.label} key`;
+// The two models a BYOK forge runs (forge._key_models): the design model shapes the class, the card model
+// writes the cards. A blank card box means the design model does both.
+function byokModels() {
+  const design = el("model").value.trim();
+  return { design, cards: el("card_model").value.trim() || design };
+}
 
+// USD for one slot's tokens on one model: [cached, uncached] — the first assumes prompt caching works on the
+// key, the second is the ceiling without it. Null when the server has no price for the model.
+function slotUsd(t, model) {
   const price = modelPrice(model);
-  const tokens = `~${e.calls} calls · ~${fmtTokens(inp)} in (~${fmtTokens(cached)} cached) · `
-    + `~${fmtTokens(out)} out`;
-  let textUsd = null;
-  if (price) {
-    textUsd = (Math.max(0, inp - cached) * price.inp + cached * price.cached + out * price.out) / 1_000_000;
-    const noCache = (inp * price.inp + out * price.out) / 1_000_000;
-    notes.push(`Text assumes prompt caching works on your key — up to ${usd(noCache)} without it.`);
-  } else {
-    notes.push("We have no price for that model — multiply the token counts by your provider's price sheet."
-      + " On frontier models a forge can be a few dollars.");
-  }
-  rows.push(["Text", `${model || "(pick a model)"}  ${tokens}`, textUsd == null ? "?" : "≈ " + usd(textUsd)]);
+  if (!price || !t) return null;
+  const inp = Number(t.input_tokens || 0), cached = Number(t.cached_tokens || 0), out = Number(t.output_tokens || 0);
+  return [(Math.max(0, inp - cached) * price.inp + cached * price.cached + out * price.out) / 1_000_000,
+          (inp * price.inp + out * price.out) / 1_000_000];
+}
 
-  const art = artFor(p);
-  let artUsd = null;
-  if (art) {
+function tokensLine(t) {
+  return `~${t.calls} calls · ~${fmtTokens(t.input_tokens)} in (~${fmtTokens(t.cached_tokens)} cached) · `
+    + `~${fmtTokens(t.output_tokens)} out`;
+}
+
+// The whole quote as data: rows of {label, what, cost (USD or null), tip}, the total, and at most one short
+// note. The panel and the confirm dialog both render this, so they can never disagree.
+function estimateRows() {
+  const e = ESTIMATE, p = currentProvider(), { design, cards } = byokModels();
+  if (!e) return { rows: [], total: null, text: null, art: null,
+                   note: "A forge is ~50 model calls and ~1.4M input tokens — check your provider's pricing." };
+  const whole = { calls: e.calls, input_tokens: e.input_tokens, cached_tokens: e.cached_tokens,
+                  output_tokens: e.output_tokens };
+  // One row when one model does everything; otherwise each half priced on its own model.
+  const slots = design === cards || !e.slots
+    ? [{ label: "Design + cards", model: design, t: whole }]
+    : [{ label: "Design", model: design, t: e.slots.design }, { label: "Card coding", model: cards, t: e.slots.cards }];
+  const rows = [], unpriced = [];
+  let text = 0, ceiling = 0;
+  for (const sl of slots) {
+    const usdPair = slotUsd(sl.t, sl.model);
+    if (!usdPair) { unpriced.push(sl.model || "(no model)"); text = null; }
+    else if (text != null) { text += usdPair[0]; ceiling += usdPair[1]; }
+    // The vendor prefix ("anthropic/", "openai/") is dropped on screen; the tooltip keeps the full id.
+    rows.push({ label: sl.label, what: sl.model.split("/").pop() || "pick a model",
+                cost: usdPair ? usdPair[0] : null, tip: `${sl.model}: ${tokensLine(sl.t)}` });
+  }
+
+  const artBlock = artFor(p);
+  let art = null;
+  if (artBlock) {
     const n = Number(e.images_per_forge || 36);
-    artUsd = art.pack_usd != null ? Number(art.pack_usd)
-           : (art.per_image_usd != null ? Number(art.per_image_usd) * n : null);
-    const per = art.per_image_usd != null ? ` × $${Number(art.per_image_usd).toFixed(3)}` : "";
-    rows.push(["Art", `${art.model || p.label + " image API"}  ${n} images (splash, sprite, ${n - 2} card `
-      + `portraits)${per}`, artUsd == null ? "?" : "≈ " + usd(artUsd)]);
-  } else if (p.mode) {
-    notes.push(`No generated art on this key — ${p.label} has no image API we can drive, so classes forged `
-      + "here ship with the game's built-in card doodles.");
+    art = artBlock.pack_usd != null ? Number(artBlock.pack_usd)
+        : (artBlock.per_image_usd != null ? Number(artBlock.per_image_usd) * n : null);
+    rows.push({ label: "Art", what: `${n} images`, cost: art,
+                tip: `${artBlock.model || p.label + " image API"}: splash, sprite and ${n - 2} card portraits` });
+  } else {
+    rows.push({ label: "Art", what: "not on this provider", cost: "—",
+                tip: "Classes forged on this key use the game's built-in card doodles." });
   }
-  if (textUsd != null && artUsd != null) rows.push(["Total", "", "≈ " + usd(textUsd + artUsd)]);
+  const total = text != null && (art != null || !artBlock) ? text + (art || 0) : null;
 
-  // Gemini and xAI bill a flat per-image list price with no cheaper model on the same API, so say what the
-  // alternative key would cost for the SAME pack — the OpenRouter number is measured from our own ledger.
-  const or = ESTIMATE.art?.openrouter;
-  if (art && (p.artKey === "gemini" || p.artKey === "xai") && or?.pack_usd != null) {
-    notes.push(`Art is generated on your key; there's no cheaper ${p.label} image model on this API. `
-      + `An OpenRouter key makes the same pack for about ${usd(or.pack_usd)}.`);
-  }
-  return { head, rows, notes };
+  // One note, most useful first: a model we can't price, then a much cheaper art route (Gemini/xAI bill a
+  // flat list price per image; the OpenRouter figure is measured from our own ledger), then the caching
+  // caveat when it moves the number.
+  const or = e.art?.openrouter;
+  let note = "";
+  if (unpriced.length) note = `No price on file for ${unpriced.join(" / ")} — check your provider's rates.`;
+  else if (artBlock && (p.artKey === "gemini" || p.artKey === "xai") && or?.pack_usd != null && art > or.pack_usd) {
+    note = `An OpenRouter key makes the same art for ~${usd(or.pack_usd)}.`;
+  } else if (ceiling > text * 1.25) note = `Assumes prompt caching — up to ${usd(ceiling + (art || 0))} without it.`;
+  return { rows, total, text, art, note };
 }
 
-// Plain text (the confirm dialog). Same numbers as the panel.
-function estimateText(model) {
-  const { head, rows, notes } = estimateRows(model);
-  const lines = [];
-  if (head) lines.push(head);
-  for (const [label, what, cost] of rows) lines.push(`  ${label.padEnd(7)}${what}${what ? "   " : ""}${cost}`);
-  return lines.concat(notes).join("\n");
+// The confirm dialog: three short lines, same numbers as the panel.
+function estimateText() {
+  const { total, text, art, note } = estimateRows(), { design, cards } = byokModels();
+  const models = design === cards ? `Model: ${design}` : `Design: ${design} · Cards: ${cards}`;
+  const cost = total != null
+    ? `Estimated ≈ ${usd(total)} per forge` + (art ? ` (text ${usd(text)} + art ${usd(art)})` : "")
+    : "Estimated cost: unknown for this model.";
+  return [models, cost, note].filter(Boolean).join("\n");
 }
 
-// The quote is shown on demand: the "Estimate cost with these settings" button reveals it, and any change
-// to the provider or model (showEstimate(false) from those handlers) folds it back to the button, so the
-// numbers on screen always belong to the settings on screen.
+// The quote is shown on demand: the "Estimate cost" link reveals it, and any change to the provider or
+// a model (showEstimate(false) from those handlers) folds it back, so the numbers on screen always belong
+// to the settings on screen.
 let ESTIMATE_SHOWN = false;
 
 function showEstimate(shown) {
@@ -389,14 +409,15 @@ function renderEstimate() {
   box.classList.toggle("hidden", !ESTIMATE_SHOWN);
   if (btn) btn.classList.toggle("hidden", ESTIMATE_SHOWN);
   if (!ESTIMATE_SHOWN) { box.innerHTML = ""; return; }
-  const { head, rows, notes } = estimateRows(el("model").value.trim());
-  // Column widths from the content, so Text / Art / Total line up without a real table.
-  const w1 = Math.max(0, ...rows.map(r => r[1].length));
-  const table = rows.map(([label, what, cost]) =>
-    esc(`  ${label.padEnd(7)}${what.padEnd(w1)}   ${cost}`)).join("\n");
-  box.innerHTML = (head ? `⚠ ${esc(head)}` : "⚠")
-    + (table ? `<pre>${table}</pre>` : "")
-    + notes.map(n => `<p class="est-note">${esc(n)}</p>`).join("");
+  const { rows, total, note } = estimateRows();
+  const cost = (c) => c == null ? "?" : typeof c === "string" ? c : usd(c);
+  box.innerHTML = `<div class="est-head">Estimated cost per forge</div>`
+    + (rows.length ? `<table class="est-table">${rows.map((r) =>
+        `<tr title="${esc(r.tip)}"><th>${esc(r.label)}</th><td class="est-what">${esc(r.what)}</td>`
+        + `<td class="est-cost">${cost(r.cost)}</td></tr>`).join("")}`
+      + `<tr class="est-total"><th>Total</th><td></td><td class="est-cost">${total == null ? "?" : "≈ " + usd(total)}</td></tr>`
+      + `</table>` : "")
+    + (note ? `<p class="est-note">${esc(note)}</p>` : "");
 }
 
 function show(id) {
@@ -489,20 +510,21 @@ function applyProvider() {
   const dl = el("model-list");
   dl.innerHTML = "";
   for (const m of p.models) { const o = document.createElement("option"); o.value = m; dl.appendChild(o); }
-  el("model").placeholder = p.models[0] ? `Model — e.g. ${p.models[0]}` : "Model";
+  el("model").placeholder = p.models[0] ? `e.g. ${p.models[0]}` : "Model";
 
   // Load-models hits {base_url}/models with a Bearer token — works for OpenAI-compatible providers, not
   // Anthropic's native API. Hide it when there's no usable URL.
   el("load-models").style.display = (p.mode === "byok" && (id !== "custom" || resolvedBaseUrl())) ? "" : "none";
 
-  el("byok-hint").innerHTML =
-    `Get an <b>API key</b> from ${esc(p.keyFrom)}. Your key is sent with this one request and kept only `
-    + `in your browser — never saved on our server. `
-    + (p.art
-        ? `<b>Art included:</b> the splash, sprite and card portraits are generated on this key too `
-          + `— the estimate below is the real per-image price for this provider.`
-        : `<b>No generated art:</b> ${esc(p.label)} can't make images, so classes forged on this key `
-          + `ship without splash, sprite or card portraits (the game uses its built-in card doodles).`);
+  el("byok-hint").textContent = `Get a key at ${p.keyFrom}`;
+  // Art is a property of the provider, so it lives in a chip beside the estimate rather than a paragraph;
+  // the tooltip carries the detail.
+  const chip = el("byok-art");
+  chip.textContent = p.art ? "Art included" : "No generated art";
+  chip.classList.toggle("ok", !!p.art);
+  chip.title = p.art
+    ? "The splash, sprite and card portraits are generated on this key too."
+    : `${p.label} can't make images, so classes forged on this key use the game's built-in card doodles.`;
   renderEstimate();
 }
 
@@ -524,6 +546,7 @@ function restoreByok() {
     applyProvider();
     if (saved.base_url) el("base_url").value = saved.base_url;
     if (saved.model) el("model").value = saved.model;
+    if (saved.card_model) el("card_model").value = saved.card_model;
     if (saved.api_key) el("api_key").value = saved.api_key;
   } catch (_) { applyProvider(); }
 }
@@ -532,6 +555,7 @@ function saveByok() {
     provider: el("provider").value,
     base_url: el("base_url").value.trim(),
     model: el("model").value.trim(),
+    card_model: el("card_model").value.trim(),
     api_key: el("api_key").value.trim(),
   }));
   renderBanner();  // a saved key satisfies the "enter an API key" warning
@@ -583,15 +607,18 @@ async function forge() {
     const api_key = el("api_key").value.trim();
     const model = el("model").value.trim();
     if (!api_key || !model) { toast("Enter your API key and a model — or switch to 'Use a token'."); return; }
-    if (!confirm(`This forge bills YOUR API key (${model}).\n\n${estimateText(model)}\n\nForge this class?`)) return;
+    if (!confirm(`This forge bills your ${p.label} key.\n\n${estimateText()}\n\nForge this class?`)) return;
+    // Blank = the design model codes the cards too; sent only when it differs, so a one-model forge's
+    // request is unchanged.
+    const card_model = byokModels().cards !== model ? byokModels().cards : undefined;
     if (p.mode === "anthropic") {
       body.mode = "anthropic";
-      body.key = { api_key, model };
+      body.key = { api_key, model, card_model };
     } else {
       const base_url = resolvedBaseUrl();
       if (!base_url) { toast("Enter the base URL for your provider."); return; }
       body.mode = "byok";
-      body.key = { base_url, api_key, model };
+      body.key = { base_url, api_key, model, card_model };
     }
     saveByok();
   }
@@ -808,9 +835,9 @@ function renderUsage(cls) {
       + (u.art_cost_usd != null
           ? ` ($${Number(u.art_cost_usd).toFixed(2)} ${u.art_cost_metered ? "metered" : "est."})` : "")
     : "";
-  line.textContent = `This forge used ${u.calls} calls · ${fmtTokens(u.input_tokens)} input tokens`
-    + (u.cached_tokens ? ` (${fmtTokens(u.cached_tokens)} from cache)` : "")
-    + ` · ${fmtTokens(u.output_tokens)} output tokens${art} on your key.`;
+  line.textContent = `This forge used ${u.calls} calls · ${fmtTokens(u.input_tokens)} tokens in`
+    + (u.cached_tokens ? ` (${fmtTokens(u.cached_tokens)} cached)` : "")
+    + ` · ${fmtTokens(u.output_tokens)} out${art} on your key.`;
   line.classList.remove("hidden");
 }
 
@@ -1520,7 +1547,7 @@ async function loadModels() {
     dl.innerHTML = "";
     for (const id of d.models) { const o = document.createElement("option"); o.value = id; dl.appendChild(o); }
     saveByok();
-    toast(`Loaded ${d.models.length} models — click the Model box to pick one.`);
+    toast(`Loaded ${d.models.length} models — pick from either model box.`);
     el("model").focus();
   } catch (e) {
     toast(e.message);
@@ -1709,12 +1736,9 @@ el("forge-get-tokens").onclick = () => {
 
 el("provider").onchange = () => { applyProvider(); saveByok(); showEstimate(false); renderForgeButton(); };
 el("model").oninput = () => { showEstimate(false); renderForgeButton(); };
+el("card_model").oninput = () => showEstimate(false);
 el("estimate-btn").onclick = () => showEstimate(true);
-// The key-safety blurb is a one-way reveal: the button gives way to the answer for the rest of the visit.
-el("key-safety-btn").onclick = () => {
-  el("key-safety").classList.remove("hidden");
-  el("key-safety-btn").classList.add("hidden");
-};
+el("key-safety-btn").onclick = () => el("key-safety").classList.toggle("hidden");
 el("stats-days").onchange = loadStats;
 el("traffic-days").onchange = loadTraffic;
 // Debounced so typing an address doesn't fire a query per keystroke.
