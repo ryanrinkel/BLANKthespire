@@ -1,0 +1,12 @@
+# Summarise the nginx access log for the operator dashboard (traffic.json) and render the full GoAccess
+# report (goaccess.html) into /opt/btsweb/traffic. Runs as root: the log is www-data:adm 0640. The app
+# (btsweb user) only READS the two output files. Installed with btsweb-traffic.timer — see
+# DEPLOY-DIGITALOCEAN.md "Traffic report".
+[Unit]
+Description=BLANK the spire — nginx traffic summary + GoAccess report
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/btsweb/web
+ExecStart=/usr/bin/python3 tools/traffic_report.py --out-dir /opt/btsweb/traffic
+Nice=10

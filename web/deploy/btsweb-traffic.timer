@@ -1,0 +1,11 @@
+# Every 15 minutes: btsweb-traffic.service (a few seconds of CPU over ~400 days of rotated logs).
+[Unit]
+Description=BLANK the spire — refresh the traffic report every 15 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=15min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

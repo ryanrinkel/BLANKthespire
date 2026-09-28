@@ -40,6 +40,7 @@ os.environ["BTSWEB_ADMIN_EMAILS"] = "unlimited@example.com"
 os.environ["BTSWEB_PUBLIC_URL"] = "http://testserver"
 os.environ["BTSWEB_GAP_LOG"] = str(_TMP / "gaps.jsonl")
 os.environ["BTSWEB_CARD_FEEDBACK_LOG"] = str(_TMP / "feedback.jsonl")
+os.environ["BTSWEB_TRAFFIC_DIR"] = str(_TMP / "traffic")       # never the droplet /opt/btsweb/traffic
 os.environ.setdefault("BTSGEN_IMAGE_BACKEND", "null")
 
 # The CSRF header every mutating /api call must carry.

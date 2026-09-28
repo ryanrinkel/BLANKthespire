@@ -1,0 +1,21 @@
+# /etc/logrotate.d/nginx for the droplet. Same as Ubuntu's stock file except `rotate 400`: the access log
+# is the site's only visitor record (no analytics script), and tools/traffic_report.py reads every
+# rotation, so keep about 13 months instead of the stock 14 days (~50KB/day compressed).
+/var/log/nginx/*.log {
+	daily
+	missingok
+	rotate 400
+	compress
+	delaycompress
+	notifempty
+	create 0640 www-data adm
+	sharedscripts
+	prerotate
+		if [ -d /etc/logrotate.d/httpd-prerotate ]; then \
+			run-parts /etc/logrotate.d/httpd-prerotate; \
+		fi \
+	endscript
+	postrotate
+		invoke-rc.d nginx rotate >/dev/null 2>&1
+	endscript
+}

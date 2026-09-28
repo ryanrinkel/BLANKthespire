@@ -269,6 +269,36 @@
       <p id="stats-note" class="hint"></p>
     </section>
 
+    <!-- Admin-only, same gate as the stats card: who is visiting the site. Built by app.js loadTraffic()
+         from /api/admin/traffic, which is the nginx access log summarised by tools/traffic_report.py
+         (no analytics script anywhere on the site). The "full report" link opens the GoAccess page. -->
+    <section id="traffic" class="card hidden">
+      <div class="stats-head">
+        <h2>Site traffic</h2>
+        <span class="spacer"></span>
+        <a id="traffic-report" class="hint hidden" href="/admin/traffic" target="_blank" rel="noopener">Full report ↗</a>
+        <select id="traffic-days" class="in small">
+          <option value="7">Last 7 days</option>
+          <option value="30" selected>Last 30 days</option>
+          <option value="90">Last 90 days</option>
+          <option value="0">All logged</option>
+        </select>
+      </div>
+      <div id="traffic-tiles" class="stat-tiles"></div>
+      <div id="traffic-chart" class="stats-chart"></div>
+      <div class="stats-tables">
+        <div>
+          <h4>Where visitors came from</h4>
+          <table id="traffic-referers" class="stats-table"></table>
+        </div>
+        <div>
+          <h4>Pages opened</h4>
+          <table id="traffic-pages" class="stats-table"></table>
+        </div>
+      </div>
+      <p id="traffic-note" class="hint"></p>
+    </section>
+
     <!-- Admin-only (users.admin from /api/me), same gate as the stats card above: adjust an account's token
          balance or grant it unlimited hosted forging. Rows and the audit trail are built by app.js
          loadAdminUsers(); the card stays hidden and nothing is fetched for everyone else. Admin itself is

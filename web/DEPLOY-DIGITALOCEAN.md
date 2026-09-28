@@ -130,6 +130,24 @@ sudo systemctl daemon-reload && sudo systemctl enable --now btsweb-prune.timer
 #   sudo -u btsweb ../.venv/bin/python tools/prune_forged_art.py --dry-run --target-free-gb 999
 ```
 
+### Traffic report (operator page "Site traffic" card + GoAccess)
+
+The site loads no analytics script; nginx's access log is the only visitor record. Keep it ~13 months
+instead of the stock 14 days, install GoAccess, and the 15-minute timer that summarises the log into
+`/opt/btsweb/traffic/` (`traffic.json` → the admin card via `/api/admin/traffic`; `goaccess.html` →
+`/admin/traffic`, admin-only):
+
+```bash
+sudo apt install -y goaccess
+sudo cp /opt/btsweb/web/deploy/logrotate-nginx /etc/logrotate.d/nginx      # rotate 400
+sudo cp /opt/btsweb/web/deploy/btsweb-traffic.{service,timer} /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now btsweb-traffic.timer
+sudo systemctl start btsweb-traffic.service && ls -la /opt/btsweb/traffic   # first run, ~seconds
+```
+
+Counting rules (unique IPs per UTC day, crawlers/scanners dropped by user agent, so every number is a
+floor) are documented at the top of `web/tools/traffic_report.py`.
+
 ## 6. nginx + TLS
 
 ```bash

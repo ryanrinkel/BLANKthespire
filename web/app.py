@@ -2092,6 +2092,59 @@ def _log_admin_action(s, actor, target, action: str, old_value: int, new_value: 
                     int(old_value), int(new_value), note[:200])
 
 
+# --- operator dashboard: site traffic --------------------------------------------------------------
+# There is no analytics script on the site. tools/traffic_report.py (deploy/btsweb-traffic.timer, every
+# 15 min, as root) summarises the nginx access log into BTSWEB_TRAFFIC_DIR/traffic.json and renders the
+# full GoAccess report next to it; these two routes only READ those files. Same admin gate as the stats
+# card. Nothing here touches the database or the logs themselves.
+TRAFFIC_DIR = Path(os.environ.get("BTSWEB_TRAFFIC_DIR", "/opt/btsweb/traffic"))
+# The GoAccess report is one self-contained page with its own inline <script>/<style>, so it cannot run
+# under the site CSP (script-src 'self'). It is served admin-only, from disk, and this policy still
+# forbids anything from leaving the page (no connect/img/font to third parties, no framing).
+TRAFFIC_REPORT_CSP = ("default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; "
+                      "img-src data:; font-src data:; connect-src 'none'; object-src 'none'; "
+                      "frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
+
+
+@app.route("/api/admin/traffic")
+@require_login
+def admin_traffic():
+    """traffic.json as written by tools/traffic_report.py, plus `available`/`report` flags so the card can
+    say "not generated yet" instead of erroring while the timer has never run."""
+    err = _admin_or_403()
+    if err:
+        return err
+    path = TRAFFIC_DIR / "traffic.json"
+    if not path.is_file():
+        return jsonify({"available": False,
+                        "reason": "No traffic summary yet — is btsweb-traffic.timer installed and running?"})
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        return jsonify({"available": False, "reason": f"traffic.json unreadable: {e}"}), 500
+    data["available"] = True
+    data["report"] = (TRAFFIC_DIR / "goaccess.html").is_file()
+    return jsonify(data)
+
+
+@app.route("/admin/traffic")
+def admin_traffic_report():
+    """The full GoAccess report. A page, not an API: signed-out goes to the splash like /app does."""
+    user = current_user()
+    if user is None:
+        return redirect("/")
+    if not is_admin(user.get("email", "")):
+        return jsonify({"error": "forbidden"}), 403
+    path = TRAFFIC_DIR / "goaccess.html"
+    if not path.is_file():
+        return Response("No GoAccess report yet — see DEPLOY-DIGITALOCEAN.md “Traffic report”.",
+                        status=404, mimetype="text/plain")
+    resp = send_file(path, mimetype="text/html", max_age=0, conditional=False)
+    resp.headers["Content-Security-Policy"] = TRAFFIC_REPORT_CSP
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
 @app.route("/api/admin/users")
 @require_login
 def admin_users():

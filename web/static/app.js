@@ -1034,6 +1034,7 @@ async function loadAccount() {
     toast("Couldn't load your account — check your connection.");
   }
   loadStats();
+  loadTraffic();
   loadAdminUsers();
 }
 
@@ -1370,9 +1371,11 @@ function renderStats(d) {
 // Stacked bars, one per day with forges, hosted / BYOK / demo. Inline SVG, no library: recessive grid,
 // 2px surface gaps between segments, legend above, per-bar hover title. Days with no forges are skipped
 // (the API only returns days that have some), so the x axis labels the first, last and a few in between.
-function renderStatsChart(daily) {
-  const box = el("stats-chart");
-  if (!daily.length) { box.innerHTML = `<p class="hint">No forges in this window.</p>`; return; }
+function renderStatsChart(daily, series = STATS_SERIES, boxId = "stats-chart",
+                          empty = "No forges in this window.", aria = "Forges per day by mode") {
+  const box = el(boxId);
+  if (!daily.length) { box.innerHTML = `<p class="hint">${esc(empty)}</p>`; return; }
+  const STATS_SERIES = series;
   const W = 720, H = 200, padL = 34, padR = 8, padT = 8, padB = 22;
   const innerW = W - padL - padR, innerH = H - padT - padB;
   const totals = daily.map((r) => STATS_SERIES.reduce((n, s) => n + Number(r[s.key] || 0), 0));
@@ -1381,7 +1384,7 @@ function renderStatsChart(daily) {
   const barW = Math.max(2, Math.min(28, step - 3));
   const y = (v) => padT + innerH - (v / max) * innerH;
   const ticks = [0, Math.ceil(max / 2), max];
-  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Forges per day by mode">`;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(aria)}">`;
   for (const t of ticks) {
     svg += `<line class="grid" x1="${padL}" x2="${W - padR}" y1="${y(t).toFixed(1)}" y2="${y(t).toFixed(1)}" />`
       + `<text class="axis" x="${padL - 6}" y="${(y(t) + 4).toFixed(1)}" text-anchor="end">${t}</text>`;
@@ -1409,6 +1412,70 @@ function renderStatsChart(daily) {
   const legend = `<div class="stats-legend">` + STATS_SERIES.map((s) =>
     `<span><i style="background:${s.color}"></i>${esc(s.label)}</span>`).join("") + `</div>`;
   box.innerHTML = legend + `<div class="stats-wrap">${svg}</div>`;
+}
+
+// --- admin: site traffic ------------------------------------------------------------------------------
+// Same gate as the stats card. Data: /api/admin/traffic = the nginx access log summarised by
+// tools/traffic_report.py (unique IPs per UTC day, crawlers/scanners dropped by user agent, so every
+// number is a floor). The three depth buckets are exclusive per day, so the bars stack to "humans seen".
+const TRAFFIC_SERIES = [
+  { key: "app", label: "Reached the app", color: "#8f55eb" },
+  { key: "clicked", label: "Clicked past the splash", color: "#28a07f" },
+  { key: "landing_only", label: "Splash only", color: "#5a5870" },
+];
+
+async function loadTraffic() {
+  const card = el("traffic");
+  if (!card) return;
+  if (!ME || !ME.admin) { card.classList.add("hidden"); return; }
+  card.classList.remove("hidden");
+  try {
+    const r = await fetch("/api/admin/traffic");
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    renderTraffic(await r.json());
+  } catch (e) {
+    el("traffic-note").textContent = "Couldn't load traffic: " + e.message;
+  }
+}
+
+function renderTraffic(d) {
+  if (!d.available) {
+    el("traffic-tiles").innerHTML = "";
+    el("traffic-chart").innerHTML = "";
+    el("traffic-referers").innerHTML = el("traffic-pages").innerHTML = "";
+    el("traffic-note").textContent = d.reason || "No traffic summary yet.";
+    return;
+  }
+  const days = el("traffic-days").value;
+  const w = (d.windows || {})[days] || {};
+  const daily = (d.daily || []).filter((r) => !w.since || r.day >= w.since);
+  el("traffic-report").classList.toggle("hidden", !d.report);
+
+  const botShare = pct(w.bot_requests, w.requests);
+  const tiles = [
+    { k: "Visitors", v: fmtInt(w.humans), s: `${fmtInt(w.landing_only)} splash only · ${fmtInt(w.clicked)} clicked through · ${fmtInt(w.app)} in the app` },
+    { k: "Reached the app", v: fmtInt(w.app), s: `${pct(w.app, w.humans)} of visitors · signed in, JS running` },
+    { k: "Shared deck pages", v: fmtInt(w.deck), s: "unique visitors to /deck/…" },
+    { k: "Requests", v: fmtInt(w.requests), s: `${botShare} from crawlers and scanners` },
+  ];
+  el("traffic-tiles").innerHTML = tiles.map((t) =>
+    `<div class="stat-tile"><div class="k">${esc(t.k)}</div><div class="v">${esc(t.v)}</div><div class="s">${esc(t.s)}</div></div>`).join("");
+
+  renderStatsChart(daily, TRAFFIC_SERIES, "traffic-chart", "No visitors in this window.", "Visitors per day by depth");
+
+  const refRows = (w.referers || []).map((r) =>
+    `<tr><td>${esc(r.source)}</td><td class="num">${fmtInt(r.visitors)}</td></tr>`).join("");
+  el("traffic-referers").innerHTML = `<tr><th>Source</th><th class="num">Visitors</th></tr>`
+    + (refRows || `<tr><td colspan="2" class="muted">No outside referers in this window (direct, search-with-no-referer, or private).</td></tr>`);
+  const pageRows = (w.pages || []).map((r) =>
+    `<tr><td>${esc(r.path)}</td><td class="num">${fmtInt(r.visitors)}</td></tr>`).join("");
+  el("traffic-pages").innerHTML = `<tr><th>Page</th><th class="num">Visitors</th></tr>`
+    + (pageRows || `<tr><td colspan="2" class="muted">No page hits in this window.</td></tr>`);
+
+  const span = w.since ? `${w.since} → ${d.last_day} (${fmtInt(w.day_count)} days, UTC)` : "no days logged";
+  el("traffic-note").textContent = `${span}. From the nginx access log, refreshed ${d.generated_at || "?"}. `
+    + "Unique IPs, crawlers and scanners dropped by user agent — spoofed ones still land in “splash only”, "
+    + "so “clicked through” is the honest floor for people. The site loads no analytics script.";
 }
 
 // --- wiring --------------------------------------------------------------------------------------
@@ -1654,6 +1721,7 @@ el("key-safety-btn").onclick = () => {
   el("key-safety-btn").classList.add("hidden");
 };
 el("stats-days").onchange = loadStats;
+el("traffic-days").onchange = loadTraffic;
 // Debounced so typing an address doesn't fire a query per keystroke.
 el("admin-users-q").oninput = () => {
   clearTimeout(ADMIN_Q_TIMER);
