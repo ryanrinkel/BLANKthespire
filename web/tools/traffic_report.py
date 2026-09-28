@@ -65,7 +65,9 @@ BOT_UA_RE = re.compile(
 # Pages past the splash. /api covers the app's own calls (a real browser on /app), /auth the OAuth hops.
 ENGAGED_RE = re.compile(r"^/(login|app|help|download|deck/|terms|privacy|auth/|api/)")
 DECK_RE = re.compile(r"^/deck/[^/?]+$")
-PAGE_SKIP_RE = re.compile(r"^/(static/|api/|favicon\.ico|healthz|auth/)")
+# Not pages: our own API/static/auth hops, and anything with a file extension (scanners probing
+# /css/style.css, /wp-login.php, /.env… that happened to answer 200 via the SPA fallback).
+PAGE_SKIP_RE = re.compile(r"^/(static/|api/|favicon\.ico|healthz|auth/)|^.*\.[A-Za-z0-9]{1,5}$")
 IPISH_HOST_RE = re.compile(r"^\d{1,3}(\.\d{1,3}){3}(:\d+)?$|\d{1,3}-\d{1,3}-\d{1,3}-\d{1,3}")
 REFERER_SKIP_HOSTS = {"accounts.google.com", "localhost"}
 
