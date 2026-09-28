@@ -1047,6 +1047,11 @@ BYOK_TEXT_PRICES: dict[str, tuple[float, float, float]] = {
     "gpt-4o-mini": (0.15, 0.60, 0.075),
     "gpt-4.1": (2.00, 8.00, 0.50),
     "o4-mini": (1.10, 4.40, 0.275),
+    # Checked 2026-09-28. Cache WRITES ($12.50 / $2.50) are billed above plain input and this table has no
+    # column for them, so quotes run a little low. Long context doubles input and costs 1.5x on output.
+    # Sol's rate is a promo "through at least 2026-11-21": re-check after that.
+    "gpt-6-astra": (10.00, 50.00, 1.00),
+    "gpt-5.6-sol": (2.00, 10.00, 0.20),
     # Google Gemini, paid tier (ai.google.dev pricing). flash-lite first in the dropdown: cheapest text on
     # the shim, and the art bill is the same whichever text model is picked.
     "gemini-2.5-flash-lite": (0.10, 0.40, 0.01),
