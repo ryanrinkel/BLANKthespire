@@ -67,7 +67,7 @@ ENGAGED_RE = re.compile(r"^/(login|app|help|download|deck/|terms|privacy|auth/|a
 DECK_RE = re.compile(r"^/deck/[^/?]+$")
 # Not pages: our own API/static/auth hops, and anything with a file extension (scanners probing
 # /css/style.css, /wp-login.php, /.env… that happened to answer 200 via the SPA fallback).
-PAGE_SKIP_RE = re.compile(r"^/(static/|api/|favicon\.ico|healthz|auth/)|^.*\.[A-Za-z0-9]{1,5}$")
+PAGE_SKIP_RE = re.compile(r"^/(static/|api/|favicon\.ico|healthz|auth/|\.well-known/)|^.*\.[A-Za-z0-9]{1,5}$")
 IPISH_HOST_RE = re.compile(r"^\d{1,3}(\.\d{1,3}){3}(:\d+)?$|\d{1,3}-\d{1,3}-\d{1,3}-\d{1,3}")
 REFERER_SKIP_HOSTS = {"accounts.google.com", "localhost"}
 

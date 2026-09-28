@@ -49,6 +49,7 @@ SAMPLE = [
     line("5.5.5.5", "15/Sep/2026", "/help", ref="https://www.blankthespire.com/"),
     line("6.6.6.6", "15/Sep/2026", "/", status=302),  # not a 200 splash
     line("5.5.5.5", "15/Sep/2026", "/css/style.css"),  # a probe that got 200: never a "page"
+    line("5.5.5.5", "15/Sep/2026", "/.well-known/acme-challenge/abc"),  # certbot, not a page
 ]
 
 
@@ -106,6 +107,7 @@ def test_windows_count_each_ip_once_at_its_deepest(logs):
                     "steamcommunity.com": 1}
     pages = {r["path"]: r["visitors"] for r in w["pages"]}
     assert pages["/"] == 3 and pages["/deck/sherman-52"] == 1 and "/api/me" not in pages and "/css/style.css" not in pages
+    assert not any(p.startswith("/.well-known") for p in pages)
     assert data["windows"]["7"]["day_count"] == 2
     # A window anchored past the log sees nothing, and reports so rather than crashing.
     empty = tr.Tally({"x"}).window(7, "2026-09-15")
