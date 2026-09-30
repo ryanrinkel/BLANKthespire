@@ -528,8 +528,9 @@ function effPhrase(e, target) {
   const hits = e.hits > 1 ? ` ×${e.hits}` : "";
   const toAll = target === "all_enemies" ? " to all enemies" : "";
   switch (e.op) {
-    case "damage": return `Deal ${a ?? ""} damage${scale}${toAll}${hits}${e.unblockable === true ? " (ignores Block)" : ""}`; // Phase AN (v44)
-    case "block": return `Gain ${a ?? ""} Block${scale}`;
+    case "damage": return `Deal ${a ?? ""} damage${scale}${toAll}${hits}${e.unblockable === true ? " (ignores Block)" : ""}${e.grow_held ? ` (+${e.grow_held} per turn held)` : ""}`; // Phase AN (v44) / BD (v58)
+    case "block": return `Gain ${a ?? ""} Block${scale}${e.grow_held ? ` (+${e.grow_held} per turn held)` : ""}`; // Phase BD (v58)
+    case "held_discount": return `Costs ${a ?? 1} less for each turn it is retained`; // Phase BD (v58, gap #58)
     case "draw": return `Draw ${a ?? 1} card${(a ?? 1) == 1 ? "" : "s"}${scale}`;
     case "gain_energy": return `Gain ${a ?? 1} energy`;
     case "lose_hp": return `Lose ${a ?? ""} HP`;

@@ -113,6 +113,9 @@ public static class EffectRunner
                         int plays = PlaysThisCombat(card);
                         MainFile.Logger.Info($"[U] grow damage: base {amt} + grow {e.Grow}×{plays} = {amt + e.Grow * plays} (play #{plays + 1} of '{card.Id}').");
                     }
+                    if (e.HasGrowHeld) // Phase BD (v58) smoke logging: prove the held-turn growth resolved
+                        MainFile.Logger.Info($"[BD] grow_held damage: base {amt} + {e.GrowHeld} per held turn -> " +
+                                             $"{card.DynamicVars.CalculatedDamage.BaseValue} ('{card.Id}').");
                     // Hold the command so we can read its per-hit/per-target DamageResults after it resolves — the
                     // unblocked total feeds a later damage_dealt_unblocked heal (Phase P gap #21, lifesteal).
                     if (card.TargetType == TargetType.RandomEnemy) // Phase AJ smoke: BaseLib rolls a random enemy per hit
@@ -253,6 +256,7 @@ public static class EffectRunner
                 case "retain":
                 case "ethereal":
                 case "sly": // Phase BB (v56, gap #55): the game plays a discarded Sly card for free (CardCmd.DiscardAndDraw)
+                case "held_discount": // Phase BD (v58, gap #58): the discount lands in DataCard.AfterFlush, not at play time
                     // Card-keyword ops: declared as a CardKeyword at declaration time (the game applies the
                     // keyword behavior — exhaust-on-play, opening hand, retain, etc.); nothing to run here.
                     break;

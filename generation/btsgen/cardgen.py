@@ -276,6 +276,9 @@ def effect_literal(e: dict) -> str:
         elif op == "damage" and e.get("grow", 0):
             # Phase U (gap #23, Rampage): named Grow arg (order-independent in C#). grow ⊥ scale (validator-enforced).
             lit = f'new EffectSpec("damage", {amount}, Grow: {e["grow"]})'
+        elif op in ("damage", "block") and e.get("grow_held", 0):
+            # Phase BD (v58, gap #57, Windmill Strike): named GrowHeld arg. grow_held ⊥ scale/grow (validator-enforced).
+            lit = f'new EffectSpec("{op}", {amount}, GrowHeld: {int(e["grow_held"])})'
         elif op == "damage" and hits > 1:
             lit = f'new EffectSpec("damage", {amount}, null, {hits})'
         else:
@@ -530,13 +533,17 @@ def describe(effects: list[dict], target: str) -> str:
             elif e.get("grow", 0):
                 # Phase U (gap #23, Rampage): {CalculatedDamage} (base-game calc-var name) shows the CURRENT grown value (calc-var). Byte-match ForgedCards.Describe.
                 parts.append(f"Deal {{CalculatedDamage}} damage{dmg_suffix}{ub}. Grows by {e['grow']} each time it is played this combat.")
+            elif e.get("grow_held", 0):
+                # Phase BD (v58, gap #57, Windmill Strike): the calc-var climbs per held turn. Byte-match ForgedCards.Describe.
+                parts.append(f"Deal {{CalculatedDamage}} damage{dmg_suffix}{ub}. Grows by {int(e['grow_held'])} each turn it is retained.")
             elif e.get("hits", 1) > 1:
                 parts.append(f"Deal {{Damage}} damage {{Hits}} times{dmg_suffix}{ub}.")
             else:
                 parts.append(f"Deal {{Damage}} damage{dmg_suffix}{ub}.")
         elif op == "block":
             scale = str(e.get("scale", "")).lower()
-            parts.append("Gain {Block} Block." if not scale
+            parts.append(f"Gain {{CalculatedBlock}} Block. Grows by {int(e['grow_held'])} each turn it is retained." if e.get("grow_held", 0)  # Phase BD (v58)
+                         else "Gain {Block} Block." if not scale
                          else "Gain X Block." if scale == "x"
                          else f"Gain {e.get('amount', 0)} Block, plus your Forge." if scale == "forged"
                          else f"Gain {e.get('amount', 0)} Block, plus 1 per '{e.get('tag', '')}' card you own." if scale == "tag_cards_owned"
@@ -589,6 +596,9 @@ def describe(effects: list[dict], target: str) -> str:
         elif op == "sly":
             # Phase BB (v56, gap #55): the base-game Sly keyword sentence. Lockstep with ForgedCards.Describe.
             parts.append("Sly.")
+        elif op == "held_discount":
+            # Phase BD (v58, gap #58): the Sands of Time sentence (literal). Lockstep with ForgedCards.Describe.
+            parts.append(f"Costs {max(1, int(e.get('amount', 1) or 1))} less for each turn it is retained.")
         elif op == "purge":
             # Phase W (gap #19): the purge keyword sentence. Lockstep with ForgedCards.Describe.
             parts.append("Purge. (Removed from your deck for the rest of the run.)")

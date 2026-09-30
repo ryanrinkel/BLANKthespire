@@ -159,6 +159,8 @@ def test_detectors_round_trip() -> None:
         "tainted_power": _card([{"op": "damage", "amount": 12}, {"op": "add_status_card", "card": "wound", "pile": "discard"}]),
         # Phase AX (v53): copy the struck target's debuffs to the rest of the room
         "contagion": _card([{"op": "apply_status", "status": "vulnerable", "amount": 2}, {"op": "spread_debuffs"}]),
+        # Phase BD (v58): the held-card payoff (Windmill Strike)
+        "patience_payoff": _card([{"op": "retain"}, {"op": "damage", "amount": 7, "grow_held": 4}]),
         # Phase BC (v57): exhaust-fuel (Burning Pact)
         "exhaust_fuel": _card([{"op": "exhaust_card", "cards": "choose", "amount": 1}, {"op": "draw", "amount": 2}]),
         # Phase BB (v56): the opener's window (the mirror of late_game)

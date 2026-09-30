@@ -85,8 +85,14 @@ public sealed record EffectSpec(string Op, int Amount = 0, string? Status = null
     string? Tag = null, bool OncePerCombat = false,
     bool Unblockable = false, // Phase AN (v44): a `damage` op that IGNORES Block (ValueProp.Unblockable on its damage var)
     string? CardKind = null, string? Scope = null, int Count = 0, // Phase AO (v45): the cost_shift filter / lifetime / use budget
-    string? StatusCard = null) // Phase AP (v46): the add_status_card kind (dazed/wound/burn)
+    string? StatusCard = null, // Phase AP (v46): the add_status_card kind (dazed/wound/burn)
+    int GrowHeld = 0) // Phase BD (v58, gap #57): +GrowHeld damage/Block per turn THIS card was retained (Windmill Strike)
 {
+    /// <summary>Phase BD (v58, gap #57): this <c>damage</c>/<c>block</c> op's amount INCREASES by <see cref="GrowHeld"/>
+    /// for each end-of-turn flush THIS card instance survived in hand (Retain) — <c>amount + GrowHeld × turns held</c>
+    /// (Windmill Strike). Per-card-instance, per-combat (the counter lives on the combat clone, see DataCard.AfterFlush).
+    /// Requires <c>retain</c> on the same card; mutually exclusive with <see cref="Scale"/> and <see cref="Grow"/>.</summary>
+    public bool HasGrowHeld => GrowHeld != 0;
     /// <summary>This op's amount comes from a live scalar (any <see cref="Scale"/>), not <see cref="Amount"/>.</summary>
     public bool IsScaled => Scale != null;
 

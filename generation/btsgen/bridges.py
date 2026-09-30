@@ -49,6 +49,8 @@ def card_tokens(card: dict) -> set[str]:
         toks.add("x")
     if cc.unblockable:  # Phase AN (v44): the damage flag is a vocabulary token an archetype may claim
         toks.add("unblockable")
+    if cc.grow_held:  # Phase BD (v58): the held-turn growth field is a token too (retain_hold claims it)
+        toks.add("grow_held")
     return toks
 
 

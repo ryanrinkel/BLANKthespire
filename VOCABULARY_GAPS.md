@@ -582,7 +582,12 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Mechanic sketch:** Card field (like `grow`): +N damage/Block for each turn this card stays in your hand (Windmill Strike). Per-card-instance, per-combat.
 - **Buildable today?** No.
 - **Priority:** requested by Ryan in the 2026-09-29 archetype copy review.
-- **Status:** captured
+- **Status:** **done (2026-09-30, vocab v58, Phase BD)** — effect FIELD `grow_held` (1..9, on damage/block, needs
+  `retain`, ⊥ scale/grow, joins the one-calc-var budget) driven by the game's own retain hook: `DataCard.AfterFlush`
+  (the `retainedCards` list `CombatManager.FlushPlayerHand` hands every card — the Bookmark relic's hook) bumps a
+  per-instance `_turnsHeld`, and `WithCalculatedDamage` / `WithCalculatedBlock` read it live. Harness: featured
+  `patience_payoff`, `retain_hold` ops + build_notes, `bridges.card_tokens`, census `grow_held`, exemplar
+  `ex_windmill_cut`, render.js. `[BD]` tags. Smoke pending (`tests/test_phase_bd.py`).
 
 ### 58. Card gets cheaper each turn it's held
 - **Surfaced by:** archetype copy review (2026-09-29), for Retain
@@ -590,7 +595,11 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Mechanic sketch:** Card field: this card costs 1 less for each turn it's retained, floor 0 (Sands of Time / Establishment).
 - **Buildable today?** No.
 - **Priority:** requested by Ryan in the 2026-09-29 archetype copy review.
-- **Status:** captured
+- **Status:** **done (2026-09-30, vocab v58, Phase BD)** — flag-op `held_discount {amount?: 1..2}` (needs `retain`,
+  cost 1+, one per card, card-only): the same `AfterFlush` hook calls `CardEnergyCost.AddThisCombat(-N)` (the
+  Kingly Kick modifier; the game floors at 0). It MUST be a this-combat modifier — `FlushPlayerHand` runs
+  `EndOfTurnCleanup` right after the hook. Harness: `patience_payoff`, `retain_hold` ops, exemplar `ex_hourglass_edge`,
+  `_PREFERRED_OPS`, gate tail, render.js. Smoke pending.
 
 ### 59. Condition: early turns
 - **Surfaced by:** archetype copy review (2026-09-29), for Ambusher

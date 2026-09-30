@@ -19,6 +19,7 @@ validator. (The vocabulary grows as the interpreter grows — more ops/statuses 
 | `innate`       | *(none)*          | This card starts in your opening hand every combat. A card property (no targeted effect). |
 | `retain`       | *(none)*          | This card is NOT discarded at end of turn — it stays in your hand. A card property. |
 | `ethereal`     | *(none)*          | If this card is still in your hand at end of turn, it Exhausts. A card property. |
+| `held_discount`| optional `amount` (1–2, default 1) | **Costs N less for each turn it is retained** (v58 — Sands of Time / Establishment): every end of turn this card survives in your hand (via `retain`) lowers its cost by `amount` for the rest of the combat (never below 0). The patience payoff on the card itself: a 3-cost bomb that is free after two held turns. Needs `retain` on the same card and a cost of 1+; card-only; one per card. Pairs with `grow_held` (see Structural mechanics). |
 | `sly`          | *(none)*          | **Sly** (v56) — if this card is **discarded from your hand by an effect** before the end of your turn, it is **played for free** (the base-game keyword; a random enemy target). The discard-fuel card that is fine to play and better to pitch: pair it with `discard` / `scry` outlets. End-of-turn cleanup is not a discard. Never with `retain`, never on a Power; an upgrade may add it. |
 | `purge`        | *(none)*          | **Purge** — when this card is played, it is removed from your **run deck for the rest of the run** (permanent deck-thinning; a stronger `exhaust` that never comes back). A card property. **Mutually exclusive with `exhaust`** (a card can't do both). **Never on a BASIC card.** Put it on a strong one-shot skill/attack you're happy to spend once to thin toward a lean engine (1–3 per class). A generated copy of a purge card (from `add_card`) just vanishes for the combat — it isn't in your run deck to remove. |
 | `purge_card`   | *(none)*          | **Choose-a-card Purge** — when this card is played, **YOU pick a card in your hand and purge THAT card** (removed from your run deck for the rest of the run). The player-choice form of `purge`: instead of the played card removing itself, it lets you thin a *chosen* target — great for cutting a Basic/Curse/dead card you drew. Carries no amount/target. Empty hand = harmless no-op. Put it on a skill/attack (1–2 per class). A chosen generated copy (no run-deck original) just vanishes for the combat. |
@@ -123,6 +124,12 @@ An ungated pair is rejected (that should just be one bigger number), and a third
   one effect, `grow` must be ≤ `amount`, and it counts as the card's one calculated value (so a card can't also
   carry a scaled damage/block). Not legal inside an `add_trigger` payload. Distinct from `forge`: `grow` is ONE
   card feeding itself; Forge is a CLASS-level counter many cards pump.
+- **Windmill Strike (`grow_held`, v58):** add `grow_held` (int 1..9) to a `damage` or `block` effect on a card with
+  `retain` → the amount **grows every end of turn the card stays in your hand**: amount + `grow_held` × turns held.
+  `{ "op":"retain" }, { "op":"damage", "amount":7, "grow_held":4 }` = "Retain. Deal 7 damage. Grows by 4 each turn it
+  is retained." — the base-game **Windmill Strike**; the card shows its CURRENT value in hand. Needs `retain` on the
+  same card; `grow_held` ≤ `amount`; NOT a scale (⊥ `scale`, ⊥ `grow`); it counts as the card's one calculated value.
+  Not legal inside an `add_trigger` payload. Its cost-side twin is the `held_discount` op (Sands of Time).
 - **Scaled amounts (`scale`):** instead of a fixed number, a `damage`, `block`, or `draw` effect can scale its
   amount to a **live combat value**. Put `"scale": "<source>"` on the effect (still include a nominal `"amount"`,
   which is ignored). Sources:

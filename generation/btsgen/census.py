@@ -76,6 +76,7 @@ class CardCensus:
     whens: Counter = field(default_factory=Counter)        # `when` condition kinds
     scales: Counter = field(default_factory=Counter)       # scale sources (cards_in_hand, x, forged, ...)
     grow: int = 0                                          # Phase U (gap #23): count of `grow` (Rampage) damage effects
+    grow_held: int = 0                                     # Phase BD (v58, gap #57): count of `grow_held` (Windmill Strike) effects
     x_cost: bool = False
     cost4: bool = False                                    # Phase AX (v53): the heavyweight (rare-only) cost slot
     plain: bool = False
@@ -187,6 +188,8 @@ def _walk_effects(effects, cc: CardCensus, *, in_payload: bool = False) -> None:
             cc.scales[scale] += 1
         if isinstance(eff.get("grow"), int) and eff.get("grow"):  # Phase U (gap #23): Rampage grow-on-play
             cc.grow += 1
+        if isinstance(eff.get("grow_held"), int) and eff.get("grow_held"):  # Phase BD (v58): Windmill Strike grow-on-hold
+            cc.grow_held += 1
 
 
 def walk_card(card: dict) -> CardCensus:
@@ -214,6 +217,7 @@ def walk_card(card: dict) -> CardCensus:
         and not cc.scales
         and not cc.x_cost
         and not cc.grow
+        and not cc.grow_held  # Phase BD (v58)
         and not cc.multi_hit
     )
     return cc
@@ -246,6 +250,7 @@ class Census:
     ripen_amounts: Counter = field(default_factory=Counter)
     targeted_payloads: int = 0
     grow: int = 0
+    grow_held: int = 0  # Phase BD (v58)
     payload_ops: Counter = field(default_factory=Counter)  # Phase AL (v42)
     scaled_payloads: int = 0
     multi_hit_payloads: int = 0
@@ -304,6 +309,7 @@ class Census:
         self.ripen_amounts.update(cc.ripen_amounts)
         self.targeted_payloads += cc.targeted_payloads
         self.grow += cc.grow
+        self.grow_held += cc.grow_held  # Phase BD (v58)
         self.payload_ops.update(cc.payload_ops)  # Phase AL (v42)
         self.scaled_payloads += cc.scaled_payloads
         self.multi_hit_payloads += cc.multi_hit_payloads
@@ -321,7 +327,7 @@ class Census:
                      "summon_buffs", "ripen_amounts", "payload_ops"):
             getattr(self, name).update(getattr(other, name))
         for name in ("multi_hit", "tagged_cards", "upgrade_cost_cards", "once_per_turn", "once_per_combat",
-                     "targeted_payloads", "grow", "scaled_payloads", "multi_hit_payloads"):
+                     "targeted_payloads", "grow", "grow_held", "scaled_payloads", "multi_hit_payloads"):
             setattr(self, name, getattr(self, name) + getattr(other, name))
 
 
@@ -434,6 +440,9 @@ def format_report(named: list[tuple[str, Census]]) -> str:
                f"  cost4={agg.cost4}")
     # Phase AY (v54): run-persistent Forge — a CLASS count, so it reads 0 on a bare card-list census.
     out.append(f"  AY (v54): forge_persist_classes={agg.forge_persist}")
+    # Phase BB-BD (v56-v58): the tempo keyword, the hand ops and the held-card payoffs.
+    out.append(f"  BB-BD (v56-58): sly={agg.ops.get('sly', 0)}  exhaust_card={agg.ops.get('exhaust_card', 0)}  "
+               f"draw_until={agg.ops.get('draw_until', 0)}  grow_held={agg.grow_held}  held_discount={agg.ops.get('held_discount', 0)}")
     out.append(f"  triggers: turn_end+turn_start={agg.triggers.get('turn_end',0)+agg.triggers.get('turn_start',0)}  "
                f"reactive[{'/'.join(_REACTIVE_HEAD)}]={'/'.join(str(agg.triggers.get(k,0)) for k in _REACTIVE_HEAD)}"
                f"  | all: {_all(agg.triggers)}")

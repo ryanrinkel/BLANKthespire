@@ -73,7 +73,10 @@ _BUILD_AROUND_OPS = {"add_trigger", "apply_status_custom",
                      "retrieve_card",  # Phase AP (v46): pile recursion (Headbutt / Exhume) is a build-around, not a stat line
                      "spend_forge",  # Phase AX (v53, gap #44): cashing out the Forge ramp is a build-around, not a stat line
                      "spread_debuffs",  # Phase AX (v53, gaps #45-#47): contagion is a build-around payoff, not a stat line
-                     "exhaust_card"}  # Phase BC (v57, gap #52): exhaust-fuel is the engine half of a card, not a stat line
+                     "exhaust_card",  # Phase BC (v57, gap #52): exhaust-fuel is the engine half of a card, not a stat line
+                     "held_discount"}  # Phase BD (v58, gap #58): a held-turn discount is a build-around, not a stat line
+# Phase BD (v58, gap #58): the held_discount band (mirrors ForgedCards.HeldDiscountMaxAmount + the schema clause).
+_HELD_DISCOUNT_MAX = 2
 # F5: the live state scalars an effect's amount may scale to (mirrors ForgedCards.SupportedScales). "x" stays
 # the X-cost scalar; the rest are hand/energy state reads. Only "cards_retained" is allowed inside a trigger.
 # Phase M: "forged" is the ADDITIVE exception (printed amount + the Forge counter) and is damage/block-only.
@@ -713,12 +716,42 @@ class CardValidator:
                     out.append(f"'grow' ({grow}) can't exceed the base damage ({e.get('amount', 0)}) — a card growing faster than its base reads as degenerate.")
             if e.get("orb") is not None and op != "channel_orb":
                 out.append(f"'orb' only applies to channel_orb (op '{op}').")
+            # Phase BD (v58, gap #57): `grow_held` — damage/block only, ⊥ scale, ⊥ grow, 1..9, <= amount. Mirrors ForgedCards.
+            gh = e.get("grow_held", 0)
+            if gh:
+                if op not in ("damage", "block"):
+                    out.append(f"'grow_held' only applies to damage/block (op '{op}').")
+                if scale:
+                    out.append("'grow_held' and 'scale' can't combine on one effect (grow_held is an additive per-held-turn step, not a scalar).")
+                if grow:
+                    out.append("'grow_held' and 'grow' can't combine on one effect (one growth rule per effect).")
+                if not (isinstance(gh, int) and not isinstance(gh, bool) and 1 <= gh <= 9):
+                    out.append(f"'grow_held' must be 1..9 (got {gh}).")
+                elif gh > int(e.get("amount", 0) or 0):
+                    out.append(f"'grow_held' ({gh}) can't exceed the base amount ({e.get('amount', 0)}) — a card growing faster than its base reads as degenerate.")
+            if op == "held_discount":
+                hd = e.get("amount")
+                if hd is not None and not (isinstance(hd, int) and not isinstance(hd, bool) and 1 <= hd <= _HELD_DISCOUNT_MAX):
+                    out.append(f"held_discount 'amount' (the discount per held turn) must be 1..{_HELD_DISCOUNT_MAX}; got {hd!r}.")
+        # Phase BD (v58): the held-card payoffs need `retain` on the same list (base / upgrade independent), held_discount is
+        # one per list, and a discount needs a cost to lower (never 0-cost / X-cost). Mirrors ForgedCards.
+        for lst in (effects, up_effects):
+            if any(e.get("grow_held", 0) or e.get("op") == "held_discount" for e in lst) \
+                    and not any(e.get("op") == "retain" for e in lst):
+                out.append("'grow_held' / 'held_discount' need 'retain' on the same card (they pay off the turns the card is held).")
+            if sum(1 for e in lst if e.get("op") == "held_discount") > 1:
+                out.append("at most one 'held_discount' effect per card.")
+        if any(e.get("op") == "held_discount" for e in effects + up_effects):
+            _c = card.get("cost", 0)
+            if isinstance(_c, str) or (isinstance(_c, int) and _c < 1):
+                out.append("'held_discount' needs a card that costs 1+ energy (not 0-cost, not X-cost) -- there is nothing to discount.")
         if sum(1 for e in effects if isinstance(e.get("hits"), int) and e.get("hits", 1) > 1) > 1:
             out.append("at most one multi-hit damage effect per card.")
         # one calculated var per card: at most one scaled damage/block (a scaled draw uses no var → exempt).
         # Phase U (gap #23): a `grow` damage also declares a CalculatedDamage var — counts toward the same budget.
         if sum(1 for e in effects if (str(e.get("scale", "")).strip() and e.get("op") in ("damage", "block"))
-               or (e.get("grow", 0) and e.get("op") == "damage")) > 1:
+               or (e.get("grow", 0) and e.get("op") == "damage")
+               or (e.get("grow_held", 0) and e.get("op") in ("damage", "block"))) > 1:  # Phase BD (v58)
             out.append("at most one scaled/grow damage/block effect per card (the engine allows one calculated value).")
         # Phase P (gap #21): a damage_dealt_unblocked heal must follow a damage op in the SAME list (base and
         # upgrade checked independently — the runtime runs each list top-to-bottom). Mirrors ForgedCards.Validate.
@@ -993,6 +1026,8 @@ class CardValidator:
                     out.append("'once_per_turn' / 'once_per_combat' go on the add_trigger op, not on a payload effect.")
                 if t.get("unblockable"):  # Phase AN (v44): card-level only (mirrors ForgedCards.ValidateTrigger)
                     out.append("'unblockable' is not allowed in a trigger payload (it flags a card-level damage).")
+                if t.get("grow_held"):  # Phase BD (v58)
+                    out.append("'grow_held' is not allowed in a trigger payload (it's a per-card held-turn mechanic).")
                 if tgt is not None:
                     # H4 (gap #14): a TARGETED payload effect hits enemies — damage / enemy-debuff apply_status only,
                     # and never scaled. (target enum + op-vs-target coupling are also enforced by the schema.)
@@ -1174,9 +1209,12 @@ class CardValidator:
             # Phase U (gap #23): a `grow` attack is a self-scaling engine — each grow point compounds over the
             # combat (a per-card forge). Priced a touch above forge income (2.5/pt) since it's built into the card.
             grow_premium = self._amt(eff.get("grow", 0)) * 2.5
+            # Phase BD (v58): a held-turn step compounds only while the card sits unplayed (a tempo tax), so it is priced
+            # at ~60% of the per-play grow premium.
+            held_premium = self._amt(eff.get("grow_held", 0)) * 1.5
             # Phase AN (v44): an unblockable hit is worth more than its number (it lands through any Block).
             unblockable_premium = amt * 0.5 if eff.get("unblockable") is True else 0.0
-            return amt + (6.0 if forged else 0.0) + grow_premium + unblockable_premium
+            return amt + (6.0 if forged else 0.0) + grow_premium + held_premium + unblockable_premium
         if op == "gain_max_hp":
             # Phase AN (v44): a run-permanent stat (+ an immediate heal of the same amount) — priced like a permanent
             # buff so a common can't carry it cheaply (the vocabulary pins it to uncommon/rare).
@@ -1195,7 +1233,10 @@ class CardValidator:
                 return amt * width * min(count, 3.0) * 0.6
             return amt * width
         if op == "block":
-            return amt * 0.8 + (6.0 if forged else 0.0)
+            return amt * 0.8 + (6.0 if forged else 0.0) + self._amt(eff.get("grow_held", 0)) * 1.2  # Phase BD (v58)
+        if op == "held_discount":
+            # Phase BD (v58, gap #58): energy in disguise, paid for with the held turns — ~a third of gain_energy per point.
+            return max(1.0, self._amt(eff.get("amount", 1))) * 2.0
         if op == "exhaust_card":
             # Phase BC (v57, gap #52): exhausting your OWN hand is a COST — the card loses future plays — unless the
             # class has an on_exhaust engine (unseen here). Priced as a flat negative per card burned so the payoff half

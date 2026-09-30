@@ -5,7 +5,7 @@
       "id": "retain_hold",
       "name": "Retain / hold & build",
       "description": "Hold cards turn after turn, curate the perfect hand, then unleash it once the payoff is ready.",
-      "build_notes": "What players love here (the Watcher's Windmill Strike, Sands of Time and Establishment; Well-Laid Plans): patience that visibly pays off, and a hand that works as a curated toolkit. Give cards `retain`, bonuses for having been held (`retained_last_turn`), payoffs that read how many cards were held (`cards_retained`), and enough defense to survive the build-up turns.",
+      "build_notes": "What players love here (the Watcher's Windmill Strike, Sands of Time and Establishment; Well-Laid Plans): patience that visibly pays off, and a hand that works as a curated toolkit. Give cards `retain`, bonuses for having been held (`retained_last_turn`), payoffs that read how many cards were held (`cards_retained`), and payoffs ON the held card itself (v58: a damage/Block `grow_held` that climbs each turn it stays in hand - Windmill Strike; a `held_discount` bomb that gets cheaper each held turn - Sands of Time), and enough defense to survive the build-up turns.",
       "metaphors": [
         "the held breath",
         "coiling",
@@ -38,7 +38,9 @@
           "retain",
           "draw",
           "scale",
-          "add_trigger"
+          "add_trigger",
+          "grow_held",
+          "held_discount"
         ],
         "class_kind": "normal"
       },

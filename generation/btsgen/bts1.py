@@ -25,7 +25,13 @@ import sys
 import zlib
 from pathlib import Path
 
-VOCAB_VERSION = 57  # must be <= ForgedCards.VocabVersion (57: Phase BC — HAND OPS: card-only
+VOCAB_VERSION = 58  # must be <= ForgedCards.VocabVersion (58: Phase BD — HELD-CARD PAYOFFS: the game's own
+                    # retain hook (AbstractModel.AfterFlush's retainedCards) drives a new damage/block effect
+                    # FIELD `grow_held` (1..9: +N per turn the card is retained — Windmill Strike; a calc-var,
+                    # joins the one-calc-var budget, ⊥ scale/grow) and a new flag-op `held_discount {amount?
+                    # 1..2}` (costs N less for the combat per turn retained — Sands of Time / Establishment;
+                    # CardEnergyCost.AddThisCombat). Both need `retain` on the card; card-only. No codec change.)
+                    # 57: Phase BC — HAND OPS: card-only
                     # `exhaust_card {cards: choose|random|up_to|all, amount 1..3, card_type?}` (exhaust OTHER
                     # cards in hand — Burning Pact / True Grit / Purity / Second Wind; CardCmd.Exhaust one at a
                     # time so on_exhaust fires per card) and `draw_until {card_type}` (Pillage: draw until a

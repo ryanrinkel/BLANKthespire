@@ -42,7 +42,19 @@ public static class ForgedCards
     /// v10 (forged statuses, Phase J): + CharacterSpec.StatusPool (a class's ≤4 custom modifier-family statuses
     /// read from `status_pool`; see ForgedCharacters / ForgedStatusPower). Class cards may apply a custom status
     /// by pool name via the `apply_status_custom` op (class-only, like custom-orb channels).</summary>
-    public const int VocabVersion = 57; // 57: Phase BC (VOCAB_EXPANSION_5, gaps #52/#53) — HAND OPS.
+    public const int VocabVersion = 58; // 58: Phase BD (VOCAB_EXPANSION_5, gaps #57/#58) — HELD-CARD PAYOFFS. The game's
+                                        //     own retain hook (AbstractModel.AfterFlush hands every card in the player's
+                                        //     piles the retainedCards list) now drives two Retain payoffs on the card that
+                                        //     was held: a new effect FIELD `grow_held` (1..9, on a damage/block op: +N per
+                                        //     end-of-turn flush the card survived in hand — Windmill Strike; a calc-var, so
+                                        //     the in-hand number climbs live; joins the one-calc-var budget; ⊥ scale/grow)
+                                        //     and a new flag-op `held_discount {amount?: 1..2}` (the card costs N less for
+                                        //     the rest of the combat per turn it is retained — Sands of Time / Establishment;
+                                        //     CardEnergyCost.AddThisCombat, floored at 0 by the game; never on a 0-cost or
+                                        //     X-cost card). Both REQUIRE `retain` on the same card, are card-only, and are
+                                        //     rejected in trigger payloads. Describe: "Grows by N each turn it is retained."
+                                        //     / "Costs N less for each turn it is retained." [BD] tags in AfterFlush.
+                                        // 57: Phase BC (VOCAB_EXPANSION_5, gaps #52/#53) — HAND OPS.
                                         //     New card-only op `exhaust_card {cards: choose|random|up_to|all, amount?: 1..3,
                                         //     card_type?: attack|skill|power|non_attack}` — exhaust OTHER cards in your hand
                                         //     as part of a card's effect (Burning Pact / True Grit / Purity / Second Wind):
@@ -429,6 +441,7 @@ public static class ForgedCards
          "graft_card", // Phase AI (gap #7): CHOOSE form of transform_card — pick a card in hand, IT permanently becomes the named same-class card for the rest of the run. Card-only.
          "exhaust_card", // Phase BC (v57, gap #52): exhaust OTHER cards in your hand (choose / random / up_to / all, optional card_type filter). Card-only.
          "draw_until", // Phase BC (v57, gap #53): draw until you draw a card of `card_type` (Pillage = non_attack). Card-only.
+         "held_discount", // Phase BD (v58, gap #58): flag-op — costs N less for the combat per turn it is retained (Sands of Time). Card-only, needs retain.
          "apply_custom", // EXPLORE SPIKE: apply a hardcoded modifier-family custom status (not in LLM contract)
          "summon_spike"]; // PHASE K SPIKE: summon a hardcoded player pet (not in LLM contract)
     // Phase H3/H4: the trigger kinds. turn_start/turn_end fire every turn; ripen is a one-shot countdown; the rest
@@ -526,6 +539,9 @@ public static class ForgedCards
     private static readonly HashSet<string> ExhaustPickModes = ["choose", "random", "up_to", "all"];
     private static readonly HashSet<string> HandKindFilters = ["attack", "skill", "power", "non_attack"];
     private const int ExhaustCardMaxAmount = 3;
+    // Phase BD (v58, gap #58): the held_discount band — Sands of Time / Establishment lower by 1 per turn; 2 is the ceiling
+    // (a 3-cost card free after two held turns is already the whole fantasy). Lockstep with validator._HELD_DISCOUNT_MAX.
+    private const int HeldDiscountMaxAmount = 2;
     private static readonly HashSet<string> StatusCards = ["dazed", "wound", "burn"];
     private const int RetrieveMaxAmount = 2;   // "Return 2 cards" is the ceiling — a 3+ recursion is a degenerate loop
     private const int StatusCardMaxAmount = 3; // Power Through adds 2 Wounds; 3 is the ceiling
@@ -772,6 +788,9 @@ public static class ForgedCards
         var invalid = Validate(effects, upgrade, allowCustomOrbs, target, orbNames);
         if (invalid != null) { error = invalid; return false; }
 
+        // Phase BD (v58, gap #58): a held_discount needs a cost to lower — never on a 0-cost or X-cost card.
+        if (effects.Concat(upgrade ?? []).Any(e => e.Op == "held_discount") && (costsX || cost < 1))
+        { error = "'held_discount' needs a card that costs 1+ energy (not 0-cost, not X-cost) — there is nothing to discount."; return false; }
         // Phase BB (v56, gap #55): Sly is a hand keyword for cards you PITCH — an Attack or a Skill (every base-game Sly
         // card is one). A Power auto-played off a discard is a free permanent buff, which is not the fantasy.
         if (type == CardType.Power && effects.Concat(upgrade ?? []).Any(e => e.Op == "sly"))
@@ -976,10 +995,14 @@ public static class ForgedCards
             int count = e.ContainsKey("count") ? Int(e, "count") : 0;
             // Phase AP (v46): add_status_card's Status-card kind (lowercased: dazed/wound/burn; membership in Validate).
             string? statusCard = e.ContainsKey("card") ? Str(e, "card").Trim().ToLowerInvariant() : null;
+            // Phase BD (v58, gap #57): `grow_held` is the per-held-turn damage/Block step (Windmill Strike). 0 = none;
+            // legality (damage/block, ⊥scale/grow, 1..9, ≤amount, needs retain) validated in Validate.
+            int growHeld = e.ContainsKey("grow_held") ? Int(e, "grow_held") : 0;
             list.Add(new EffectSpec(op, amount, status, hits, scale, orb, when, trigger, triggered, statusName,
                                     summonName, oncePerTurn, target, cardId, pile, pole, grow, cards, tag,
                                     OncePerCombat: oncePerCombat, Unblockable: unblockable,
-                                    CardKind: cardKind, Scope: scope, Count: count, StatusCard: statusCard));
+                                    CardKind: cardKind, Scope: scope, Count: count, StatusCard: statusCard,
+                                    GrowHeld: growHeld));
         }
         return list.ToArray();
     }
@@ -1114,6 +1137,24 @@ public static class ForgedCards
                 if (e.Grow > e.Amount)
                     return $"'grow' ({e.Grow}) can't exceed the base damage ({e.Amount}) — a card growing faster than its base reads as degenerate.";
             }
+            // Phase BD (v58, gap #57): `grow_held` is the per-held-turn step (Windmill Strike): damage/block only, NOT a
+            // scale, never together with `grow` (one growth per effect), 1..9 and ≤ the printed amount like grow.
+            if (e.HasGrowHeld)
+            {
+                if (e.Op is not ("damage" or "block"))
+                    return $"'grow_held' only applies to damage/block (op '{e.Op}').";
+                if (e.IsScaled)
+                    return "'grow_held' and 'scale' can't combine on one effect (grow_held is an additive per-held-turn step, not a scalar).";
+                if (e.HasGrow)
+                    return "'grow_held' and 'grow' can't combine on one effect (one growth rule per effect).";
+                if (e.GrowHeld < 1 || e.GrowHeld > 9)
+                    return $"'grow_held' must be 1..9 (got {e.GrowHeld}).";
+                if (e.GrowHeld > e.Amount)
+                    return $"'grow_held' ({e.GrowHeld}) can't exceed the base amount ({e.Amount}) — a card growing faster than its base reads as degenerate.";
+            }
+            // Phase BD (v58, gap #58): held_discount — the flag-op's optional amount is the per-held-turn discount (1..2).
+            if (e.Op == "held_discount" && e.Amount > HeldDiscountMaxAmount)
+                return $"held_discount 'amount' (the discount per held turn) may be at most {HeldDiscountMaxAmount}; got {e.Amount}.";
             if (e.Op == "channel_orb")
             {
                 var oerr = OrbNameError(e.Orb, allowCustomOrbs, orbNames, "channel_orb");
@@ -1354,8 +1395,21 @@ public static class ForgedCards
         // One calculated var per card (BaseLib limit): damage/block scaling each declares a CalculatedVar, so at
         // most one scaled damage/block per card (a scaled draw uses no var and is exempt). Phase U (gap #23): a
         // `grow` damage ALSO declares a CalculatedDamage var, so it counts toward the same one-calc-var budget.
-        if (effects.Count(e => (e.IsScaled && e.Op is "damage" or "block") || (e.HasGrow && e.Op == "damage")) > 1)
+        if (effects.Count(e => (e.IsScaled && e.Op is "damage" or "block") || (e.HasGrow && e.Op == "damage")
+                               || (e.HasGrowHeld && e.Op is "damage" or "block")) > 1) // Phase BD (v58): grow_held is a calc-var too
             return "at most one scaled/grow damage/block effect per card (the engine allows one calculated value).";
+        // Phase BD (v58, gaps #57/#58): the held-card payoffs only ever fire on a card that survives the flush, so they
+        // REQUIRE `retain` on the same effect list (base and upgrade checked independently — an upgrade that appends
+        // retain may carry them; a base list without retain may not). held_discount is one per list.
+        foreach (var list in new[] { effects, upgrade })
+        {
+            if (list == null) continue;
+            bool held = list.Any(e => e.HasGrowHeld || e.Op == "held_discount");
+            if (held && !list.Any(e => e.Op == "retain"))
+                return "'grow_held' / 'held_discount' need 'retain' on the same card (they pay off the turns the card is held).";
+            if (list.Count(e => e.Op == "held_discount") > 1)
+                return "at most one 'held_discount' effect per card.";
+        }
         // The game builds one DynamicVarSet per card and THROWS on a duplicate key, so a card may declare each
         // canonical value only ONCE (one damage, one block, one of each status, …). This is a hard safety
         // boundary: an authored/LLM card with two same-type effects would otherwise crash the game on play.
@@ -1589,6 +1643,8 @@ public static class ForgedCards
             // has no meaning in a trigger payload (which re-runs from a granted power, not a card the player replays).
             if (t.HasGrow)
                 return "'grow' is not allowed in a trigger payload (it's a per-card-play attack mechanic).";
+            if (t.HasGrowHeld) // Phase BD (v58)
+                return "'grow_held' is not allowed in a trigger payload (it's a per-card held-turn mechanic).";
             // Phase AN (v44): `unblockable` rides a CARD's damage var; a payload damage is an intrinsic CreatureCmd hit
             // with no var to flag. Card-level only.
             if (t.Unblockable)
@@ -1877,12 +1933,15 @@ public static class ForgedCards
                                     : $"Deal damage equal to {ScalePhrase(e.Scale)}{dmgSuffix}{ub}.");
                     else if (e.HasGrow) // Phase U (gap #23): {CalculatedDamage} (the base-game calc-var name; a bare {Damage} is unresolvable here) shows the CURRENT grown value (calc-var)
                         parts.Add($"Deal {{CalculatedDamage}} damage{dmgSuffix}{ub}. Grows by {e.Grow} each time it is played this combat.");
+                    else if (e.HasGrowHeld) // Phase BD (v58, gap #57): Windmill Strike — the calc-var climbs per held turn
+                        parts.Add($"Deal {{CalculatedDamage}} damage{dmgSuffix}{ub}. Grows by {e.GrowHeld} each turn it is retained.");
                     else
                         parts.Add(e.Hits > 1
                             ? $"Deal {{Damage}} damage {{Hits}} times{dmgSuffix}{ub}."
                             : $"Deal {{Damage}} damage{dmgSuffix}{ub}.");
                     break;
-                case "block":       parts.Add(!e.IsScaled ? "Gain {Block} Block."
+                case "block":       parts.Add(e.HasGrowHeld ? $"Gain {{CalculatedBlock}} Block. Grows by {e.GrowHeld} each turn it is retained." // Phase BD (v58)
+                                        : !e.IsScaled ? "Gain {Block} Block."
                                         : e.Scale == "x" ? "Gain X Block."
                                         : e.Scale == "forged" ? $"Gain {e.Amount} Block, plus your Forge."
                                         : e.Scale == "tag_cards_owned" ? $"Gain {e.Amount} Block, plus 1 per '{e.Tag}' card you own."
@@ -1906,6 +1965,7 @@ public static class ForgedCards
                 case "retain":      parts.Add("Retain."); break;
                 case "ethereal":    parts.Add("Ethereal."); break;
                 case "sly":         parts.Add("Sly."); break; // Phase BB (v56, gap #55): the keyword idiom (byte-lockstep with cardgen.py)
+                case "held_discount": parts.Add($"Costs {Math.Max(1, e.Amount)} less for each turn it is retained."); break; // Phase BD (v58, gap #58)
                 case "purge":       parts.Add("Purge. (Removed from your deck for the rest of the run.)"); break; // Phase W (gap #19)
                 case "purge_card":  parts.Add("Choose a card in your hand and Purge it. (Removed from your deck for the rest of the run.)"); break; // Phase Z (gap #19 choose)
                 case "sacrifice_summon": parts.Add("Sacrifice your summon."); break; // Phase AV (v52): flag-op sentence (byte-lockstep with cardgen.py)

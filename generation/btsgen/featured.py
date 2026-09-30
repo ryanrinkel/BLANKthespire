@@ -191,6 +191,12 @@ FEATURED_MENU: list[Featured] = [
              '(vulnerable / weak / frail / poison) and THEN carries op "spread_debuffs" (no amount) - the debuffs on '
              'the struck enemy are copied onto every other living enemy. Never on a basic; one per card.',
              lambda cc: "spread_debuffs" in cc.ops),
+    # Phase BD (v58, gaps #57/#58): the Retain payoffs on the held card itself (Windmill Strike / Sands of Time).
+    Featured("patience_payoff", 'a RETAIN card that grows or gets cheaper each turn it is held (field "grow_held" on its damage/Block, or op "held_discount")',
+             'REQUIRED: give this card op "retain" and EITHER a damage/block effect carrying "grow_held" 2-4 (it grows '
+             'that much each end of turn it stays in your hand - Windmill Strike) OR the flag-op "held_discount" on a '
+             '2-3 cost card (it costs 1 less for the combat per turn held - Sands of Time). Never on a 0-cost card.',
+             lambda cc: cc.grow_held > 0 or "held_discount" in cc.ops),
     # Phase BC (v57, gap #52): exhaust FUEL — a card that burns other hand cards to feed an on_exhaust engine.
     Featured("exhaust_fuel", 'a card that EXHAUSTS other cards in your hand as fuel (op "exhaust_card": choose / random / up_to / all non-Attacks)',
              'REQUIRED: add a skill with op "exhaust_card" (cards "choose", "random" or "up_to" with amount 1-3, or '
