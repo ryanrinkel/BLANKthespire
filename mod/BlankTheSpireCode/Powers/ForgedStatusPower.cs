@@ -169,9 +169,22 @@ public abstract class ForgedStatusPower : BlankTheSpirePower
         if (side != Owner.Side || !participants.Contains(Owner) || !Owner.IsAlive) return;
         int n = Amount;
         MainFile.Logger.Info($"[AQ] damage_over_time '{s.Name}' ticks {n} on {Owner.Name} (decay {s.Decay}).");
-        await CreatureCmd.Damage(new ThrowingPlayerChoiceContext(), Owner, n,
-                                 ValueProp.Unblockable | ValueProp.Unpowered, (Creature?)null, (CardModel?)null);
+        // Phase BE (v59): this tick is byte-identical to a Poison tick (null dealer, no card, Unblockable|Unpowered), so
+        // the on_poison_damage detector in ForgedTriggerPower would mistake it for one. Flag it for the duration.
+        CustomTickInProgress = true;
+        try
+        {
+            await CreatureCmd.Damage(new ThrowingPlayerChoiceContext(), Owner, n,
+                                     ValueProp.Unblockable | ValueProp.Unpowered, (Creature?)null, (CardModel?)null);
+        }
+        finally { CustomTickInProgress = false; }
     }
+
+    /// <summary>Phase BE (v59, gap #56): true while one of OUR damage_over_time statuses is dealing its tick. The tick
+    /// carries the exact props PoisonPower's does (null dealer, no card, Unblockable|Unpowered), so
+    /// <see cref="ForgedTriggerPower"/>'s <c>on_poison_damage</c> detector reads this to tell them apart. Static: one tick
+    /// resolves fully before the next (the hook is awaited), so a single flag is enough.</summary>
+    internal static bool CustomTickInProgress;
 
     public override decimal ModifyBlockAdditive(
         Creature target, decimal block, ValueProp props, CardModel cardSource, CardPlay cardPlay)

@@ -42,7 +42,16 @@ public static class ForgedCards
     /// v10 (forged statuses, Phase J): + CharacterSpec.StatusPool (a class's ≤4 custom modifier-family statuses
     /// read from `status_pool`; see ForgedCharacters / ForgedStatusPower). Class cards may apply a custom status
     /// by pool name via the `apply_status_custom` op (class-only, like custom-orb channels).</summary>
-    public const int VocabVersion = 58; // 58: Phase BD (VOCAB_EXPANSION_5, gaps #57/#58) — HELD-CARD PAYOFFS. The game's
+    public const int VocabVersion = 59; // 59: Phase BE (VOCAB_EXPANSION_5, gap #56) — ON_POISON_DAMAGE. New reactive
+                                        //     add_trigger kind `on_poison_damage` ("Whenever an enemy takes Poison damage,
+                                        //     …"): ForgedTriggerPower.AfterDamageGiven recognizes the base game's Poison
+                                        //     tick (no dealer, no card, Unblockable|Unpowered, an enemy target still
+                                        //     carrying PoisonPower) — the hook that also fires on a LETHAL tick — and
+                                        //     excludes the mod's own damage_over_time tick (ForgedStatusPower
+                                        //     .CustomTickInProgress). Multi-fire (once_per_turn / once_per_combat
+                                        //     eligible; an Accelerant double-tick fires twice). Ticks land at the ENEMY's
+                                        //     turn start, so a Block payload is live through its attacks. [BE] tag.
+                                        // 58: Phase BD (VOCAB_EXPANSION_5, gaps #57/#58) — HELD-CARD PAYOFFS. The game's
                                         //     own retain hook (AbstractModel.AfterFlush hands every card in the player's
                                         //     piles the retainedCards list) now drives two Retain payoffs on the card that
                                         //     was held: a new effect FIELD `grow_held` (1..9, on a damage/block op: +N per
@@ -450,19 +459,22 @@ public static class ForgedCards
         ["turn_end", "turn_start", "ripen", "on_hp_lost",
          "on_exhaust", "on_card_played", "on_card_drawn", "on_damage_dealt", "on_block_gained", "attacked",
          "on_discard", // Phase R (gap #17): CARD-LATENT Reflex — fires THIS card's payload when ANY effect discards it (v51)
-         "on_blade_played"]; // Phase T: Parry analogue — fires whenever you play your signature blade (a token card)
+         "on_blade_played", // Phase T: Parry analogue — fires whenever you play your signature blade (a token card)
+         "on_poison_damage"]; // Phase BE (v59, gap #56): fires whenever an ENEMY takes Poison damage (the base-game tick)
     // H4: the reactive kinds that can fire MULTIPLE times per turn → eligible for the `once_per_turn` gate.
     // (turn_start/turn_end/ripen already fire at most once per turn, so once_per_turn is rejected on them.)
     private static readonly HashSet<string> MultiFireTriggers =
         ["on_hp_lost", "on_exhaust", "on_card_played", "on_card_drawn", "on_damage_dealt", "on_block_gained", "attacked",
          "on_discard", // Phase R: a card can be discarded → redrawn → discarded again within a turn
-         "on_blade_played"]; // Phase T: you can play the blade more than once a turn (retrieve + replay)
+         "on_blade_played", // Phase T: you can play the blade more than once a turn (retrieve + replay)
+         "on_poison_damage"]; // Phase BE (v59): several poisoned enemies (or Accelerant) tick in one enemy turn
     // Phase AK (v41): the POWER-HOSTED reactive kinds eligible for `once_per_combat` — the fired flag lives on the
     // granted ForgedTriggerPower, a fresh instance per combat. on_discard is card-latent (no power; DataCard tracks
     // it by round), so it is excluded.
     private static readonly HashSet<string> OncePerCombatTriggers =
         ["on_hp_lost", "on_exhaust", "on_card_played", "on_card_drawn", "on_damage_dealt", "on_block_gained", "attacked",
-         "on_blade_played"];
+         "on_blade_played",
+         "on_poison_damage"]; // Phase BE (v59)
     // Phase H3: the self/orb-only sub-vocabulary a trigger's payload may use when it has NO target. (H4 lifts this
     // for effects that carry a `target`: damage + enemy-debuff apply_status may then hit enemies — see TriggerRunner.)
     private static readonly HashSet<string> TriggerOps =
@@ -2090,6 +2102,7 @@ public static class ForgedCards
             "attacked"        => "Whenever you are attacked",
             "on_discard"      => "Whenever this card is discarded", // Phase R (gap #17): Reflex — card-latent
             "on_blade_played" => "Whenever you play your blade", // Phase T: Parry analogue (fires on the token blade)
+            "on_poison_damage" => "Whenever an enemy takes Poison damage", // Phase BE (v59, gap #56)
             _                 => "At the end of your turn",
         };
         var frags = (t.Triggered ?? []).Select(TriggerFragment).Where(s => s.Length > 0).ToList();

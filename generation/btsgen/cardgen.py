@@ -486,6 +486,8 @@ def trigger_sentence(t: dict) -> str:
         when = "Whenever this card is discarded"
     elif trig == "on_blade_played":  # Phase T: Parry analogue (fires on the token blade)
         when = "Whenever you play your blade"
+    elif trig == "on_poison_damage":  # Phase BE (v59, gap #56): the Venom engine. Mirrors ForgedCards.TriggerSentence.
+        when = "Whenever an enemy takes Poison damage"
     else:
         when = "At the end of your turn"
     frags = [f for f in (_trigger_fragment(x) for x in t.get("effects", [])) if f]

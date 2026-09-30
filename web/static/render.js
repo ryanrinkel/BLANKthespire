@@ -483,6 +483,7 @@ const STATUS_NAMES = {
 const TRIGGER_PREFIX = {
   turn_start: "At the start of each turn", turn_end: "At the end of each turn",
   ripen: "After it ripens in hand", on_hp_lost: "Whenever you lose HP",
+  on_poison_damage: "Whenever an enemy takes Poison damage", // Phase BE (v59, gap #56)
 };
 const SCALE_SUFFIX = {
   cards_in_hand: " per card in hand", cards_retained: " per card retained",

@@ -10,6 +10,7 @@ using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Entities.Powers;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Models.Powers; // Phase BE (v59): PoisonPower (the on_poison_damage detector)
 using MegaCrit.Sts2.Core.ValueProps;
 
 namespace BlankTheSpire.BlankTheSpireCode.Powers;
@@ -175,6 +176,23 @@ public abstract class ForgedTriggerPower : BlankTheSpirePower
     public override async Task AfterDamageGiven(PlayerChoiceContext ctx, Creature dealer, DamageResult result,
         ValueProp props, Creature target, CardModel cardSource)
     {
+        // Phase BE (v59, gap #56): on_poison_damage — "whenever an enemy takes Poison damage". The base game's Poison
+        // tick (PoisonPower.AfterSideTurnStart) is CreatureCmd.Damage(new ThrowingPlayerChoiceContext(), owner, amount,
+        // Unblockable | Unpowered, null, null): no dealer, no card, and the stacks are still on the target when the
+        // hooks run (PowerCmd.Decrement comes after). This hook is the right one — Hook.AfterDamageReceived is SKIPPED
+        // when the tick kills, AfterDamageGiven always fires. The ctx here is a ThrowingPlayerChoiceContext, so it is
+        // deliberately NOT stored in _combatCtx (AfterBlockGained reuses that). Our own damage_over_time tick has the
+        // same shape and is excluded by ForgedStatusPower.CustomTickInProgress.
+        if (Trigger?.Trigger == "on_poison_damage")
+        {
+            if (dealer != null || cardSource != null || props != (ValueProp.Unblockable | ValueProp.Unpowered)) return;
+            if (target == null || target.Player != null || !target.HasPower<PoisonPower>()) return;
+            if (ForgedStatusPower.CustomTickInProgress) return;
+            MainFile.Logger.Info($"[BE] on_poison_damage: '{target.Monster?.GetType().Name ?? "enemy"}' took {result.UnblockedDamage} " +
+                                 $"Poison damage ({target.GetPowerAmount<PoisonPower>()} stacks; HP {target.CurrentHp}{(target.IsAlive ? "" : ", killed")}).");
+            await FireReactive("on_poison_damage", ctx);
+            return;
+        }
         _combatCtx = ctx;
         if (Trigger?.Trigger != "on_damage_dealt") return;
         bool byCard = dealer == Owner && cardSource != null;
@@ -244,6 +262,7 @@ public abstract class ForgedTriggerPower : BlankTheSpirePower
                 "on_card_drawn" => "On Card Drawn", "on_damage_dealt" => "On Damage Dealt",
                 "on_block_gained" => "On Block Gained", "attacked" => "When Attacked",
                 "on_blade_played" => "On Blade Played", // Phase T
+                "on_poison_damage" => "On Poison Damage", // Phase BE (v59)
                 _ => "Turn End",
             };
             string desc = t != null ? ForgedCards.DescribeTrigger(t) : "A forged trigger.";

@@ -25,7 +25,12 @@ import sys
 import zlib
 from pathlib import Path
 
-VOCAB_VERSION = 58  # must be <= ForgedCards.VocabVersion (58: Phase BD — HELD-CARD PAYOFFS: the game's own
+VOCAB_VERSION = 59  # must be <= ForgedCards.VocabVersion (59: Phase BE — ON_POISON_DAMAGE: a new reactive
+                    # add_trigger kind that fires whenever an ENEMY takes Poison damage — the base game's tick
+                    # recognized in ForgedTriggerPower.AfterDamageGiven (no dealer/card, Unblockable|Unpowered,
+                    # an enemy still carrying PoisonPower; fires on a lethal tick too); the mod's own
+                    # damage_over_time tick is excluded. Multi-fire, once_per_turn/once_per_combat eligible.)
+                    # 58: Phase BD — HELD-CARD PAYOFFS: the game's own
                     # retain hook (AbstractModel.AfterFlush's retainedCards) drives a new damage/block effect
                     # FIELD `grow_held` (1..9: +N per turn the card is retained — Windmill Strike; a calc-var,
                     # joins the one-calc-var budget, ⊥ scale/grow) and a new flag-op `held_discount {amount?

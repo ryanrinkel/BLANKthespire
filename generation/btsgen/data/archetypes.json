@@ -691,7 +691,7 @@
       "id": "poison_attrition",
       "name": "Venom / attrition",
       "description": "Stack Poison on your enemies and wear them down while you stay alive.",
-      "build_notes": "Poison ignores Block, so the class wins over several turns: cheap appliers, ways to multiply or spread Poison, and enough defense to survive while it works.",
+      "build_notes": "Poison ignores Block, so the class wins over several turns: cheap appliers, ways to multiply or spread Poison, and enough defense to survive while it works. A power with `on_poison_damage` (v59) turns every tick into a little Block or a draw - the engine that lets the class survive while the Poison works.",
       "metaphors": [
         "rot",
         "the slow tide",
@@ -721,7 +721,8 @@
         "ops": [
           "poison",
           "apply_status",
-          "damage"
+          "damage",
+          "on_poison_damage"
         ],
         "class_kind": "normal"
       },

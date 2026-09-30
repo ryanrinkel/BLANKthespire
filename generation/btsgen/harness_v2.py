@@ -71,7 +71,8 @@ _PREFERRED_CONDITIONS = ["hp_below_half", "no_block", "has_block", "turn_at_leas
                          "hand_size_ge", "retained_last_turn", "target_has_status", "draw_pile_empty",
                          "hp_lost_ge", "forged_ge"]
 _PREFERRED_TRIGGERS = ["on_exhaust", "on_card_played", "on_hp_lost", "on_block_gained", "on_card_drawn",
-                       "on_damage_dealt", "attacked", "on_discard", "ripen"]
+                       "on_damage_dealt", "attacked", "on_discard", "ripen",
+                       "on_poison_damage"]  # Phase BE (v59)
 _CLASS_ONLY_TOKENS = {"channel_orb", "evoke", "gain_orb_slot", "focus", "orbs_match", "orb_count_ge", "summon",
                       "summon_attack", "buff_summon", "heal_summon", "shield_summon",
                       "sacrifice_summon",  # Phase AV (v52)

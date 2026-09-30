@@ -110,7 +110,8 @@ _SELF_BUFF_STATUSES = {"strength", "dexterity", "thorns", "regen", "metallicize"
 _MULTI_FIRE_TRIGGERS = {"on_hp_lost", "on_exhaust", "on_card_played", "on_card_drawn", "on_damage_dealt",
                         "on_block_gained", "attacked",
                         "on_discard",  # Phase R (gap #17): a card can be discarded, redrawn, discarded again
-                        "on_blade_played"}  # Phase AJ (v40): the blade can be played several times a turn (C# parity)
+                        "on_blade_played",  # Phase AJ (v40): the blade can be played several times a turn (C# parity)
+                        "on_poison_damage"}  # Phase BE (v59, gap #56): each poisoned enemy ticks separately
 _ENEMY_DEBUFF_STATUSES = {"vulnerable", "weak", "frail", "poison"}
 # Phase AK (v41): the POWER-HOSTED reactive kinds eligible for 'once_per_combat' (mirror ForgedCards.OncePerCombatTriggers)
 # — every multi-fire kind except the card-latent on_discard (no power instance to carry the fired flag).

@@ -574,7 +574,15 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Mechanic sketch:** `add_trigger` kind `on_poison_damage`: fires when an enemy takes Poison damage (payload e.g. gain Block, draw, apply another debuff); gate once_per_turn by default.
 - **Buildable today?** No.
 - **Priority:** requested by Ryan in the 2026-09-29 archetype copy review.
-- **Status:** captured
+- **Status:** **done (2026-09-30, vocab v59, Phase BE)** — reactive kind `on_poison_damage`, detected in
+  `ForgedTriggerPower.AfterDamageGiven`: the base game's Poison tick is `CreatureCmd.Damage(ThrowingPlayerChoiceContext,
+  owner, amount, Unblockable|Unpowered, null, null)` and the stacks are still on the target when the hooks run;
+  `AfterDamageGiven` fires on a LETHAL tick too (`AfterDamageReceived` is skipped then). The mod's own
+  `damage_over_time` tick has the same shape and is excluded via `ForgedStatusPower.CustomTickInProgress`. Multi-fire
+  (once_per_turn / once_per_combat eligible). Harness: featured `venom_engine` (pool-level: the trigger + ≥2 poison
+  appliers; NOT on the reactive quota menu), `poison_attrition` ops, exemplar `ex_venom_ward`, `_PREFERRED_TRIGGERS`,
+  render.js. `[BE]` tag. Smoke pending (`tests/test_phase_be.py`; the tester must also carry one damage_over_time
+  status and show NO `[BE]` line on its tick).
 
 ### 57. Card grows each turn it's held
 - **Surfaced by:** archetype copy review (2026-09-29), for Retain

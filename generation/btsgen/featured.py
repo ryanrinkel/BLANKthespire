@@ -191,6 +191,15 @@ FEATURED_MENU: list[Featured] = [
              '(vulnerable / weak / frail / poison) and THEN carries op "spread_debuffs" (no amount) - the debuffs on '
              'the struck enemy are copied onto every other living enemy. Never on a basic; one per card.',
              lambda cc: "spread_debuffs" in cc.ops),
+    # Phase BE (v59, gap #56): the Venom engine — deliberately NOT on the reactive quota menu (that would push Poison
+    # onto every class); the detector wants the trigger AND poison appliers in the same pool.
+    Featured("venom_engine", 'a POWER that pays off each time an enemy takes Poison damage (add_trigger "on_poison_damage")',
+             'REQUIRED: add a POWER with op "add_trigger", trigger "on_poison_damage" (once_per_turn) whose payload is '
+             'small Block, a draw, or another debuff - it fires at the start of each poisoned enemy\'s turn, so Block '
+             'is up for its attacks. The class needs 2+ cards that apply poison for it to matter.',
+             lambda cc: "on_poison_damage" in cc.triggers,
+             detect_pool=lambda ccs: any("on_poison_damage" in cc.triggers for cc in ccs)
+             and sum(1 for cc in ccs if "poison" in cc.statuses) >= 2),
     # Phase BD (v58, gaps #57/#58): the Retain payoffs on the held card itself (Windmill Strike / Sands of Time).
     Featured("patience_payoff", 'a RETAIN card that grows or gets cheaper each turn it is held (field "grow_held" on its damage/Block, or op "held_discount")',
              'REQUIRED: give this card op "retain" and EITHER a damage/block effect carrying "grow_held" 2-4 (it grows '
