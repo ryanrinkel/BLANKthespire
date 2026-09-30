@@ -564,7 +564,7 @@ your CARDS are its offense. Six card ops drive the minions (all SUMMON-CLASS ONL
 your FRONT-most living minion):
   • `summon` (summon_name:"<the minion>", amount = HP): NOT on board -> summon it with `amount` HP (omit to use \
     its max_hp); ALREADY on board -> RAISE its Max HP by `amount`. A differently-named minion joins beside the \
-    first. Usually a self-target skill: "summon your Thrall (8 HP)" / "raise your Thrall's HP by 6".
+    first. Usually a self-target skill ("summon your Thrall (6 HP)"); at most 6 HP per energy (uncommon 7, rare 8).
   • `summon_attack` (amount per-hit, optional "hits"): damage THROUGH the minion — the MINION is the attacker, \
     so it scales with its Strength; nothing if none is out. This is how a summon class deals its damage — put it \
     on attack cards ("your summon strikes for 9" / "hits all enemies for 5").
@@ -590,7 +590,7 @@ what `sacrifice_summon` cashes in); "on_nth_attack": {{ "n": 2-5, "actions": [..
 Three shapes to draft toward: COMMANDER (passive bodyguard + buff_summon / summon_attack), SWARM (a cheap \
 autonomous minion whose on_summon / on_death payoffs are the real card — summon, sacrifice, re-summon), \
 ETHEREAL STRIKER (attackable:false, low HP, hits harder because it never shields you). Example: "summon_pool": \
-[ {{ "name": "Bone Thrall", "max_hp": 12, "description": "A raised servant that guards you." }} ], with \ncards like {{"op":"summon","summon_name":"Bone Thrall","amount":12}}, {{"op":"summon_attack","amount":9}}, \
+[ {{ "name": "Bone Thrall", "max_hp": 12, "description": "A raised servant that guards you." }} ], with \ncards like {{"op":"summon","summon_name":"Bone Thrall","amount":6}}, {{"op":"summon_attack","amount":9}}, \
 {{"op":"buff_summon","amount":3,"status":"strength"}} and {{"op":"sacrifice_summon"}} + \
 {{"op":"block","amount":12}}. All six ops are SUMMON-CLASS ONLY (a class that declared a summon_pool); never use \
 them otherwise.
@@ -2725,6 +2725,15 @@ def _summon_pool_custom_names(bp: dict) -> set[str]:
     return names
 
 
+def _summon_pool_max_hp(bp: dict) -> dict[str, int]:
+    """Lowercased summon name -> its declared max_hp, so the validator can price an amount-less `summon`."""
+    out: dict[str, int] = {}
+    for sm in (bp.get("summon_pool") or []):
+        if isinstance(sm, dict) and str(sm.get("name", "")).strip() and isinstance(sm.get("max_hp"), int):
+            out[str(sm["name"]).strip().lower()] = sm["max_hp"]
+    return out
+
+
 def _card_uses_summons(card: dict) -> bool:
     """True if any (base/upgrade) effect uses a summon op (summon / summon_attack / buff_summon / sacrifice_summon -
     Phase AV) - all class-only mechanics that do nothing without a summon_pool (used to drop such a card off a
@@ -3149,7 +3158,8 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
     # (Phase K) so channel / apply_status_custom / summon cards may reference them by pool name.
     validator = CardValidator(extra_orbs=_orb_pool_custom_names(bp),
                               extra_statuses=_status_pool_custom_names(bp),
-                              extra_summons=_summon_pool_custom_names(bp))
+                              extra_summons=_summon_pool_custom_names(bp),
+                              summon_max_hp=_summon_pool_max_hp(bp))
     # O-2: resolve the bridge witness context ONCE, up front — it now feeds the proactive per-card fusion
     # directives here AND the coverage round's post-hoc witness check below.
     bridge_ctx = _resolve_bridge_ctx(bp)
@@ -4009,8 +4019,10 @@ class _CardFake:
             card = {**base, "type": "attack", "target": "enemy",
                     "effects": [{"op": "summon_attack", "amount": 8 + n}]}
         elif "summon" in theme:  # the Osty Summon keyword: (re)summon / grow the minion, amount = HP
+            from .validator import summon_hp_cap  # the HP budget the card validator enforces
+            hp = min(12, summon_hp_cap(base.get("rarity"), base.get("cost")) or 12)
             card = {**base, "type": "skill", "target": "self",
-                    "effects": [{"op": "summon", "summon_name": "Bone Thrall", "amount": 12}]}
+                    "effects": [{"op": "summon", "summon_name": "Bone Thrall", "amount": max(1, hp)}]}
         # Orb-aware fakes so an offline orb-class forge produces real orb cards. Check the slot-machine
         # (random + orbs_match) brief FIRST — its theme also contains "channel"/"orb" — then evoke/focus
         # before plain channel, since their briefs ("evoke your next orb") also contain the word "orb".

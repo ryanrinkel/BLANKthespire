@@ -136,6 +136,21 @@ _BALANCE_STEP_MAX = 5
 # Phase AC (gap #2): summon heal/shield per-op caps (mirror ForgedCards.HealSummonMaxAmount / ShieldSummonMaxAmount).
 _HEAL_SUMMON_MAX = 9
 _SHIELD_SUMMON_MAX = 12
+# Summon HP budget (2026-09-30). Every point of summon HP is effectively a point of player HP, so `summon` is priced
+# like Block at the base-game Necrobinder's rate (Bodyguard 5 / Afterlife 6 for 1 energy, Reanimate 20 for 3): HP per
+# energy by rarity, rares allowed to stretch. A 0-cost card counts as half an energy; X-cost cards aren't capped
+# here (they scale with the energy spent). An upgrade may add a little on top (Bodyguard 5 -> 7). Python-side
+# balance rule only: the mod has no HP cap on the op.
+_SUMMON_HP_PER_ENERGY = {"basic": 6, "common": 6, "uncommon": 7, "rare": 8}
+_SUMMON_HP_UPGRADE_BONUS = 3
+
+
+def summon_hp_cap(rarity, cost) -> int | None:
+    """The most HP one `summon` may grant on a card of this rarity and energy cost (None for an X-cost card)."""
+    if not isinstance(cost, int) or isinstance(cost, bool):
+        return None
+    rate = _SUMMON_HP_PER_ENERGY.get(str(rarity or "").strip().lower(), _SUMMON_HP_PER_ENERGY["common"])
+    return int(rate * (cost if cost > 0 else 0.5))
 # Phase AN (v44): the gain_max_hp cap (mirrors ForgedCards.GainMaxHpMaxAmount + the schema clause). A run-permanent
 # stat (Feed is +3/+4), so the band is tight; card-only (the triggerEffect op enum omits it).
 _GAIN_MAX_HP_MAX = 5
@@ -213,7 +228,7 @@ class CardValidator:
     """Loads the schema + known-id sets once, then validates single cards repeatedly."""
 
     def __init__(self, extra_orbs: set[str] | None = None, extra_statuses: set[str] | None = None,
-                 extra_summons: set[str] | None = None) -> None:
+                 extra_summons: set[str] | None = None, summon_max_hp: dict[str, int] | None = None) -> None:
         paths.assert_project_present()
         schema = json.loads(paths.CARD_SCHEMA.read_text())
         self._schema_validator = Draft202012Validator(schema)
@@ -234,6 +249,9 @@ class CardValidator:
         # ONLY these (lowercased). Shared / single-card generation passes none, so summon has no valid target
         # there and is rejected (it's a class-only op, like custom-orb channels / apply_status_custom).
         self._allowed_custom_summons = {s.strip().lower() for s in (extra_summons or set())}
+        # Each minion's declared max_hp (lowercased name -> HP): a `summon` with no amount grants this, so the HP
+        # budget check below can price it. Unknown -> an amount-less summon isn't checked.
+        self._summon_max_hp = {str(k).strip().lower(): v for k, v in (summon_max_hp or {}).items()}
         self.known_statuses = self._ids_in(paths.STATUSES_DIR)
         # authored pool + already-quarantined generated cards both count as resolvable refs
         self.known_cards = self._ids_in(paths.CARDS_DIR) | self._ids_in(paths.GENERATED_DIR)
@@ -692,6 +710,24 @@ class CardValidator:
         # deck-EDITING out of the starting deck — a basic shouldn't carry it. Mirrors ForgedCards (SupportedOps only).
         if any(e.get("op") == "purge_card" for e in effects + up_effects) and is_basic:
             out.append("'purge_card' is not allowed on a BASIC card (deck-editing shouldn't be in the starting deck).")
+        # Summon HP budget (see _SUMMON_HP_PER_ENERGY): a card-level `summon` may grant at most its rarity's HP per
+        # energy; the upgrade gets a small bonus on top. An amount-less summon grants the minion's max_hp.
+        rarity = str(card.get("rarity", "")).strip().lower()
+        cap = summon_hp_cap(rarity, card.get("cost", 0))
+        if cap is not None:
+            rate = _SUMMON_HP_PER_ENERGY.get(rarity, _SUMMON_HP_PER_ENERGY["common"])
+            for lst, limit, which in ((effects, cap, ""), (up_effects, cap + _SUMMON_HP_UPGRADE_BONUS, "upgraded ")):
+                for e in lst:
+                    if e.get("op") != "summon":
+                        continue
+                    hp = e.get("amount")
+                    if hp is None:
+                        hp = self._summon_max_hp.get(str(e.get("summon_name", "")).strip().lower())
+                    if isinstance(hp, int) and not isinstance(hp, bool) and hp > limit:
+                        out.append(f"the {which}summon grants {hp} HP on a {card.get('cost', 0)}-cost {rarity or 'common'} "
+                                   f"card, over its budget of {limit}. Summon HP is effectively player HP, so price it "
+                                   f"like Block: about {rate} HP per energy at this rarity. Lower the amount, or raise "
+                                   f"the cost or rarity.")
         # Phase AH (gaps #35/#38): transform_card permanently rewrites the run-deck original into another same-class
         # card. Never on a BASIC card (a self-rewriting starter would mutate the starting deck / floors). ⊥ purge
         # (transform BECOMES a card; purge DELETES it — contradictory); at most one per card (a card becomes one
