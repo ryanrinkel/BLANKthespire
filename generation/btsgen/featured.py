@@ -191,6 +191,12 @@ FEATURED_MENU: list[Featured] = [
              '(vulnerable / weak / frail / poison) and THEN carries op "spread_debuffs" (no amount) - the debuffs on '
              'the struck enemy are copied onto every other living enemy. Never on a basic; one per card.',
              lambda cc: "spread_debuffs" in cc.ops),
+    # Phase BF (v60, gap #54): the setup-then-release beat on the base game's own amplifiers.
+    Featured("setup_spike", 'a SETUP card that spikes your next Attack (apply_status vigor) or a rare that doubles your Attacks for a turn (apply_status double_damage)',
+             'REQUIRED: add a skill with apply_status vigor (amount 3-6: your NEXT Attack deals that much more, then it '
+             'is spent) plus a draw or energy so the attack lands the same turn - OR, at rare only, apply_status '
+             'double_damage amount 1 (your Attacks deal double this turn) with a real cost (2+ energy or exhaust).',
+             lambda cc: bool(cc.statuses.keys() & {"vigor", "double_damage"})),
     # Phase BE (v59, gap #56): the Venom engine — deliberately NOT on the reactive quota menu (that would push Poison
     # onto every class); the detector wants the trigger AND poison appliers in the same pool.
     Featured("venom_engine", 'a POWER that pays off each time an enemy takes Poison damage (add_trigger "on_poison_damage")',

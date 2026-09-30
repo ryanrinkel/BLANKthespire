@@ -493,9 +493,8 @@ builds a Forge class — design AROUND these four beats, don't just sprinkle the
  4. PAYOFFS STAY CONCENTRATED. The blade is the PRIMARY forged payoff; ship AT MOST ONE extra `scale:"forged"` \
     card at uncommon/rare (write it "deal 6 damage, plus your Forge"), optionally gated behind \
     `when:{{"kind":"forged_ge","value":N}}` ("if your Forge is 10+, …") as the archetype's rare finisher. \
-    OPTIONAL BURST: one `{{"op":"blade_empower","amount":2}}` (or 3) skill/power — "Your blade deals 2x damage \
-    this turn" — a spike distinct from the slow ramp (cash a big Forge in one swing). Forge-class only (it needs \
-    the blade); card-only; 1 per class. \
+    OPTIONAL BURST: `apply_status vigor` (v60: +N to your NEXT Attack — any attack, the blade included) or one \
+    `{{"op":"blade_empower","amount":2}}` skill ("Your blade deals 2x damage this turn"; forge-class, 1 per class). \
     OPTIONAL CASH-OUT (v53): one uncommon/rare card that lists a BIG payoff gated with \
     `when:{{"kind":"forged_ge","value":N}}` FIRST and `{{"op":"spend_forge","amount":3-8}}` LAST \
     ("Deal 20 damage if your Forge is 5+. Spend 5 Forge.") — the counter EMPTIES to buy the burst, so it is a real \

@@ -71,6 +71,8 @@ EXOTIC_MENU_V2 = [
     ("temp_dexterity", 'REQUIRED: apply_status temp_dexterity (a burst of Dexterity for this turn only).'),
     # Phase AN (v44): the one-turn bristle (temp_focus is orb-class-only and stays off this base menu).
     ("temp_thorns", 'REQUIRED: apply_status temp_thorns (Thorns for this turn only - a one-turn bristle that punishes the attacks coming this turn).'),
+    # Phase BF (v60): the base-game Vigor — +N to your next Attack, then consumed.
+    ("vigor", 'REQUIRED: apply_status vigor (amount 3-6: your NEXT Attack deals that much more damage, then it is spent - a setup card that wants an attack the same turn).'),
 ]
 REACTIVE_MENU_V2 = REACTIVE_MENU + [
     ("on_card_drawn", 'REQUIRED: add an ongoing power (op "add_trigger", trigger "on_card_drawn", once_per_turn) that rewards drawing a card.'),

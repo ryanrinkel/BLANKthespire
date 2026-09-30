@@ -149,7 +149,7 @@
       "id": "forge_ramp",
       "name": "Forge / signature-blade ramp",
       "description": "Stoke the forge all fight long, then cash it in on a signature blade whose damage climbs with every hit.",
-      "build_notes": "Forge income can come from anywhere the theme suggests: attacks that forge on hit, skills, triggers on blocking or drawing, a power, the starter relic. Don't default to a single per-turn power. Cash it in with one or two payoff attacks using `scale:\"forged\"`, whose printed damage grows hit by hit. For burst, prefer tools that boost ANY attack (Strength, temporary Strength, multi-hit) so they land naturally on the blade but still help the rest of the deck; `blade_empower` exists but is optional.",
+      "build_notes": "Forge income can come from anywhere the theme suggests: attacks that forge on hit, skills, triggers on blocking or drawing, a power, the starter relic. Don't default to a single per-turn power. Cash it in with one or two payoff attacks using `scale:\"forged\"`, whose printed damage grows hit by hit. For burst, prefer tools that boost ANY attack (`vigor` - v60, +N to your next Attack - Strength, temporary Strength, multi-hit) so they land naturally on the blade but still help the rest of the deck; `blade_empower` exists but is optional.",
       "metaphors": [
         "the smith at the anvil",
         "stoking the furnace",
@@ -184,7 +184,8 @@
           "forged_ge",
           "add_trigger",
           "blade_empower",
-          "spend_forge"
+          "spend_forge",
+          "vigor"
         ],
         "class_kind": "normal"
       },
@@ -3734,7 +3735,7 @@
       "id": "burst_window",
       "name": "Glass tempest / temp-stat burst",
       "description": "Sculpt the perfect hand over a few turns, then cash it in on one huge, stat-spiked turn.",
-      "build_notes": "Touchstone: Slay the Spire 1 Flex builds, where temporary Strength meets a hand full of attacks. The identity is SETUP: draw, retain and energy tools that let the player assemble the right hand, then temporary stat spikes (`temp_strength`, `temp_dexterity`, `temp_thorns`) and cheap or multi-hit attacks that cash them in on the same turn. The player builds this moment; it isn't handed to them.",
+      "build_notes": "Touchstone: Slay the Spire 1 Flex builds, where temporary Strength meets a hand full of attacks. The identity is SETUP: draw, retain and energy tools that let the player assemble the right hand, then temporary stat spikes (`temp_strength`, `temp_dexterity`, `temp_thorns`, `vigor` for one big attack; a rare `double_damage` turn) and cheap or multi-hit attacks that cash them in on the same turn. The player builds this moment; it isn't handed to them.",
       "metaphors": [
         "the adrenaline spike",
         "the sugar rush",
@@ -3766,7 +3767,9 @@
           "temp_strength",
           "temp_dexterity",
           "temp_thorns",
-          "damage"
+          "damage",
+          "vigor",
+          "double_damage"
         ],
         "class_kind": "normal"
       },

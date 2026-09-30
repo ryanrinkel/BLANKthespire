@@ -33,6 +33,8 @@ _STATUS_WEIGHT = {
     "strength": 4.0, "dexterity": 3.0,
     "temp_strength": 2.0, "temp_dexterity": 1.5,   # this-turn only: ~half the permanent stat
     "temp_thorns": 1.0, "temp_focus": 1.5,         # Phase AN (v44): this-turn only, ~half of thorns / focus
+    "vigor": 1.2,           # Phase BF (v60): +N on ONE attack, then gone — a touch over the damage it adds
+    "double_damage": 12.0,  # Phase BF (v60): a whole turn of doubled attacks — rare-tier per turn (amount = turns)
     "thorns": 2.0,          # pays out per enemy hit taken
     "regen": 2.0,           # heal per turn, decaying
     "metallicize": 3.0,     # STS2 Plating: N + (N-1) + ... + 1 Block over N turns
@@ -104,7 +106,10 @@ _TRIGGER_SCALABLE_OPS = {"damage", "block", "draw", "gain_energy", "heal", "lose
 # (it lands on the minion, like Strength). Kept in lockstep with the mod's ForgedCards.buff_summon validation.
 _SELF_BUFF_STATUSES = {"strength", "dexterity", "thorns", "regen", "metallicize", "artifact", "buffer",
                        "intangible", "ritual", "blur", "temp_strength", "temp_dexterity", "barricade", "focus",
-                       "temp_thorns", "temp_focus"}  # Phase AN (v44): one-turn Thorns / Focus
+                       "temp_thorns", "temp_focus",  # Phase AN (v44): one-turn Thorns / Focus
+                       "vigor", "double_damage"}  # Phase BF (v60): the base-game next-attack amplifiers
+# Phase BF (v60): double_damage's band — amount is TURNS of doubled attacks; 2 is the ceiling, and it is rare-only.
+_DOUBLE_DAMAGE_MAX = 2
 # H4 (gaps #13/#14): the reactive triggers that can fire many times a turn → eligible for 'once_per_turn'
 # (mirror ForgedCards.MultiFireTriggers); and the debuffs a TARGETED trigger apply_status may apply.
 _MULTI_FIRE_TRIGGERS = {"on_hp_lost", "on_exhaust", "on_card_played", "on_card_drawn", "on_damage_dealt",
@@ -772,6 +777,17 @@ class CardValidator:
                 out.append("a card can't be both 'purge' and 'exhaust' (purge already removes it from the run — pick one).")
             if is_basic:
                 out.append("'purge' is not allowed on a BASIC card (it would thin the class's starting deck / floors).")
+        # Phase BF (v60, gap #54): double_damage is a whole turn of doubled Attacks — rare-only, amount 1..2 (turns),
+        # one per card (the dup-var guard already stops two). Generation-side rule (the C# power has no band).
+        dd = [e for e in effects + up_effects
+              if e.get("op") == "apply_status" and str(e.get("status", "")).strip().lower() == "double_damage"]
+        if dd:
+            if str(card.get("rarity", "")).strip().lower() != "rare":
+                out.append("apply_status double_damage is RARE-only (a turn of doubled Attacks is a build-defining swing).")
+            for e in dd:
+                da = e.get("amount")
+                if isinstance(da, int) and not isinstance(da, bool) and da > _DOUBLE_DAMAGE_MAX:
+                    out.append(f"double_damage 'amount' (turns of doubled Attacks) may be at most {_DOUBLE_DAMAGE_MAX}; got {da}.")
         # Phase BB (v56, gap #55): sly ⊥ retain (Retain holds the card; Sly wants it discarded — a card with both has no
         # identity, and Retain keeps it out of the flush so Sly rarely fires), and never on a Power (every base-game Sly
         # card is an Attack/Skill you pitch; a Power auto-played off a discard is a free permanent buff). Mirrors

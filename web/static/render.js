@@ -479,6 +479,7 @@ const STATUS_NAMES = {
   buffer: "Buffer", intangible: "Intangible", ritual: "Ritual", blur: "Blur", barricade: "Barricade",
   focus: "Focus", temp_strength: "Strength (this turn)", temp_dexterity: "Dexterity (this turn)",
   temp_thorns: "Thorns (this turn)", temp_focus: "Focus (this turn)", // Phase AN (v44)
+  vigor: "Vigor", double_damage: "Double Damage", // Phase BF (v60, gap #54)
 };
 const TRIGGER_PREFIX = {
   turn_start: "At the start of each turn", turn_end: "At the end of each turn",

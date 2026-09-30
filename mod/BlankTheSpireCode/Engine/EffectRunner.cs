@@ -997,6 +997,7 @@ public static class EffectRunner
         "intangible", "ritual", "blur", "temp_strength", "temp_dexterity", "barricade",
         "focus", // orb output scaling (Phase G)
         "temp_thorns", "temp_focus", // Phase AN (v44): one-turn Thorns / Focus (ForgedTempThornsPower / ForgedTempFocusPower)
+        "vigor", "double_damage", // Phase BF (v60, gap #54): the base game's VigorPower / DoubleDamagePower
     ];
 
     /// <summary>Orb type for the <c>channel_orb</c> op (Phase G; lightning/frost/dark for the MVP).
@@ -1238,6 +1239,8 @@ public static class EffectRunner
             "focus"          => ApplyPower<FocusPower>(self, card, ctx, play),
             "temp_thorns"    => ApplyPower<ForgedTempThornsPower>(self, card, ctx, play), // Phase AN (v44)
             "temp_focus"     => ApplyPower<ForgedTempFocusPower>(self, card, ctx, play),  // Phase AN (v44)
+            "vigor"          => ApplyPower<VigorPower>(self, card, ctx, play),            // Phase BF (v60)
+            "double_damage"  => ApplyPower<DoubleDamagePower>(self, card, ctx, play),     // Phase BF (v60)
             _ => throw new NotSupportedException($"EffectRunner.ApplyStatus: unsupported status '{status}'"),
         };
     }
@@ -1515,6 +1518,8 @@ public static class EffectRunner
             "focus"          => RelicApplyT<FocusPower>(ctx, target, source, amount),
             "temp_thorns"    => RelicApplyT<ForgedTempThornsPower>(ctx, target, source, amount), // Phase AN (v44)
             "temp_focus"     => RelicApplyT<ForgedTempFocusPower>(ctx, target, source, amount),  // Phase AN (v44)
+            "vigor"          => RelicApplyT<VigorPower>(ctx, target, source, amount),            // Phase BF (v60)
+            "double_damage"  => RelicApplyT<DoubleDamagePower>(ctx, target, source, amount),     // Phase BF (v60)
             _ => Task.CompletedTask,
         };
 

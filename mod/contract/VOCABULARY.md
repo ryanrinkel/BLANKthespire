@@ -79,6 +79,8 @@ ride any card (e.g. an attack that also grants you Block-over-time).
 | `temp_strength` | buff   | Like `strength` but only for this turn (a safe burst with no lasting power). |
 | `temp_dexterity`| buff   | Like `dexterity` but only for this turn. |
 | `temp_thorns`   | buff   | Like `thorns` but only for this turn (v44 — a one-turn bristle: the riposte window without a permanent Thorns ramp). |
+| `vigor`         | buff   | **+`amount` damage to your NEXT Attack**, then it is consumed (v60 — the base-game Vigor / Pen Nib: every hit of a multi-hit gets it). The generic next-attack spike for ANY class — the setup/release beat a Glass tempest or a Forge burst wants; also a payload ("Whenever you gain Block, gain 2 Vigor"). 2–6 typical. |
+| `double_damage` | buff   | **Your Attacks deal DOUBLE damage this turn** (v60 — the base-game Double Damage / Phantasmal Killer; `amount` = turns, 1 stack falls off each turn end). Rare-tier, `amount: 1` (2 at most), one per class; it wants a cost (2+ energy, exhaust, or a gate). |
 | `thorns`        | buff   | When an enemy attacks you, it takes `amount` damage back. Permanent. |
 | `regen`         | buff   | Heal `amount` HP at the end of your turn (typically decays). |
 | `metallicize`   | buff   | Gain `amount` Block at the end of every turn, then lose 1 stack at the start of each of your later turns (STS2 **Plating**: `amount` N yields N + (N-1) + … + 1 Block over N turns, NOT a permanent per-turn engine — it decays by one per turn, not when hit). |
@@ -277,7 +279,7 @@ draw/energy engine at turn start, an orb auto-channeler, etc.
 - `effects`: the payload, run each time it fires. By default **a trigger fires with no target**, so a payload effect
   is a **SELF/orb-only sub-vocabulary**: `block`, `draw`, `gain_energy`, `heal`, `lose_hp`, `apply_status` (**self-buffs
   ONLY** — strength/dexterity/thorns/regen/metallicize/artifact/buffer/intangible/ritual/blur/temp_strength/
-  temp_dexterity/barricade/focus/temp_thorns/temp_focus), `gain_orb_slot`, `channel_orb` (any orb in YOUR class's pool — base, `random`, or
+  temp_dexterity/barricade/focus/temp_thorns/temp_focus/vigor/double_damage), `gain_orb_slot`, `channel_orb` (any orb in YOUR class's pool — base, `random`, or
   a custom orb: "At the start of your turn, channel an Ember"), `evoke`, `forge` (fixed amount only — the Forge
   engine: "At the start of your turn, Forge 2"), `balance_step` (fixed amount only — the Balance engine: "At the
   start of your turn, shift 2 toward the Dark"), `add_card` (**CLASS-ONLY** — the compost loop: "Whenever a card is

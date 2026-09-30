@@ -25,7 +25,12 @@ import sys
 import zlib
 from pathlib import Path
 
-VOCAB_VERSION = 59  # must be <= ForgedCards.VocabVersion (59: Phase BE — ON_POISON_DAMAGE: a new reactive
+VOCAB_VERSION = 60  # must be <= ForgedCards.VocabVersion (60: Phase BF — NEXT-ATTACK AMPLIFIERS from the base
+                    # game: two self-buff statuses mapped onto sealed base-game powers. `vigor` = VigorPower (+N
+                    # to your next Attack, then consumed; cards, payloads, orbs, relics) and `double_damage` =
+                    # DoubleDamagePower (your Attacks deal double this turn; amount = turns, rare-only, 1..2).
+                    # No new power class, no codec change.)
+                    # 59: Phase BE — ON_POISON_DAMAGE: a new reactive
                     # add_trigger kind that fires whenever an ENEMY takes Poison damage — the base game's tick
                     # recognized in ForgedTriggerPower.AfterDamageGiven (no dealer/card, Unblockable|Unpowered,
                     # an enemy still carrying PoisonPower; fires on a lethal tick too); the mod's own

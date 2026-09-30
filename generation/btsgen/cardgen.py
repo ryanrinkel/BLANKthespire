@@ -43,6 +43,7 @@ STATUS_NAME = {
     "temp_strength": "Strength", "temp_dexterity": "Dexterity", "barricade": "Barricade",
     "focus": "Focus",
     "temp_thorns": "Thorns", "temp_focus": "Focus",  # Phase AN (v44): worded like the temp stats (ForgedCards.StatusName)
+    "vigor": "Vigor", "double_damage": "Double Damage",  # Phase BF (v60, gap #54): the base-game next-attack amplifiers
 }
 # Self-buffs are worded "Gain" and always land on the player; debuffs are "Apply"-ed to the target.
 # Keep in lockstep with EffectRunner.SelfBuffStatuses (the C# single source of truth for buff-vs-debuff side).
@@ -50,6 +51,7 @@ _BUFFS = {
     "strength", "dexterity", "thorns", "regen", "metallicize", "artifact", "buffer",
     "intangible", "ritual", "blur", "temp_strength", "temp_dexterity", "barricade", "focus",
     "temp_thorns", "temp_focus",  # Phase AN (v44)
+    "vigor", "double_damage",  # Phase BF (v60)
 }
 
 

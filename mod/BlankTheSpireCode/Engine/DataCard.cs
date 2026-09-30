@@ -253,6 +253,10 @@ public abstract class DataCard : ConstructedCardModel
                         case "focus":          Power<FocusPower>(vname, e.Amount, up); break;
                         case "temp_thorns":    Power<ForgedTempThornsPower>(vname, e.Amount, up); break; // Phase AN (v44)
                         case "temp_focus":     Power<ForgedTempFocusPower>(vname, e.Amount, up); break;  // Phase AN (v44)
+                        // Phase BF (v60, gap #54): the base game's own next-attack amplifiers — sealed, concrete powers
+                        // (unlike the abstract TemporaryStrengthPower that crashed temp_strength), with shipped loc/icons.
+                        case "vigor":          Power<VigorPower>(vname, e.Amount, up); break;         // +N to your next Attack, then consumed
+                        case "double_damage":  Power<DoubleDamagePower>(vname, e.Amount, up); break;  // your Attacks deal double this turn (N turns)
                         default:
                             throw new NotSupportedException($"DataCard: unsupported status '{e.Status}'");
                     }

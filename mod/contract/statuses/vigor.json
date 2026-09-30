@@ -1,0 +1,6 @@
+{
+  "id": "vigor",
+  "name": "Vigor",
+  "kind": "buff",
+  "decay": "turn"
+}

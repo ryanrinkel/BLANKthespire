@@ -159,6 +159,8 @@ def test_detectors_round_trip() -> None:
         "tainted_power": _card([{"op": "damage", "amount": 12}, {"op": "add_status_card", "card": "wound", "pile": "discard"}]),
         # Phase AX (v53): copy the struck target's debuffs to the rest of the room
         "contagion": _card([{"op": "apply_status", "status": "vulnerable", "amount": 2}, {"op": "spread_debuffs"}]),
+        # Phase BF (v60): the next-attack spike
+        "setup_spike": _card([{"op": "apply_status", "status": "vigor", "amount": 4}, {"op": "draw", "amount": 1}]),
         # Phase BE (v59): the Venom engine
         "venom_engine": _card([{"op": "add_trigger", "trigger": "on_poison_damage", "once_per_turn": True, "effects": [{"op": "block", "amount": 2}]}]),
         # Phase BD (v58): the held-card payoff (Windmill Strike)

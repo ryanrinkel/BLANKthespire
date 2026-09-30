@@ -42,7 +42,15 @@ public static class ForgedCards
     /// v10 (forged statuses, Phase J): + CharacterSpec.StatusPool (a class's ≤4 custom modifier-family statuses
     /// read from `status_pool`; see ForgedCharacters / ForgedStatusPower). Class cards may apply a custom status
     /// by pool name via the `apply_status_custom` op (class-only, like custom-orb channels).</summary>
-    public const int VocabVersion = 59; // 59: Phase BE (VOCAB_EXPANSION_5, gap #56) — ON_POISON_DAMAGE. New reactive
+    public const int VocabVersion = 60; // 60: Phase BF (VOCAB_EXPANSION_5, gap #54) — NEXT-ATTACK AMPLIFIERS, from the
+                                        //     base game: two new self-buff statuses mapped straight onto sealed base-game
+                                        //     powers (no new power class, shipped loc + icons). `vigor` = VigorPower: +N
+                                        //     damage to your next Attack, then consumed (Pen Nib / Vigor); legal on cards,
+                                        //     in trigger payloads, orbs, relics. `double_damage` = DoubleDamagePower: your
+                                        //     card Attacks deal DOUBLE damage this turn, one stack per turn (Phantasmal
+                                        //     Killer / Double Damage; generation caps it at amount 1..2, rare-only).
+                                        //     blade_empower stays (blade-only); these boost ANY attack.
+                                        // 59: Phase BE (VOCAB_EXPANSION_5, gap #56) — ON_POISON_DAMAGE. New reactive
                                         //     add_trigger kind `on_poison_damage` ("Whenever an enemy takes Poison damage,
                                         //     …"): ForgedTriggerPower.AfterDamageGiven recognizes the base game's Poison
                                         //     tick (no dealer, no card, Unblockable|Unpowered, an enemy target still
@@ -503,7 +511,8 @@ public static class ForgedCards
         ["vulnerable", "weak", "frail", "poison",
          "strength", "dexterity", "thorns", "regen", "metallicize", "artifact", "buffer",
          "intangible", "ritual", "blur", "temp_strength", "temp_dexterity", "barricade", "focus",
-         "temp_thorns", "temp_focus"]; // Phase AN (v44): one-turn Thorns / Focus (removed at the end of your turn)
+         "temp_thorns", "temp_focus", // Phase AN (v44): one-turn Thorns / Focus (removed at the end of your turn)
+         "vigor", "double_damage"]; // Phase BF (v60, gap #54): the base game's VigorPower / DoubleDamagePower
     // Phase AN (v44): the gain_max_hp cap (Feed is +3/+4; a run-permanent stat, so the band is tight). Lockstep with
     // validator._GAIN_MAX_HP_MAX and the schema clause.
     private const int GainMaxHpMaxAmount = 5;
@@ -1887,6 +1896,7 @@ public static class ForgedCards
         "temp_strength" => "Strength", "temp_dexterity" => "Dexterity", "barricade" => "Barricade",
         "focus" => "Focus",
         "temp_thorns" => "Thorns", "temp_focus" => "Focus", // Phase AN (v44): worded like the temp stats
+        "vigor" => "Vigor", "double_damage" => "Double Damage", // Phase BF (v60)
         _ => status ?? "",
     };
 
@@ -2320,6 +2330,7 @@ public static class ForgedCards
         "temp_strength" => "Strength", "temp_dexterity" => "Dexterity", "barricade" => "Barricade",
         "focus" => "Focus",
         "temp_thorns" => "Thorns", "temp_focus" => "Focus", // Phase AN (v44)
+        "vigor" => "Vigor", "double_damage" => "Double Damage", // Phase BF (v60)
         _ => status ?? "",
     };
 

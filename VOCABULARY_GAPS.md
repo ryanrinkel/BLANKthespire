@@ -550,7 +550,15 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Mechanic sketch:** A self buff consumed by your next Attack: x2 damage (Phantasmal Killer / Double Damage) or +N damage (Pen Nib-style). Generalizes `blade_empower`, which only multiplies the Forge blade.
 - **Buildable today?** No.
 - **Priority:** requested by Ryan in the 2026-09-29 archetype copy review.
-- **Status:** captured
+- **Status:** **done (2026-09-30, vocab v60, Phase BF)** — from the BASE GAME, no new power class: two `apply_status`
+  self-buffs mapped onto sealed base-game powers (shipped loc + icons). `vigor` = `VigorPower` (+N to your next
+  Attack, then consumed — the BeforeAttack latch / AfterAttack use-up is the game's; a multi-hit gets it on every
+  hit); `double_damage` = `DoubleDamagePower` (your card Attacks deal double THIS TURN, one stack per turn — the
+  whole-turn Phantasmal Killer, not a one-attack ×2; generation: rare-only, amount 1..2). `blade_empower` stays as the
+  blade-only spike. Lockstep on every status map (DataCard / EffectRunner / TriggerRunner / OrbRunner / SummonRunner /
+  ForgedCards + `statuses/vigor.json`, `double_damage.json`). Harness: featured `setup_spike`, `EXOTIC_MENU_V2` vigor,
+  `forge_ramp` + `burst_window` ops, exemplars `ex_coiled_breath` / `ex_phantom_hour`, render.js; the Forge pitch's
+  blade_empower clause was cut for vigor (the rule-0.9 offset). Smoke pending (`tests/test_phase_bf.py`).
 
 ### 55. Sly keyword
 - **Surfaced by:** archetype copy review (2026-09-29), for Madness

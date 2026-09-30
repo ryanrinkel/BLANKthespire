@@ -174,6 +174,8 @@ public static class OrbRunner
             "focus"          => Apply<FocusPower>(ctx, target, source, amount),
             "temp_thorns"    => Apply<ForgedTempThornsPower>(ctx, target, source, amount), // Phase AN (v44)
             "temp_focus"     => Apply<ForgedTempFocusPower>(ctx, target, source, amount),  // Phase AN (v44)
+            "vigor"          => Apply<VigorPower>(ctx, target, source, amount),            // Phase BF (v60)
+            "double_damage"  => Apply<DoubleDamagePower>(ctx, target, source, amount),     // Phase BF (v60)
             _ => Task.CompletedTask,
         };
 
@@ -242,6 +244,7 @@ public static class OrbRunner
         "temp_strength" => "Strength", "temp_dexterity" => "Dexterity", "barricade" => "Barricade",
         "focus" => "Focus",
         "temp_thorns" => "Thorns", "temp_focus" => "Focus", // Phase AN (v44)
+        "vigor" => "Vigor", "double_damage" => "Double Damage", // Phase BF (v60)
         _ => status ?? "",
     };
 }

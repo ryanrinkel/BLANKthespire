@@ -317,6 +317,8 @@ public static class TriggerRunner
         "focus"          => ApplyT<FocusPower>(ctx, player, amount),
         "temp_thorns"    => ApplyT<ForgedTempThornsPower>(ctx, player, amount), // Phase AN (v44)
         "temp_focus"     => ApplyT<ForgedTempFocusPower>(ctx, player, amount),  // Phase AN (v44)
+        "vigor"          => ApplyT<VigorPower>(ctx, player, amount),            // Phase BF (v60): "whenever you gain Block, gain 2 Vigor"
+        "double_damage"  => ApplyT<DoubleDamagePower>(ctx, player, amount),     // Phase BF (v60)
         _ => Task.CompletedTask,
     };
 

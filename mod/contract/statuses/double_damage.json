@@ -1,0 +1,6 @@
+{
+  "id": "double_damage",
+  "name": "Double Damage",
+  "kind": "buff",
+  "decay": "turn"
+}
