@@ -1013,8 +1013,9 @@ _PRUNABLE_SECTIONS: list[tuple[str, frozenset, str | None, str, str]] = [
     ("RAMPAGE", frozenset({"grow"}), None, "rampage", "rampage (a damage `grow` per replay)"),
     ("IN-RUN UPGRADE", frozenset({"upgrade_card"}), None, "upgrade", "in-run upgrade (upgrade_card, Armaments)"),
     ("DECK-THINNING", frozenset({"purge", "purge_card"}), None, "purge", "deck-thinning (purge / purge_card)"),
-    ("DISCARD / HAND-CHURN", frozenset({"discard", "scry", "on_discard", "retrieve_card"}), None, "discard",
-     "discard / scry income + on_discard fuel cards + retrieve_card recursion"),
+    ("DISCARD / HAND-CHURN", frozenset({"discard", "scry", "on_discard", "retrieve_card",
+                                        "sly"}), None, "discard",  # Phase BB (v56): Sly is discard-class vocabulary
+     "discard / scry income + on_discard / sly fuel cards + retrieve_card recursion"),
     ("CORRUPTION", frozenset({"corruption"}), None, "corruption", "corruption (Skills cost 0 but Exhaust)"),
     ("METAMORPH", frozenset({"transform_card", "graft_card"}), None, "transform",
      "metamorph (transform_card / graft_card: a card that permanently becomes another)"),
@@ -1382,6 +1383,8 @@ def _cond_uptime(when, deck_stats: dict, trigger: str = "", realistic: bool = Fa
         up = 1.0 if value <= 1 else (0.5 if value == 2 else 0.25)
     elif kind == "turn_at_least":
         up = min(1.0, max(0.15, (7.0 - value) / 6.0))  # ~6-turn fight
+    elif kind == "turn_at_most":  # Phase BB (v56): the mirror — open for the first `value` turns of a ~6-turn fight
+        up = min(1.0, max(0.15, value / 6.0))
     elif kind == "hand_size_ge":
         held = min(3, round(4 * deck_stats["share"])) if realistic else min(5, round(10 * deck_stats["share"]))
         expected = 5 + held - (1 if str(trigger).strip().lower() == "on_card_played" else 0)
@@ -2096,10 +2099,12 @@ _ORB_FORBIDDEN_CONDITION_KINDS = {"target_has_status", "retained_last_turn", "ta
 _ORB_CONDITION_KINDS = {
     "orbs_match", "orb_count_ge", "no_block", "hp_below_half", "has_block", "enemy_count_ge", "turn_at_least",
     "hand_size_ge", "forged_ge", "draw_pile_empty", "light_ge", "dark_ge", "centered", "hp_lost_ge", "energy_ge",
-    "cards_played_this_turn_ge"}
+    "cards_played_this_turn_ge",
+    "turn_at_most"}  # Phase BB (v56): a player read like its mirror — legal in an orb effect
 # value bounds (mirror C# Conditions.Validate): kinds that NEED value >= 1, and the three capped thresholds.
 _ORB_CONDITION_VALUE_KINDS = {"orb_count_ge", "enemy_count_ge", "turn_at_least", "hand_size_ge", "forged_ge",
-                              "light_ge", "dark_ge", "centered", "hp_lost_ge", "energy_ge", "cards_played_this_turn_ge"}
+                              "light_ge", "dark_ge", "centered", "hp_lost_ge", "energy_ge", "cards_played_this_turn_ge",
+                              "turn_at_most"}  # Phase BB (v56)
 _ORB_CONDITION_VALUE_MAX = {"energy_ge": 6, "cards_played_this_turn_ge": 10, "hp_lost_ge": 15}
 
 

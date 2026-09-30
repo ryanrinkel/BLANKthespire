@@ -28,7 +28,9 @@ public static class Conditions
          "light_ge", "dark_ge", "centered", // Phase S (gap #1): the Balance gauge reads (light/dark pole magnitude; |gauge| <= N)
          // Phase AM (v43, VOCAB_GAP_REMEDIATION Wave 3): two TARGET reads (the chosen enemy — single-target cards only,
          // never in a trigger) + two player reads (legal on cards AND as a trigger's fire-time gate).
-         "target_hp_below_half", "target_has_block", "energy_ge", "cards_played_this_turn_ge"];
+         "target_hp_below_half", "target_has_block", "energy_ge", "cards_played_this_turn_ge",
+         // Phase BB (v56, gap #59): the mirror of turn_at_least — "if it is turn N or earlier" (the opener's window).
+         "turn_at_most"];
 
     /// <summary>Phase AM (v43): the condition kinds that read the CHOSEN TARGET (play.Target). Only meaningful on a
     /// single-enemy card (target:"enemy"); an AoE / self / random_enemy card has no chosen target, and a trigger fires
@@ -57,7 +59,8 @@ public static class Conditions
              // window >= 1). All need value >= 1 (matching card.schema.json's global value minimum).
              || c.Kind == "light_ge" || c.Kind == "dark_ge" || c.Kind == "centered"
              || c.Kind == "hp_lost_ge" // Phase AD (gap #12)
-             || c.Kind == "energy_ge" || c.Kind == "cards_played_this_turn_ge") && c.Value < 1) // Phase AM (v43)
+             || c.Kind == "energy_ge" || c.Kind == "cards_played_this_turn_ge" // Phase AM (v43)
+             || c.Kind == "turn_at_most") && c.Value < 1) // Phase BB (v56)
             return $"condition '{c.Kind}' needs value >= 1.";
         // Phase AM (v43): cap the two new thresholds (see EnergyGeMax / CardsPlayedGeMax).
         if (c.Kind == "energy_ge" && c.Value > EnergyGeMax)
@@ -119,6 +122,8 @@ public static class Conditions
                 return player.Creature.CombatState.HittableEnemies.Count(e => e.IsAlive) >= c.Value;
             case "turn_at_least":
                 return player.Creature.CombatState.RoundNumber >= c.Value;
+            case "turn_at_most": // Phase BB (v56, gap #59): the opener's window — turn N or earlier
+                return player.Creature.CombatState.RoundNumber <= c.Value;
             case "hand_size_ge":
                 return player.PlayerCombatState.Hand.Cards.Count >= c.Value;
             case "forged_ge": // Phase M (gap #36): the Forge-gated payoff ("If your Forge is 10+ …")
@@ -173,6 +178,7 @@ public static class Conditions
         "has_block"          => c.Value > 1 ? $"you have {c.Value}+ Block" : "you have Block",
         "enemy_count_ge"     => $"there are {c.Value}+ enemies",
         "turn_at_least"      => $"it is turn {c.Value}+",
+        "turn_at_most"       => $"it is turn {c.Value} or earlier", // Phase BB (v56, gap #59)
         "hand_size_ge"       => $"you hold {c.Value}+ cards",
         "retained_last_turn" => "you held this card",
         "forged_ge"          => $"your Forge is {c.Value}+",

@@ -503,6 +503,7 @@ function condCore(c) {
     case "hp_below_half": return "you're below half HP";
     case "enemy_count_ge": return `there are ${v ?? "enough"}+ enemies`;
     case "turn_at_least": return `it's turn ${v ?? "?"}+`;
+    case "turn_at_most": return `it's turn ${v ?? "?"} or earlier`; // Phase BB (v56, gap #59)
     case "hand_size_ge": return `your hand has ${v ?? "enough"}+ cards`;
     case "retained_last_turn": return "you retained a card last turn";
     case "forged_ge": return `your Forge is ${v ?? "enough"}+`;
@@ -560,6 +561,7 @@ function effPhrase(e, target) {
     case "innate": return "Innate";
     case "retain": return "Retain";
     case "ethereal": return "Ethereal";
+    case "sly": return "Sly"; // Phase BB (v56, gap #55): discarded from hand by an effect = played for free
     case "evoke": return "Evoke your next orb";
     case "channel_orb": return `Channel ${titleCase(e.orb || "an orb")}${a > 1 ? ` ×${a}` : ""}`;
     case "apply_status":

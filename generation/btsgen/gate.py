@@ -107,7 +107,8 @@ CORE_OPS = ("damage", "block", "apply_status", "add_trigger", "draw", "retain", 
 # the vocabulary grows that is NOT in this list or in FAMILY_OPS stays in the core until someone measures it.
 GATED_OP_ORDER = ("balance_step", "add_card", "discard", "upgrade_card", "scry", "purge_card", "purge",
                   "spread_debuffs", "retrieve_card", "innate", "cost_shift", "corruption", "add_status_card",
-                  "ethereal", "gain_max_hp", "graft_card", "transform_card")
+                  "ethereal", "gain_max_hp", "graft_card", "transform_card",
+                  "sly")  # Phase BB (v56): unmeasured, so it rides the tail like the other rare keywords
 
 # ---- Phase 1b: which gate UNIT each schema element belongs to. A unit is a gated op name or a family name. An
 # element whose units are all gated moves to the tail (families are "fam:<name>", so the Forge family never

@@ -159,6 +159,8 @@ def test_detectors_round_trip() -> None:
         "tainted_power": _card([{"op": "damage", "amount": 12}, {"op": "add_status_card", "card": "wound", "pile": "discard"}]),
         # Phase AX (v53): copy the struck target's debuffs to the rest of the room
         "contagion": _card([{"op": "apply_status", "status": "vulnerable", "amount": 2}, {"op": "spread_debuffs"}]),
+        # Phase BB (v56): the opener's window (the mirror of late_game)
+        "first_blood": _card([{"op": "damage", "amount": 8}, {"op": "gain_energy", "amount": 1, "when": {"kind": "turn_at_most", "value": 2}}]),
     }
     plain = census.walk_card(_card([{"op": "damage", "amount": 6}]))
     check(set(samples) == {f.id for f in featured.FEATURED_MENU}, "a sample exists for every menu entry")
@@ -281,6 +283,8 @@ def test_class_kind_detectors_and_presence() -> None:
         "knife_edge": _card([{"op": "damage", "amount": 12, "when": {"kind": "centered", "value": 1}}]),
         "discard_loop": _card([{"op": "scry", "amount": 2}]),
         "transform_graft": _card([{"op": "graft_card", "card_id": "ember"}]),
+        # Phase BB (v56): the base-game Sly keyword on a discard-class card
+        "sly_fuel": _card([{"op": "sly"}, {"op": "damage", "amount": 5}]),
         # Phase AV (v52): spend the minion for a payoff
         "summon_sacrifice": _card([{"op": "sacrifice_summon"}, {"op": "block", "amount": 12}]),
         # Phase AX (v53): cash the Forge counter out for a burst (gated payoff FIRST, spend LAST)

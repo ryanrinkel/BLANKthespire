@@ -77,6 +77,9 @@ FEATURED_MENU: list[Featured] = [
              lambda cc: "ripen" in cc.triggers),
     Featured("late_game", 'a card that powers up late in the fight (`when` turn_at_least)',
              _d("turn_at_least"), lambda cc: "turn_at_least" in cc.whens),
+    # Phase BB (v56, gap #59): the mirror — an opener that is strongest before the fight settles.
+    Featured("first_blood", 'an opener that is strongest in the first turns (`when` turn_at_most)',
+             _d("turn_at_most"), lambda cc: "turn_at_most" in cc.whens),
     Featured("horde_payoff", 'an AoE payoff for facing a crowd (all_enemies + `when` enemy_count_ge)',
              _d("enemy_count_ge"), lambda cc: "enemy_count_ge" in cc.whens),
     Featured("desperation", 'a last-stand payoff while below half HP (`when` hp_below_half)',
@@ -289,6 +292,14 @@ FEATURED_CLASS_KIND: dict[str, list[Featured]] = {
                  lambda cc: "scry" in cc.ops or "on_discard" in cc.triggers,
                  detect_pool=lambda ccs: any("scry" in cc.ops for cc in ccs)
                  and any("on_discard" in cc.triggers for cc in ccs)),
+        # Phase BB (v56, gap #55): the base-game Sly keyword — discard-fuel that plays itself for free when pitched.
+        # Kept OFF the keyword menu on purpose: its quota would push Sly onto classes with no discard outlet, and a
+        # Sly card with nothing to discard it is a plain card. Here the class kind guarantees the outlet.
+        Featured("sly_fuel", 'a discard-class SLY card - discarded from hand by an effect, it is played for FREE (op "sly")',
+                 'REQUIRED: give this Attack/Skill the flag-op "sly" (if an effect discards it from your hand before '
+                 'the end of your turn, it is played for free) - a card that is fine to play and better to pitch; '
+                 'never with "retain", never on a Power. The class must keep a discard / scry outlet to feed it.',
+                 lambda cc: "sly" in cc.ops),
     ],
     "transform": [
         Featured("transform_graft", 'a transform-class GRAFT that lets you reforge a chosen card in hand into a strong one (op "graft_card")',

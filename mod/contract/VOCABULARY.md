@@ -19,6 +19,7 @@ validator. (The vocabulary grows as the interpreter grows — more ops/statuses 
 | `innate`       | *(none)*          | This card starts in your opening hand every combat. A card property (no targeted effect). |
 | `retain`       | *(none)*          | This card is NOT discarded at end of turn — it stays in your hand. A card property. |
 | `ethereal`     | *(none)*          | If this card is still in your hand at end of turn, it Exhausts. A card property. |
+| `sly`          | *(none)*          | **Sly** (v56) — if this card is **discarded from your hand by an effect** before the end of your turn, it is **played for free** (the base-game keyword; a random enemy target). The discard-fuel card that is fine to play and better to pitch: pair it with `discard` / `scry` outlets. End-of-turn cleanup is not a discard. Never with `retain`, never on a Power; an upgrade may add it. |
 | `purge`        | *(none)*          | **Purge** — when this card is played, it is removed from your **run deck for the rest of the run** (permanent deck-thinning; a stronger `exhaust` that never comes back). A card property. **Mutually exclusive with `exhaust`** (a card can't do both). **Never on a BASIC card.** Put it on a strong one-shot skill/attack you're happy to spend once to thin toward a lean engine (1–3 per class). A generated copy of a purge card (from `add_card`) just vanishes for the combat — it isn't in your run deck to remove. |
 | `purge_card`   | *(none)*          | **Choose-a-card Purge** — when this card is played, **YOU pick a card in your hand and purge THAT card** (removed from your run deck for the rest of the run). The player-choice form of `purge`: instead of the played card removing itself, it lets you thin a *chosen* target — great for cutting a Basic/Curse/dead card you drew. Carries no amount/target. Empty hand = harmless no-op. Put it on a skill/attack (1–2 per class). A chosen generated copy (no run-deck original) just vanishes for the combat. |
 | `forge`        | `amount` (int ≥1) | **Forge N** — stoke your **Forge** counter by `amount` (a stacking power; it resets each combat unless the class sets `forge_persist` — see Run-persistent Forge). Cash it with a `scale:"forged"` payoff (see Scaled amounts — the pairing is required both ways). Income also works inside `add_trigger` payloads ("At the start of your turn, Forge 2") — see Triggers. |
@@ -207,6 +208,7 @@ condition. (v49: the same `when` is legal inside a custom orb's `passive` / `evo
 | `has_block`         | optional `value` (int, default 1) | you currently have at least `value` Block (a defensive follow-up). |
 | `enemy_count_ge`    | `value` (int ≥1) | there are at least `value` living enemies (a reward-vs-crowds payoff; `negate` for a lone-elite bonus). |
 | `turn_at_least`     | `value` (int ≥1) | it is turn `value` or later (a card that powers up as the fight drags on). |
+| `turn_at_most`      | `value` (int ≥1) | it is turn `value` or earlier (v56 — the opener's window: "if it is turn 2 or earlier, …"; an ambush that is strongest early without `innate` on everything). |
 | `hand_size_ge`      | `value` (int ≥1) | you currently hold at least `value` cards (a full-hand payoff; pairs with Retain/draw). |
 | `retained_last_turn`| —           | THIS card was in your hand at the start of this turn (you held it). The on-hold bonus: "if retained, …". |
 | `forged_ge`         | `value` (int ≥1) | your **Forge** counter is at least `value` (a Forge-class gated payoff: "If your Forge is 10+, …"). Pair with `forge` income only. |
@@ -458,7 +460,7 @@ content exists — so the only real choice is whether it is *interesting*.
   engine — never for a bigger Strike. A 4-cost common/uncommon is a dead draw and is rejected.
 - **`upgrade.effects` normally lists the SAME effects in the SAME order** (only the numbers change). Two exceptions
   (v53): the upgrade may **APPEND exactly one keyword** the base card lacks (`exhaust` / `retain` / `innate` /
-  `ethereal` — "Rampage+ also Retains"), or **DROP a trailing `exhaust`** (the upgrade sheds the drawback). Any other
+  `ethereal` / `sly` — "Rampage+ also Retains"), or **DROP a trailing `exhaust`** (the upgrade sheds the drawback). Any other
   change in length or keywords is rejected.
 - `tags`: 1–3 slugs (v53 raised the cap from 2).
 

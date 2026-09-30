@@ -268,6 +268,8 @@ def test_w2_menu_keys_wired() -> None:
         "target_has_block": {"op": "apply_status", "status": "vulnerable", "amount": 2, "when": {"kind": "target_has_block"}},
         "energy_ge": {"op": "draw", "amount": 1, "when": {"kind": "energy_ge", "value": 2}},
         "cards_played_this_turn_ge": {"op": "apply_status", "status": "weak", "amount": 1, "when": {"kind": "cards_played_this_turn_ge", "value": 2}},
+        # Phase BB (v56): the opener's window
+        "turn_at_most": {"op": "gain_energy", "amount": 1, "when": {"kind": "turn_at_most", "value": 2}},
         "block": {"op": "damage", "amount": 1, "scale": "block"},
         "hp_lost_this_turn": {"op": "damage", "amount": 1, "scale": "hp_lost_this_turn"},
         "draw_pile_count": {"op": "block", "amount": 1, "scale": "draw_pile_count"},

@@ -25,7 +25,13 @@ import sys
 import zlib
 from pathlib import Path
 
-VOCAB_VERSION = 55  # must be <= ForgedCards.VocabVersion (55: Phase BA — FORGED POTIONS: a new
+VOCAB_VERSION = 56  # must be <= ForgedCards.VocabVersion (56: Phase BB — TEMPO KEYWORDS: the base-game
+                    # `sly` keyword flag-op (discarded from hand by an effect = played for free; the game's
+                    # CardCmd.DiscardAndDraw does the auto-play, so the mod only declares the keyword; never
+                    # with retain, never on a Power; an upgrade may add it) + the `turn_at_most {value}`
+                    # condition, the mirror of turn_at_least. No codec change — the codec carries JSON, and the
+                    # bump only stops an older mod from importing a code whose new keyword it would ignore.)
+                    # 55: Phase BA — FORGED POTIONS: a new
                     # CHARACTER-level array `potion_pool` carrying the class's own signature potion
                     # ({name, emoji, rarity: common|uncommon|rare, usage: combat|any, target:
                     # self|enemy|all_enemies, description, effects[]}). Its effects are the relic

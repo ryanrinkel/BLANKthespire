@@ -42,7 +42,16 @@ public static class ForgedCards
     /// v10 (forged statuses, Phase J): + CharacterSpec.StatusPool (a class's ≤4 custom modifier-family statuses
     /// read from `status_pool`; see ForgedCharacters / ForgedStatusPower). Class cards may apply a custom status
     /// by pool name via the `apply_status_custom` op (class-only, like custom-orb channels).</summary>
-    public const int VocabVersion = 55; // 55: Phase BA (VOCAB_GAP_REMEDIATION Wave 4) — FORGED POTIONS.
+    public const int VocabVersion = 56; // 56: Phase BB (VOCAB_EXPANSION_5, gaps #55/#59) — TEMPO KEYWORDS.
+                                        //     New keyword flag-op `sly` (the base-game CardKeyword.Sly: if this card is
+                                        //     discarded from your hand by an effect before the end of your turn, the GAME
+                                        //     plays it for free — CardCmd.DiscardAndDraw does the auto-play, so the mod only
+                                        //     declares the keyword; an upgrade may add it like the other four; never with
+                                        //     `retain`, never on a Power). New `when` kind `turn_at_most {value}`, the
+                                        //     mirror of turn_at_least ("if it is turn 2 or earlier" — the opener's window;
+                                        //     legal as a trigger gate and inside custom-orb effects like its mirror).
+                                        //     Describe: "Sly." / "… if it is turn N or earlier". [BB] tag on the Sly play.
+                                        // 55: Phase BA (VOCAB_GAP_REMEDIATION Wave 4) — FORGED POTIONS.
                                         //     A new CHARACTER-level array `potion_pool` (0..MaxPotions entries): the
                                         //     class's own signature potion — {name, emoji, rarity, usage, target,
                                         //     description, effects[]}. Effects are the RELIC sub-vocabulary (no card,
@@ -379,6 +388,7 @@ public static class ForgedCards
          "gain_max_hp", // Phase AN (v44): Feed — raise your Max HP by amount (and heal that much). Card-only, 1..5.
          "cost_shift", // Phase AO (v45): a card-type-scoped energy discount (this turn / this combat / next N plays). Card-only.
          "exhaust", "innate", "retain", "ethereal",
+         "sly", // Phase BB (v56, gap #55): the base-game Sly keyword — discarded from hand by an effect = played for free
          "gain_orb_slot", "channel_orb", "evoke", // Phase G orbs (opened to the LLM contract in G3)
          "forge", // Phase M (gap #36): stoke the per-combat Forge counter (payoff = scale:"forged")
          "add_trigger", // Phase H3 triggers
@@ -516,11 +526,13 @@ public static class ForgedCards
     internal const int MaxCardCost = 4;
     // Phase AX (v53): the keyword flag-ops an UPGRADE may ADD (exactly one, appended to the end of the upgrade
     // effect list). Removal is exhaust-only (an upgrade that drops a drawback), so it has no set of its own.
-    private static readonly HashSet<string> UpgradeAddableKeywords = ["exhaust", "retain", "innate", "ethereal"];
+    private static readonly HashSet<string> UpgradeAddableKeywords = ["exhaust", "retain", "innate", "ethereal",
+        "sly"]; // Phase BB (v56): "Reflex+ is also Sly" is the same one-keyword append
     // Phase AX (v53): the keyword flag-ops whose presence differs between the base and upgrade lists — the set
     // DataCard diffs to pick each keyword's BaseLib UpgradeType (None / Add / Remove). `purge` is deliberately
     // absent: it is not a CardKeyword (it rides Spec.HasPurge + GetResultPileTypeForCardPlay).
-    internal static readonly HashSet<string> KeywordOps = ["exhaust", "retain", "innate", "ethereal"];
+    internal static readonly HashSet<string> KeywordOps = ["exhaust", "retain", "innate", "ethereal",
+        "sly"]; // Phase BB (v56): CardKeyword.Sly
     // Phase AX (v53): how many times one card may declare the SAME apply_status. The second one must be
     // `when`-gated and takes a suffixed var ("Weak2"); a third is always a reject.
     private const int MaxSameStatusPerCard = 2;
@@ -738,6 +750,11 @@ public static class ForgedCards
 
         var invalid = Validate(effects, upgrade, allowCustomOrbs, target, orbNames);
         if (invalid != null) { error = invalid; return false; }
+
+        // Phase BB (v56, gap #55): Sly is a hand keyword for cards you PITCH — an Attack or a Skill (every base-game Sly
+        // card is one). A Power auto-played off a discard is a free permanent buff, which is not the fantasy.
+        if (type == CardType.Power && effects.Concat(upgrade ?? []).Any(e => e.Op == "sly"))
+        { error = "'sly' is not allowed on a Power (Sly is for Attacks/Skills you discard for a free play)."; return false; }
 
         // Cost is an int (0–4, Phase AX) OR the string "X" (an X-cost card: X = all energy, resolved at play time).
         bool costsX = card.ContainsKey("cost")
@@ -1331,6 +1348,14 @@ public static class ForgedCards
         // (exhaust → Exhaust pile this combat only; purge → gone from the run). One at most, per base-StS convention.
         if (effects.Any(e => e.Op == "purge") && effects.Any(e => e.Op == "exhaust"))
             return "a card can't be both 'purge' and 'exhaust' (purge already removes it from the run — pick one).";
+        // Phase BB (v56, gap #55): sly ⊥ retain. Retain says "hold this card"; Sly says "discard this card for a free
+        // play" — a card carrying both has no identity (and Retain keeps it out of the flush, so Sly rarely fires).
+        // Checked across base + upgrade (an upgrade appending the contradicting keyword is the same mistake).
+        {
+            var all = effects.Concat(upgrade ?? []).ToList();
+            if (all.Any(e => e.Op == "sly") && all.Any(e => e.Op == "retain"))
+                return "a card can't be both 'sly' and 'retain' (Retain holds the card; Sly wants it discarded — pick one).";
+        }
         // Phase AH (gaps #35/#38): transform_card ⊥ purge. Both permanently rewrite the run-deck original; a card
         // can't both BECOME another card and DELETE itself from the run (contradictory). One at most, per card.
         if ((effects.Concat(upgrade ?? [])).Any(e => e.Op == "transform_card")
@@ -1824,6 +1849,7 @@ public static class ForgedCards
                 case "innate":      parts.Add("Innate."); break;
                 case "retain":      parts.Add("Retain."); break;
                 case "ethereal":    parts.Add("Ethereal."); break;
+                case "sly":         parts.Add("Sly."); break; // Phase BB (v56, gap #55): the keyword idiom (byte-lockstep with cardgen.py)
                 case "purge":       parts.Add("Purge. (Removed from your deck for the rest of the run.)"); break; // Phase W (gap #19)
                 case "purge_card":  parts.Add("Choose a card in your hand and Purge it. (Removed from your deck for the rest of the run.)"); break; // Phase Z (gap #19 choose)
                 case "sacrifice_summon": parts.Add("Sacrifice your summon."); break; // Phase AV (v52): flag-op sentence (byte-lockstep with cardgen.py)

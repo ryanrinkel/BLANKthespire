@@ -175,6 +175,12 @@ public abstract class DataCard : ConstructedCardModel
                 case "innate":      WithKeyword(CardKeyword.Innate, KeywordUpgrade("innate")); break;    // keyword: starts in opening hand
                 case "retain":      WithKeyword(CardKeyword.Retain, KeywordUpgrade("retain")); break;    // keyword: not discarded at end of turn
                 case "ethereal":    WithKeyword(CardKeyword.Ethereal, KeywordUpgrade("ethereal")); break;  // keyword: exhausts if still in hand
+                // Phase BB (v56, gap #55): the base-game SLY keyword. The free play lives inside the GAME's own
+                // CardCmd.DiscardAndDraw (it collects IsSlyThisTurn cards, discards the batch, then AutoPlays each one
+                // at EnergySpent 0 with a random enemy target) — every mod discard op already goes through that batch
+                // call, so declaring the keyword is the whole implementation. Do NOT also route it through
+                // AfterCardDiscarded: that would double-play the card beside the native path.
+                case "sly":         WithKeyword(CardKeyword.Sly, KeywordUpgrade("sly")); break;
                 case "gain_orb_slot":         // Phase G orbs: executed in OnPlay; counts shown via Describe (no var)
                 case "channel_orb":
                 case "evoke":
@@ -277,8 +283,21 @@ public abstract class DataCard : ConstructedCardModel
                 case "innate":   WithKeyword(CardKeyword.Innate, UpgradeType.Add); break;
                 case "retain":   WithKeyword(CardKeyword.Retain, UpgradeType.Add); break;
                 case "ethereal": WithKeyword(CardKeyword.Ethereal, UpgradeType.Add); break;
+                case "sly":      WithKeyword(CardKeyword.Sly, UpgradeType.Add); break; // Phase BB (v56)
             }
         }
+    }
+
+    /// <summary>Phase BB (v56, gap #55): the smoke tag for a SLY free play. The game raises this hook right before
+    /// <c>CardCmd.AutoPlay</c> runs a card, with the reason; a <c>SlyDiscard</c> on THIS card proves the base-game
+    /// keyword fired off one of our discards (the AutoSlay grep gate). Nothing else happens here — the play itself is
+    /// the game's.</summary>
+    public override Task BeforeCardAutoPlayed(CardModel card, Creature? target, AutoPlayType type)
+    {
+        if (card == this && type == AutoPlayType.SlyDiscard)
+            MainFile.Logger.Info($"[BB] sly: '{Spec.Title ?? Spec.Id}' discarded from hand -> played for free" +
+                                 $"{(target != null ? $" at '{target.Monster?.GetType().Name ?? "target"}'" : "")}.");
+        return base.BeforeCardAutoPlayed(card, target, type);
     }
 
     protected override async Task OnPlay(PlayerChoiceContext choiceContext, CardPlay play)

@@ -61,10 +61,11 @@ def seeded_shuffle(items, seed: int, salt: str = "") -> list:
 # that declared the matching pool. The clause keeps ONLY the entries the live VOCABULARY.md actually has.
 _PREFERRED_OPS = ["add_trigger", "transform_card", "graft_card", "spread_debuffs", "scry", "balance_step", "purge", "purge_card",
                   "forge", "upgrade_card", "discard", "add_card", "corruption", "retain", "exhaust",
-                  "ethereal", "innate", "lose_hp"]
+                  "ethereal", "innate", "sly",  # Phase BB (v56): the base-game Sly keyword
+                  "lose_hp"]
 _PREFERRED_SCALES = ["cards_in_hand", "cards_retained", "unspent_energy_last_turn", "forged",
                      "damage_dealt_unblocked", "target_debuff_count", "tag_cards_owned"]
-_PREFERRED_CONDITIONS = ["hp_below_half", "no_block", "has_block", "turn_at_least", "enemy_count_ge",
+_PREFERRED_CONDITIONS = ["hp_below_half", "no_block", "has_block", "turn_at_least", "turn_at_most", "enemy_count_ge",
                          "hand_size_ge", "retained_last_turn", "target_has_status", "draw_pile_empty",
                          "hp_lost_ge", "forged_ge"]
 _PREFERRED_TRIGGERS = ["on_exhaust", "on_card_played", "on_hp_lost", "on_block_gained", "on_card_drawn",

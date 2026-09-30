@@ -548,7 +548,15 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Mechanic sketch:** Card keyword `sly`: if this card is discarded from your hand by an effect before end of turn, play it for free (base-game Sly). Hook point: the card's `AfterCardDiscarded` override, which already powers `on_discard`.
 - **Buildable today?** No.
 - **Priority:** requested by Ryan in the 2026-09-29 archetype copy review.
-- **Status:** captured
+- **Status:** **done (2026-09-30, vocab v56, Phase BB)** — the base game already implements Sly: `CardModel.IsSlyThisTurn`
+  + the free play inside `CardCmd.DiscardAndDraw` (every mod discard op is a batch call through it), so the mod only
+  DECLARES `CardKeyword.Sly` (`DataCard` flag-op `sly`, upgrade-addable like the other four; NOT routed through
+  `AfterCardDiscarded` — that would double-play). Rules: sly ⊥ retain, never on a Power (C# + validator.py);
+  class-level `sly_warnings` (needs a discard/scry outlet). Harness: `FEATURED_CLASS_KIND["discard"].sly_fuel`
+  (deliberately NOT on the keyword menu — its quota would push Sly onto classes with no outlet), `madness_discard`
+  ops, exemplar `ex_pocket_dagger`, `_PREFERRED_OPS`, gate tail. `[BB]` tag on `BeforeCardAutoPlayed(SlyDiscard)`.
+  Accepted quirk: a scried Sly card auto-plays too (`Scry` discards through the same batch call). AutoSlay smoke
+  pending (`tests/test_phase_bb.py` is the offline gate).
 
 ### 56. Trigger when Poison deals damage
 - **Surfaced by:** archetype copy review (2026-09-29), for Venom
@@ -580,7 +588,11 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Mechanic sketch:** `turn_at_most {value}` condition, the mirror of `turn_at_least`.
 - **Buildable today?** No.
 - **Priority:** requested by Ryan in the 2026-09-29 archetype copy review.
-- **Status:** captured
+- **Status:** **done (2026-09-30, vocab v56, Phase BB)** — `Conditions.Kinds/Validate/Eval/Phrase` ("it is turn N or
+  earlier"), schema enum + required value, VOCABULARY row, `cardgen.cond_phrase`, `WHEN_MENU_V2`, featured
+  `first_blood`, `_PREFERRED_CONDITIONS`, `_ORB_CONDITION_KINDS` (legal in orb effects like its mirror), the
+  class_forge uptime heuristic (value/6), `ambush_alpha` ops + build_notes, exemplar `ex_first_light`, render.js.
+  (`turn_at_least N+1 negate:true` already meant the same thing; the new kind buys legible card text.)
 
 ### 60. Visible ripen countdown (mod change)
 - **Surfaced by:** archetype copy review (2026-09-29), for Ripening

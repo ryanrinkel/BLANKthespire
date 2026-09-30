@@ -252,6 +252,7 @@ public static class EffectRunner
                 case "innate":
                 case "retain":
                 case "ethereal":
+                case "sly": // Phase BB (v56, gap #55): the game plays a discarded Sly card for free (CardCmd.DiscardAndDraw)
                     // Card-keyword ops: declared as a CardKeyword at declaration time (the game applies the
                     // keyword behavior — exhaust-on-play, opening hand, retain, etc.); nothing to run here.
                     break;

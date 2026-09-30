@@ -96,6 +96,9 @@ WHEN_MENU_V2 = WHEN_MENU + [
                   'hold 2+ energy after paying for it).'),
     ("cards_played_this_turn_ge", 'REQUIRED: gate a bonus with `when` cards_played_this_turn_ge value:2 (the Finisher '
                                   'combo gate: stronger once you have played 2+ other cards this turn).'),
+    # Phase BB (v56, gap #59): the opener's window — the mirror of turn_at_least.
+    ("turn_at_most", 'REQUIRED: gate a bonus with `when` turn_at_most value:2 (an opener: stronger on turns 1-2, '
+                     'before the fight settles).'),
 ]
 # W2.2: class-kind-GATED `when` entries — (key, directive, kind). Dealt only to a class whose kind set (see
 # harness_v2.pool_kind: the blueprint's orb/status/summon kind UNIONED with the selected archetypes' mechanic_kind)

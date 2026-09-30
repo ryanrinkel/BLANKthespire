@@ -295,6 +295,8 @@ def cond_phrase(w: dict) -> str:
         return f"there are {int(w.get('value', 0) or 0)}+ enemies"
     if kind == "turn_at_least":  # L-4 (now also a card condition)
         return f"it is turn {int(w.get('value', 0) or 0)}+"
+    if kind == "turn_at_most":  # Phase BB (v56, gap #59): the opener's window. Mirrors Conditions.Phrase.
+        return f"it is turn {int(w.get('value', 0) or 0)} or earlier"
     if kind == "hand_size_ge":  # F5
         return f"you hold {int(w.get('value', 0) or 0)}+ cards"
     if kind == "retained_last_turn":  # F5
@@ -534,6 +536,9 @@ def describe(effects: list[dict], target: str) -> str:
             parts.append("Retain.")
         elif op == "ethereal":
             parts.append("Ethereal.")
+        elif op == "sly":
+            # Phase BB (v56, gap #55): the base-game Sly keyword sentence. Lockstep with ForgedCards.Describe.
+            parts.append("Sly.")
         elif op == "purge":
             # Phase W (gap #19): the purge keyword sentence. Lockstep with ForgedCards.Describe.
             parts.append("Purge. (Removed from your deck for the rest of the run.)")

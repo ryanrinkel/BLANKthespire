@@ -59,7 +59,8 @@ EXOTIC_STATUSES = frozenset({
 SPECIALTY_STATUSES = frozenset({"poison", "frail", "focus", "temp_focus"})  # Phase AN (v44): temp_focus is orb-class too
 # W2.1: the four card-property keywords (nullary ops). `multi_hit` joins them as a keyword KIND (see
 # CardCensus.keyword_kinds) because "Deal 4 damage 3 times" is a card shape, not an op.
-KEYWORD_OPS = frozenset({"exhaust", "retain", "innate", "ethereal"})
+KEYWORD_OPS = frozenset({"exhaust", "retain", "innate", "ethereal",
+                         "sly"})  # Phase BB (v56, gap #55): the base-game Sly keyword is a card shape too
 MULTI_HIT_KIND = "multi_hit"
 
 

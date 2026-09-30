@@ -643,6 +643,21 @@ def corruption_warnings(cards: list[dict]) -> list[str]:
     return []
 
 
+def sly_warnings(cards: list[dict]) -> list[str]:
+    """Set-level Sly pairing (Phase BB, v56, gap #55): a `sly` card is played for free when an EFFECT discards it from
+    hand — so a class shipping Sly cards must ship a discard outlet (a `discard` / `scry` op somewhere, card or
+    trigger payload). Without one the keyword never fires and the card is just a plain, slightly under-statted card.
+    Advisory, mirroring blade_empower_warnings (the per-card rules — never with retain, never on a Power — live in
+    validator.py)."""
+    sly_cards = sorted({str(c.get("id", "?")) for c in cards if isinstance(c, dict) and _card_has_op(c, {"sly"})})
+    has_outlet = any(isinstance(c, dict) and _card_has_op(c, {"discard", "scry"}) for c in cards)
+    if sly_cards and not has_outlet:
+        return [f"sly with no discard outlet: {', '.join(sly_cards)} are Sly (played for free when an effect discards "
+                "them), but no card in the class has a `discard` or `scry` op to pitch them — the keyword never fires. "
+                "Add a discard/scry outlet, or drop sly."]
+    return []
+
+
 def cost_shift_warnings(cards: list[dict]) -> list[str]:
     """Set-level Cost Shift discipline (Phase AO, v45): a whole-combat `cost_shift` (scope "combat") is a rare
     build-around discount — the plan's loop-discipline rule is AT MOST ONE such card per class (two stack into a

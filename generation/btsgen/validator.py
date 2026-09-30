@@ -175,7 +175,8 @@ _SPEND_FORGE_MAX = 10
 _MAX_COST = 4
 # Phase AX (v53): the keyword flag-ops an UPGRADE may ADD (exactly one, appended to the end of the upgrade effect
 # list). Removal is exhaust-only. `purge` is deliberately absent - it is not a CardKeyword.
-_KEYWORD_OPS = {"exhaust", "retain", "innate", "ethereal"}
+_KEYWORD_OPS = {"exhaust", "retain", "innate", "ethereal",
+                "sly"}  # Phase BB (v56, gap #55): CardKeyword.Sly (mirrors ForgedCards.KeywordOps / UpgradeAddableKeywords)
 # Phase AX (v53): how many times one card may declare the SAME apply_status. The second must be `when`-gated and
 # takes a suffixed var ("Weak2"); a third is always a reject. Lockstep with ForgedCards.MaxSameStatusPerCard.
 _MAX_SAME_STATUS = 2
@@ -706,6 +707,15 @@ class CardValidator:
                 out.append("a card can't be both 'purge' and 'exhaust' (purge already removes it from the run — pick one).")
             if is_basic:
                 out.append("'purge' is not allowed on a BASIC card (it would thin the class's starting deck / floors).")
+        # Phase BB (v56, gap #55): sly ⊥ retain (Retain holds the card; Sly wants it discarded — a card with both has no
+        # identity, and Retain keeps it out of the flush so Sly rarely fires), and never on a Power (every base-game Sly
+        # card is an Attack/Skill you pitch; a Power auto-played off a discard is a free permanent buff). Mirrors
+        # ForgedCards.Validate + TryBuildSpec. The "needs a discard outlet" rule is class-level (character_validator).
+        if any(e.get("op") == "sly" for e in effects + up_effects):
+            if any(e.get("op") == "retain" for e in effects + up_effects):
+                out.append("a card can't be both 'sly' and 'retain' (Retain holds the card; Sly wants it discarded -- pick one).")
+            if str(card.get("type", "")).strip().lower() == "power":
+                out.append("'sly' is not allowed on a Power (Sly is for Attacks/Skills you discard for a free play).")
         # Phase Z (gap #19 choose): purge_card thins a CHOSEN card (not itself), so no ⊥exhaust rule; but keep
         # deck-EDITING out of the starting deck — a basic shouldn't carry it. Mirrors ForgedCards (SupportedOps only).
         if any(e.get("op") == "purge_card" for e in effects + up_effects) and is_basic:
@@ -1149,6 +1159,11 @@ class CardValidator:
             return amt * width
         if op == "block":
             return amt * 0.8 + (6.0 if forged else 0.0)
+        if op == "sly":
+            # Phase BB (v56, gap #55): a free play off a discard — the card's whole value again, minus the outlet it
+            # needs (unseen here). A flat premium so a Sly card isn't priced as its face alone (the base game's Sly
+            # cards are a touch under-statted for their cost; the free replay is the rest).
+            return 2.0
         if op == "draw":
             return amt * 5.0
         if op == "gain_energy":
