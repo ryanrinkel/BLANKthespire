@@ -1,10 +1,11 @@
 {
-  "_comment": "Metaphor-tagged archetype catalog for the staged creative front-end (the MAP stage). Each entry pairs a mechanical engine (vocabulary.ops + class_kind) with seeded-but-open metaphors. The `buildable` field here is a documentation guess only - catalog.py RECOMPUTES it at load against the live mod/contract/VOCABULARY.md and VOCABULARY_GAPS.md, so it auto-flips as the vocab roadmap ships. Ops use the exact tokens from VOCABULARY.md. `mechanic_kind` (optional) names the base-vocab SUBSYSTEM an archetype's ops need (forge / balance / discard / token / transform / exhaust / retain / rampage / tags / purge); harness_v2._pool_kind unions it with the class_kind to decide which `needs`-tagged exemplars a class is dealt. The `vocabulary.ops` list is really a VOCAB-TOKEN list (ops + statuses + conditions + scales + triggers) - catalog.live_vocab_tokens() checks each against VOCABULARY.md's backtick tokens.",
+  "_comment": "Metaphor-tagged archetype catalog for the staged creative front-end (the MAP stage). Each entry pairs a mechanical engine (vocabulary.ops + class_kind) with seeded-but-open metaphors. The `buildable` field here is a documentation guess only - catalog.py RECOMPUTES it at load against the live mod/contract/VOCABULARY.md and VOCABULARY_GAPS.md, so it auto-flips as the vocab roadmap ships. Ops use the exact tokens from VOCABULARY.md. `mechanic_kind` (optional) names the base-vocab SUBSYSTEM an archetype's ops need (forge / balance / discard / token / transform / exhaust / retain / rampage / tags / purge); harness_v2._pool_kind unions it with the class_kind to decide which `needs`-tagged exemplars a class is dealt. The `vocabulary.ops` list is really a VOCAB-TOKEN list (ops + statuses + conditions + scales + triggers) - catalog.live_vocab_tokens() checks each against VOCABULARY.md's backtick tokens. `description` is ONE player-facing sentence (<=150 chars, no op syntax; the picker shows it). `build_notes` is model-only construction guidance (card shapes, op syntax, touchstones); pricing/counts live in DESIGN_HEURISTICS.md archetype-notes, never here. `base_synergies` lists SHARED-POOL base-game relics/potions/colorless cards (available to every character, every run) this engine cashes in on: pieces tiered core/support with a one-line why in our own words, plus `avoid` anti-synergies, `hooks`, strengths and weaknesses. Ids are the base game's (spire-codex); only ids/names are stored, never Mega Crit's card text.",
   "archetypes": [
     {
       "id": "retain_hold",
       "name": "Retain / hold & build",
-      "description": "keep cheap cards in hand, coil, then release a scaled payoff",
+      "description": "Hold cards turn after turn, curate the perfect hand, then unleash it once the payoff is ready.",
+      "build_notes": "What players love here (the Watcher's Windmill Strike, Sands of Time and Establishment; Well-Laid Plans): patience that visibly pays off, and a hand that works as a curated toolkit. Give cards `retain`, bonuses for having been held (`retained_last_turn`), payoffs that read how many cards were held (`cards_retained`), and enough defense to survive the build-up turns.",
       "metaphors": [
         "the held breath",
         "coiling",
@@ -45,12 +46,108 @@
       "buildable": true,
       "gap_refs": [
         "VOCABULARY_GAPS#5"
-      ]
+      ],
+      "base_synergies": {
+        "hooks": [
+          "retain",
+          "cards_in_hand",
+          "unspent_energy"
+        ],
+        "pieces": [
+          {
+            "kind": "relic",
+            "id": "RUNIC_PYRAMID",
+            "name": "Runic Pyramid",
+            "tier": "core",
+            "why": "Never discard your hand: every card is a retained card"
+          },
+          {
+            "kind": "relic",
+            "id": "CLOAK_CLASP",
+            "name": "Cloak Clasp",
+            "tier": "core",
+            "why": "Block per card held at end of turn pays for holding"
+          },
+          {
+            "kind": "relic",
+            "id": "RINGING_TRIANGLE",
+            "name": "Ringing Triangle",
+            "tier": "support",
+            "why": "Retains the whole opening hand on turn 1"
+          },
+          {
+            "kind": "relic",
+            "id": "PAELS_TEARS",
+            "name": "Pael's Tears",
+            "tier": "support",
+            "why": "Holding a turn with energy unspent refunds +2 next turn"
+          },
+          {
+            "kind": "relic",
+            "id": "POCKETWATCH",
+            "name": "Pocketwatch",
+            "tier": "support",
+            "why": "A quiet 3-or-fewer-cards turn draws 3 more next turn"
+          },
+          {
+            "kind": "potion",
+            "id": "STABLE_SERUM",
+            "name": "Stable Serum",
+            "tier": "core",
+            "why": "Retain the whole hand for 2 turns"
+          },
+          {
+            "kind": "potion",
+            "id": "LIQUID_MEMORIES",
+            "name": "Liquid Memories",
+            "tier": "support",
+            "why": "Pulls the released payoff back from the discard"
+          },
+          {
+            "kind": "colorless",
+            "id": "EQUILIBRIUM",
+            "name": "Equilibrium",
+            "tier": "core",
+            "why": "Block plus retain-your-hand in one card"
+          },
+          {
+            "kind": "colorless",
+            "id": "SALVO",
+            "name": "Salvo",
+            "tier": "core",
+            "why": "Damage plus retain-your-hand"
+          },
+          {
+            "kind": "colorless",
+            "id": "PROLONG",
+            "name": "Prolong",
+            "tier": "support",
+            "why": "Carries this turn's Block into the held turn"
+          }
+        ],
+        "avoid": [
+          {
+            "kind": "relic",
+            "id": "FIDDLE",
+            "name": "Fiddle",
+            "why": "Can't draw mid-turn, and the payoff often wants a refill"
+          }
+        ],
+        "strengths": [
+          "Big, predictable release turns",
+          "Holds answers for the right enemy intent"
+        ],
+        "weaknesses": [
+          "Slow first two turns",
+          "A 5-card hand caps the build-up"
+        ]
+      }
     },
     {
       "id": "forge_ramp",
       "name": "Forge / signature-blade ramp",
-      "description": "stoke a per-combat Forge counter with forge income (cards + a per-turn power), then cash it with one or two scale:\"forged\" payoff attacks whose printed damage grows hit-by-hit; a blade_empower card can spike the blade to double/triple damage for a turn",
+      "description": "Stoke the forge all fight long, then cash it in on a signature blade whose damage climbs with every hit.",
+      "build_notes": "Forge income can come from anywhere the theme suggests: attacks that forge on hit, skills, triggers on blocking or drawing, a power, the starter relic. Don't default to a single per-turn power. Cash it in with one or two payoff attacks using `scale:\"forged\"`, whose printed damage grows hit by hit. For burst, prefer tools that boost ANY attack (Strength, temporary Strength, multi-hit) so they land naturally on the blade but still help the rest of the deck; `blade_empower` exists but is optional.",
       "metaphors": [
         "the smith at the anvil",
         "stoking the furnace",
@@ -93,12 +190,88 @@
       "buildable": true,
       "gap_refs": [
         "VOCABULARY_GAPS#36"
-      ]
+      ],
+      "base_synergies": {
+        "hooks": [
+          "big_single_hit",
+          "strength",
+          "vigor",
+          "upgrade"
+        ],
+        "pieces": [
+          {
+            "kind": "potion",
+            "id": "GIGANTIFICATION_POTION",
+            "name": "Gigantification Potion",
+            "tier": "core",
+            "why": "Triples the one blade swing that matters"
+          },
+          {
+            "kind": "relic",
+            "id": "PEN_NIB",
+            "name": "Pen Nib",
+            "tier": "core",
+            "why": "Every 10th attack doubles; time it onto the blade"
+          },
+          {
+            "kind": "potion",
+            "id": "DUPLICATOR",
+            "name": "Duplicator",
+            "tier": "core",
+            "why": "The payoff attack hits twice"
+          },
+          {
+            "kind": "relic",
+            "id": "AKABEKO",
+            "name": "Akabeko",
+            "tier": "support",
+            "why": "Opening Vigor lands on the first blade hit"
+          },
+          {
+            "kind": "colorless",
+            "id": "PREP_TIME",
+            "name": "Prep Time",
+            "tier": "support",
+            "why": "Vigor every turn stacks onto one heavy swing"
+          },
+          {
+            "kind": "relic",
+            "id": "VAJRA",
+            "name": "Vajra",
+            "tier": "support",
+            "why": "Strength multiplies across a multi-hit blade"
+          },
+          {
+            "kind": "potion",
+            "id": "FLEX_POTION",
+            "name": "Flex Potion",
+            "tier": "support",
+            "why": "+5 Strength for the cash-in turn"
+          },
+          {
+            "kind": "relic",
+            "id": "MINIATURE_CANNON",
+            "name": "Miniature Cannon",
+            "tier": "support",
+            "why": "Upgraded payoff attacks deal +3"
+          }
+        ],
+        "avoid": [],
+        "strengths": [
+          "Highest single-target burst in the catalog",
+          "One card carries the class"
+        ],
+        "weaknesses": [
+          "Needs turns to stoke",
+          "Weak against many small enemies"
+        ]
+      }
     },
     {
       "id": "rampage_grow",
       "name": "Rampage / grow-on-play",
-      "description": "a signature attack that grows every time you swing it - commit to the same card again and again as it climbs to a finisher. Distinct from Forge ramp: grow is ONE card feeding itself (via the `grow` field on a damage effect), not a class-level counter that many cards pump. Give the grow attack cheap draw/retain support so it recurs; 1-2 grow attacks per class max.",
+      "description": "One signature attack that hits harder every time you swing it, climbing from a weak jab to a finisher.",
+      "build_notes": "Use the `grow` field on a damage effect. This is ONE card feeding itself, unlike Forge ramp's class-wide counter that many cards pump. Give the grow attack cheap draw and retain support so it comes back around. Crosses well with small-deck (Ascetic) and combo plans: a thin deck redraws the grow attack almost every turn.",
       "metaphors": [
         "building momentum",
         "the snowball down the hill",
@@ -138,12 +311,95 @@
       "buildable": true,
       "gap_refs": [
         "VOCABULARY_GAPS#23"
-      ]
+      ],
+      "base_synergies": {
+        "hooks": [
+          "replay_card",
+          "return_card",
+          "draw_specific",
+          "big_single_hit"
+        ],
+        "pieces": [
+          {
+            "kind": "colorless",
+            "id": "NOSTALGIA",
+            "name": "Nostalgia",
+            "tier": "core",
+            "why": "The grow attack goes back on top of the draw pile every turn"
+          },
+          {
+            "kind": "relic",
+            "id": "HISTORY_COURSE",
+            "name": "History Course",
+            "tier": "core",
+            "why": "Replays your last attack at turn start: a free extra grow"
+          },
+          {
+            "kind": "potion",
+            "id": "DUPLICATOR",
+            "name": "Duplicator",
+            "tier": "core",
+            "why": "Two swings, two growths, in one play"
+          },
+          {
+            "kind": "colorless",
+            "id": "SECRET_WEAPON",
+            "name": "Secret Weapon",
+            "tier": "support",
+            "why": "Tutors the grow attack from the draw pile"
+          },
+          {
+            "kind": "colorless",
+            "id": "SEEKER_STRIKE",
+            "name": "Seeker Strike",
+            "tier": "support",
+            "why": "Digs the grow attack out of the draw pile"
+          },
+          {
+            "kind": "potion",
+            "id": "DROPLET_OF_PRECOGNITION",
+            "name": "Droplet of Precognition",
+            "tier": "support",
+            "why": "Fetches the grow attack on demand"
+          },
+          {
+            "kind": "potion",
+            "id": "LIQUID_MEMORIES",
+            "name": "Liquid Memories",
+            "tier": "support",
+            "why": "Recovers it from the discard, free to play"
+          },
+          {
+            "kind": "relic",
+            "id": "MUSIC_BOX",
+            "name": "Music Box",
+            "tier": "support",
+            "why": "An Ethereal copy of your first attack each turn"
+          }
+        ],
+        "avoid": [
+          {
+            "kind": "relic",
+            "id": "BING_BONG",
+            "name": "Bing Bong",
+            "why": "Extra copies dilute how often THE grow card comes back"
+          }
+        ],
+        "strengths": [
+          "One card becomes a boss-killer",
+          "Cheap to assemble"
+        ],
+        "weaknesses": [
+          "Weak early swings",
+          "Lives or dies on seeing the grow card"
+        ]
+      }
     },
     {
       "id": "battle_smith",
       "name": "Battle-smith / in-run upgrade",
-      "description": "sharpen your tools mid-fight - upgrades as a combat resource (the Armaments fantasy). A skill carries `{\"op\":\"upgrade_card\",\"cards\":\"choose\"}` (YOU pick one card in hand - the true Armaments feel), `\"cards\":\"random\"` (upgrade one random card in hand), or `\"cards\":\"all\"` (upgrade the whole hand, a strong uncommon+). COMBAT-SCOPED: upgrades last this combat only, so lean on retain or big/refilling hands so an upgraded card sticks around to matter; a rare power can run a `turn_start`-> `upgrade_card` (random) engine. 1-2 upgrade cards per class.",
+      "description": "Sharpen your tools mid-fight: upgrade the cards in your hand and spend the better versions right away.",
+      "build_notes": "Touchstone: the base-game Armaments, and any deck that would love Apotheosis. `upgrade_card` takes `\"cards\":\"choose\"` (the player picks one card in hand, the true Armaments feel), `\"random\"` (one random card in hand) or `\"all\"` (the whole hand). Upgrades last this combat only, so lean on retain or big, refilling hands so an upgraded card sticks around. A rare power can run a `turn_start` -> random `upgrade_card` engine. It thrives in BIGGER decks that cycle fast through many cheap cards (upgrading a whole hand turns a bloated pool efficient), pairs with draw and scry manipulation that finds the upgraded tools, and, because the class upgrades in combat, frees rest sites for healing or for Girya and Shovel.",
       "metaphors": [
         "the forge between blows",
         "honing the edge mid-duel",
@@ -181,12 +437,102 @@
       "buildable": true,
       "gap_refs": [
         "VOCABULARY_GAPS#18"
-      ]
+      ],
+      "base_synergies": {
+        "hooks": [
+          "upgrade",
+          "fat_deck",
+          "draw",
+          "scry"
+        ],
+        "pieces": [
+          {
+            "kind": "relic",
+            "id": "JEWELRY_BOX",
+            "name": "Jewelry Box",
+            "tier": "core",
+            "why": "Adds Apotheosis: upgrade every card at once"
+          },
+          {
+            "kind": "potion",
+            "id": "BLESSING_OF_THE_FORGE",
+            "name": "Blessing of the Forge",
+            "tier": "core",
+            "why": "Upgrade the whole hand for the fight"
+          },
+          {
+            "kind": "relic",
+            "id": "RAZOR_TOOTH",
+            "name": "Razor Tooth",
+            "tier": "core",
+            "why": "Every Attack and Skill upgrades itself as you play it"
+          },
+          {
+            "kind": "relic",
+            "id": "BELLOWS",
+            "name": "Bellows",
+            "tier": "support",
+            "why": "The opening hand arrives upgraded"
+          },
+          {
+            "kind": "relic",
+            "id": "STONE_CRACKER",
+            "name": "Stone Cracker",
+            "tier": "support",
+            "why": "Two draw-pile cards upgrade each combat"
+          },
+          {
+            "kind": "relic",
+            "id": "MINIATURE_CANNON",
+            "name": "Miniature Cannon",
+            "tier": "support",
+            "why": "Upgraded attacks hit for +3"
+          },
+          {
+            "kind": "relic",
+            "id": "SAND_CASTLE",
+            "name": "Sand Castle",
+            "tier": "support",
+            "why": "Six upgrades up front"
+          },
+          {
+            "kind": "relic",
+            "id": "GIRYA",
+            "name": "Girya",
+            "tier": "support",
+            "why": "Rest sites freed from upgrading can buy Strength instead"
+          },
+          {
+            "kind": "relic",
+            "id": "SHOVEL",
+            "name": "Shovel",
+            "tier": "support",
+            "why": "Or dig for relics at the rest site"
+          },
+          {
+            "kind": "colorless",
+            "id": "SCRAWL",
+            "name": "Scrawl",
+            "tier": "support",
+            "why": "Refills the hand so there's more to upgrade"
+          }
+        ],
+        "avoid": [],
+        "strengths": [
+          "Turns a bloated card pool into an efficient one",
+          "Frees rest sites for healing or Girya/Shovel"
+        ],
+        "weaknesses": [
+          "Upgrades from cards are combat-only",
+          "Setup cards are weak on their own"
+        ]
+      }
     },
     {
       "id": "ascetic_purge",
-      "name": "Ascetic / deck-thinning",
-      "description": "burn the chaff - cards that thin your deck toward a lean engine (permanent deck-thinning). Two shapes: a strong, over-statted skill or attack carries the flag-op `{\"op\":\"purge\"}` so that playing it removes THAT card from your RUN DECK for the rest of the run (a stronger `exhaust` that never returns; you spend the card once, so over-stat it for its cost); OR the op `{\"op\":\"purge_card\"}` lets the PLAYER choose a card in hand and purge THAT one (targeted thinning - cut a Basic, Curse, or dead draw), and since the purge_card card itself stays it can be a normal repeatable skill. Pair with a deck the player WANTS thin (a few key payoff cards you dig to). THE PAYOFF for going small: a thin deck empties its draw pile fast, so gate a Grand-Finale-style finisher behind `when:{\"kind\":\"draw_pile_empty\"}` - a splashy over-printed effect that only fires once the whole deck has been drawn (the balance pass prices the gate in, so print BIG base-game-Grand-Finale numbers on it). One such finisher rewards the whole thinning plan; it is a payoff condition, not an identity of its own. Neither purge op goes on a basic; keep deck-thinning to 1-3 cards per class - it sharpens the identity, it isn't the whole identity. (`purge` is also mutually exclusive with `exhaust`.)",
+      "name": "Ascetic / small deck",
+      "description": "Run a lean deck that cycles fast and assembles all the pieces for a win.",
+      "build_notes": "The identity is a SMALL deck. Heavy draw and cycling make a thin deck empty its draw pile every turn or two. Exhaust, ethereal and purge effects let the player manipulate their deck size; example payoffs might include Grand-Finale-style finishers gated on `when:{\"kind\":\"draw_pile_empty\"}` or a few-card combo engine that wins the game if those are the only cards left. (Purge is a supporting tool the player has to EARN: gate `purge_card` behind a condition they must engineer (`draw_pile_empty`, `cards_played_this_turn_ge`), or put self-`purge` only on a costly one-shot whose play takes setup. Never a free, repeatable purge skill.",
       "metaphors": [
         "burning the chaff",
         "the ascetic's discipline",
@@ -226,12 +572,122 @@
       "buildable": true,
       "gap_refs": [
         "VOCABULARY_GAPS#19"
-      ]
+      ],
+      "base_synergies": {
+        "hooks": [
+          "small_deck",
+          "shuffle",
+          "deck_removal",
+          "exhaust",
+          "draw_pile_empty"
+        ],
+        "pieces": [
+          {
+            "kind": "relic",
+            "id": "EMPTY_CAGE",
+            "name": "Empty Cage",
+            "tier": "core",
+            "why": "Removes 2 cards on pickup"
+          },
+          {
+            "kind": "relic",
+            "id": "PRECISE_SCISSORS",
+            "name": "Precise Scissors",
+            "tier": "support",
+            "why": "Removes a card on pickup"
+          },
+          {
+            "kind": "relic",
+            "id": "PRECARIOUS_SHEARS",
+            "name": "Precarious Shears",
+            "tier": "support",
+            "why": "Removes 2 cards for 16 HP"
+          },
+          {
+            "kind": "relic",
+            "id": "PAELS_TOOTH",
+            "name": "Pael's Tooth",
+            "tier": "support",
+            "why": "Removes 5, then returns them upgraded one by one"
+          },
+          {
+            "kind": "relic",
+            "id": "THE_ABACUS",
+            "name": "The Abacus",
+            "tier": "core",
+            "why": "A thin deck shuffles often: Block on every shuffle"
+          },
+          {
+            "kind": "colorless",
+            "id": "STRATAGEM",
+            "name": "Stratagem",
+            "tier": "core",
+            "why": "Every shuffle tutors a card, and a thin deck shuffles constantly"
+          },
+          {
+            "kind": "relic",
+            "id": "UNCEASING_TOP",
+            "name": "Unceasing Top",
+            "tier": "support",
+            "why": "Empty hand draws a card, keeping a small deck cycling"
+          },
+          {
+            "kind": "colorless",
+            "id": "PURITY",
+            "name": "Purity",
+            "tier": "core",
+            "why": "Exhausts up to 3 dead cards from hand"
+          },
+          {
+            "kind": "potion",
+            "id": "BOTTLED_POTENTIAL",
+            "name": "Bottled Potential",
+            "tier": "support",
+            "why": "Reshuffle everything and draw 5"
+          },
+          {
+            "kind": "colorless",
+            "id": "SCRAWL",
+            "name": "Scrawl",
+            "tier": "support",
+            "why": "Draw to a full hand: in a thin deck, that's most of it"
+          }
+        ],
+        "avoid": [
+          {
+            "kind": "colorless",
+            "id": "MIND_BLAST",
+            "name": "Mind Blast",
+            "why": "Scales with a big draw pile, the opposite plan"
+          },
+          {
+            "kind": "relic",
+            "id": "BING_BONG",
+            "name": "Bing Bong",
+            "why": "Doubles every card you add"
+          },
+          {
+            "kind": "relic",
+            "id": "ETERNAL_FEATHER",
+            "name": "Eternal Feather",
+            "why": "Rewards a large deck"
+          }
+        ],
+        "strengths": [
+          "Sees its best cards every turn",
+          "Consistent, combo-like turns"
+        ],
+        "weaknesses": [
+          "Thin decks have few answers",
+          "Status cards (Dazed, Wounds) clog it badly"
+        ]
+      }
     },
     {
       "id": "poison_attrition",
       "name": "Venom / attrition",
-      "description": "stack Poison and let the slow tide do the killing",
+      "description": "Stack Poison on your enemies and wear them down while you stay alive.",
+      "build_notes": "Poison ignores Block, so the class wins over several turns: cheap appliers, ways to multiply or spread Poison, and enough defense to survive while it works.",
       "metaphors": [
         "rot",
         "the slow tide",
@@ -266,12 +722,72 @@
         "class_kind": "normal"
       },
       "buildable": true,
-      "gap_refs": []
+      "gap_refs": [],
+      "base_synergies": {
+        "hooks": [
+          "debuff_apply",
+          "stall",
+          "mitigation"
+        ],
+        "pieces": [
+          {
+            "kind": "relic",
+            "id": "UNSETTLING_LAMP",
+            "name": "Unsettling Lamp",
+            "tier": "core",
+            "why": "Doubles the first debuff you apply each combat: a big first Poison"
+          },
+          {
+            "kind": "potion",
+            "id": "POWDERED_DEMISE",
+            "name": "Powdered Demise",
+            "tier": "support",
+            "why": "A second damage-over-time stacked on top"
+          },
+          {
+            "kind": "relic",
+            "id": "STURDY_CLAMP",
+            "name": "Sturdy Clamp",
+            "tier": "support",
+            "why": "Keeps Block up while the poison ticks"
+          },
+          {
+            "kind": "potion",
+            "id": "BEETLE_JUICE",
+            "name": "Beetle Juice",
+            "tier": "support",
+            "why": "Weakens their attacks while you wait them out"
+          },
+          {
+            "kind": "colorless",
+            "id": "DARK_SHACKLES",
+            "name": "Dark Shackles",
+            "tier": "support",
+            "why": "Buys a safe turn of waiting"
+          },
+          {
+            "kind": "colorless",
+            "id": "REND",
+            "name": "Rend",
+            "tier": "support",
+            "why": "Poison counts as a unique debuff for bonus damage"
+          }
+        ],
+        "avoid": [],
+        "strengths": [
+          "Ignores Block",
+          "Great against one big, slow enemy"
+        ],
+        "weaknesses": [
+          "Slow against swarms",
+          "Needs to survive the wait"
+        ]
+      }
     },
     {
       "id": "block_bulwark",
       "name": "Bulwark / turtle",
-      "description": "out-defend the fight; turn Block into an engine",
+      "description": "Out-defend the fight and turn your Block into an engine.",
       "metaphors": [
         "the wall",
         "the shell",
@@ -308,12 +824,115 @@
         "class_kind": "normal"
       },
       "buildable": true,
-      "gap_refs": []
+      "gap_refs": [],
+      "base_synergies": {
+        "hooks": [
+          "block_stack",
+          "block_retention",
+          "dexterity"
+        ],
+        "pieces": [
+          {
+            "kind": "relic",
+            "id": "STURDY_CLAMP",
+            "name": "Sturdy Clamp",
+            "tier": "core",
+            "why": "Up to 10 Block persists across turns"
+          },
+          {
+            "kind": "relic",
+            "id": "PARRYING_SHIELD",
+            "name": "Parrying Shield",
+            "tier": "core",
+            "why": "10+ Block at end of turn deals damage"
+          },
+          {
+            "kind": "potion",
+            "id": "FORTIFIER",
+            "name": "Fortifier",
+            "tier": "core",
+            "why": "Triples your Block"
+          },
+          {
+            "kind": "relic",
+            "id": "VAMBRACE",
+            "name": "Vambrace",
+            "tier": "support",
+            "why": "Doubles the first Block card each combat"
+          },
+          {
+            "kind": "relic",
+            "id": "ODDLY_SMOOTH_STONE",
+            "name": "Oddly Smooth Stone",
+            "tier": "support",
+            "why": "+1 Dexterity"
+          },
+          {
+            "kind": "relic",
+            "id": "CLOAK_CLASP",
+            "name": "Cloak Clasp",
+            "tier": "support",
+            "why": "More Block from a held hand"
+          },
+          {
+            "kind": "relic",
+            "id": "CAPTAINS_WHEEL",
+            "name": "Captain's Wheel",
+            "tier": "support",
+            "why": "A big Block drop on turn 3"
+          },
+          {
+            "kind": "potion",
+            "id": "HEART_OF_IRON",
+            "name": "Heart of Iron",
+            "tier": "support",
+            "why": "Plating: Block every turn"
+          },
+          {
+            "kind": "colorless",
+            "id": "ETERNAL_ARMOR",
+            "name": "Eternal Armor",
+            "tier": "support",
+            "why": "Plating at scale"
+          },
+          {
+            "kind": "colorless",
+            "id": "PROLONG",
+            "name": "Prolong",
+            "tier": "support",
+            "why": "Doubles banked Block into next turn"
+          },
+          {
+            "kind": "colorless",
+            "id": "FISTICUFFS",
+            "name": "Fisticuffs",
+            "tier": "support",
+            "why": "Damage that is also Block"
+          }
+        ],
+        "avoid": [
+          {
+            "kind": "colorless",
+            "id": "PANIC_BUTTON",
+            "name": "Panic Button",
+            "why": "Locks out Block from cards for 2 turns"
+          }
+        ],
+        "strengths": [
+          "Survives anything",
+          "Block-into-damage payoffs scale with the defense"
+        ],
+        "weaknesses": [
+          "Slow to kill",
+          "Weak to enemy scaling"
+        ]
+      }
     },
     {
       "id": "strength_berserk",
-      "name": "Berserker / rage",
-      "description": "trade your own blood for raw, escalating power",
+      "name": "Berserker / Strength",
+      "description": "Build Strength fast and make every attack hit harder than the last.",
+      "build_notes": "The identity is STRENGTH scaling (Demon Form, Inflame, Limit Break): gain Strength from cards, triggers and powers, and use multi-hit attacks that multiply it. Paying HP is one optional way to buy Strength, not the theme; HP-as-a-resource belongs to Blood / sacrifice.",
       "metaphors": [
         "fury",
         "the red haze",
@@ -348,12 +967,93 @@
         "class_kind": "normal"
       },
       "buildable": true,
-      "gap_refs": []
+      "gap_refs": [],
+      "base_synergies": {
+        "hooks": [
+          "strength",
+          "hp_loss",
+          "multi_hit"
+        ],
+        "pieces": [
+          {
+            "kind": "relic",
+            "id": "VAJRA",
+            "name": "Vajra",
+            "tier": "core",
+            "why": "+1 Strength every fight"
+          },
+          {
+            "kind": "relic",
+            "id": "GIRYA",
+            "name": "Girya",
+            "tier": "core",
+            "why": "Strength at rest sites"
+          },
+          {
+            "kind": "potion",
+            "id": "STRENGTH_POTION",
+            "name": "Strength Potion",
+            "tier": "core",
+            "why": "+2 Strength"
+          },
+          {
+            "kind": "relic",
+            "id": "SHURIKEN",
+            "name": "Shuriken",
+            "tier": "support",
+            "why": "3 attacks in a turn = +1 Strength"
+          },
+          {
+            "kind": "relic",
+            "id": "REPTILE_TRINKET",
+            "name": "Reptile Trinket",
+            "tier": "support",
+            "why": "Potions give temporary Strength"
+          },
+          {
+            "kind": "potion",
+            "id": "MAZALETHS_GIFT",
+            "name": "Mazaleth's Gift",
+            "tier": "support",
+            "why": "Ritual: Strength every turn"
+          },
+          {
+            "kind": "relic",
+            "id": "TUNGSTEN_ROD",
+            "name": "Tungsten Rod",
+            "tier": "support",
+            "why": "Softens every self-damage payment"
+          },
+          {
+            "kind": "relic",
+            "id": "CENTENNIAL_PUZZLE",
+            "name": "Centennial Puzzle",
+            "tier": "support",
+            "why": "The first HP payment draws 3"
+          },
+          {
+            "kind": "colorless",
+            "id": "PROWESS",
+            "name": "Prowess",
+            "tier": "support",
+            "why": "Strength plus Dexterity"
+          }
+        ],
+        "avoid": [],
+        "strengths": [
+          "Scales every attack",
+          "Snowballs through long fights"
+        ],
+        "weaknesses": [
+          "HP costs add up",
+          "Weak to Weak and Strength-down"
+        ]
+      }
     },
     {
       "id": "strike_tempo",
       "name": "Striker / relentless offense",
-      "description": "win by attacking: multi-hit flurries (repeated hits on one target), scaling strikes, and one decisive finisher",
+      "description": "Win by attacking: multi-hit flurries, strikes that scale, and big, splashy finishers.",
       "metaphors": [
         "the striker",
         "the finisher",
@@ -392,12 +1092,107 @@
         "class_kind": "normal"
       },
       "buildable": true,
-      "gap_refs": []
+      "gap_refs": [],
+      "base_synergies": {
+        "hooks": [
+          "attacks_per_turn",
+          "multi_hit",
+          "cheap_attacks"
+        ],
+        "pieces": [
+          {
+            "kind": "relic",
+            "id": "KUNAI",
+            "name": "Kunai",
+            "tier": "core",
+            "why": "3 attacks in a turn = +1 Dexterity"
+          },
+          {
+            "kind": "relic",
+            "id": "SHURIKEN",
+            "name": "Shuriken",
+            "tier": "core",
+            "why": "3 attacks in a turn = +1 Strength"
+          },
+          {
+            "kind": "relic",
+            "id": "ORNAMENTAL_FAN",
+            "name": "Ornamental Fan",
+            "tier": "core",
+            "why": "3 attacks in a turn = 4 Block"
+          },
+          {
+            "kind": "relic",
+            "id": "KUSARIGAMA",
+            "name": "Kusarigama",
+            "tier": "support",
+            "why": "3 attacks in a turn = extra damage"
+          },
+          {
+            "kind": "relic",
+            "id": "NUNCHAKU",
+            "name": "Nunchaku",
+            "tier": "support",
+            "why": "Every 10 attacks refunds energy"
+          },
+          {
+            "kind": "relic",
+            "id": "PEN_NIB",
+            "name": "Pen Nib",
+            "tier": "support",
+            "why": "A flurry reaches the 10th attack fast"
+          },
+          {
+            "kind": "relic",
+            "id": "STRIKE_DUMMY",
+            "name": "Strike Dummy",
+            "tier": "support",
+            "why": "Strike-named cards deal +3"
+          },
+          {
+            "kind": "colorless",
+            "id": "FLASH_OF_STEEL",
+            "name": "Flash of Steel",
+            "tier": "support",
+            "why": "A free attack that draws"
+          },
+          {
+            "kind": "colorless",
+            "id": "CALAMITY",
+            "name": "Calamity",
+            "tier": "support",
+            "why": "Every attack adds another attack"
+          },
+          {
+            "kind": "potion",
+            "id": "ATTACK_POTION",
+            "name": "Attack Potion",
+            "tier": "support",
+            "why": "A free attack for the finishing turn"
+          }
+        ],
+        "avoid": [
+          {
+            "kind": "relic",
+            "id": "ART_OF_WAR",
+            "name": "Art of War",
+            "why": "Rewards turns with NO attacks"
+          }
+        ],
+        "strengths": [
+          "Pressure from turn one",
+          "Counter-relics pay out every turn"
+        ],
+        "weaknesses": [
+          "Weak to Block-heavy enemies",
+          "Needs card flow"
+        ]
+      }
     },
     {
       "id": "orb_channel",
       "name": "Channeler / elements",
-      "description": "channel orbs that tick each turn, then evoke the burst",
+      "description": "Channel orbs that tick every turn, then evoke them for the burst.",
       "metaphors": [
         "the storm",
         "conduction",
@@ -435,12 +1230,72 @@
         "class_kind": "orb"
       },
       "buildable": true,
-      "gap_refs": []
+      "gap_refs": [],
+      "base_synergies": {
+        "hooks": [
+          "powers_played",
+          "energy_surplus",
+          "card_replay"
+        ],
+        "pieces": [
+          {
+            "kind": "potion",
+            "id": "DUPLICATOR",
+            "name": "Duplicator",
+            "tier": "core",
+            "why": "Channels twice"
+          },
+          {
+            "kind": "relic",
+            "id": "GAME_PIECE",
+            "name": "Game Piece",
+            "tier": "support",
+            "why": "Focus powers draw a card"
+          },
+          {
+            "kind": "relic",
+            "id": "MUMMIFIED_HAND",
+            "name": "Mummified Hand",
+            "tier": "support",
+            "why": "Playing a Focus power makes a hand card free"
+          },
+          {
+            "kind": "relic",
+            "id": "ICE_CREAM",
+            "name": "Ice Cream",
+            "tier": "support",
+            "why": "Banks energy for a big evoke turn"
+          },
+          {
+            "kind": "potion",
+            "id": "POWER_POTION",
+            "name": "Power Potion",
+            "tier": "support",
+            "why": "A free power, Focus included"
+          },
+          {
+            "kind": "colorless",
+            "id": "PRODUCTION",
+            "name": "Production",
+            "tier": "support",
+            "why": "+2 energy for a channel-heavy turn"
+          }
+        ],
+        "avoid": [],
+        "strengths": [
+          "Passive value every turn",
+          "Flexible damage or defense"
+        ],
+        "weaknesses": [
+          "Few shared-pool orb payoffs",
+          "Slot-limited"
+        ]
+      }
     },
     {
       "id": "slot_machine",
       "name": "Gambler / RNG jackpot",
-      "description": "pull random orbs and pay off the jackpot when they match",
+      "description": "Pull random orbs and hit the jackpot when they match.",
       "metaphors": [
         "the wheel",
         "luck",
@@ -476,12 +1331,58 @@
         "class_kind": "orb"
       },
       "buildable": true,
-      "gap_refs": []
+      "gap_refs": [],
+      "base_synergies": {
+        "hooks": [
+          "random_generation",
+          "card_replay"
+        ],
+        "pieces": [
+          {
+            "kind": "potion",
+            "id": "DUPLICATOR",
+            "name": "Duplicator",
+            "tier": "core",
+            "why": "Double pull: two random orbs chase the match"
+          },
+          {
+            "kind": "relic",
+            "id": "VEXING_PUZZLEBOX",
+            "name": "Vexing Puzzlebox",
+            "tier": "support",
+            "why": "A random free card: more lottery tickets"
+          },
+          {
+            "kind": "colorless",
+            "id": "JACKPOT",
+            "name": "Jackpot",
+            "tier": "support",
+            "why": "The same fantasy in a colorless card"
+          },
+          {
+            "kind": "potion",
+            "id": "DISTILLED_CHAOS",
+            "name": "Distilled Chaos",
+            "tier": "support",
+            "why": "Plays three random cards: more pulls"
+          }
+        ],
+        "avoid": [],
+        "strengths": [
+          "Huge match turns",
+          "Unmatched orbs still tick for value"
+        ],
+        "weaknesses": [
+          "High variance",
+          "Thin shared-pool support"
+        ]
+      }
     },
     {
       "id": "summon_swarm",
       "name": "Commander / minions",
-      "description": "win through a loyal minion you raise, strike through, buff, keep alive (heal/shield it) - or spend outright (sacrifice_summon) for a burst",
+      "description": "Raise a loyal minion, fight through it and keep it alive, or sacrifice it for one big burst.",
+      "build_notes": "The minion toolkit: `summon`, `summon_attack`, `buff_summon`, `heal_summon`, `shield_summon`, and `sacrifice_summon` to spend it outright for a burst.",
       "metaphors": [
         "the pack",
         "loyalty",
@@ -523,12 +1424,58 @@
       "buildable": true,
       "gap_refs": [
         "VOCABULARY_GAPS#2"
-      ]
+      ],
+      "base_synergies": {
+        "hooks": [
+          "energy_surplus",
+          "draw",
+          "block_stack"
+        ],
+        "pieces": [
+          {
+            "kind": "relic",
+            "id": "LANTERN",
+            "name": "Lantern",
+            "tier": "support",
+            "why": "Energy to summon and act on turn 1"
+          },
+          {
+            "kind": "potion",
+            "id": "ENERGY_POTION",
+            "name": "Energy Potion",
+            "tier": "support",
+            "why": "Re-summon and still attack"
+          },
+          {
+            "kind": "relic",
+            "id": "GAME_PIECE",
+            "name": "Game Piece",
+            "tier": "support",
+            "why": "Summon-supporting powers draw"
+          },
+          {
+            "kind": "colorless",
+            "id": "PROWESS",
+            "name": "Prowess",
+            "tier": "support",
+            "why": "Stats that help the fight while the minion works"
+          }
+        ],
+        "avoid": [],
+        "strengths": [
+          "The minion soaks hits and adds damage",
+          "Sacrifice turns spike"
+        ],
+        "weaknesses": [
+          "Shared pool has almost no minion payoffs",
+          "Losing the minion stalls the class"
+        ]
+      }
     },
     {
       "id": "status_signature",
-      "name": "Signature condition",
-      "description": "invent your own buff/debuff and build the whole class around it",
+      "name": "Signature / custom status",
+      "description": "Invent your own buff or debuff and build the whole class around it.",
       "metaphors": [
         "the mark",
         "the brand",
@@ -565,12 +1512,51 @@
         "class_kind": "status"
       },
       "buildable": true,
-      "gap_refs": []
+      "gap_refs": [],
+      "base_synergies": {
+        "hooks": [
+          "debuff_apply",
+          "unique_debuffs"
+        ],
+        "pieces": [
+          {
+            "kind": "relic",
+            "id": "UNSETTLING_LAMP",
+            "name": "Unsettling Lamp",
+            "tier": "core",
+            "why": "Doubles the first application of your signature status"
+          },
+          {
+            "kind": "colorless",
+            "id": "REND",
+            "name": "Rend",
+            "tier": "support",
+            "why": "Your custom debuff adds to the unique-debuff count"
+          },
+          {
+            "kind": "potion",
+            "id": "POTION_OF_BINDING",
+            "name": "Potion of Binding",
+            "tier": "support",
+            "why": "More debuffs stacked alongside yours"
+          }
+        ],
+        "avoid": [],
+        "strengths": [
+          "A unique identity",
+          "Its stacks compound"
+        ],
+        "weaknesses": [
+          "Few shared-pool pieces know your status",
+          "Slow if appliers aren't drawn"
+        ]
+      }
     },
     {
       "id": "tempo_draw",
-      "name": "Tempo / flow",
-      "description": "draw and energy acceleration that snowballs a single turn",
+      "name": "Flow / card advantage",
+      "description": "Draw more, play more: cheap cards and card advantage chain into long, many-card turns.",
+      "build_notes": "Card advantage is the engine: draw, cheap cards and cost reduction so the player plays MANY cards a turn, with payoffs that count cards played (`cards_played_this_turn_ge`) or drawn. Where Overload spends energy on a few big cards, Flow spends it on many small ones.",
       "metaphors": [
         "the current",
         "the dance",
@@ -607,12 +1593,113 @@
         "class_kind": "normal"
       },
       "buildable": true,
-      "gap_refs": []
+      "gap_refs": [],
+      "base_synergies": {
+        "hooks": [
+          "draw",
+          "energy_surplus",
+          "cards_played"
+        ],
+        "pieces": [
+          {
+            "kind": "relic",
+            "id": "BRILLIANT_SCARF",
+            "name": "Brilliant Scarf",
+            "tier": "core",
+            "why": "The 5th card each turn is free"
+          },
+          {
+            "kind": "relic",
+            "id": "IRON_CLUB",
+            "name": "Iron Club",
+            "tier": "core",
+            "why": "Every 4 cards played draws 1"
+          },
+          {
+            "kind": "colorless",
+            "id": "PANACHE",
+            "name": "Panache",
+            "tier": "core",
+            "why": "5 cards in a turn = AoE damage"
+          },
+          {
+            "kind": "relic",
+            "id": "GREMLIN_HORN",
+            "name": "Gremlin Horn",
+            "tier": "support",
+            "why": "Kills refund energy and a card"
+          },
+          {
+            "kind": "relic",
+            "id": "UNCEASING_TOP",
+            "name": "Unceasing Top",
+            "tier": "support",
+            "why": "An empty hand keeps drawing"
+          },
+          {
+            "kind": "potion",
+            "id": "CURE_ALL",
+            "name": "Cure All",
+            "tier": "support",
+            "why": "Energy plus draw"
+          },
+          {
+            "kind": "potion",
+            "id": "SNECKO_OIL",
+            "name": "Snecko Oil",
+            "tier": "support",
+            "why": "Draw 7 for one giant turn"
+          },
+          {
+            "kind": "colorless",
+            "id": "MASTER_OF_STRATEGY",
+            "name": "Master of Strategy",
+            "tier": "support",
+            "why": "Free draw 3"
+          },
+          {
+            "kind": "colorless",
+            "id": "AUTOMATION",
+            "name": "Automation",
+            "tier": "support",
+            "why": "Every 10 draws = energy"
+          },
+          {
+            "kind": "colorless",
+            "id": "RESTLESSNESS",
+            "name": "Restlessness",
+            "tier": "support",
+            "why": "Empty hand turns into draw plus energy"
+          }
+        ],
+        "avoid": [
+          {
+            "kind": "relic",
+            "id": "VELVET_CHOKER",
+            "name": "Velvet Choker",
+            "why": "Caps you at 6 cards a turn"
+          },
+          {
+            "kind": "relic",
+            "id": "FIDDLE",
+            "name": "Fiddle",
+            "why": "No mid-turn draw"
+          }
+        ],
+        "strengths": [
+          "Explosive single turns",
+          "Finds its answers"
+        ],
+        "weaknesses": [
+          "Fizzles without payoffs",
+          "Draws into status cards"
+        ]
+      }
     },
     {
       "id": "self_sacrifice",
       "name": "Blood / sacrifice",
-      "description": "spend HP as a resource, then claw it back",
+      "description": "Spend HP as a resource, then claw it back.",
       "metaphors": [
         "the offering",
         "blood price",
@@ -649,12 +1736,87 @@
         "class_kind": "normal"
       },
       "buildable": true,
-      "gap_refs": []
+      "gap_refs": [],
+      "base_synergies": {
+        "hooks": [
+          "hp_loss",
+          "heal",
+          "max_hp"
+        ],
+        "pieces": [
+          {
+            "kind": "relic",
+            "id": "TUNGSTEN_ROD",
+            "name": "Tungsten Rod",
+            "tier": "core",
+            "why": "Every HP payment costs 1 less"
+          },
+          {
+            "kind": "relic",
+            "id": "CENTENNIAL_PUZZLE",
+            "name": "Centennial Puzzle",
+            "tier": "core",
+            "why": "The first HP loss draws 3"
+          },
+          {
+            "kind": "relic",
+            "id": "MEAT_ON_THE_BONE",
+            "name": "Meat on the Bone",
+            "tier": "support",
+            "why": "Low HP at combat end heals"
+          },
+          {
+            "kind": "relic",
+            "id": "BLOOD_VIAL",
+            "name": "Blood Vial",
+            "tier": "support",
+            "why": "Small heal every fight"
+          },
+          {
+            "kind": "relic",
+            "id": "BEATING_REMNANT",
+            "name": "Beating Remnant",
+            "tier": "support",
+            "why": "Caps HP loss per turn"
+          },
+          {
+            "kind": "relic",
+            "id": "LIZARD_TAIL",
+            "name": "Lizard Tail",
+            "tier": "support",
+            "why": "A safety net for going too low"
+          },
+          {
+            "kind": "potion",
+            "id": "REGEN_POTION",
+            "name": "Regen Potion",
+            "tier": "support",
+            "why": "Claws HP back over turns"
+          },
+          {
+            "kind": "potion",
+            "id": "FAIRY_IN_A_BOTTLE",
+            "name": "Fairy in a Bottle",
+            "tier": "support",
+            "why": "A second life"
+          }
+        ],
+        "avoid": [],
+        "strengths": [
+          "HP is a resource others can't spend",
+          "Strong low-HP payoffs"
+        ],
+        "weaknesses": [
+          "Risky in long acts",
+          "Needs reliable healing"
+        ]
+      }
     },
     {
       "id": "debuff_expose",
       "name": "Expose / hex",
-      "description": "crack the enemy open with Vulnerable/Weak, then exploit it - the more debuffs pile on, the harder your flechettes bite",
+      "description": "Crack the enemy open with Vulnerable and Weak, then exploit it: the more debuffs pile up, the harder you hit.",
+      "build_notes": "Touchstone: the base-game Flechettes.",
       "metaphors": [
         "the opening",
         "the chink",
@@ -695,12 +1857,88 @@
         "class_kind": "normal"
       },
       "buildable": true,
-      "gap_refs": []
+      "gap_refs": [],
+      "base_synergies": {
+        "hooks": [
+          "vulnerable",
+          "weak",
+          "debuff_apply",
+          "unique_debuffs"
+        ],
+        "pieces": [
+          {
+            "kind": "relic",
+            "id": "BAG_OF_MARBLES",
+            "name": "Bag of Marbles",
+            "tier": "core",
+            "why": "Free Vulnerable on everything at fight start"
+          },
+          {
+            "kind": "relic",
+            "id": "UNSETTLING_LAMP",
+            "name": "Unsettling Lamp",
+            "tier": "core",
+            "why": "Doubles your first debuff"
+          },
+          {
+            "kind": "colorless",
+            "id": "SHOCKWAVE",
+            "name": "Shockwave",
+            "tier": "core",
+            "why": "3 Weak and 3 Vulnerable to all enemies"
+          },
+          {
+            "kind": "colorless",
+            "id": "REND",
+            "name": "Rend",
+            "tier": "core",
+            "why": "More damage per unique debuff"
+          },
+          {
+            "kind": "relic",
+            "id": "RED_MASK",
+            "name": "Red Mask",
+            "tier": "support",
+            "why": "Free Weak on everything"
+          },
+          {
+            "kind": "relic",
+            "id": "HAND_DRILL",
+            "name": "Hand Drill",
+            "tier": "support",
+            "why": "Breaking Block applies Vulnerable"
+          },
+          {
+            "kind": "potion",
+            "id": "VULNERABLE_POTION",
+            "name": "Vulnerable Potion",
+            "tier": "support",
+            "why": "3 Vulnerable"
+          },
+          {
+            "kind": "potion",
+            "id": "POTION_OF_BINDING",
+            "name": "Potion of Binding",
+            "tier": "support",
+            "why": "Weak and Vulnerable on all"
+          }
+        ],
+        "avoid": [],
+        "strengths": [
+          "Multiplies the whole deck's damage",
+          "Defensive through Weak"
+        ],
+        "weaknesses": [
+          "Artifact-style enemies blank debuffs",
+          "Needs appliers drawn first"
+        ]
+      }
     },
     {
       "id": "reaper_lifesteal",
       "name": "Reaper / lifesteal",
-      "description": "hit everything and heal for the unblocked damage you deal - attrition as the win condition",
+      "description": "Heal yourself with every hit: dealing damage and gaining life are the same action.",
+      "build_notes": "A LifeLink build: attacks heal for the unblocked damage they deal (`heal` scaled by `damage_dealt_unblocked`). Vulnerable and multi-hit get more damage through; area damage is optional, not the identity.",
       "metaphors": [
         "the reaper",
         "the red harvest",
@@ -738,12 +1976,80 @@
       "buildable": true,
       "gap_refs": [
         "VOCABULARY_GAPS#21"
-      ]
+      ],
+      "base_synergies": {
+        "hooks": [
+          "aoe",
+          "unblocked_damage",
+          "heal",
+          "vulnerable"
+        ],
+        "pieces": [
+          {
+            "kind": "colorless",
+            "id": "OMNISLICE",
+            "name": "Omnislice",
+            "tier": "core",
+            "why": "Damage copied to every other enemy: more unblocked hits"
+          },
+          {
+            "kind": "colorless",
+            "id": "DRAMATIC_ENTRANCE",
+            "name": "Dramatic Entrance",
+            "tier": "support",
+            "why": "Free AoE"
+          },
+          {
+            "kind": "relic",
+            "id": "BAG_OF_MARBLES",
+            "name": "Bag of Marbles",
+            "tier": "support",
+            "why": "Vulnerable means more unblocked damage to heal from"
+          },
+          {
+            "kind": "relic",
+            "id": "THE_BOOT",
+            "name": "The Boot",
+            "tier": "support",
+            "why": "Small unblocked hits floor at 5"
+          },
+          {
+            "kind": "relic",
+            "id": "MERCURY_HOURGLASS",
+            "name": "Mercury Hourglass",
+            "tier": "support",
+            "why": "Chip AoE every turn"
+          },
+          {
+            "kind": "potion",
+            "id": "EXPLOSIVE_AMPOULE",
+            "name": "Explosive Ampoule",
+            "tier": "support",
+            "why": "A burst of AoE"
+          },
+          {
+            "kind": "potion",
+            "id": "REGEN_POTION",
+            "name": "Regen Potion",
+            "tier": "support",
+            "why": "Sustain alongside the lifesteal"
+          }
+        ],
+        "avoid": [],
+        "strengths": [
+          "Heals while it kills",
+          "Strong against swarms"
+        ],
+        "weaknesses": [
+          "Heavily blocking enemies starve it",
+          "Low burst"
+        ]
+      }
     },
     {
       "id": "power_ramp",
       "name": "Power engine / snowball",
-      "description": "per-turn triggers that escalate; win the long game",
+      "description": "Per-turn powers that escalate every turn until you win the long game.",
       "metaphors": [
         "the engine",
         "the snowball",
@@ -779,12 +2085,100 @@
         "class_kind": "normal"
       },
       "buildable": true,
-      "gap_refs": []
+      "gap_refs": [],
+      "base_synergies": {
+        "hooks": [
+          "powers_played",
+          "turn_count"
+        ],
+        "pieces": [
+          {
+            "kind": "relic",
+            "id": "GAME_PIECE",
+            "name": "Game Piece",
+            "tier": "core",
+            "why": "Every power draws a card"
+          },
+          {
+            "kind": "relic",
+            "id": "MUMMIFIED_HAND",
+            "name": "Mummified Hand",
+            "tier": "core",
+            "why": "Every power makes a hand card free"
+          },
+          {
+            "kind": "relic",
+            "id": "FROZEN_EGG",
+            "name": "Frozen Egg",
+            "tier": "support",
+            "why": "Powers are upgraded when added"
+          },
+          {
+            "kind": "relic",
+            "id": "PERMAFROST",
+            "name": "Permafrost",
+            "tier": "support",
+            "why": "First power each combat gives Block"
+          },
+          {
+            "kind": "relic",
+            "id": "LOST_WISP",
+            "name": "Lost Wisp",
+            "tier": "support",
+            "why": "Every power deals AoE damage"
+          },
+          {
+            "kind": "relic",
+            "id": "JEWELED_MASK",
+            "name": "Jeweled Mask",
+            "tier": "support",
+            "why": "A free power in the opening hand"
+          },
+          {
+            "kind": "relic",
+            "id": "LASTING_CANDY",
+            "name": "Lasting Candy",
+            "tier": "support",
+            "why": "More powers in card rewards"
+          },
+          {
+            "kind": "potion",
+            "id": "POWER_POTION",
+            "name": "Power Potion",
+            "tier": "support",
+            "why": "A free power"
+          },
+          {
+            "kind": "colorless",
+            "id": "PROWESS",
+            "name": "Prowess",
+            "tier": "support",
+            "why": "A cheap stat power"
+          }
+        ],
+        "avoid": [
+          {
+            "kind": "relic",
+            "id": "SPIKED_GAUNTLETS",
+            "name": "Spiked Gauntlets",
+            "why": "Powers cost 1 more"
+          }
+        ],
+        "strengths": [
+          "Wins long fights",
+          "Engines stack"
+        ],
+        "weaknesses": [
+          "Slow setup",
+          "Dead draws late in a fight"
+        ]
+      }
     },
     {
       "id": "countdown_ripen",
-      "name": "Delayed maturation (ripen)",
-      "description": "plant something that does nothing now and fires once after N turns",
+      "name": "Ripening / delayed payoff",
+      "description": "Plant something that does nothing now and goes off a few turns later.",
+      "build_notes": "Every ripening effect must be trackable: the player should always see how many turns are left before it goes off (shown as a buff on the player that counts down). Mix a few ripening cards with cards that keep the player alive in the meantime, so the wait feels like planning, not dead turns.",
       "metaphors": [
         "the seed",
         "dormancy",
@@ -821,12 +2215,80 @@
       "buildable": true,
       "gap_refs": [
         "VOCABULARY_GAPS#6"
-      ]
+      ],
+      "base_synergies": {
+        "hooks": [
+          "turn_count",
+          "delayed_payoff",
+          "stall"
+        ],
+        "pieces": [
+          {
+            "kind": "colorless",
+            "id": "THE_BOMB",
+            "name": "The Bomb",
+            "tier": "core",
+            "why": "The same fantasy: 40 AoE after 3 turns"
+          },
+          {
+            "kind": "relic",
+            "id": "STONE_CALENDAR",
+            "name": "Stone Calendar",
+            "tier": "core",
+            "why": "Huge AoE at the end of turn 7"
+          },
+          {
+            "kind": "relic",
+            "id": "CAPTAINS_WHEEL",
+            "name": "Captain's Wheel",
+            "tier": "support",
+            "why": "Turn-3 Block while seeds ripen"
+          },
+          {
+            "kind": "relic",
+            "id": "HORN_CLEAT",
+            "name": "Horn Cleat",
+            "tier": "support",
+            "why": "Turn-2 Block"
+          },
+          {
+            "kind": "relic",
+            "id": "CHANDELIER",
+            "name": "Chandelier",
+            "tier": "support",
+            "why": "Turn-3 energy"
+          },
+          {
+            "kind": "potion",
+            "id": "SHIP_IN_A_BOTTLE",
+            "name": "Ship in a Bottle",
+            "tier": "support",
+            "why": "Block now and next turn"
+          },
+          {
+            "kind": "potion",
+            "id": "CLARITY",
+            "name": "Clarity Extract",
+            "tier": "support",
+            "why": "Draw spread across turns"
+          }
+        ],
+        "avoid": [],
+        "strengths": [
+          "Stacks huge future turns",
+          "Rewards planning"
+        ],
+        "weaknesses": [
+          "Nothing happens now",
+          "Short fights waste it"
+        ]
+      }
     },
     {
       "id": "balance_gauge",
-      "name": "Two-pole balance gauge",
-      "description": "a meter pushed toward light or dark; both extremes bite",
+      "name": "Balance / light & dark gauge",
+      "description": "Walk the Light or the Dark path: every card pushes the gauge, and each side has its own rewards.",
+      "build_notes": "Touchstone: Knights of the Old Republic, where you can become a light-side or a dark-side Jedi. Give BOTH poles real payoffs (`light_ge` / `dark_ge` cards worth leaning into) and `balance_step` income on each side, plus at least one `centered` card for the player who walks the middle. A run should be able to commit to one side or swing between them. Name and theme cards so their pole is obvious.",
       "metaphors": [
         "the knife's edge",
         "equilibrium",
@@ -865,12 +2327,51 @@
       "buildable": true,
       "gap_refs": [
         "VOCABULARY_GAPS#1"
-      ]
+      ],
+      "base_synergies": {
+        "hooks": [
+          "draw",
+          "card_replay"
+        ],
+        "pieces": [
+          {
+            "kind": "potion",
+            "id": "DUPLICATOR",
+            "name": "Duplicator",
+            "tier": "support",
+            "why": "A double push on the gauge"
+          },
+          {
+            "kind": "relic",
+            "id": "IRON_CLUB",
+            "name": "Iron Club",
+            "tier": "support",
+            "why": "More cards, more gauge income"
+          },
+          {
+            "kind": "colorless",
+            "id": "EQUILIBRIUM",
+            "name": "Equilibrium",
+            "tier": "support",
+            "why": "Retain the hand to time the swing"
+          }
+        ],
+        "avoid": [],
+        "strengths": [
+          "Two modes, flexible",
+          "Both extremes pay"
+        ],
+        "weaknesses": [
+          "Almost no shared-pool pieces read the gauge",
+          "Awkward if stuck mid-gauge"
+        ]
+      }
     },
     {
       "id": "madness_discard",
       "name": "Madness / discard-matters",
-      "description": "churn your hand - discard as fuel, cards that reward being thrown away (the base-game Reflex feel). Three tools: forced discard (random, or the player's choice) as a cheap enabler that pairs with draw; on-discard fuel cards that grant nothing when played but fire when THEY are discarded by an effect, so the player keeps them in hand and pitches them for value; and scry, which looks at the top few cards of the draw pile and discards any of them - a draw filter that also lets the player choose which fuel card to pitch, since a scry-discard counts as an effect-discard. Retrieving a card from the discard pile closes the loop. Ship discard income, a couple of on-discard fuel cards, and a scry/churn engine.",
+      "description": "Churn your hand: discard is fuel, and some cards pay out when you throw them away.",
+      "build_notes": "Touchstone: the base-game Reflex and Sly cards. Discard is a resource: pair discard outlets (random or the player's choice, `scry`, discard-then-draw) with cards that are fine to play but even better when an effect discards them (an `on_discard` trigger that adds value on top of a normal play). Add payoffs that react to discards, and `retrieve_card` to bring a key card back. Every card should be playable on its own; avoid cards that do nothing unless discarded.",
       "metaphors": [
         "the gambler",
         "sifting the ashes",
@@ -918,12 +2419,95 @@
       "buildable": true,
       "gap_refs": [
         "VOCABULARY_GAPS#17"
-      ]
+      ],
+      "base_synergies": {
+        "hooks": [
+          "discard",
+          "empty_hand",
+          "draw",
+          "retrieve"
+        ],
+        "pieces": [
+          {
+            "kind": "relic",
+            "id": "GAMBLING_CHIP",
+            "name": "Gambling Chip",
+            "tier": "core",
+            "why": "Discard and redraw at fight start: fuel pitched on turn 1"
+          },
+          {
+            "kind": "potion",
+            "id": "GAMBLERS_BREW",
+            "name": "Gambler's Brew",
+            "tier": "core",
+            "why": "Pitch any number of cards"
+          },
+          {
+            "kind": "colorless",
+            "id": "BEAT_DOWN",
+            "name": "Beat Down",
+            "tier": "core",
+            "why": "Plays 3 attacks from the discard pile"
+          },
+          {
+            "kind": "relic",
+            "id": "UNCEASING_TOP",
+            "name": "Unceasing Top",
+            "tier": "support",
+            "why": "Discarding down to empty keeps drawing"
+          },
+          {
+            "kind": "relic",
+            "id": "SCREAMING_FLAGON",
+            "name": "Screaming Flagon",
+            "tier": "support",
+            "why": "End turn with an empty hand = AoE damage"
+          },
+          {
+            "kind": "potion",
+            "id": "LIQUID_MEMORIES",
+            "name": "Liquid Memories",
+            "tier": "support",
+            "why": "Pulls a card back from the discard, free"
+          },
+          {
+            "kind": "colorless",
+            "id": "RESTLESSNESS",
+            "name": "Restlessness",
+            "tier": "support",
+            "why": "Empty hand = draw 2 plus energy"
+          },
+          {
+            "kind": "colorless",
+            "id": "THINKING_AHEAD",
+            "name": "Thinking Ahead",
+            "tier": "support",
+            "why": "Hand sculpting"
+          }
+        ],
+        "avoid": [
+          {
+            "kind": "relic",
+            "id": "RUNIC_PYRAMID",
+            "name": "Runic Pyramid",
+            "why": "Keeping the hand fights the discard plan"
+          }
+        ],
+        "strengths": [
+          "Turns dead cards into value",
+          "Fast cycling"
+        ],
+        "weaknesses": [
+          "Needs discard outlets",
+          "Random discard can pitch the wrong card"
+        ]
+      }
     },
     {
       "id": "token_conjurer",
-      "name": "Token conjurer",
-      "description": "conjure copies of your own cards into your piles - a deck that manufactures its own fuel",
+      "name": "Conjurer / tokens",
+      "description": "Conjure copies of your own cards into your piles: a deck that manufactures its own fuel.",
+      "build_notes": "Touchstone: Slay the Spire 1's Anger, an attack that adds a copy of itself. Conjure copies of your own cards (`add_card`, including self-copies) and give the class a reason to want the extras: triggers when cards are played or exhausted, a power that turns each copy into value, and cheap copies that fuel a combo turn. A natural fit for combo decks and for a power that helps it go off.",
       "metaphors": [
         "the conjurer",
         "sleight of hand",
@@ -961,12 +2545,86 @@
       "buildable": true,
       "gap_refs": [
         "VOCABULARY_GAPS#16"
-      ]
+      ],
+      "base_synergies": {
+        "hooks": [
+          "card_generation",
+          "free_cards"
+        ],
+        "pieces": [
+          {
+            "kind": "colorless",
+            "id": "CALAMITY",
+            "name": "Calamity",
+            "tier": "core",
+            "why": "Every attack conjures another attack"
+          },
+          {
+            "kind": "relic",
+            "id": "VEXING_PUZZLEBOX",
+            "name": "Vexing Puzzlebox",
+            "tier": "support",
+            "why": "A free random card every fight"
+          },
+          {
+            "kind": "relic",
+            "id": "CROSSBOW",
+            "name": "Crossbow",
+            "tier": "support",
+            "why": "A free random attack every turn"
+          },
+          {
+            "kind": "relic",
+            "id": "TOOLBOX",
+            "name": "Toolbox",
+            "tier": "support",
+            "why": "A colorless card every fight"
+          },
+          {
+            "kind": "colorless",
+            "id": "JACK_OF_ALL_TRADES",
+            "name": "Jack of All Trades",
+            "tier": "support",
+            "why": "A free colorless card"
+          },
+          {
+            "kind": "colorless",
+            "id": "DISCOVERY",
+            "name": "Discovery",
+            "tier": "support",
+            "why": "Choose a free card"
+          },
+          {
+            "kind": "potion",
+            "id": "OROBIC_ACID",
+            "name": "Orobic Acid",
+            "tier": "support",
+            "why": "Three free cards"
+          },
+          {
+            "kind": "relic",
+            "id": "DOLLYS_MIRROR",
+            "name": "Dolly's Mirror",
+            "tier": "support",
+            "why": "Copies a key card for the deck"
+          }
+        ],
+        "avoid": [],
+        "strengths": [
+          "Never runs out of fuel",
+          "Lots of options"
+        ],
+        "weaknesses": [
+          "Tokens are individually weak",
+          "Clutters the hand"
+        ]
+      }
     },
     {
       "id": "exhaust_pyre",
       "name": "Pyre / exhaust-matters",
-      "description": "burn cards away for power - every Exhaust feeds the engine; pair with token_conjurer for the compost loop (on_exhaust + add_card = what burns returns), or with corruption (your Skills cost 0 but Exhaust when played - reckless-tempo fuel for the on_exhaust engine)",
+      "description": "Burn cards away for power: every Exhaust feeds the engine.",
+      "build_notes": "This deck wants to exhaust the cards in its hand and gets bonuses for doing so. Look for triggered effects that happen on exhaust, cards that have effects when exhausted or return something from the exhausted pool to hand or discard.",
       "metaphors": [
         "the pyre",
         "ashes",
@@ -1006,12 +2664,80 @@
       "buildable": true,
       "gap_refs": [
         "VOCABULARY_GAPS#20"
-      ]
+      ],
+      "base_synergies": {
+        "hooks": [
+          "exhaust",
+          "exhaust_from_hand",
+          "skills_played"
+        ],
+        "pieces": [
+          {
+            "kind": "colorless",
+            "id": "PURITY",
+            "name": "Purity",
+            "tier": "core",
+            "why": "Exhaust up to 3 cards from hand"
+          },
+          {
+            "kind": "relic",
+            "id": "JOSS_PAPER",
+            "name": "Joss Paper",
+            "tier": "core",
+            "why": "Every 5 exhausts draws a card"
+          },
+          {
+            "kind": "relic",
+            "id": "BURNING_STICKS",
+            "name": "Burning Sticks",
+            "tier": "core",
+            "why": "The first exhausted Skill copies itself back"
+          },
+          {
+            "kind": "relic",
+            "id": "FORGOTTEN_SOUL",
+            "name": "Forgotten Soul",
+            "tier": "support",
+            "why": "Every exhaust pings an enemy"
+          },
+          {
+            "kind": "relic",
+            "id": "TOASTY_MITTENS",
+            "name": "Toasty Mittens",
+            "tier": "support",
+            "why": "Exhausts the top card every turn, +1 Strength"
+          },
+          {
+            "kind": "relic",
+            "id": "PAELS_EYE",
+            "name": "Pael's Eye",
+            "tier": "support",
+            "why": "Exhaust the hand for an extra turn"
+          },
+          {
+            "kind": "potion",
+            "id": "GLOWWATER_POTION",
+            "name": "Glowwater Potion",
+            "tier": "support",
+            "why": "Exhaust the hand, draw 10"
+          }
+        ],
+        "avoid": [],
+        "strengths": [
+          "Deck gets leaner as the fight goes",
+          "On-exhaust engines stack"
+        ],
+        "weaknesses": [
+          "Runs out of fuel in long fights",
+          "Exhausting the wrong card hurts"
+        ]
+      }
     },
     {
       "id": "strike_synergy",
       "name": "Strikes-matter / tag synergy",
-      "description": "a family of same-named cards that reward owning many of them - the more you draft, the harder your payoffs hit (Perfected Strike)",
+      "description": "A family of same-named cards that reward owning many: the more you draft, the harder the payoffs hit.",
+      "build_notes": "Touchstone: the base-game Perfected Strike. The family word doesn't have to be 'Strike': pick any word that fits the theme (Blade, Hex, Brew...) and put it in the TITLE of every card that carries the tag, so players can see which cards count.",
       "metaphors": [
         "the drilled form",
         "one strike, mastered",
@@ -1048,12 +2774,71 @@
       "buildable": true,
       "gap_refs": [
         "VOCABULARY_GAPS#25"
-      ]
+      ],
+      "base_synergies": {
+        "hooks": [
+          "strike_named",
+          "cards_owned"
+        ],
+        "pieces": [
+          {
+            "kind": "relic",
+            "id": "STRIKE_DUMMY",
+            "name": "Strike Dummy",
+            "tier": "core",
+            "why": "Every Strike-named card deals +3"
+          },
+          {
+            "kind": "relic",
+            "id": "NUTRITIOUS_SOUP",
+            "name": "Nutritious Soup",
+            "tier": "core",
+            "why": "Enchants every Strike"
+          },
+          {
+            "kind": "colorless",
+            "id": "ULTIMATE_STRIKE",
+            "name": "Ultimate Strike",
+            "tier": "support",
+            "why": "A Strike-named colorless card for the count"
+          },
+          {
+            "kind": "colorless",
+            "id": "SEEKER_STRIKE",
+            "name": "Seeker Strike",
+            "tier": "support",
+            "why": "Another Strike-named card for the count"
+          }
+        ],
+        "avoid": [
+          {
+            "kind": "relic",
+            "id": "PANDORAS_BOX",
+            "name": "Pandora's Box",
+            "why": "Transforms your Strikes away"
+          },
+          {
+            "kind": "relic",
+            "id": "CLAWS",
+            "name": "Claws",
+            "why": "Transforms cards away from the tag"
+          }
+        ],
+        "strengths": [
+          "Scales with drafting",
+          "Simple, strong payoffs"
+        ],
+        "weaknesses": [
+          "Needs many copies",
+          "Awkward draft priorities"
+        ]
+      }
     },
     {
       "id": "metamorph",
       "name": "Metamorph / self-rewriting cards",
-      "description": "cards that PERMANENTLY transform into other cards mid-run - a weak card ranks up into a strong one once you've built up (rank-up), two cards swap into each other as a stance/weapon-mode toggle (mode-swap), or a graft card lets you PICK a weak card in hand and reforge it into a strong one (prune & graft). The deck rewrites itself as the run goes on",
+      "description": "Cards that permanently transform mid-run, so the deck rewrites itself as the run goes on.",
+      "build_notes": "Three shapes: rank-up (`transform_card` turns a weak card into a strong one once you've built up), mode-swap (two cards transform into each other as a stance or weapon toggle), and prune & graft (`graft_card` lets the player pick a weak card in hand and reforge it into a strong one).",
       "metaphors": [
         "the circuit that rewrites itself",
         "filing the sear, reboring the barrel",
@@ -1095,12 +2880,65 @@
         "VOCABULARY_GAPS#35",
         "VOCABULARY_GAPS#38",
         "VOCABULARY_GAPS#7"
-      ]
+      ],
+      "base_synergies": {
+        "hooks": [
+          "transform",
+          "upgrade"
+        ],
+        "pieces": [
+          {
+            "kind": "colorless",
+            "id": "ENTROPY",
+            "name": "Entropy",
+            "tier": "core",
+            "why": "Transforms a card in hand every turn"
+          },
+          {
+            "kind": "relic",
+            "id": "ASTROLABE",
+            "name": "Astrolabe",
+            "tier": "support",
+            "why": "Transforms 3 cards and upgrades them"
+          },
+          {
+            "kind": "relic",
+            "id": "NEW_LEAF",
+            "name": "New Leaf",
+            "tier": "support",
+            "why": "A transform on pickup"
+          },
+          {
+            "kind": "relic",
+            "id": "ARCHAIC_TOOTH",
+            "name": "Archaic Tooth",
+            "tier": "support",
+            "why": "A starter card becomes an ancient version"
+          },
+          {
+            "kind": "relic",
+            "id": "WAR_HAMMER",
+            "name": "War Hammer",
+            "tier": "support",
+            "why": "Upgrades after elite kills"
+          }
+        ],
+        "avoid": [],
+        "strengths": [
+          "Deck improves over the run",
+          "Weak cards become strong ones"
+        ],
+        "weaknesses": [
+          "Rank-ups need setup",
+          "Hard to predict"
+        ]
+      }
     },
     {
       "id": "big_energy",
-      "name": "Overload / big energy",
-      "description": "generate outsized energy, then dump it into huge expensive turns",
+      "name": "Overload / mana ramp",
+      "description": "Ramp your energy, then spend it on big, expensive cards and X-cost spells.",
+      "build_notes": "The mana-ramp class: energy generation and cost reduction first, then 2-3 cost cards and X-cost spells (`\"cost\": \"X\"` with `scale:\"x\"`) as the payoffs, with card draw to keep the big cards coming. X-cost cards are the signature: give the class a few that scale well with a big energy turn.",
       "metaphors": [
         "the surge",
         "overload",
@@ -1139,12 +2977,100 @@
         "class_kind": "normal"
       },
       "buildable": true,
-      "gap_refs": []
+      "gap_refs": [],
+      "base_synergies": {
+        "hooks": [
+          "energy_surplus",
+          "x_cost",
+          "high_cost"
+        ],
+        "pieces": [
+          {
+            "kind": "relic",
+            "id": "CHEMICAL_X",
+            "name": "Chemical X",
+            "tier": "core",
+            "why": "X-cost cards get +2"
+          },
+          {
+            "kind": "relic",
+            "id": "ICE_CREAM",
+            "name": "Ice Cream",
+            "tier": "core",
+            "why": "Energy carries over between turns"
+          },
+          {
+            "kind": "relic",
+            "id": "INTIMIDATING_HELMET",
+            "name": "Intimidating Helmet",
+            "tier": "core",
+            "why": "Block for every 2+ cost card"
+          },
+          {
+            "kind": "relic",
+            "id": "PAELS_TEARS",
+            "name": "Pael's Tears",
+            "tier": "support",
+            "why": "Unspent energy pays out next turn"
+          },
+          {
+            "kind": "relic",
+            "id": "VERY_HOT_COCOA",
+            "name": "Very Hot Cocoa",
+            "tier": "support",
+            "why": "+4 energy on turn 1"
+          },
+          {
+            "kind": "relic",
+            "id": "CHANDELIER",
+            "name": "Chandelier",
+            "tier": "support",
+            "why": "+3 energy on turn 3"
+          },
+          {
+            "kind": "potion",
+            "id": "ENERGY_POTION",
+            "name": "Energy Potion",
+            "tier": "support",
+            "why": "+2 energy"
+          },
+          {
+            "kind": "potion",
+            "id": "RADIANT_TINCTURE",
+            "name": "Radiant Tincture",
+            "tier": "support",
+            "why": "Energy over several turns"
+          },
+          {
+            "kind": "colorless",
+            "id": "VOLLEY",
+            "name": "Volley",
+            "tier": "support",
+            "why": "An X-cost colorless attack"
+          },
+          {
+            "kind": "colorless",
+            "id": "PRODUCTION",
+            "name": "Production",
+            "tier": "support",
+            "why": "Free +2 energy"
+          }
+        ],
+        "avoid": [],
+        "strengths": [
+          "Huge, expensive turns",
+          "Pays for X-cost cards"
+        ],
+        "weaknesses": [
+          "Clunky hands",
+          "Energy cards cost card slots"
+        ]
+      }
     },
     {
       "id": "counter_riposte",
-      "name": "Counterpuncher",
-      "description": "get hit, hit back: retaliation triggers and thorns turn the enemy's own attack into your damage",
+      "name": "Counterpuncher / retaliation",
+      "description": "Get hit, hit back: retaliation and Thorns turn the enemy's own attacks into your damage.",
       "metaphors": [
         "the riposte",
         "the parry-and-thrust",
@@ -1183,12 +3109,66 @@
         "class_kind": "normal"
       },
       "buildable": true,
-      "gap_refs": []
+      "gap_refs": [],
+      "base_synergies": {
+        "hooks": [
+          "thorns",
+          "hp_loss",
+          "attacked"
+        ],
+        "pieces": [
+          {
+            "kind": "relic",
+            "id": "BRONZE_SCALES",
+            "name": "Bronze Scales",
+            "tier": "core",
+            "why": "Starting Thorns"
+          },
+          {
+            "kind": "potion",
+            "id": "LIQUID_BRONZE",
+            "name": "Liquid Bronze",
+            "tier": "core",
+            "why": "+3 Thorns"
+          },
+          {
+            "kind": "relic",
+            "id": "CENTENNIAL_PUZZLE",
+            "name": "Centennial Puzzle",
+            "tier": "support",
+            "why": "Getting hit draws 3"
+          },
+          {
+            "kind": "relic",
+            "id": "TUNGSTEN_ROD",
+            "name": "Tungsten Rod",
+            "tier": "support",
+            "why": "Each hit costs 1 less"
+          },
+          {
+            "kind": "relic",
+            "id": "PARRYING_SHIELD",
+            "name": "Parrying Shield",
+            "tier": "support",
+            "why": "Blocking well also hits back"
+          }
+        ],
+        "avoid": [],
+        "strengths": [
+          "Punishes multi-hit enemies",
+          "Damage without spending cards"
+        ],
+        "weaknesses": [
+          "Useless when the enemy doesn't attack",
+          "Low control"
+        ]
+      }
     },
     {
       "id": "threshold_duelist",
-      "name": "Duelist of moments",
-      "description": "when-gated payoffs ARE the identity: execute windows, late-game spikes, no-block daring - the right moment is everything",
+      "name": "Duelist / fight-state payoffs",
+      "description": "Cards that change with the fight: execute a wounded enemy, fight harder when you're hurt, reward going without Block.",
+      "build_notes": "The `when`-gated payoffs ARE the identity: conditions the fight hands you (target below half HP, your own HP below half, no Block, a late turn) rather than a turn the player builds. Distinct from Glass tempest, which constructs its own big turn.",
       "metaphors": [
         "the perfect moment",
         "the execute",
@@ -1228,12 +3208,73 @@
         "class_kind": "normal"
       },
       "buildable": true,
-      "gap_refs": []
+      "gap_refs": [],
+      "base_synergies": {
+        "hooks": [
+          "no_block",
+          "turn_count",
+          "hp_threshold",
+          "cards_played"
+        ],
+        "pieces": [
+          {
+            "kind": "relic",
+            "id": "ORICHALCUM",
+            "name": "Orichalcum",
+            "tier": "core",
+            "why": "Ending without Block isn't fatal"
+          },
+          {
+            "kind": "relic",
+            "id": "STONE_CALENDAR",
+            "name": "Stone Calendar",
+            "tier": "support",
+            "why": "Turn 7 pays out: pairs with turn gates"
+          },
+          {
+            "kind": "relic",
+            "id": "PAELS_FLESH",
+            "name": "Pael's Flesh",
+            "tier": "support",
+            "why": "Energy from turn 3 onward, for late-gated payoffs"
+          },
+          {
+            "kind": "relic",
+            "id": "MEAT_ON_THE_BONE",
+            "name": "Meat on the Bone",
+            "tier": "support",
+            "why": "Rewards living below half HP"
+          },
+          {
+            "kind": "colorless",
+            "id": "PANACHE",
+            "name": "Panache",
+            "tier": "support",
+            "why": "5 cards in a turn = damage (a played-count gate)"
+          },
+          {
+            "kind": "colorless",
+            "id": "THE_GAMBIT",
+            "name": "The Gambit",
+            "tier": "support",
+            "why": "Makes no-Block turns survivable, at a price"
+          }
+        ],
+        "avoid": [],
+        "strengths": [
+          "Big payoffs at the right moment",
+          "Rewards skilled sequencing"
+        ],
+        "weaknesses": [
+          "Weak when gates are off",
+          "Needs setup turns"
+        ]
+      }
     },
     {
       "id": "horde_breaker",
-      "name": "Crowd-breaker",
-      "description": "AoE payoffs that want MANY enemies: the more they bring, the harder you hit all of them at once",
+      "name": "Crowd-breaker / AoE",
+      "description": "Area attacks that want many enemies: the more they bring, the harder you hit them all.",
       "metaphors": [
         "the whirlwind",
         "the cleave",
@@ -1269,12 +3310,87 @@
         "class_kind": "normal"
       },
       "buildable": true,
-      "gap_refs": []
+      "gap_refs": [],
+      "base_synergies": {
+        "hooks": [
+          "aoe",
+          "enemy_death",
+          "enemy_count"
+        ],
+        "pieces": [
+          {
+            "kind": "relic",
+            "id": "GREMLIN_HORN",
+            "name": "Gremlin Horn",
+            "tier": "core",
+            "why": "Every kill refunds energy and a card"
+          },
+          {
+            "kind": "colorless",
+            "id": "OMNISLICE",
+            "name": "Omnislice",
+            "tier": "core",
+            "why": "Splash damage to every other enemy"
+          },
+          {
+            "kind": "relic",
+            "id": "FESTIVE_POPPER",
+            "name": "Festive Popper",
+            "tier": "support",
+            "why": "Fight-start AoE"
+          },
+          {
+            "kind": "relic",
+            "id": "MERCURY_HOURGLASS",
+            "name": "Mercury Hourglass",
+            "tier": "support",
+            "why": "AoE every turn"
+          },
+          {
+            "kind": "relic",
+            "id": "LETTER_OPENER",
+            "name": "Letter Opener",
+            "tier": "support",
+            "why": "Skill turns deal AoE"
+          },
+          {
+            "kind": "colorless",
+            "id": "DRAMATIC_ENTRANCE",
+            "name": "Dramatic Entrance",
+            "tier": "support",
+            "why": "Free AoE"
+          },
+          {
+            "kind": "colorless",
+            "id": "ROLLING_BOULDER",
+            "name": "Rolling Boulder",
+            "tier": "support",
+            "why": "Growing AoE every turn"
+          },
+          {
+            "kind": "potion",
+            "id": "EXPLOSIVE_AMPOULE",
+            "name": "Explosive Ampoule",
+            "tier": "support",
+            "why": "A burst of AoE"
+          }
+        ],
+        "avoid": [],
+        "strengths": [
+          "Clears swarms fast",
+          "Kills chain"
+        ],
+        "weaknesses": [
+          "Weak against lone bosses",
+          "Low single-target damage"
+        ]
+      }
     },
     {
       "id": "ambush_alpha",
-      "name": "Ambusher",
-      "description": "innate opening-hand burst: win the first three turns before the enemy ever sets up",
+      "name": "Ambusher / opening burst",
+      "description": "Hit hardest at the start of a fight and aim to end it before the enemy gets going.",
+      "build_notes": "Front-loaded power: `innate` cards guarantee a strong opening hand, cheap high-impact attacks and early energy make the first turns explosive, and a few payoffs are strongest early in the fight. Give the class a fallback for fights that drag (card draw, a modest mid-fight plan), but its identity is fast, decisive openings.",
       "metaphors": [
         "the ambush",
         "the first strike",
@@ -1309,12 +3425,101 @@
         "class_kind": "normal"
       },
       "buildable": true,
-      "gap_refs": []
+      "gap_refs": [],
+      "base_synergies": {
+        "hooks": [
+          "first_turn",
+          "innate",
+          "energy_surplus"
+        ],
+        "pieces": [
+          {
+            "kind": "relic",
+            "id": "THROWING_AXE",
+            "name": "Throwing Axe",
+            "tier": "core",
+            "why": "The first card each combat plays twice"
+          },
+          {
+            "kind": "relic",
+            "id": "BAG_OF_PREPARATION",
+            "name": "Bag of Preparation",
+            "tier": "core",
+            "why": "Draws 2 more on turn 1"
+          },
+          {
+            "kind": "relic",
+            "id": "LANTERN",
+            "name": "Lantern",
+            "tier": "core",
+            "why": "+1 energy on turn 1"
+          },
+          {
+            "kind": "relic",
+            "id": "AKABEKO",
+            "name": "Akabeko",
+            "tier": "support",
+            "why": "Vigor on the first attack"
+          },
+          {
+            "kind": "relic",
+            "id": "BELLOWS",
+            "name": "Bellows",
+            "tier": "support",
+            "why": "The opening hand is upgraded"
+          },
+          {
+            "kind": "relic",
+            "id": "RINGING_TRIANGLE",
+            "name": "Ringing Triangle",
+            "tier": "support",
+            "why": "Keeps the opening hand for turn 2"
+          },
+          {
+            "kind": "relic",
+            "id": "VERY_HOT_COCOA",
+            "name": "Very Hot Cocoa",
+            "tier": "support",
+            "why": "+4 energy on turn 1"
+          },
+          {
+            "kind": "relic",
+            "id": "FESTIVE_POPPER",
+            "name": "Festive Popper",
+            "tier": "support",
+            "why": "Fight-start AoE"
+          },
+          {
+            "kind": "potion",
+            "id": "ATTACK_POTION",
+            "name": "Attack Potion",
+            "tier": "support",
+            "why": "More turn-1 damage"
+          }
+        ],
+        "avoid": [
+          {
+            "kind": "relic",
+            "id": "BREAD",
+            "name": "Bread",
+            "why": "-2 energy on turn 1"
+          }
+        ],
+        "strengths": [
+          "Ends fights before the enemy sets up",
+          "Very consistent openings"
+        ],
+        "weaknesses": [
+          "Falls off in long fights",
+          "Innate slots are limited"
+        ]
+      }
     },
     {
       "id": "fleeting_flux",
-      "name": "Use-it-or-lose-it",
-      "description": "ethereal cards over-statted for their cost: big now, gone at end of turn - churn your hand or waste them",
+      "name": "Fleeting / ethereal",
+      "description": "Over-powered cards that vanish at end of turn: play them now or lose them.",
+      "build_notes": "Every card here asks a question the moment it's drawn: play it now or lose it. Ethereal cards are over-statted for their cost, but a deck can't hold many before the waste adds up, so pair them with draw, energy and cheap enablers. Crosses well with small-deck (Ascetic) and combo plans, where the same ethereal cards come around every turn.",
       "metaphors": [
         "the fading spark",
         "the melting snow",
@@ -1350,12 +3555,66 @@
         "class_kind": "normal"
       },
       "buildable": true,
-      "gap_refs": []
+      "gap_refs": [],
+      "base_synergies": {
+        "hooks": [
+          "ethereal",
+          "energy_surplus",
+          "draw"
+        ],
+        "pieces": [
+          {
+            "kind": "relic",
+            "id": "GHOST_SEED",
+            "name": "Ghost Seed",
+            "tier": "core",
+            "why": "Strikes and Defends become Ethereal"
+          },
+          {
+            "kind": "relic",
+            "id": "MUSIC_BOX",
+            "name": "Music Box",
+            "tier": "core",
+            "why": "An Ethereal copy of your first attack each turn"
+          },
+          {
+            "kind": "potion",
+            "id": "ENERGY_POTION",
+            "name": "Energy Potion",
+            "tier": "support",
+            "why": "Play more Ethereal cards before they vanish"
+          },
+          {
+            "kind": "relic",
+            "id": "LANTERN",
+            "name": "Lantern",
+            "tier": "support",
+            "why": "More energy for turn 1"
+          },
+          {
+            "kind": "colorless",
+            "id": "PRODUCTION",
+            "name": "Production",
+            "tier": "support",
+            "why": "+2 energy"
+          }
+        ],
+        "avoid": [],
+        "strengths": [
+          "Over-statted cards",
+          "The deck self-trims each fight"
+        ],
+        "weaknesses": [
+          "Wastes cards on bad draws",
+          "Energy-hungry"
+        ]
+      }
     },
     {
       "id": "untouchable_ward",
-      "name": "Untouchable",
-      "description": "mitigation exotica: negate, absorb, and phase (buffer/artifact/intangible/blur) instead of flat Block",
+      "name": "Untouchable / exotic mitigation",
+      "description": "Negate, absorb and phase through damage instead of stacking flat Block.",
+      "build_notes": "The toolkit is Buffer, Artifact, Intangible and Blur, and the class needs an ENGINE that brings them back (a power or trigger that regrants Buffer or Blur, a ripening countdown to the next Intangible, cards that recycle a ward) rather than a pile of one-off shields. Include enough Intangible that the plan works, gated so it can't be permanent.",
       "metaphors": [
         "the ghost",
         "the ward",
@@ -1392,12 +3651,80 @@
         "class_kind": "normal"
       },
       "buildable": true,
-      "gap_refs": []
+      "gap_refs": [],
+      "base_synergies": {
+        "hooks": [
+          "mitigation",
+          "buffer",
+          "hp_loss_cap"
+        ],
+        "pieces": [
+          {
+            "kind": "potion",
+            "id": "LUCKY_TONIC",
+            "name": "Lucky Tonic",
+            "tier": "core",
+            "why": "A Buffer charge"
+          },
+          {
+            "kind": "relic",
+            "id": "DIAMOND_DIADEM",
+            "name": "Diamond Diadem",
+            "tier": "core",
+            "why": "Half damage on quiet turns"
+          },
+          {
+            "kind": "relic",
+            "id": "TUNGSTEN_ROD",
+            "name": "Tungsten Rod",
+            "tier": "support",
+            "why": "Every hit costs 1 less"
+          },
+          {
+            "kind": "relic",
+            "id": "BEATING_REMNANT",
+            "name": "Beating Remnant",
+            "tier": "support",
+            "why": "Caps HP loss per turn"
+          },
+          {
+            "kind": "potion",
+            "id": "BEETLE_JUICE",
+            "name": "Beetle Juice",
+            "tier": "support",
+            "why": "30% less damage for 4 turns"
+          },
+          {
+            "kind": "potion",
+            "id": "SHACKLING_POTION",
+            "name": "Shackling Potion",
+            "tier": "support",
+            "why": "Strips enemy Strength"
+          },
+          {
+            "kind": "colorless",
+            "id": "DARK_SHACKLES",
+            "name": "Dark Shackles",
+            "tier": "support",
+            "why": "Strips Strength"
+          }
+        ],
+        "avoid": [],
+        "strengths": [
+          "Negates big hits",
+          "Stronger than flat Block against bosses"
+        ],
+        "weaknesses": [
+          "Expensive",
+          "Weak against many small hits"
+        ]
+      }
     },
     {
       "id": "burst_window",
-      "name": "Glass tempest",
-      "description": "temp-stat spike turns: all your strength at once, then gone - one explosive window per fight",
+      "name": "Glass tempest / temp-stat burst",
+      "description": "Sculpt the perfect hand over a few turns, then cash it in on one huge, stat-spiked turn.",
+      "build_notes": "Touchstone: Slay the Spire 1 Flex builds, where temporary Strength meets a hand full of attacks. The identity is SETUP: draw, retain and energy tools that let the player assemble the right hand, then temporary stat spikes (`temp_strength`, `temp_dexterity`, `temp_thorns`) and cheap or multi-hit attacks that cash them in on the same turn. The player builds this moment; it isn't handed to them.",
       "metaphors": [
         "the adrenaline spike",
         "the sugar rush",
@@ -1434,12 +3761,86 @@
         "class_kind": "normal"
       },
       "buildable": true,
-      "gap_refs": []
+      "gap_refs": [],
+      "base_synergies": {
+        "hooks": [
+          "temp_stats",
+          "big_single_hit",
+          "card_replay"
+        ],
+        "pieces": [
+          {
+            "kind": "potion",
+            "id": "FLEX_POTION",
+            "name": "Flex Potion",
+            "tier": "core",
+            "why": "+5 Strength for the window"
+          },
+          {
+            "kind": "potion",
+            "id": "GIGANTIFICATION_POTION",
+            "name": "Gigantification Potion",
+            "tier": "core",
+            "why": "Triple damage on the next attack"
+          },
+          {
+            "kind": "potion",
+            "id": "DUPLICATOR",
+            "name": "Duplicator",
+            "tier": "core",
+            "why": "Doubles the window's best card"
+          },
+          {
+            "kind": "relic",
+            "id": "REPTILE_TRINKET",
+            "name": "Reptile Trinket",
+            "tier": "support",
+            "why": "Potions add temporary Strength"
+          },
+          {
+            "kind": "relic",
+            "id": "PEN_NIB",
+            "name": "Pen Nib",
+            "tier": "support",
+            "why": "Double damage lands in the window"
+          },
+          {
+            "kind": "relic",
+            "id": "CHANDELIER",
+            "name": "Chandelier",
+            "tier": "support",
+            "why": "+3 energy for a turn-3 window"
+          },
+          {
+            "kind": "potion",
+            "id": "SPEED_POTION",
+            "name": "Speed Potion",
+            "tier": "support",
+            "why": "+5 temporary Dexterity"
+          },
+          {
+            "kind": "colorless",
+            "id": "PREP_TIME",
+            "name": "Prep Time",
+            "tier": "support",
+            "why": "Vigor builds up for the window"
+          }
+        ],
+        "avoid": [],
+        "strengths": [
+          "Enormous single turns",
+          "Burns elites down"
+        ],
+        "weaknesses": [
+          "Timing-dependent",
+          "Nothing left after the window"
+        ]
+      }
     },
     {
       "id": "iron_regrowth",
-      "name": "Regrower",
-      "description": "heal/regen attrition: outlast the fight by healing more than they can ever land",
+      "name": "Regrower / heal & regen",
+      "description": "Outlast the fight by healing more than the enemy can ever land.",
       "metaphors": [
         "the regrowth",
         "the mending",
@@ -1475,7 +3876,81 @@
         "class_kind": "normal"
       },
       "buildable": true,
-      "gap_refs": []
+      "gap_refs": [],
+      "base_synergies": {
+        "hooks": [
+          "heal",
+          "regen",
+          "max_hp"
+        ],
+        "pieces": [
+          {
+            "kind": "potion",
+            "id": "REGEN_POTION",
+            "name": "Regen Potion",
+            "tier": "core",
+            "why": "5 Regen"
+          },
+          {
+            "kind": "relic",
+            "id": "MEAT_ON_THE_BONE",
+            "name": "Meat on the Bone",
+            "tier": "core",
+            "why": "Heals after close fights"
+          },
+          {
+            "kind": "relic",
+            "id": "BLOOD_VIAL",
+            "name": "Blood Vial",
+            "tier": "support",
+            "why": "A heal every fight"
+          },
+          {
+            "kind": "relic",
+            "id": "PANTOGRAPH",
+            "name": "Pantograph",
+            "tier": "support",
+            "why": "A big heal before bosses"
+          },
+          {
+            "kind": "relic",
+            "id": "STRAWBERRY",
+            "name": "Strawberry",
+            "tier": "support",
+            "why": "More Max HP to heal into"
+          },
+          {
+            "kind": "relic",
+            "id": "MANGO",
+            "name": "Mango",
+            "tier": "support",
+            "why": "More Max HP"
+          },
+          {
+            "kind": "potion",
+            "id": "FRUIT_JUICE",
+            "name": "Fruit Juice",
+            "tier": "support",
+            "why": "Max HP"
+          },
+          {
+            "kind": "potion",
+            "id": "FAIRY_IN_A_BOTTLE",
+            "name": "Fairy in a Bottle",
+            "tier": "support",
+            "why": "A second life"
+          }
+        ],
+        "avoid": [],
+        "strengths": [
+          "Outlasts anything",
+          "Carries HP between fights"
+        ],
+        "weaknesses": [
+          "Low damage",
+          "Weak to enemy scaling"
+        ]
+      }
     }
   ]
 }

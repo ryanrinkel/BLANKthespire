@@ -3,12 +3,15 @@
 Run:  uv run python -m tests.test_archetypes     (from generation/)
 Exits nonzero on any failure. Covers: no two archetypes share a name / description / metaphor string (and no
 archetype repeats a metaphor), the file's `buildable` flag agrees with the catalog's live recomputation (every
-`buildable:false` names an open gap in VOCABULARY_GAPS.md, every `buildable:true` has none), and the optional
-`mechanic_kind` field only takes values from the fixed set harness_v2._pool_kind understands.
+`buildable:false` names an open gap in VOCABULARY_GAPS.md, every `buildable:true` has none), the optional
+`mechanic_kind` field only takes values from the fixed set harness_v2._pool_kind understands, the copy format
+('Theme / mechanic' names; one short player-facing description with no op syntax; model-only `build_notes`), and
+the `base_synergies` shape plus its path into the MAP and blueprint prompts.
 """
 from __future__ import annotations
 
 import json
+import re
 import sys
 
 from btsgen.class_forge import point_btsgen_at_mod_contract
@@ -127,11 +130,75 @@ def test_ops_are_live_tokens() -> None:
         check(not missing, f"'{a['id']}' ops not in the live vocabulary: {missing}")
 
 
+# --------------------------------------------------------------- copy format (player-facing vs model-only)
+DESC_MAX = 150
+_OP_SYNTAX = re.compile(r"[`{}]")
+
+
+def test_copy_format() -> None:
+    print("archetypes.json: names are 'Theme / mechanic', descriptions are one short player-facing line:")
+    cat = load_catalog()
+    for a in _raw():
+        name, desc = a.get("name", ""), a.get("description", "")
+        check(" / " in name, f"'{a['id']}' name '{name}' doesn't follow 'Theme / mechanic'")
+        check(0 < len(desc) <= DESC_MAX, f"'{a['id']}' description is {len(desc)} chars (1-{DESC_MAX})")
+        check(not _OP_SYNTAX.search(desc), f"'{a['id']}' description carries op syntax (backticks/braces): {desc}")
+        check(desc[:1].isupper(), f"'{a['id']}' description starts lowercase: {desc}")
+        notes = a.get("build_notes")
+        check(notes is None or (isinstance(notes, str) and notes.strip()), f"'{a['id']}' build_notes present but empty")
+        check(cat.by_id[a["id"]].build_notes == (notes or "").strip(), f"catalog carries build_notes for '{a['id']}'")
+    # the MAP prompt shows build notes on their own line, never folded into `engine:`
+    block = cat.prompt_block()
+    check("    build: " in block, "prompt_block renders a build: line")
+    for line in block.splitlines():
+        if line.startswith("    engine: "):
+            check(len(line) - len("    engine: ") <= DESC_MAX, f"engine line too long: {line[:80]}")
+
+
+# --------------------------------------------------------------- base-game synergies
+_KINDS = frozenset({"relic", "potion", "colorless"})
+_TIERS = frozenset({"core", "support"})
+
+
+def test_base_synergies() -> None:
+    print("archetypes.json: `base_synergies` are well-formed and reach the prompts:")
+    cat = load_catalog()
+    for a in _raw():
+        bs = a.get("base_synergies")
+        check(isinstance(bs, dict), f"'{a['id']}' has base_synergies")
+        if not isinstance(bs, dict):
+            continue
+        pieces = bs.get("pieces") or []
+        check(bool(pieces), f"'{a['id']}' names at least one base-game piece")
+        has_core = any(p.get("tier") == "core" for p in pieces)
+        seen: set[str] = set()
+        for p in pieces + (bs.get("avoid") or []):
+            key = f"{p.get('kind')}:{p.get('id')}"
+            check(p.get("kind") in _KINDS, f"'{a['id']}' piece {key} has an unknown kind")
+            check(bool(p.get("id")) and bool(p.get("name")) and bool(p.get("why")), f"'{a['id']}' piece {key} missing id/name/why")
+            check(key not in seen, f"'{a['id']}' lists {key} twice")
+            seen.add(key)
+        for p in pieces:
+            check(p.get("tier") in _TIERS, f"'{a['id']}' piece {p.get('id')} tier '{p.get('tier')}' not in {sorted(_TIERS)}")
+        check(bool(bs.get("strengths")) and bool(bs.get("weaknesses")), f"'{a['id']}' lists strengths and weaknesses")
+        e = cat.by_id[a["id"]]
+        # Summon / Balance have only support pieces (the shared pool barely serves them): no core line, by design.
+        check(bool(e.synergy_line()) == has_core, f"catalog renders a core synergy line for '{a['id']}' iff it has core pieces")
+        check(("base-game synergies: " in e.notes_for_blueprint()) == has_core,
+              f"'{a['id']}' blueprint notes carry the synergy line iff it has core pieces")
+    # a hydrated candidate carries the notes, parallel to its ids (the blueprint prompt reads them)
+    c = cat.hydrate_candidate({"name": "T", "fantasy": "t", "archetype_ids": ["battle_smith", "retain_hold"]})
+    check(len(c.archetype_notes) == 2 and "Apotheosis" in c.archetype_notes[0],
+          "hydrated candidate carries per-archetype notes (Battle-smith names the Apotheosis relic)")
+
+
 def main() -> int:
     test_no_shared_strings()
     test_buildable_flags_match_live_gaps()
     test_mechanic_kind_values()
     test_ops_are_live_tokens()
+    test_copy_format()
+    test_base_synergies()
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return 1 if _FAIL else 0
 

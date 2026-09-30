@@ -200,6 +200,29 @@ class ArchetypeEntry:
     # exhaust / retain / rampage / tags / purge), or "" for none. Distinct from class_kind (which drives pool
     # declarations): harness_v2._pool_kind unions it with the class_kind to deal `needs`-tagged exemplars.
     mechanic_kind: str = ""
+    # Model-only construction guidance (card shapes, op syntax, base-game touchstones). `description` stays a
+    # one-line player-facing pitch; pricing/counts live in the balance_note (DESIGN_HEURISTICS.md).
+    build_notes: str = ""
+    # Shared-pool base-game relics / potions / colorless cards this engine cashes in on (every character can
+    # find them in every run): {hooks, pieces: [{kind, id, name, tier: core|support, why}], avoid, strengths,
+    # weaknesses}. Read by synergy_line() for the MAP and blueprint prompts.
+    base_synergies: dict = field(default_factory=dict)
+
+    def synergy_line(self, tiers=("core",)) -> str:
+        """'Kunai (relic): 3 attacks in a turn = +1 Dexterity; ...' for the pieces in `tiers`, "" if none."""
+        pieces = [p for p in (self.base_synergies.get("pieces") or [])
+                  if isinstance(p, dict) and p.get("tier") in tiers]
+        return "; ".join(f'{p.get("name")} ({p.get("kind")}): {p.get("why")}' for p in pieces)
+
+    def notes_for_blueprint(self) -> str:
+        """Build notes + core base-game synergies, for the blueprint prompt ("" if the entry has neither)."""
+        parts = []
+        if self.build_notes:
+            parts.append(f"build: {self.build_notes}")
+        syn = self.synergy_line()
+        if syn:
+            parts.append(f"base-game synergies: {syn}")
+        return "\n    ".join(parts)
 
 
 # class_kind precedence when a candidate fuses two archetypes: a special pool dominates a normal one.
@@ -313,11 +336,16 @@ class ArchetypeCatalog:
                 tag += ", COLD: rarely used lately - every candidate must include at least one COLD archetype"
             lines.append(f"- {e.id} | {e.name} [{tag}] (class_kind: {e.class_kind})")
             lines.append(f"    engine: {e.description}")
+            if e.build_notes:
+                lines.append(f"    build: {e.build_notes}")
             lines.append(f"    metaphors: {', '.join(e.metaphors)}")
             if e.leans:
                 lines.append(f"    leans: {', '.join(e.leans)}")
             if e.balance_note:
                 lines.append(f"    balance: {e.balance_note}")
+            syn = e.synergy_line()
+            if syn:
+                lines.append(f"    base-game synergies: {syn}")
         return "\n".join(lines)
 
     def buildable_ids(self) -> set[str]:
@@ -332,6 +360,7 @@ class ArchetypeCatalog:
         known = [self.by_id[i] for i in ids if i in self.by_id]
         unknown = [i for i in ids if i not in self.by_id]
         descs = [self.by_id[i].description if i in self.by_id else "" for i in ids]
+        notes = [self.by_id[i].notes_for_blueprint() if i in self.by_id else "" for i in ids]
         # class_kind = the dominant pool kind among the (known) archetypes. Phase AW: EVERY distinct special kind
         # is kept (primary first, capped at MAX_CLASS_KINDS) — two special kinds make the candidate a HYBRID whose
         # blueprint declares BOTH pools; class_kind stays the primary for every pre-AW consumer.
@@ -386,6 +415,7 @@ class ArchetypeCatalog:
             fantasy=str(raw.get("fantasy", raw.get("description", ""))).strip(),
             archetype_ids=list(ids),
             archetype_descs=descs,
+            archetype_notes=notes,
             core_loop=str(raw.get("core_loop", "")).strip(),
             weakness=str(raw.get("weakness", "")).strip(),
             tension=str(raw.get("tension", "")).strip(),
@@ -425,6 +455,8 @@ def load_catalog(path: Path | None = None) -> ArchetypeCatalog:
             balance_note=archetype_balance_note(str(a["id"])),
             leans=[str(s).strip().lower() for s in (a.get("leans") or [])],
             mechanic_kind=str(a.get("mechanic_kind") or "").strip().lower(),
+            build_notes=str(a.get("build_notes") or "").strip(),
+            base_synergies=dict(a.get("base_synergies") or {}),
         ))
     return ArchetypeCatalog(entries)
 

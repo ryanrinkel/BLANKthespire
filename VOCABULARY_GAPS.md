@@ -517,3 +517,83 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Buildable today?** No — surfaced as off-vocabulary by the map stage.
 - **Priority:** unset (triage).
 - **Status:** captured
+
+### 52. Exhaust another card from your hand
+- **Surfaced by:** archetype copy review (2026-09-29), for Ascetic, Pyre
+- **Fantasy it serves:** An op that exhausts OTHER cards in hand as part of a card's effect or cost: choose 1 (Burning Pact), random (True Grit), all non-Attacks (Second Wind), up to N (Purity).
+- **Mechanic sketch:** A card op that exhausts OTHER cards in hand as part of its effect/cost: `cards` choose 1 / random / all non-Attacks / up to N (Burning Pact, True Grit, Second Wind, Purity). Card-only; pairs with the `on_exhaust` trigger.
+- **Buildable today?** No.
+- **Priority:** requested by Ryan in the 2026-09-29 archetype copy review.
+- **Status:** captured
+
+### 53. Draw until a non-Attack
+- **Surfaced by:** archetype copy review (2026-09-29), for Ascetic, Striker
+- **Fantasy it serves:** Draw cards until you draw a card of a given type (Pillage). Rewards type-dense decks.
+- **Mechanic sketch:** `draw_until {card_type}`: draw until you draw a card of that type (Pillage); cap the draw at the hand limit.
+- **Buildable today?** No.
+- **Priority:** requested by Ryan in the 2026-09-29 archetype copy review.
+- **Status:** captured
+
+### 54. Next attack deals double / more
+- **Surfaced by:** archetype copy review (2026-09-29), for Forge ramp, Glass tempest
+- **Fantasy it serves:** A general 'your next attack deals double damage' or '+N damage to your next attack' effect (Phantasmal/Double Damage, Pen Nib). Today only the Forge blade can be multiplied (`blade_empower`).
+- **Mechanic sketch:** A self buff consumed by your next Attack: x2 damage (Phantasmal Killer / Double Damage) or +N damage (Pen Nib-style). Generalizes `blade_empower`, which only multiplies the Forge blade.
+- **Buildable today?** No.
+- **Priority:** requested by Ryan in the 2026-09-29 archetype copy review.
+- **Status:** captured
+
+### 55. Sly keyword
+- **Surfaced by:** archetype copy review (2026-09-29), for Madness
+- **Fantasy it serves:** Base-game keyword: 'If this card is discarded from your Hand before the end of your turn, play it for free.' Lets discard decks use real cards that are better when pitched.
+- **Mechanic sketch:** Card keyword `sly`: if this card is discarded from your hand by an effect before end of turn, play it for free (base-game Sly). Hook point: the card's `AfterCardDiscarded` override, which already powers `on_discard`.
+- **Buildable today?** No.
+- **Priority:** requested by Ryan in the 2026-09-29 archetype copy review.
+- **Status:** captured
+
+### 56. Trigger when Poison deals damage
+- **Surfaced by:** archetype copy review (2026-09-29), for Venom
+- **Fantasy it serves:** A trigger that fires when an enemy takes Poison damage ('Whenever an enemy takes Poison damage, gain 1 Block').
+- **Mechanic sketch:** `add_trigger` kind `on_poison_damage`: fires when an enemy takes Poison damage (payload e.g. gain Block, draw, apply another debuff); gate once_per_turn by default.
+- **Buildable today?** No.
+- **Priority:** requested by Ryan in the 2026-09-29 archetype copy review.
+- **Status:** captured
+
+### 57. Card grows each turn it's held
+- **Surfaced by:** archetype copy review (2026-09-29), for Retain
+- **Fantasy it serves:** Windmill Strike: this card gains +N damage (or Block) each turn it stays in your hand.
+- **Mechanic sketch:** Card field (like `grow`): +N damage/Block for each turn this card stays in your hand (Windmill Strike). Per-card-instance, per-combat.
+- **Buildable today?** No.
+- **Priority:** requested by Ryan in the 2026-09-29 archetype copy review.
+- **Status:** captured
+
+### 58. Card gets cheaper each turn it's held
+- **Surfaced by:** archetype copy review (2026-09-29), for Retain
+- **Fantasy it serves:** Sands of Time / Establishment: this card costs 1 less each turn it's retained.
+- **Mechanic sketch:** Card field: this card costs 1 less for each turn it's retained, floor 0 (Sands of Time / Establishment).
+- **Buildable today?** No.
+- **Priority:** requested by Ryan in the 2026-09-29 archetype copy review.
+- **Status:** captured
+
+### 59. Condition: early turns
+- **Surfaced by:** archetype copy review (2026-09-29), for Ambusher
+- **Fantasy it serves:** The mirror of `turn_at_least`: 'if it's turn 2 or earlier'. Lets openers be strongest early without innate on everything.
+- **Mechanic sketch:** `turn_at_most {value}` condition, the mirror of `turn_at_least`.
+- **Buildable today?** No.
+- **Priority:** requested by Ryan in the 2026-09-29 archetype copy review.
+- **Status:** captured
+
+### 60. Visible ripen countdown (mod change)
+- **Surfaced by:** archetype copy review (2026-09-29), for Ripening
+- **Fantasy it serves:** The ripen power's number should count down the turns left, so the player can see when it lands. Engine/UI change, not a new op.
+- **Mechanic sketch:** ForgedTriggerPower for `ripen` should set its displayed Amount to the turns left and tick it down each turn start (today it shows a static 1). Engine/UI change only; no contract change.
+- **Buildable today?** Not a vocabulary gap: an engine/UI fix in the mod.
+- **Priority:** requested by Ryan in the 2026-09-29 archetype copy review.
+- **Status:** captured
+
+### 61. Balance gauge wording (mod/UX fix)
+- **Surfaced by:** archetype copy review (2026-09-29), for Balance
+- **Fantasy it serves:** The power vanishes at 0, shows only the size of the lean (the name flips between Light and Dark), and both extremes apply PENALTIES while our copy says they reward. Clarify the in-game text and tooltip.
+- **Mechanic sketch:** ForgedBalancePower: show the gauge at 0 (centered) instead of removing the power, show a signed/pole-labelled value, and state in the tooltip that |8| applies a PENALTY (Dark: lose 3 HP/turn; Light: gain 1 Weak/turn). Align the archetype copy (done 2026-09-29).
+- **Buildable today?** Not a vocabulary gap: an engine/UI fix in the mod.
+- **Priority:** requested by Ryan in the 2026-09-29 archetype copy review.
+- **Status:** captured

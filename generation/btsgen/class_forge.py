@@ -873,6 +873,16 @@ for a second signature under the card cap)."""
                 kind_guidance = kind_guidance.replace(' "orb_slots": 0.', '')
             kind_guidance += _hybrid_guidance(_kinds[0], _kinds[1])
         archs = "\n".join(f'- {aid}: {_s(desc)}' for aid, desc in zip(c.archetype_ids, c.archetype_descs))
+        # Build notes + core base-game synergies per archetype (catalog.ArchetypeEntry.notes_for_blueprint). Only
+        # the prompt gets them; `archs` alone still keys the feedback lookup below, so matching is unchanged.
+        _notes = list(getattr(c, "archetype_notes", None) or [])
+        archs_prompt = "\n".join(
+            f'- {aid}: {_s(desc)}' + (f'\n    {_s(_notes[k])}' if k < len(_notes) and _notes[k] else "")
+            for k, (aid, desc) in enumerate(zip(c.archetype_ids, c.archetype_descs)))
+        if any(_notes):
+            archs_prompt += ("\nThe base-game synergies are SHARED-POOL relics, potions and colorless cards any character "
+                             "can find in any run: design one or two cards that visibly cash in on at least one of them "
+                             "(e.g. cheap attacks for a 3-attacks-a-turn relic), but never require one to be present.")
         relic = ""
         if brief.relic_intent:
             ri = brief.relic_intent
@@ -925,7 +935,7 @@ for a second signature under the card cap)."""
             f'Suggested max_hp: {c.suggested_max_hp}\n'
             f'Core loop: {_s(c.core_loop)}\n'
             f'Weakness: {_s(c.weakness)}\n'
-            f'{tension_label}:\n{archs}\n'
+            f'{tension_label}:\n{archs_prompt}\n'
             f'{lines}{kind_guidance}{relic}{orb}{skin}\n\n'
             f"{use_line}{self._pool_ask()}"
             f"{self._featured_ask(brief)}{self._recency_status()}{self._archetype_recency(c.archetype_ids)}"

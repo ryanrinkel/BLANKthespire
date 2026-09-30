@@ -100,7 +100,8 @@ def test_catalog_and_featured() -> None:
     print("catalog battle_smith invites choose + featured detect fires on a choose card:")
     cat = C.load_catalog()
     e = cat.by_id["battle_smith"]
-    check("choose" in e.description, "battle_smith description should mention the choose scope")
+    # the op guidance lives in the model-only build_notes; the description is the player-facing pitch
+    check("choose" in e.build_notes, "battle_smith build_notes should mention the choose scope")
     cc = census.walk_card(_card([{"op": "upgrade_card", "cards": "choose"}]))
     check(featured._BY_ID["battle_smith"].detect(cc), "featured detect fires on an upgrade_card choose card")
 

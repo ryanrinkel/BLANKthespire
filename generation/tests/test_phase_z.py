@@ -129,7 +129,8 @@ def test_catalog_and_featured() -> None:
     cat = C.load_catalog()
     e = cat.by_id["ascetic_purge"]
     check("purge_card" in e.ops, "ascetic_purge must declare the purge_card op/token")
-    check("purge_card" in e.description, "ascetic_purge description should mention purge_card")
+    # the op guidance lives in the model-only build_notes; the description is the player-facing pitch
+    check("purge_card" in e.build_notes, "ascetic_purge build_notes should mention purge_card")
     cc = census.walk_card(_card([{"op": "block", "amount": 6}, {"op": "purge_card"}]))
     check(featured._BY_ID["ascetic_purge"].detect(cc), "featured detect fires on a purge_card card")
 

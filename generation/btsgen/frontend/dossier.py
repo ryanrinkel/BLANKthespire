@@ -15,6 +15,9 @@ class Candidate:
     fantasy: str
     archetype_ids: list[str]
     archetype_descs: list[str]
+    # Per-archetype build notes + core base-game synergies (catalog.ArchetypeEntry.notes_for_blueprint), parallel
+    # to archetype_ids; read by the blueprint prompt. Empty for callers that build a Candidate by hand.
+    archetype_notes: list[str] = field(default_factory=list)
     core_loop: str = ""
     weakness: str = ""
     tension: str = ""                    # how the archetypes pull against each other (the triangle summary under triad)
