@@ -9,6 +9,7 @@ using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Entities.Powers;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
+using MegaCrit.Sts2.Core.Localization; // Phase BG (gap #61): LocString (the live Title override)
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Powers;
 using MegaCrit.Sts2.Core.ValueProps;
@@ -18,7 +19,7 @@ namespace BlankTheSpire.BlankTheSpireCode.Powers;
 /// <summary>
 /// Phase S (VOCABULARY_GAPS #1): THE BALANCE GAUGE — a SIGNED player-level counter, the balance-class identity.
 /// Built on the <see cref="ForgedForgePower"/> pattern (per-combat counter, in-code loc + emoji icon, resets each
-/// combat) but with a SIGNED value: positive = Dark, negative = Light, the power is ABSENT at 0 (centered). The
+/// combat) but with a SIGNED value: positive = Dark, negative = Light, the power stays visible at 0 (centered; Phase BG). The
 /// <c>balance_step</c> op (cards AND add_trigger self-payloads — trigger income is the engine, exactly like
 /// <c>forge</c>) moves the gauge toward a pole; the <c>light_ge</c> / <c>dark_ge</c> / <c>centered</c> conditions
 /// read it (see <see cref="Conditions"/>). What makes it a GAUGE and not a second Forge is the BITE: at
@@ -28,7 +29,7 @@ namespace BlankTheSpire.BlankTheSpireCode.Powers;
 ///
 /// Display: the native power <see cref="MegaCrit.Sts2.Core.Entities.Powers.PowerModel.Amount"/> mirrors
 /// |value| (signed arithmetic can't ride native Counter stacking, so <see cref="BalanceStep"/> owns the math and
-/// syncs the display — the same live-stack mutation the Phase J status decay uses), while name/icon flip by sign.
+/// syncs the display — the same live-stack mutation the Phase J status decay uses), while the live Title override and the icon flip by sign.
 /// </summary>
 public sealed class ForgedBalancePower : BlankTheSpirePower
 {
@@ -90,11 +91,20 @@ public sealed class ForgedBalancePower : BlankTheSpirePower
     private void SetValue(int newValue, Creature owner)
     {
         _value = newValue;
-        if (_value == 0) { owner.RemovePowerInternal(this); return; }
+        // Phase BG (gap #61): the gauge STAYS at 0 (Amount 0, title "Balance") instead of vanishing — a centered
+        // gauge is a state the player steers toward (`centered` payoffs), so it must stay visible.
         int oldAmount = Amount;
         Amount = Math.Abs(_value);
         owner.InvokePowerModified(this, Amount - oldAmount, false);
+        InvokeDisplayAmountChanged();
     }
+
+    /// <summary>Phase BG (gap #61): the LIVE title — "🌑 Dark" / "☀️ Light" / "Balance" by the gauge's sign. The
+    /// in-code <see cref="Localization"/> below is baked ONCE at ModelDb.Init (from the template instance, where
+    /// _value == 0), so a title computed there never flips; the extra loc keys are registered there and this
+    /// override picks between them every time the tooltip renders (the base Title is the same LocString shape).</summary>
+    public override LocString Title =>
+        new LocString("powers", Id.Entry + (_value > 0 ? ".titleDark" : _value < 0 ? ".titleLight" : ".title"));
 
     /// <summary>The player's current signed gauge (0 with no gauge / outside combat). Shared by the three balance
     /// conditions (<see cref="Conditions"/>).</summary>
@@ -136,11 +146,14 @@ public sealed class ForgedBalancePower : BlankTheSpirePower
     {
         get
         {
-            string name = _value == 0 ? "Balance" : _value > 0 ? "🌑 Dark" : "☀️ Light";
-            string desc = "Your Balance gauge. Shift it toward the Light or the Dark; it clears each combat. " +
-                          $"At {ExtremeThreshold}+ it bites at the start of your turn — the Dark drains {DarkExtremeHpLoss} HP, " +
-                          $"the Light inflicts {LightExtremeWeak} Weak.";
-            return (List<(string, string)>)new PowerLoc(name, desc, desc);
+            // Phase BG (gap #61): the number on the icon is how far the gauge leans; the title says which way (live,
+            // via the Title override); the text says plainly that the extremes are PENALTIES.
+            string desc = "Your Balance gauge: the number is how far it leans, the name is which way (Dark or Light; " +
+                          "\"Balance\" = centered). Shift it with your cards; it resets each combat. " +
+                          $"PENALTY: while it leans {ExtremeThreshold} or more, the leaning pole punishes you at the start of " +
+                          $"your turn — the Dark drains {DarkExtremeHpLoss} HP, the Light inflicts {LightExtremeWeak} Weak.";
+            return (List<(string, string)>)new PowerLoc("Balance", desc, desc,
+                                                        ("titleDark", "🌑 Dark"), ("titleLight", "☀️ Light"));
         }
     }
 

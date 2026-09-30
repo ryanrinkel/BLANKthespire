@@ -635,7 +635,11 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Mechanic sketch:** ForgedTriggerPower for `ripen` should set its displayed Amount to the turns left and tick it down each turn start (today it shows a static 1). Engine/UI change only; no contract change.
 - **Buildable today?** Not a vocabulary gap: an engine/UI fix in the mod.
 - **Priority:** requested by Ryan in the 2026-09-29 archetype copy review.
-- **Status:** captured
+- **Status:** **done (2026-09-30, Phase BG, mod-only — no vocab bump)** — `ForgedTriggerPower` is `Counter` for a
+  ripen trigger (NPower only draws a number for Counter powers), overrides `DisplayAmount` with the turns left (the full
+  countdown before the first turn-start initializes it), calls `InvokeDisplayAmountChanged()` on every tick, and
+  removes itself after its one shot. `[BG] ripen … N turn(s) left` tag. The tooltip text stays static ("After N
+  turns, …"): SmartDescription's `{Amount}` is the raw stack, not DisplayAmount. Smoke + a by-hand tray screenshot pending.
 
 ### 61. Balance gauge wording (mod/UX fix)
 - **Surfaced by:** archetype copy review (2026-09-29), for Balance
@@ -643,4 +647,8 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Mechanic sketch:** ForgedBalancePower: show the gauge at 0 (centered) instead of removing the power, show a signed/pole-labelled value, and state in the tooltip that |8| applies a PENALTY (Dark: lose 3 HP/turn; Light: gain 1 Weak/turn). Align the archetype copy (done 2026-09-29).
 - **Buildable today?** Not a vocabulary gap: an engine/UI fix in the mod.
 - **Priority:** requested by Ryan in the 2026-09-29 archetype copy review.
-- **Status:** captured
+- **Status:** **done (2026-09-30, Phase BG, mod-only)** — `SetValue` no longer removes the power at 0 (Amount 0 stays on
+  the tray); the title flips LIVE via a `Title` override choosing between `.title` / `.titleDark` / `.titleLight`
+  (registered as `PowerLoc` ExtraLoc — the old in-Localization flip was dead code, baked once at `ModelDb.Init`); the
+  description states the number is the lean, the name the pole, and that 8+ is a PENALTY (Dark −3 HP / Light +1 Weak
+  per turn). Verify-first still open: whether a Counter power renders "0" or hides the badge at Amount 0.

@@ -53,7 +53,15 @@ public abstract class ForgedTriggerPower : BlankTheSpirePower
 
     public override PowerType Type => PowerType.Buff;
     // One trigger per card; replaying the same card doesn't stack the effect (literal-amount payload).
-    public override PowerStackType StackType => PowerStackType.Single;
+    // Phase BG (gap #60): a RIPEN power is Counter purely so the icon DRAWS A NUMBER — NPower only renders
+    // DisplayAmount for Counter powers (the ForgedBalancePower finding) — and DisplayAmount below is the countdown,
+    // never the stack; the ripen logic reads _ripenLeft, so a replay stacking Amount is harmless.
+    public override PowerStackType StackType => Trigger?.Trigger == "ripen" ? PowerStackType.Counter : PowerStackType.Single;
+
+    /// <summary>Phase BG (gap #60): the number on the icon. For a ripen power it is the TURNS LEFT (the full
+    /// countdown before the first turn-start initializes it), so the player always sees when it lands.</summary>
+    public override int DisplayAmount =>
+        Trigger?.Trigger == "ripen" ? (_ripenLeft < 0 ? System.Math.Max(1, Trigger.Amount) : _ripenLeft) : Amount;
 
     /// <summary>Grant trigger power <typeparamref name="T"/> to the player (self), amount 1. Done from the card
     /// leaf because the generic apply needs the concrete power type at the call site.</summary>
@@ -89,11 +97,17 @@ public abstract class ForgedTriggerPower : BlankTheSpirePower
         if (t.Trigger == "ripen" && !_ripenFired)
         {
             if (_ripenLeft < 0) _ripenLeft = System.Math.Max(1, t.Amount);
-            if (--_ripenLeft <= 0)
+            --_ripenLeft;
+            InvokeDisplayAmountChanged(); // Phase BG (gap #60): the icon counts down live
+            MainFile.Logger.Info($"[BG] ripen '{SourceSpec?.Title ?? SourceSpec?.Id}': {_ripenLeft} turn(s) left.");
+            if (_ripenLeft <= 0)
             {
                 _ripenFired = true;
                 Flash();
                 await TriggerRunner.Run(t, player, ctx);
+                // Phase BG: a spent countdown is noise on the tray — remove it after its one shot.
+                if (Owner != null && Owner.HasPower(GetType()))
+                    Owner.RemovePowerInternal(this);
             }
         }
     }
