@@ -42,6 +42,12 @@ public static class HandStateTracker
             if (hand == null) { CardsRetained = 0; return; }
             CardsRetained = hand.Count;
             foreach (var c in hand) _retained.Add(c);
+            // Phase BD (v58): each card in the pre-draw hand after turn 1 was held through the last end of turn.
+            if ((pcs?.TurnNumber ?? 0) > 1)
+                foreach (var c in hand)
+                    if (c is DataCard dc)
+                        try { dc.OnHeldIntoTurn(); }
+                        catch (Exception ex) { MainFile.Logger.Warn($"[BD] held-turn payoff failed: {ex.Message}"); }
         }
         catch { CardsRetained = 0; _retained.Clear(); }
     }

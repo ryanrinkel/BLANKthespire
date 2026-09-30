@@ -90,7 +90,7 @@ public sealed record EffectSpec(string Op, int Amount = 0, string? Status = null
 {
     /// <summary>Phase BD (v58, gap #57): this <c>damage</c>/<c>block</c> op's amount INCREASES by <see cref="GrowHeld"/>
     /// for each end-of-turn flush THIS card instance survived in hand (Retain) — <c>amount + GrowHeld × turns held</c>
-    /// (Windmill Strike). Per-card-instance, per-combat (the counter lives on the combat clone, see DataCard.AfterFlush).
+    /// (Windmill Strike). Per-card-instance, per-combat (the counter lives on the combat clone, see DataCard.OnHeldIntoTurn).
     /// Requires <c>retain</c> on the same card; mutually exclusive with <see cref="Scale"/> and <see cref="Grow"/>.</summary>
     public bool HasGrowHeld => GrowHeld != 0;
     /// <summary>This op's amount comes from a live scalar (any <see cref="Scale"/>), not <see cref="Amount"/>.</summary>

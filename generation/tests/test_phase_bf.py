@@ -71,7 +71,7 @@ def _t_engine() -> None:
     check("<VigorPower>" in _cs("Engine", "DataCard.cs") and "<DoubleDamagePower>" in _cs("Engine", "DataCard.cs"), "DataCard declares both PowerVars")
     er = _cs("Engine", "EffectRunner.cs")
     check('"vigor", "double_damage",' in er.split("SelfBuffStatuses =", 1)[1].split("];", 1)[0], "SelfBuffStatuses carries both")
-    check(er.count("ApplyPower<VigorPower>") == 1 and er.count("RelicApplyT<VigorPower>") == 1, "EffectRunner card + relic maps")
+    check(er.count("ApplyPowerLogged<VigorPower>") == 1 and er.count("RelicApplyT<VigorPower>") == 1, "EffectRunner card + relic maps")
     check("ApplyT<VigorPower>" in _cs("Engine", "TriggerRunner.cs") and "ApplyT<DoubleDamagePower>" in _cs("Engine", "TriggerRunner.cs"), "TriggerRunner self-buff map")
     for f in ("OrbRunner.cs", "SummonRunner.cs"):
         s = _cs("Engine", f)

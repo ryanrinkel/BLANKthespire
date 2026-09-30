@@ -82,6 +82,10 @@ public static class EffectRunner
                 if (PhaseAmConditions.Contains(e.When.Kind))
                     MainFile.Logger.Info($"[AM] {e.When.Kind} gate {(gateOpen ? "OPEN" : "closed")}{(e.When.Negate ? " (negated)" : "")} " +
                                          $"({PhaseAmConditionRead(e.When, card, play)}; need {e.When.Value}).");
+                // Phase BB (v56, gap #59): both branches of the turn gate, with the round it read.
+                if (e.When.Kind == "turn_at_most")
+                    MainFile.Logger.Info($"[BB] turn_at_most gate {(gateOpen ? "OPEN" : "closed")}{(e.When.Negate ? " (negated)" : "")} " +
+                                         $"(round {card.Owner?.Creature?.CombatState?.RoundNumber}; need <= {e.When.Value}).");
                 if (!gateOpen) continue;
             }
             // The card's vars (read by CommonActions) already carry the upgrade; for the scalar ops we
@@ -93,6 +97,10 @@ public static class EffectRunner
                     // Hit count rides a "Hits" DynamicVar (declared by DataCard only when >1), so it both
                     // shows in card text ({Hits}) and upgrades. CardAttack deals the card's Damage var per hit.
                     int hits = card.DynamicVars.TryGetValue("Hits", out var hv) ? (int)hv.BaseValue : 1;
+                    // Phase BF (v60, gap #54): the smoke's consume proof — an Attack resolving with Vigor / Double Damage up.
+                    if (card.Owner?.Creature is { } bfOwner && (bfOwner.HasPower<VigorPower>() || bfOwner.HasPower<DoubleDamagePower>()))
+                        MainFile.Logger.Info($"[BF] '{spec.Title ?? spec.Id}' hits {hits}x with Vigor {bfOwner.GetPower<VigorPower>()?.Amount ?? 0}, " +
+                                             $"Double Damage {bfOwner.GetPower<DoubleDamagePower>()?.Amount ?? 0}.");
                     if (e.Scale == "forged") // Phase M smoke logging: prove the additive payoff resolves + grows
                         MainFile.Logger.Info($"[M] forged payoff: damage base {amt} + Forge {ForgeStacks(card.Owner)}.");
                     if (e.Scale == "forged") // Phase AF (gap #41): log the empowered blade hit (base+Forge -> ×N) when active
@@ -114,8 +122,11 @@ public static class EffectRunner
                         MainFile.Logger.Info($"[U] grow damage: base {amt} + grow {e.Grow}×{plays} = {amt + e.Grow * plays} (play #{plays + 1} of '{card.Id}').");
                     }
                     if (e.HasGrowHeld) // Phase BD (v58) smoke logging: prove the held-turn growth resolved
-                        MainFile.Logger.Info($"[BD] grow_held damage: base {amt} + {e.GrowHeld} per held turn -> " +
-                                             $"{card.DynamicVars.CalculatedDamage.BaseValue} ('{card.Id}').");
+                    {   // the calc-var's BaseValue is 0 by construction (the bonus func carries it) — log what HeldBonusFor resolves
+                        int held = (card as DataCard)?.TurnsHeld ?? 0;
+                        MainFile.Logger.Info($"[BD] grow_held damage: base {amt} + {e.GrowHeld} x {held} held turn(s) = " +
+                                             $"{amt + e.GrowHeld * held} ('{card.Id}').");
+                    }
                     // Hold the command so we can read its per-hit/per-target DamageResults after it resolves — the
                     // unblocked total feeds a later damage_dealt_unblocked heal (Phase P gap #21, lifesteal).
                     if (card.TargetType == TargetType.RandomEnemy) // Phase AJ smoke: BaseLib rolls a random enemy per hit
@@ -256,7 +267,7 @@ public static class EffectRunner
                 case "retain":
                 case "ethereal":
                 case "sly": // Phase BB (v56, gap #55): the game plays a discarded Sly card for free (CardCmd.DiscardAndDraw)
-                case "held_discount": // Phase BD (v58, gap #58): the discount lands in DataCard.AfterFlush, not at play time
+                case "held_discount": // Phase BD (v58, gap #58): the discount lands in DataCard.OnHeldIntoTurn, not at play time
                     // Card-keyword ops: declared as a CardKeyword at declaration time (the game applies the
                     // keyword behavior — exhaust-on-play, opening hand, retain, etc.); nothing to run here.
                     break;
@@ -1239,8 +1250,8 @@ public static class EffectRunner
             "focus"          => ApplyPower<FocusPower>(self, card, ctx, play),
             "temp_thorns"    => ApplyPower<ForgedTempThornsPower>(self, card, ctx, play), // Phase AN (v44)
             "temp_focus"     => ApplyPower<ForgedTempFocusPower>(self, card, ctx, play),  // Phase AN (v44)
-            "vigor"          => ApplyPower<VigorPower>(self, card, ctx, play),            // Phase BF (v60)
-            "double_damage"  => ApplyPower<DoubleDamagePower>(self, card, ctx, play),     // Phase BF (v60)
+            "vigor"          => ApplyPowerLogged<VigorPower>(self, card, ctx, play),      // Phase BF (v60)
+            "double_damage"  => ApplyPowerLogged<DoubleDamagePower>(self, card, ctx, play), // Phase BF (v60)
             _ => throw new NotSupportedException($"EffectRunner.ApplyStatus: unsupported status '{status}'"),
         };
     }
@@ -1250,6 +1261,14 @@ public static class EffectRunner
     private static Task ApplyPower<T>(bool self, ConstructedCardModel card, PlayerChoiceContext ctx, CardPlay play)
         where T : PowerModel
         => self ? CommonActions.ApplySelf<T>(ctx, card) : CommonActions.Apply<T>(ctx, card, play);
+
+    /// <summary>Phase BF (v60): <see cref="ApplyPower{T}"/> plus the smoke's apply proof (the stack count after).</summary>
+    private static async Task ApplyPowerLogged<T>(bool self, ConstructedCardModel card, PlayerChoiceContext ctx, CardPlay play)
+        where T : PowerModel
+    {
+        await ApplyPower<T>(self, card, ctx, play);
+        MainFile.Logger.Info($"[BF] {typeof(T).Name} applied by '{card.Title}': now {card.Owner?.Creature?.GetPower<T>()?.Amount ?? 0}.");
+    }
 
     // === Phase L: forged-relic effect execution (NO card) ===========================================
     /// <summary>Run a relic hook's effects with no card: the player is the actor; <paramref name="targets"/> are

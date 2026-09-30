@@ -1,9 +1,10 @@
 """Phase BD — HELD-CARD PAYOFFS: `grow_held` + `held_discount` (VOCAB_EXPANSION_5_PLAN, gaps #57/#58, vocab v58) — offline.
 
 Run:  uv run python -m tests.test_phase_bd       (from generation/)
-Pins, in lockstep with the C#: the stamp; the engine rides the GAME's retain hook (DataCard.AfterFlush reads
-retainedCards, bumps a per-instance counter, and lowers the cost with the THIS-COMBAT modifier — a this-turn one is
-wiped by EndOfTurnCleanup right after the hook); grow_held is a calc-var on damage/block that needs retain, is ⊥
+Pins, in lockstep with the C#: the stamp; the engine rides the turn-start pre-draw hand snapshot (HandStateTracker
+calls DataCard.OnHeldIntoTurn for each card held through the last end of turn — the game's AfterFlush hook never
+reached a card in hand in the Wave 5 smoke), which bumps a per-instance counter and lowers the cost with the
+THIS-COMBAT modifier (a this-turn one would expire with the turn); grow_held is a calc-var on damage/block that needs retain, is ⊥
 scale/grow, 1..9, <= amount, joins the one-calc-var budget and is never a payload; held_discount needs retain and a
 cost of 1+, amount 1..2, one per card; describe byte-match; the contract surfaces.
 """
@@ -83,12 +84,14 @@ def test_version() -> None:
 
 
 def _t_engine() -> None:
-    print("the engine: the game's retain hook, a per-instance counter, a this-combat cost modifier:")
+    print("the engine: the turn-start held-card snapshot, a per-instance counter, a this-combat cost modifier:")
     dc = _cs("Engine", "DataCard.cs")
-    check("public override Task AfterFlush(PlayerChoiceContext choiceContext, Player player," in dc, "DataCard overrides the game's AfterFlush hook")
-    fl = dc.split("public override Task AfterFlush(", 1)[1].split("/// <summary>", 1)[0]
-    check("retainedCards.Contains(this)" in fl and "_turnsHeld++" in fl, "... counts only when THIS card was retained")
-    check("EnergyCost.AddThisCombat(-n)" in fl, "held_discount uses the THIS-COMBAT modifier (EndOfTurnCleanup runs right after the hook)")
+    hs = _cs("Engine", "HandStateTracker.cs")
+    check("internal void OnHeldIntoTurn()" in dc and "override Task AfterFlush(" not in dc, "DataCard.OnHeldIntoTurn (no AfterFlush override)")
+    check("if ((pcs?.TurnNumber ?? 0) > 1)" in hs and "dc.OnHeldIntoTurn()" in hs, "... called for the pre-draw hand from turn 2 on")
+    fl = dc.split("internal void OnHeldIntoTurn()", 1)[1].split("/// <summary>", 1)[0]
+    check("_turnsHeld++" in fl, "... bumps THIS card's counter")
+    check("EnergyCost.AddThisCombat(-n)" in fl, "held_discount uses the THIS-COMBAT modifier")
     check("AddThisTurn" not in fl and "AddUntilPlayed" not in fl, "... and never a this-turn / until-played one")
     check("[BD] grow_held" in fl and "[BD] held_discount" in fl, "[BD] tags on both paths")
     check("private int _turnsHeld;" in dc and "HeldBonusFor(EffectSpec e, int up)" in dc, "the held-turn counter + its calc-var lambda exist")

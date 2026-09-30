@@ -9,7 +9,7 @@ using BlankTheSpire.BlankTheSpireCode.Powers;
 using Godot; // Texture2D (CustomPortrait)
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
-using MegaCrit.Sts2.Core.Entities.Players; // Phase BD (v58): Player (the AfterFlush hook)
+using MegaCrit.Sts2.Core.Entities.Players; // Phase BD (v58): Player
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.Localization.DynamicVars; // Phase AN (v44): DamageVar (unblockable props) + MaxHpVar
 using MegaCrit.Sts2.Core.Models;
@@ -81,7 +81,7 @@ public abstract class DataCard : ConstructedCardModel
 
     /// <summary>Phase BD (v58, gap #57, Windmill Strike): the calc-var for a <c>grow_held</c> damage/block op. Current
     /// value = printed amount (upgrade-aware) + <c>GrowHeld</c> × the end-of-turn flushes THIS card instance survived in
-    /// hand (<see cref="_turnsHeld"/>, bumped by <see cref="AfterFlush"/>). The in-hand preview climbs the moment the
+    /// hand (<see cref="_turnsHeld"/>, bumped by <see cref="OnHeldIntoTurn"/>). The in-hand preview climbs the moment the
     /// turn ends; a fresh combat clone starts at 0.</summary>
     private static Func<CardModel, Creature?, decimal> HeldBonusFor(EffectSpec e, int up) =>
         (c, _) => e.Amount + (c.IsUpgraded ? up : 0) + e.GrowHeld * ((c as DataCard)?._turnsHeld ?? 0);
@@ -210,7 +210,7 @@ public abstract class DataCard : ConstructedCardModel
                 case "retrieve_card":         // Phase AP (v46): returns pile card(s) to hand in OnPlay (literal, no var); text via Describe
                 case "exhaust_card":          // Phase BC (v57, gap #52): exhausts hand cards in OnPlay (literal, no var); text via Describe
                 case "draw_until":            // Phase BC (v57, gap #53): draws until a card type in OnPlay (no var); text via Describe
-                case "held_discount":         // Phase BD (v58, gap #58): the discount lands in AfterFlush (no var); text via Describe
+                case "held_discount":         // Phase BD (v58, gap #58): the discount lands in OnHeldIntoTurn (no var); text via Describe
                 case "add_status_card":       // Phase AP (v46): generates Status cards in OnPlay (literal, no var); text via Describe
                 case "summon_blade":          // Phase T: retrieves the class blade to hand in OnPlay (no card var)
                 case "upgrade_card":          // Phase V/X (gap #18): upgrades hand cards in OnPlay — random/all/choose (no card var)
@@ -309,19 +309,17 @@ public abstract class DataCard : ConstructedCardModel
     // Per-instance state on the combat clone (a fresh clone per combat starts at 0; the run-deck original is never in
     // a retainedCards list, so it never moves). Read by the grow_held calc-var (HeldBonusFor).
     private int _turnsHeld;
+    internal int TurnsHeld => _turnsHeld; // read by EffectRunner's [BD] smoke log
 
-    /// <summary>Phase BD (v58, gaps #57/#58): the GAME's own retain hook. <c>CombatManager.FlushPlayerHand</c> splits the
-    /// hand into flushed vs retained and then awaits <c>Hook.AfterFlush</c>, which dispatches to every combat listener —
-    /// every card in the player's piles included (the same reach as <see cref="AfterCardDiscarded"/>). The base-game
-    /// Bookmark relic reads <paramref name="retainedCards"/> from this hook; so do we, for THIS card only. Two payoffs:
+    /// <summary>Phase BD (v58, gaps #57/#58): THIS card was held through the last end of turn (Retain). Called by
+    /// <see cref="HandStateTracker.SnapshotPreDraw"/> for every card in the pre-draw hand from turn 2 on — the same
+    /// turn-start snapshot that feeds <c>retained_last_turn</c> / <c>cards_retained</c>. (The game's <c>AfterFlush</c>
+    /// hook was the first design; the Wave 5 AutoSlay smoke showed it never reaches a card in hand.) Two payoffs:
     /// <c>grow_held</c> bumps the held-turn counter the calc-var reads (Windmill Strike), and <c>held_discount</c> lowers
-    /// this card's cost via <c>CardEnergyCost.AddThisCombat</c> (Sands of Time; the game floors the result at 0) — it
-    /// MUST be a this-combat modifier: <c>FlushPlayerHand</c> runs <c>EndOfTurnCleanup</c> right after this hook, which
-    /// wipes every "this turn" modifier.</summary>
-    public override Task AfterFlush(PlayerChoiceContext choiceContext, Player player,
-                                    IReadOnlyCollection<CardModel> flushedCards, IReadOnlyCollection<CardModel> retainedCards)
+    /// this card's cost via <c>CardEnergyCost.AddThisCombat</c> (Sands of Time; the game floors the result at 0) —
+    /// applied at turn start, after <c>EndOfTurnCleanup</c> has already run, so nothing wipes it.</summary>
+    internal void OnHeldIntoTurn()
     {
-        if (Owner == null || player != Owner || !retainedCards.Contains(this)) return Task.CompletedTask;
         _turnsHeld++;
         for (int i = 0; i < Spec.Effects.Length; i++)
         {
@@ -337,7 +335,6 @@ public abstract class DataCard : ConstructedCardModel
                                      $"costs {EnergyCost.GetWithModifiers(CostModifiers.Local)} this combat.");
             }
         }
-        return Task.CompletedTask;
     }
 
     /// <summary>Phase BB (v56, gap #55): the smoke tag for a SLY free play. The game raises this hook right before

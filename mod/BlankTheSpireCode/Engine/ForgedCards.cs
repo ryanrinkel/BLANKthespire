@@ -59,9 +59,9 @@ public static class ForgedCards
                                         //     .CustomTickInProgress). Multi-fire (once_per_turn / once_per_combat
                                         //     eligible; an Accelerant double-tick fires twice). Ticks land at the ENEMY's
                                         //     turn start, so a Block payload is live through its attacks. [BE] tag.
-                                        // 58: Phase BD (VOCAB_EXPANSION_5, gaps #57/#58) — HELD-CARD PAYOFFS. The game's
-                                        //     own retain hook (AbstractModel.AfterFlush hands every card in the player's
-                                        //     piles the retainedCards list) now drives two Retain payoffs on the card that
+                                        // 58: Phase BD (VOCAB_EXPANSION_5, gaps #57/#58) — HELD-CARD PAYOFFS. The turn-start
+                                        //     pre-draw hand snapshot (HandStateTracker — the cards held through the last
+                                        //     end of turn) now drives two Retain payoffs on the card that
                                         //     was held: a new effect FIELD `grow_held` (1..9, on a damage/block op: +N per
                                         //     end-of-turn flush the card survived in hand — Windmill Strike; a calc-var, so
                                         //     the in-hand number climbs live; joins the one-calc-var budget; ⊥ scale/grow)
@@ -70,7 +70,7 @@ public static class ForgedCards
                                         //     CardEnergyCost.AddThisCombat, floored at 0 by the game; never on a 0-cost or
                                         //     X-cost card). Both REQUIRE `retain` on the same card, are card-only, and are
                                         //     rejected in trigger payloads. Describe: "Grows by N each turn it is retained."
-                                        //     / "Costs N less for each turn it is retained." [BD] tags in AfterFlush.
+                                        //     / "Costs N less for each turn it is retained." [BD] tags in DataCard.OnHeldIntoTurn.
                                         // 57: Phase BC (VOCAB_EXPANSION_5, gaps #52/#53) — HAND OPS.
                                         //     New card-only op `exhaust_card {cards: choose|random|up_to|all, amount?: 1..3,
                                         //     card_type?: attack|skill|power|non_attack}` — exhaust OTHER cards in your hand
