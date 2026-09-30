@@ -532,7 +532,7 @@
       "id": "ascetic_purge",
       "name": "Ascetic / small deck",
       "description": "Run a lean deck that cycles fast and assembles all the pieces for a win.",
-      "build_notes": "The identity is a SMALL deck. Heavy draw and cycling make a thin deck empty its draw pile every turn or two. Exhaust, ethereal and purge effects let the player manipulate their deck size; example payoffs might include Grand-Finale-style finishers gated on `when:{\"kind\":\"draw_pile_empty\"}` or a few-card combo engine that wins the game if those are the only cards left. (Purge is a supporting tool the player has to EARN: gate `purge_card` behind a condition they must engineer (`draw_pile_empty`, `cards_played_this_turn_ge`), or put self-`purge` only on a costly one-shot whose play takes setup. Never a free, repeatable purge skill.",
+      "build_notes": "The identity is a SMALL deck. Heavy draw and cycling make a thin deck empty its draw pile every turn or two. Exhaust (`exhaust_card`: burn chosen hand cards), ethereal and purge effects let the player manipulate their deck size, and `draw_until` cycles the thin deck; example payoffs might include Grand-Finale-style finishers gated on `when:{\"kind\":\"draw_pile_empty\"}` or a few-card combo engine that wins the game if those are the only cards left. (Purge is a supporting tool the player has to EARN: gate `purge_card` behind a condition they must engineer (`draw_pile_empty`, `cards_played_this_turn_ge`), or put self-`purge` only on a costly one-shot whose play takes setup. Never a free, repeatable purge skill.",
       "metaphors": [
         "burning the chaff",
         "the ascetic's discipline",
@@ -564,7 +564,9 @@
           "purge_card",
           "draw",
           "damage",
-          "draw_pile_empty"
+          "draw_pile_empty",
+          "exhaust_card",
+          "draw_until"
         ],
         "class_kind": "normal"
       },
@@ -1087,7 +1089,8 @@
           "scale",
           "unblockable",
           "apply_status",
-          "add_status_card"
+          "add_status_card",
+          "draw_until"
         ],
         "class_kind": "normal"
       },
@@ -1187,7 +1190,8 @@
           "Weak to Block-heavy enemies",
           "Needs card flow"
         ]
-      }
+      },
+      "build_notes": "Cheap swings in volume, and `draw_until` (v57, Pillage) as the attack that digs through the Attacks for the one Skill or Power the turn needs."
     },
     {
       "id": "orb_channel",
@@ -2625,7 +2629,7 @@
       "id": "exhaust_pyre",
       "name": "Pyre / exhaust-matters",
       "description": "Burn cards away for power: every Exhaust feeds the engine.",
-      "build_notes": "This deck wants to exhaust the cards in its hand and gets bonuses for doing so. Look for triggered effects that happen on exhaust, cards that have effects when exhausted or return something from the exhausted pool to hand or discard.",
+      "build_notes": "This deck wants to exhaust the cards in its hand and gets bonuses for doing so. Look for triggered effects that happen on exhaust, cards that have effects when exhausted or return something from the exhausted pool to hand or discard. `exhaust_card` (v57) is the fuel op: burn other hand cards on purpose (choose / random / up to N / all non-Attacks) so every on_exhaust payoff fires.",
       "metaphors": [
         "the pyre",
         "ashes",
@@ -2657,7 +2661,8 @@
           "add_trigger",
           "draw",
           "corruption",
-          "retrieve_card"
+          "retrieve_card",
+          "exhaust_card"
         ],
         "class_kind": "normal"
       },

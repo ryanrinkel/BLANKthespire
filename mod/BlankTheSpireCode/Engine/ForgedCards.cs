@@ -42,7 +42,19 @@ public static class ForgedCards
     /// v10 (forged statuses, Phase J): + CharacterSpec.StatusPool (a class's ≤4 custom modifier-family statuses
     /// read from `status_pool`; see ForgedCharacters / ForgedStatusPower). Class cards may apply a custom status
     /// by pool name via the `apply_status_custom` op (class-only, like custom-orb channels).</summary>
-    public const int VocabVersion = 56; // 56: Phase BB (VOCAB_EXPANSION_5, gaps #55/#59) — TEMPO KEYWORDS.
+    public const int VocabVersion = 57; // 57: Phase BC (VOCAB_EXPANSION_5, gaps #52/#53) — HAND OPS.
+                                        //     New card-only op `exhaust_card {cards: choose|random|up_to|all, amount?: 1..3,
+                                        //     card_type?: attack|skill|power|non_attack}` — exhaust OTHER cards in your hand
+                                        //     as part of a card's effect (Burning Pact / True Grit / Purity / Second Wind):
+                                        //     the base-game hand picker (CardSelectCmd.FromHand + ExhaustSelectionPrompt,
+                                        //     min 0 for up_to) or the run's CombatCardSelection RNG, then CardCmd.Exhaust ONE
+                                        //     card at a time (the game's own rule), so on_exhaust fires per card. New
+                                        //     card-only op `draw_until {card_type}` — draw one card at a time
+                                        //     (CardPileCmd.Draw) until you draw a card of that type, the draw pile runs
+                                        //     dry, or the hand is full (Pillage = card_type non_attack). `card_type` gains
+                                        //     `non_attack` (these two ops only; cost_shift keeps attack/skill/power/all) and
+                                        //     `cards` gains `up_to` (exhaust_card only). [BC] tags on both paths.
+                                        // 56: Phase BB (VOCAB_EXPANSION_5, gaps #55/#59) — TEMPO KEYWORDS.
                                         //     New keyword flag-op `sly` (the base-game CardKeyword.Sly: if this card is
                                         //     discarded from your hand by an effect before the end of your turn, the GAME
                                         //     plays it for free — CardCmd.DiscardAndDraw does the auto-play, so the mod only
@@ -415,6 +427,8 @@ public static class ForgedCards
          "spend_forge", // Phase AX (v53, gap #44): SPEND Forge as a card's price (the cash-out half of the ramp). Forge-class, card-only.
          "spread_debuffs", // Phase AX (v53, gaps #45-#47): copy the struck target's debuffs to every OTHER living enemy. Card-only.
          "graft_card", // Phase AI (gap #7): CHOOSE form of transform_card — pick a card in hand, IT permanently becomes the named same-class card for the rest of the run. Card-only.
+         "exhaust_card", // Phase BC (v57, gap #52): exhaust OTHER cards in your hand (choose / random / up_to / all, optional card_type filter). Card-only.
+         "draw_until", // Phase BC (v57, gap #53): draw until you draw a card of `card_type` (Pillage = non_attack). Card-only.
          "apply_custom", // EXPLORE SPIKE: apply a hardcoded modifier-family custom status (not in LLM contract)
          "summon_spike"]; // PHASE K SPIKE: summon a hardcoded player pet (not in LLM contract)
     // Phase H3/H4: the trigger kinds. turn_start/turn_end fire every turn; ripen is a one-shot countdown; the rest
@@ -505,6 +519,13 @@ public static class ForgedCards
     // (_RETRIEVE_PILES / _PICK_MODES / _STATUS_CARDS / _RETRIEVE_MAX / _STATUS_CARD_MAX) + card.schema.json.
     private static readonly HashSet<string> RetrievePiles = ["discard", "exhaust"];
     private static readonly HashSet<string> PickModes = ["random", "choose"];
+    // Phase BC (v57, gap #52): the exhaust_card pick modes (the base-game shapes: Burning Pact chooses, True Grit
+    // rolls, Purity is "up to N", Second Wind / Fiend Fire take all) and its per-play cap; the hand filter the two
+    // hand ops share (`non_attack` is the Pillage / Second Wind filter; cost_shift keeps its own attack/skill/power/all).
+    // Lockstep with validator._EXHAUST_PICK_MODES / _HAND_KIND_FILTERS / _EXHAUST_CARD_MAX + the schema clauses.
+    private static readonly HashSet<string> ExhaustPickModes = ["choose", "random", "up_to", "all"];
+    private static readonly HashSet<string> HandKindFilters = ["attack", "skill", "power", "non_attack"];
+    private const int ExhaustCardMaxAmount = 3;
     private static readonly HashSet<string> StatusCards = ["dazed", "wound", "burn"];
     private const int RetrieveMaxAmount = 2;   // "Return 2 cards" is the ceiling — a 3+ recursion is a degenerate loop
     private const int StatusCardMaxAmount = 3; // Power Through adds 2 Wounds; 3 is the ceiling
@@ -1003,8 +1024,36 @@ public static class ForgedCards
                 var cserr = ValidateCostShift(e);
                 if (cserr != null) return cserr;
             }
-            else if (e.CardKind != null || e.Scope != null || e.Count != 0)
-                return $"'card_type'/'scope'/'count' only apply to cost_shift (op '{e.Op}').";
+            else if (e.Scope != null || e.Count != 0)
+                return $"'scope'/'count' only apply to cost_shift (op '{e.Op}').";
+            // Phase BC (v57): `card_type` is shared by cost_shift (its own attack/skill/power/all band, above) and the two
+            // hand ops (attack/skill/power/non_attack, below); anywhere else it is a stray field.
+            else if (e.CardKind != null && e.Op is not ("exhaust_card" or "draw_until"))
+                return $"'card_type' only applies to cost_shift/exhaust_card/draw_until (op '{e.Op}').";
+            // Phase BC (v57, gap #52): exhaust_card — a pick mode, an amount for the counted modes (1..3), an optional
+            // hand filter. `all` takes every matching card (amount is meaningless there). Card-only: not in TriggerOps.
+            if (e.Op == "exhaust_card")
+            {
+                if (e.Cards == null || !ExhaustPickModes.Contains(e.Cards))
+                    return $"exhaust_card needs a 'cards' pick mode (one of {string.Join("/", ExhaustPickModes)}); got '{e.Cards}'.";
+                if (e.Cards == "all")
+                {
+                    if (e.Amount != 0)
+                        return "exhaust_card 'cards':'all' takes no amount (it exhausts every matching card in your hand).";
+                }
+                else if (e.Amount < 1 || e.Amount > ExhaustCardMaxAmount)
+                    return $"exhaust_card 'amount' (cards exhausted) must be 1..{ExhaustCardMaxAmount}; got {e.Amount}.";
+                if (e.CardKind != null && !HandKindFilters.Contains(e.CardKind))
+                    return $"exhaust_card 'card_type' must be one of {string.Join("/", HandKindFilters)}; got '{e.CardKind}'.";
+            }
+            // Phase BC (v57, gap #53): draw_until — a required hand filter (the type that STOPS the draw), no amount.
+            if (e.Op == "draw_until")
+            {
+                if (e.CardKind == null || !HandKindFilters.Contains(e.CardKind))
+                    return $"draw_until needs a 'card_type' (one of {string.Join("/", HandKindFilters)}); got '{e.CardKind}'.";
+                if (e.Amount != 0)
+                    return "draw_until carries no amount (it draws until it finds a card of that type).";
+            }
             if (e.IsScaled)
             {
                 if (!SupportedScales.Contains(e.Scale!))
@@ -1244,8 +1293,8 @@ public static class ForgedCards
                 if (e.Cards != null && !PickModes.Contains(e.Cards))
                     return $"discard 'cards' must be one of {string.Join("/", PickModes)}; got '{e.Cards}'.";
             }
-            else if (e.Cards != null && e.Op != "retrieve_card") // retrieve_card's pick mode is validated above
-                return $"'cards' only applies to upgrade_card/discard/retrieve_card (op '{e.Op}').";
+            else if (e.Cards != null && e.Op is not ("retrieve_card" or "exhaust_card")) // both validated above
+                return $"'cards' only applies to upgrade_card/discard/retrieve_card/exhaust_card (op '{e.Op}').";
             // Phase AV (v52): sacrifice_summon is a flag-op that consumes the class's living minion so its on_death
             // rattle fires. Class-only (like `summon` — it needs a summon_pool to have anything to kill), carries no
             // amount/target/status, and card-only (it is not in TriggerOps, so ValidateTrigger rejects a payload one).
@@ -1341,6 +1390,11 @@ public static class ForgedCards
         foreach (var list in new[] { effects, upgrade })
             if (list is { Length: > 0 } && list.All(e => e.Op == "spend_forge"))
                 return "'spend_forge' can't be a card's only effect (the spend is the price — the rest of the card is the payoff).";
+        // Phase BC (v57): one exhaust_card / one draw_until per effect list (a second is the same sentence twice — raise
+        // the amount or widen the filter instead). Base + upgrade counted independently, like cost_shift.
+        foreach (var hop in new[] { "exhaust_card", "draw_until" })
+            if (effects.Count(e => e.Op == hop) > 1 || (upgrade ?? []).Count(e => e.Op == hop) > 1)
+                return $"at most one '{hop}' effect per card.";
         // One add_trigger per card: a card grants a single trigger power, which reads only the first add_trigger.
         if (effects.Count(e => e.Op == "add_trigger") > 1)
             return "at most one add_trigger per card (a card grants a single trigger power).";
@@ -1843,6 +1897,8 @@ public static class ForgedCards
                 case "discard":     parts.Add(e.Cards == "choose" ? "Discard {Discard} card(s) of your choice." // Phase AP (v46): the chosen form
                                                                   : "Discard {Discard} random card(s)."); break; // Phase R (gap #17)
                 case "retrieve_card":   parts.Add(RetrieveSentence(e)); break;   // Phase AP (v46): literal (no var), lockstep with cardgen
+                case "exhaust_card":    parts.Add(ExhaustCardSentence(e)); break; // Phase BC (v57, gap #52): literal (no var), lockstep with cardgen
+                case "draw_until":      parts.Add(DrawUntilSentence(e)); break;   // Phase BC (v57, gap #53): literal (no var), lockstep with cardgen
                 case "add_status_card": parts.Add(StatusCardSentence(e)); break; // Phase AP (v46): literal (no var), lockstep with cardgen
                 case "scry":        parts.Add("Scry {Scry}. (Look at that many cards from the top of your draw pile and discard any.)"); break; // Phase AA (gap #17 R-2)
                 case "exhaust":     parts.Add("Exhaust."); break;
@@ -2112,6 +2168,39 @@ public static class ForgedCards
         string what = n > 1 ? $"{n} {(name == "Dazed" ? name : name + "s")}" : $"a {name}";
         return $"Add {what} to your {PilePhrase(e.Pile)}.";
     }
+
+    /// <summary>Phase BC (v57): the singular / plural display words for a hand filter — "an Attack"/"Attacks",
+    /// "a non-Attack card"/"non-Attack cards", and the unfiltered "a card"/"cards". Lockstep with cardgen._hand_kind_words.</summary>
+    private static (string One, string Many) HandKindWords(string? kind) => kind switch
+    {
+        "attack"     => ("an Attack", "Attacks"),
+        "skill"      => ("a Skill", "Skills"),
+        "power"      => ("a Power", "Powers"),
+        "non_attack" => ("a non-Attack card", "non-Attack cards"),
+        _            => ("a card", "cards"),
+    };
+
+    /// <summary>Phase BC (v57, gap #52): the exhaust_card sentence — "Exhaust a card in your hand." / "Exhaust 2 random
+    /// cards in your hand." / "Exhaust up to 3 cards in your hand." / "Exhaust all non-Attack cards in your hand." /
+    /// "Exhaust a Skill in your hand." Literal numbers (no var). An absent/unknown mode reads as choose. Lockstep with
+    /// cardgen._exhaust_card_sentence.</summary>
+    private static string ExhaustCardSentence(EffectSpec e)
+    {
+        var (one, many) = HandKindWords(e.CardKind);
+        int n = Math.Max(1, e.Amount);
+        string what = e.Cards switch
+        {
+            "all"    => $"all {many}",
+            "random" => n > 1 ? $"{n} random {many}" : $"a random {one[(one.IndexOf(' ') + 1)..]}",
+            "up_to"  => $"up to {n} {many}",
+            _        => n > 1 ? $"{n} {many}" : one,
+        };
+        return $"Exhaust {what} in your hand.";
+    }
+
+    /// <summary>Phase BC (v57, gap #53): the draw_until sentence — "Draw cards until you draw a non-Attack card." /
+    /// "… a Skill." Lockstep with cardgen._draw_until_sentence.</summary>
+    private static string DrawUntilSentence(EffectSpec e) => $"Draw cards until you draw {HandKindWords(e.CardKind).One}.";
 
     /// <summary>Phase AP (v46): the display name of a base-game Status card kind. Lockstep with cardgen.STATUS_CARD_NAME.</summary>
     internal static string StatusCardName(string? kind) => kind switch

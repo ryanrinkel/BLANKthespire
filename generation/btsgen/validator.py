@@ -72,7 +72,8 @@ _BUILD_AROUND_OPS = {"add_trigger", "apply_status_custom",
                      "cost_shift",  # Phase AO (v45): a typed energy discount is a tempo utility, not a flat stat line
                      "retrieve_card",  # Phase AP (v46): pile recursion (Headbutt / Exhume) is a build-around, not a stat line
                      "spend_forge",  # Phase AX (v53, gap #44): cashing out the Forge ramp is a build-around, not a stat line
-                     "spread_debuffs"}  # Phase AX (v53, gaps #45-#47): contagion is a build-around payoff, not a stat line
+                     "spread_debuffs",  # Phase AX (v53, gaps #45-#47): contagion is a build-around payoff, not a stat line
+                     "exhaust_card"}  # Phase BC (v57, gap #52): exhaust-fuel is the engine half of a card, not a stat line
 # F5: the live state scalars an effect's amount may scale to (mirrors ForgedCards.SupportedScales). "x" stays
 # the X-cost scalar; the rest are hand/energy state reads. Only "cards_retained" is allowed inside a trigger.
 # Phase M: "forged" is the ADDITIVE exception (printed amount + the Forge counter) and is damage/block-only.
@@ -121,6 +122,12 @@ _ADD_CARD_MAX = 3
 # schema clauses. Both new ops are card-only (the triggerEffect op enum omits them); a payload discard stays random.
 _RETRIEVE_PILES = {"discard", "exhaust"}
 _PICK_MODES = {"random", "choose"}
+# Phase BC (v57, gaps #52/#53): the exhaust_card pick modes + per-play cap, and the hand filter the two hand ops share
+# (`non_attack` = the Pillage / Second Wind filter; cost_shift keeps its own attack/skill/power/all). Mirrors
+# ForgedCards.ExhaustPickModes / HandKindFilters / ExhaustCardMaxAmount + the schema clauses. Both ops are card-only.
+_EXHAUST_PICK_MODES = {"choose", "random", "up_to", "all"}
+_HAND_KIND_FILTERS = {"attack", "skill", "power", "non_attack"}
+_EXHAUST_CARD_MAX = 3
 _STATUS_CARDS = {"dazed", "wound", "burn"}
 _RETRIEVE_MAX = 2
 _STATUS_CARD_MAX = 3
@@ -597,8 +604,30 @@ class CardValidator:
             elif e.get("op") == "discard":
                 if e.get("cards") is not None and str(e.get("cards", "")).strip().lower() not in _PICK_MODES:
                     out.append(f"discard 'cards':'{e.get('cards')}' must be one of {'/'.join(sorted(_PICK_MODES))}.")
+            # Phase BC (v57, gap #52): exhaust_card — a pick mode, an amount 1..3 on the counted modes (none on `all`), an
+            # optional hand filter. Mirrors ForgedCards.Validate.
+            elif e.get("op") == "exhaust_card":
+                mode = str(e.get("cards", "")).strip().lower()
+                if mode not in _EXHAUST_PICK_MODES:
+                    out.append(f"exhaust_card 'cards':'{e.get('cards')}' must be one of {'/'.join(sorted(_EXHAUST_PICK_MODES))}.")
+                amt = e.get("amount")
+                if mode == "all":
+                    if amt is not None:
+                        out.append("exhaust_card 'cards':'all' takes no amount (it exhausts every matching card in your hand).")
+                elif not (isinstance(amt, int) and not isinstance(amt, bool) and 1 <= amt <= _EXHAUST_CARD_MAX):
+                    out.append(f"exhaust_card 'amount' (cards exhausted) must be 1..{_EXHAUST_CARD_MAX}; got {amt!r}.")
+                ck = e.get("card_type")
+                if ck is not None and str(ck).strip().lower() not in _HAND_KIND_FILTERS:
+                    out.append(f"exhaust_card 'card_type':'{ck}' must be one of {'/'.join(sorted(_HAND_KIND_FILTERS))}.")
             elif e.get("cards") is not None and e.get("op") != "retrieve_card":
-                out.append(f"'cards' only applies to upgrade_card/discard/retrieve_card (op '{e.get('op')}').")
+                out.append(f"'cards' only applies to upgrade_card/discard/retrieve_card/exhaust_card (op '{e.get('op')}').")
+            # Phase BC (v57, gap #53): draw_until — the hand filter that STOPS the draw, no amount. Mirrors ForgedCards.Validate.
+            if e.get("op") == "draw_until":
+                ck = str(e.get("card_type", "")).strip().lower()
+                if ck not in _HAND_KIND_FILTERS:
+                    out.append(f"draw_until 'card_type':'{e.get('card_type')}' must be one of {'/'.join(sorted(_HAND_KIND_FILTERS))}.")
+                if e.get("amount") is not None:
+                    out.append("draw_until carries no amount (it draws until it finds a card of that type).")
         for e in effects + up_effects:  # per-effect shape rules apply to the upgrade too (lockstep w/ the
             op = e.get("op")            # mod's `effects.Concat(upgrade)` in ForgedCards.Validate)
             hits = e.get("hits", 1)
@@ -631,8 +660,10 @@ class CardValidator:
                     out.append(f"cost_shift 'count' (the plays it applies to) must be 1..{_COST_SHIFT_MAX_COUNT}; got {cn!r}.")
                 if sc == "combat" and ca != 1:
                     out.append("cost_shift with scope 'combat' must use amount 1 (a whole-combat -2 is degenerate).")
-            elif e.get("card_type") is not None or e.get("scope") is not None or e.get("count") is not None:
-                out.append(f"'card_type'/'scope'/'count' only apply to cost_shift (op '{op}').")
+            elif e.get("scope") is not None or e.get("count") is not None:
+                out.append(f"'scope'/'count' only apply to cost_shift (op '{op}').")
+            elif e.get("card_type") is not None and op not in ("exhaust_card", "draw_until"):  # Phase BC (v57)
+                out.append(f"'card_type' only applies to cost_shift/exhaust_card/draw_until (op '{op}').")
             if scale:
                 if scale not in _SUPPORTED_SCALES:
                     out.append(f"unsupported scale '{scale}' (one of {'/'.join(sorted(_SUPPORTED_SCALES))}).")
@@ -865,6 +896,12 @@ class CardValidator:
             if (sum(1 for e in effects if e.get("op") == "add_status_card") > 1
                     or sum(1 for e in up_effects if e.get("op") == "add_status_card") > 1):
                 out.append("at most one 'add_status_card' effect per card (one drawback per play — raise the amount instead).")
+        # Phase BC (v57): one exhaust_card / one draw_until per effect list (base + upgrade independent). Card-only
+        # (the schema triggerEffect op enum omits both). Mirrors ForgedCards.Validate.
+        for hop in ("exhaust_card", "draw_until"):
+            if (sum(1 for e in effects if e.get("op") == hop) > 1
+                    or sum(1 for e in up_effects if e.get("op") == hop) > 1):
+                out.append(f"at most one '{hop}' effect per card.")
         # Phase AP (v46): retrieve_card — at most one per effect list (two recursions on one play is a loop; raise the
         # amount to 2 instead). Card-only (the schema triggerEffect op enum omits it).
         if (sum(1 for e in effects if e.get("op") == "retrieve_card") > 1
@@ -1159,6 +1196,16 @@ class CardValidator:
             return amt * width
         if op == "block":
             return amt * 0.8 + (6.0 if forged else 0.0)
+        if op == "exhaust_card":
+            # Phase BC (v57, gap #52): exhausting your OWN hand is a COST — the card loses future plays — unless the
+            # class has an on_exhaust engine (unseen here). Priced as a flat negative per card burned so the payoff half
+            # of the card (Block / draw / on_exhaust fuel) can be generous; `all` assumes ~2 cards go.
+            mode = str(eff.get("cards", "")).strip().lower()
+            n = 2.0 if mode == "all" else max(1.0, self._amt(eff.get("amount", 1)))
+            return -n * (0.5 if mode in ("choose", "up_to") else 1.0)
+        if op == "draw_until":
+            # Phase BC (v57, gap #53): expected draws depend on deck density (unseen) — price it as a draw 2 (Pillage).
+            return 10.0
         if op == "sly":
             # Phase BB (v56, gap #55): a free play off a discard — the card's whole value again, minus the outlet it
             # needs (unseen here). A flat premium so a Sly card isn't priced as its face alone (the base game's Sly

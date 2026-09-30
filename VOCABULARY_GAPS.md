@@ -524,7 +524,14 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Mechanic sketch:** A card op that exhausts OTHER cards in hand as part of its effect/cost: `cards` choose 1 / random / all non-Attacks / up to N (Burning Pact, True Grit, Second Wind, Purity). Card-only; pairs with the `on_exhaust` trigger.
 - **Buildable today?** No.
 - **Priority:** requested by Ryan in the 2026-09-29 archetype copy review.
-- **Status:** captured
+- **Status:** **done (2026-09-30, vocab v57, Phase BC)** — op `exhaust_card {cards: choose|random|up_to|all, amount 1..3,
+  card_type?: attack|skill|power|non_attack}` on the four base-game recipes: `CardSelectCmd.FromHand` +
+  `CardSelectorPrefs.ExhaustSelectionPrompt` (min 0 for up_to; the filter greys the rest), the run's
+  CombatCardSelection RNG for random, then `CardCmd.Exhaust` ONE card at a time (the game's own rule) so every
+  `on_exhaust` payoff fires per card. Card-only, one per card; `card_type` gains `non_attack` (hand ops only) and
+  `cards` gains `up_to` (exhaust_card only). Harness: featured `exhaust_fuel`, `exhaust_pyre` + `ascetic_purge` ops,
+  exemplars `ex_burning_oath` / `ex_clearing_breath`, DECK-THINNING keep-set, gate tail, `_PREFERRED_OPS`. `[BC]`
+  tags + `Auto-selected` under AutoSlay. Smoke pending (`tests/test_phase_bc.py` is the offline gate).
 
 ### 53. Draw until a non-Attack
 - **Surfaced by:** archetype copy review (2026-09-29), for Ascetic, Striker
@@ -532,7 +539,10 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Mechanic sketch:** `draw_until {card_type}`: draw until you draw a card of that type (Pillage); cap the draw at the hand limit.
 - **Buildable today?** No.
 - **Priority:** requested by Ryan in the 2026-09-29 archetype copy review.
-- **Status:** captured
+- **Status:** **done (2026-09-30, vocab v57, Phase BC)** — op `draw_until {card_type: attack|skill|power|non_attack}`:
+  the decompiled Pillage loop (single-card `CardPileCmd.Draw` until a match, a null draw, or `CardPile.MaxCardsInHand`)
+  plus a 10-draw safety cap. Card-only, one per card, priced as draw 2. Harness: `strike_tempo` + `ascetic_purge` ops,
+  exemplar `ex_press_the_line`, `_PREFERRED_OPS`, gate tail, render.js. `[BC]` tag. Smoke pending.
 
 ### 54. Next attack deals double / more
 - **Surfaced by:** archetype copy review (2026-09-29), for Forge ramp, Glass tempest

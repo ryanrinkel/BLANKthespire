@@ -198,6 +198,8 @@ public abstract class DataCard : ConstructedCardModel
                 case "spread_debuffs":        // Phase AX (v53, gaps #45-#47): copies the target's debuffs in OnPlay (flag-op, no var); text via Describe
                 case "add_card":              // Phase Q (gap #16): generates card copies in OnPlay (no card var)
                 case "retrieve_card":         // Phase AP (v46): returns pile card(s) to hand in OnPlay (literal, no var); text via Describe
+                case "exhaust_card":          // Phase BC (v57, gap #52): exhausts hand cards in OnPlay (literal, no var); text via Describe
+                case "draw_until":            // Phase BC (v57, gap #53): draws until a card type in OnPlay (no var); text via Describe
                 case "add_status_card":       // Phase AP (v46): generates Status cards in OnPlay (literal, no var); text via Describe
                 case "summon_blade":          // Phase T: retrieves the class blade to hand in OnPlay (no card var)
                 case "upgrade_card":          // Phase V/X (gap #18): upgrades hand cards in OnPlay — random/all/choose (no card var)

@@ -547,6 +547,14 @@ function effPhrase(e, target) {
       return e.cards === "choose" ? `Return ${n} chosen card${n == 1 ? "" : "s"} from your ${pile} pile to hand`
                                   : `Return ${n} random card${n == 1 ? "" : "s"} from your ${pile} pile to hand`;
     }
+    case "exhaust_card": { // Phase BC (v57, gap #52)
+      const what = { attack: "Attack", skill: "Skill", power: "Power", non_attack: "non-Attack card" }[e.card_type] || "card";
+      const n = a ?? 1;
+      if (e.cards === "all") return `Exhaust all ${what}s in your hand`;
+      if (e.cards === "up_to") return `Exhaust up to ${n} ${what}${n == 1 ? "" : "s"} in your hand`;
+      return `Exhaust ${n} ${e.cards === "random" ? "random " : ""}${what}${n == 1 ? "" : "s"} in your hand`;
+    }
+    case "draw_until": return `Draw cards until you draw a ${{ attack: "Attack", skill: "Skill", power: "Power" }[e.card_type] || "non-Attack card"}`; // Phase BC (v57, gap #53)
     case "add_status_card": { // Phase AP (v46)
       const n = a ?? 1;
       const name = { dazed: "Dazed", burn: "Burn" }[e.card] || "Wound";

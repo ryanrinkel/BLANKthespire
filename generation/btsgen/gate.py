@@ -108,7 +108,8 @@ CORE_OPS = ("damage", "block", "apply_status", "add_trigger", "draw", "retain", 
 GATED_OP_ORDER = ("balance_step", "add_card", "discard", "upgrade_card", "scry", "purge_card", "purge",
                   "spread_debuffs", "retrieve_card", "innate", "cost_shift", "corruption", "add_status_card",
                   "ethereal", "gain_max_hp", "graft_card", "transform_card",
-                  "sly")  # Phase BB (v56): unmeasured, so it rides the tail like the other rare keywords
+                  "sly",  # Phase BB (v56): unmeasured, so it rides the tail like the other rare keywords
+                  "exhaust_card", "draw_until")  # Phase BC (v57): the hand ops, likewise unmeasured
 
 # ---- Phase 1b: which gate UNIT each schema element belongs to. A unit is a gated op name or a family name. An
 # element whose units are all gated moves to the tail (families are "fam:<name>", so the Forge family never
@@ -124,8 +125,9 @@ FIELD_UNITS = {
     "orb": ("channel_orb",), "status_name": ("apply_status_custom",), "summon_name": ("summon",),
     "card_id": ("add_card", "transform_card", "graft_card"),
     "pile": ("add_card", "add_status_card", "retrieve_card"),
-    "cards": ("discard", "retrieve_card", "upgrade_card"),
-    "pole": ("balance_step",), "card_type": ("cost_shift",), "scope": ("cost_shift",), "count": ("cost_shift",),
+    "cards": ("discard", "retrieve_card", "upgrade_card", "exhaust_card"),  # Phase BC (v57)
+    "pole": ("balance_step",), "card_type": ("cost_shift", "exhaust_card", "draw_until"),  # Phase BC (v57)
+    "scope": ("cost_shift",), "count": ("cost_shift",),
     "card": ("add_status_card",),
 }
 DEF_UNITS = {"triggerEffect": ("add_trigger",)}

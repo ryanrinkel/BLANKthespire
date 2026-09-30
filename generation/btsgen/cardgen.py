@@ -96,6 +96,39 @@ def _status_card_sentence(e: dict) -> str:
     return f"Add {what} to your {_pile_phrase(e.get('pile'))}."
 
 
+def _hand_kind_words(kind) -> tuple[str, str]:
+    # Phase BC (v57): the singular / plural words for a hand filter. Mirrors ForgedCards.HandKindWords.
+    return {
+        "attack": ("an Attack", "Attacks"),
+        "skill": ("a Skill", "Skills"),
+        "power": ("a Power", "Powers"),
+        "non_attack": ("a non-Attack card", "non-Attack cards"),
+    }.get(str(kind or "").lower(), ("a card", "cards"))
+
+
+def _exhaust_card_sentence(e: dict) -> str:
+    # Phase BC (v57, gap #52): "Exhaust a card in your hand." / "Exhaust 2 random cards in your hand." / "Exhaust up to 3
+    # cards in your hand." / "Exhaust all non-Attack cards in your hand." Literal numbers (no var); an absent/unknown mode
+    # reads as choose. Mirrors ForgedCards.ExhaustCardSentence.
+    one, many = _hand_kind_words(e.get("card_type"))
+    n = max(1, int(e.get("amount", 1) or 1))
+    mode = str(e.get("cards", "")).lower()
+    if mode == "all":
+        what = f"all {many}"
+    elif mode == "random":
+        what = f"{n} random {many}" if n > 1 else f"a random {one.split(' ', 1)[1]}"
+    elif mode == "up_to":
+        what = f"up to {n} {many}"
+    else:
+        what = f"{n} {many}" if n > 1 else one
+    return f"Exhaust {what} in your hand."
+
+
+def _draw_until_sentence(e: dict) -> str:
+    # Phase BC (v57, gap #53): "Draw cards until you draw a non-Attack card." Mirrors ForgedCards.DrawUntilSentence.
+    return f"Draw cards until you draw {_hand_kind_words(e.get('card_type'))[0]}."
+
+
 def _add_card_name(card_id) -> str:
     # Display title for an add_card's referenced card: the snake_case id, title-cased (no sibling-name context
     # in describe(), same choice as _orb_display). Mirrors ForgedCards.AddCardName.
@@ -208,6 +241,17 @@ def effect_literal(e: dict) -> str:
     elif op == "discard" and str(e.get("cards", "")).lower() == "choose":
         # Phase AP (v46): the chosen form carries the named Cards arg; the random form stays the plain literal below.
         lit = f'new EffectSpec("discard", {e.get("amount", 0)}, Cards: "choose")'
+    elif op == "exhaust_card":
+        # Phase BC (v57, gap #52): named Cards (+ CardKind) args. Amount = cards exhausted (0 for the `all` mode).
+        cards = str(e.get("cards", "choose")).replace("\\", "\\\\").replace('"', '\\"')
+        lit = f'new EffectSpec("exhaust_card", {e.get("amount", 0) if cards != "all" else 0}, Cards: "{cards}")'
+        if e.get("card_type"):
+            ck = str(e["card_type"]).replace("\\", "\\\\").replace('"', '\\"')
+            lit = f'{lit[:-1]}, CardKind: "{ck}")'
+    elif op == "draw_until":
+        # Phase BC (v57, gap #53): named CardKind arg (the type that stops the draw). No amount.
+        ck = str(e.get("card_type", "non_attack")).replace("\\", "\\\\").replace('"', '\\"')
+        lit = f'new EffectSpec("draw_until", CardKind: "{ck}")'
     elif op == "retrieve_card":
         # Phase AP (v46): named Pile / Cards args (order-independent in C#). Amount = cards returned (default 1).
         pile = str(e.get("pile", "discard")).replace("\\", "\\\\").replace('"', '\\"')
@@ -525,6 +569,12 @@ def describe(effects: list[dict], target: str) -> str:
         elif op == "add_status_card":
             # Phase AP (v46): literal sentence (no var). Lockstep with ForgedCards.Describe / StatusCardSentence.
             parts.append(_status_card_sentence(e))
+        elif op == "exhaust_card":
+            # Phase BC (v57, gap #52): literal sentence (no var). Lockstep with ForgedCards.Describe / ExhaustCardSentence.
+            parts.append(_exhaust_card_sentence(e))
+        elif op == "draw_until":
+            # Phase BC (v57, gap #53): literal sentence (no var). Lockstep with ForgedCards.Describe / DrawUntilSentence.
+            parts.append(_draw_until_sentence(e))
         elif op == "scry":
             # Phase AA (gap #17 R-2): top-of-draw look count via the {Scry} var. Lockstep with ForgedCards.Describe.
             parts.append("Scry {Scry}. (Look at that many cards from the top of your draw pile and discard any.)")

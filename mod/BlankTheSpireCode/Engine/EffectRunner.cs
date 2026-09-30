@@ -358,6 +358,18 @@ public static class EffectRunner
                     // cards are never offered (a random recursion pulling Wounds is anti-fun). Empty pile → no-op.
                     await RetrieveCards(e, amt, ctx, card.Owner);
                     break;
+                case "exhaust_card":
+                    // Phase BC (v57, gap #52): exhaust OTHER cards in your hand — the player's pick (Burning Pact / Purity),
+                    // a random one (True Grit) or every matching card (Second Wind / Fiend Fire). The playing card is in
+                    // the Play pile by now, so it is never in the candidate set. Each card goes through CardCmd.Exhaust on
+                    // its own, so every on_exhaust payoff fires per card. Under AutoSlay the picker auto-picks (no hang).
+                    await ExhaustCards(e, amt, ctx, card.Owner, card);
+                    break;
+                case "draw_until":
+                    // Phase BC (v57, gap #53): draw one card at a time until you draw a card of `card_type` (Pillage =
+                    // "until a non-Attack"), the draw pile runs dry, or the hand is full — the base game's own loop.
+                    await DrawUntil(e, ctx, card.Owner);
+                    break;
                 case "add_status_card":
                     // Phase AP (v46): generate `amt` base-game Status cards (Dazed/Wound/Burn) into a pile — the
                     // self-drawback of an over-statted card (Wild Strike / Power Through / Overclock). Combat-transient
@@ -628,6 +640,99 @@ public static class EffectRunner
             await CardPileCmd.Add(c, PileType.Hand, CardPilePosition.Random);
         MainFile.Logger.Info($"[AP] retrieve_card {e.Cards ?? "random"} x{chosen.Count} from {pileType} -> hand " +
                              $"({string.Join(", ", chosen.Select(c => $"'{c.Title}'"))}).");
+    }
+
+    /// <summary>Phase BC (v57): does a hand card match a hand filter? <c>attack</c> / <c>skill</c> / <c>power</c> by
+    /// <see cref="CardModel.Type"/>, <c>non_attack</c> = anything but an Attack (the Pillage / Second Wind filter),
+    /// null/unknown = everything. Shared by <see cref="ExhaustCards"/> and <see cref="DrawUntil"/>.</summary>
+    internal static bool HandKindMatches(CardModel c, string? kind) => kind switch
+    {
+        "attack"     => c.Type == CardType.Attack,
+        "skill"      => c.Type == CardType.Skill,
+        "power"      => c.Type == CardType.Power,
+        "non_attack" => c.Type != CardType.Attack,
+        _            => true,
+    };
+
+    /// <summary>Phase BC (v57, gap #52): EXHAUST <paramref name="n"/> OTHER card(s) in <paramref name="owner"/>'s hand,
+    /// optionally filtered by <c>e.CardKind</c>. <c>e.Cards</c>: <c>choose</c> opens the base-game hand picker with the
+    /// game's own exhaust prompt (<c>CardSelectorPrefs.ExhaustSelectionPrompt</c> — Burning Pact; the filter greys the rest
+    /// out), <c>up_to</c> the same picker with min 0 (Purity: "exhaust up to N"), <c>random</c> rolls off the run's
+    /// CombatCardSelection stream (True Grit; seed-correct), <c>all</c> takes every matching card (Second Wind / Fiend
+    /// Fire). Each pick goes through <c>CardCmd.Exhaust</c> ONE AT A TIME — the game's own rule ("do NOT make a bulk
+    /// version": one card's exhaust hooks run fully before the next starts), which is also what makes every
+    /// <c>on_exhaust</c> payoff fire per card. An empty (filtered) hand / no selection is a logged no-op. Under AutoSlay
+    /// the run-scoped <c>AutoSlayCardSelector</c> auto-picks, so the picker never blocks the bot.</summary>
+    internal static async Task ExhaustCards(EffectSpec e, int n, PlayerChoiceContext ctx, Player owner, AbstractModel source)
+    {
+        var pool = owner.PlayerCombatState.Hand.Cards.Where(c => HandKindMatches(c, e.CardKind)).ToList();
+        if (pool.Count == 0) { MainFile.Logger.Info($"[BC] exhaust_card {e.Cards}: no matching card in hand (no-op)."); return; }
+        List<CardModel> chosen;
+        Func<CardModel, bool>? filter = e.CardKind == null ? null : c => HandKindMatches(c, e.CardKind);
+        switch (e.Cards)
+        {
+            case "all":
+                chosen = pool;
+                break;
+            case "random":
+            {
+                var rng = owner.RunState.Rng.CombatCardSelection;
+                int take = Math.Min(Math.Max(1, n), pool.Count);
+                chosen = new List<CardModel>(take);
+                for (int i = 0; i < take; i++)
+                {
+                    int idx = rng.NextInt(pool.Count);
+                    chosen.Add(pool[idx]);
+                    pool.RemoveAt(idx);
+                }
+                break;
+            }
+            case "up_to":
+            {
+                int max = Math.Min(Math.Max(1, n), pool.Count);
+                chosen = (await CardSelectCmd.FromHand(ctx, owner,
+                    new CardSelectorPrefs(CardSelectorPrefs.ExhaustSelectionPrompt, 0, max), filter, source)).ToList();
+                break;
+            }
+            default: // choose
+            {
+                int take = Math.Min(Math.Max(1, n), pool.Count);
+                chosen = (await CardSelectCmd.FromHand(ctx, owner,
+                    new CardSelectorPrefs(CardSelectorPrefs.ExhaustSelectionPrompt, take), filter, source)).ToList();
+                break;
+            }
+        }
+        if (chosen.Count == 0) { MainFile.Logger.Info($"[BC] exhaust_card {e.Cards}: no selection (no-op)."); return; }
+        foreach (var c in chosen)
+            await CardCmd.Exhaust(ctx, c);   // one at a time (the game's own rule) → Hook.AfterCardExhausted per card
+        MainFile.Logger.Info($"[BC] exhaust_card {e.Cards}{(e.CardKind != null ? $" [{e.CardKind}]" : "")} x{chosen.Count} " +
+                             $"({string.Join(", ", chosen.Select(c => $"'{c.Title}'"))}).");
+    }
+
+    /// <summary>Phase BC (v57, gap #53): the draw_until loop cap — a safety net, not a design number. A deck with NO
+    /// card of the wanted type would otherwise draw itself dry every play; the hand limit stops it first in practice.</summary>
+    private const int DrawUntilCap = 10;
+
+    /// <summary>Phase BC (v57, gap #53): DRAW UNTIL — draw one card at a time until the drawn card matches
+    /// <c>e.CardKind</c> (Pillage: "until you draw a non-Attack"), the single-card <c>CardPileCmd.Draw</c> returns null
+    /// (draw + discard both empty, or a no-draw effect), or the hand is at <see cref="CardPile.MaxCardsInHand"/>. The
+    /// game's own overload handles the reshuffle, <c>Hook.ShouldDraw</c> and <c>AfterCardDrawn</c>, so an
+    /// <c>on_card_drawn</c> engine fires per card drawn. Byte-for-byte the decompiled Pillage loop, plus the cap.</summary>
+    internal static async Task DrawUntil(EffectSpec e, PlayerChoiceContext ctx, Player owner)
+    {
+        int drawn = 0;
+        CardModel? last = null;
+        while (drawn < DrawUntilCap)
+        {
+            if (owner.PlayerCombatState.Hand.Cards.Count >= CardPile.MaxCardsInHand) break;
+            last = await CardPileCmd.Draw(ctx, owner);
+            if (last == null) break;
+            drawn++;
+            if (HandKindMatches(last, e.CardKind)) break;
+        }
+        bool hit = last != null && HandKindMatches(last, e.CardKind);
+        MainFile.Logger.Info($"[BC] draw_until [{e.CardKind}]: drew {drawn} card(s), " +
+                             (hit ? $"stopped on '{last!.Title}'." : "stopped without a match (hand full / pile dry / cap)."));
     }
 
     /// <summary>Phase AP (v46): generate <paramref name="n"/> base-game STATUS cards (<c>e.StatusCard</c>: dazed / wound /

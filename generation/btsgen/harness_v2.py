@@ -62,6 +62,7 @@ def seeded_shuffle(items, seed: int, salt: str = "") -> list:
 _PREFERRED_OPS = ["add_trigger", "transform_card", "graft_card", "spread_debuffs", "scry", "balance_step", "purge", "purge_card",
                   "forge", "upgrade_card", "discard", "add_card", "corruption", "retain", "exhaust",
                   "ethereal", "innate", "sly",  # Phase BB (v56): the base-game Sly keyword
+                  "exhaust_card", "draw_until",  # Phase BC (v57): the hand ops
                   "lose_hp"]
 _PREFERRED_SCALES = ["cards_in_hand", "cards_retained", "unspent_energy_last_turn", "forged",
                      "damage_dealt_unblocked", "target_debuff_count", "tag_cards_owned"]

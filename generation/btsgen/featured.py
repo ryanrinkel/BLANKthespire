@@ -191,6 +191,13 @@ FEATURED_MENU: list[Featured] = [
              '(vulnerable / weak / frail / poison) and THEN carries op "spread_debuffs" (no amount) - the debuffs on '
              'the struck enemy are copied onto every other living enemy. Never on a basic; one per card.',
              lambda cc: "spread_debuffs" in cc.ops),
+    # Phase BC (v57, gap #52): exhaust FUEL — a card that burns other hand cards to feed an on_exhaust engine.
+    Featured("exhaust_fuel", 'a card that EXHAUSTS other cards in your hand as fuel (op "exhaust_card": choose / random / up_to / all non-Attacks)',
+             'REQUIRED: add a skill with op "exhaust_card" (cards "choose", "random" or "up_to" with amount 1-3, or '
+             '"all" with card_type "non_attack") that exhausts OTHER cards in your hand (Burning Pact / True Grit / '
+             'Purity / Second Wind), and make the rest of the card pay for the cards it burns (draw / Block / an '
+             'on_exhaust payoff elsewhere in the class). Card-only; one per card.',
+             lambda cc: "exhaust_card" in cc.ops),
     Featured("graft", 'a card that lets you PICK a card in hand and permanently reforge it into another (op "graft_card")',
              'REQUIRED: add a card with op "graft_card" naming a STRONG card in this class ("card_id") — when played, '
              'the player picks a card in HAND and THAT picked card permanently becomes card_id for the rest of the run '

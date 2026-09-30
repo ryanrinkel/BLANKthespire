@@ -25,7 +25,13 @@ import sys
 import zlib
 from pathlib import Path
 
-VOCAB_VERSION = 56  # must be <= ForgedCards.VocabVersion (56: Phase BB — TEMPO KEYWORDS: the base-game
+VOCAB_VERSION = 57  # must be <= ForgedCards.VocabVersion (57: Phase BC — HAND OPS: card-only
+                    # `exhaust_card {cards: choose|random|up_to|all, amount 1..3, card_type?}` (exhaust OTHER
+                    # cards in hand — Burning Pact / True Grit / Purity / Second Wind; CardCmd.Exhaust one at a
+                    # time so on_exhaust fires per card) and `draw_until {card_type}` (Pillage: draw until a
+                    # card of that type, the pile is dry or the hand is full). `card_type` gains non_attack
+                    # (hand ops only), `cards` gains up_to (exhaust_card only). No codec change.)
+                    # 56: Phase BB — TEMPO KEYWORDS: the base-game
                     # `sly` keyword flag-op (discarded from hand by an effect = played for free; the game's
                     # CardCmd.DiscardAndDraw does the auto-play, so the mod only declares the keyword; never
                     # with retain, never on a Power; an upgrade may add it) + the `turn_at_most {value}`

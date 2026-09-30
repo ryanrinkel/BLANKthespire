@@ -1012,7 +1012,8 @@ _PRUNABLE_SECTIONS: list[tuple[str, frozenset, str | None, str, str]] = [
     ("TOKEN GENERATION", frozenset({"add_card"}), None, "tokens", "tokens (add_card copies of your own cards)"),
     ("RAMPAGE", frozenset({"grow"}), None, "rampage", "rampage (a damage `grow` per replay)"),
     ("IN-RUN UPGRADE", frozenset({"upgrade_card"}), None, "upgrade", "in-run upgrade (upgrade_card, Armaments)"),
-    ("DECK-THINNING", frozenset({"purge", "purge_card"}), None, "purge", "deck-thinning (purge / purge_card)"),
+    ("DECK-THINNING", frozenset({"purge", "purge_card", "exhaust_card"}), None, "purge",  # Phase BC (v57): hand-burning fuel
+     "deck-thinning (purge / purge_card) + exhaust_card fuel"),
     ("DISCARD / HAND-CHURN", frozenset({"discard", "scry", "on_discard", "retrieve_card",
                                         "sly"}), None, "discard",  # Phase BB (v56): Sly is discard-class vocabulary
      "discard / scry income + on_discard / sly fuel cards + retrieve_card recursion"),
