@@ -106,7 +106,7 @@ public abstract class ForgedTriggerPower : BlankTheSpirePower
                 Flash();
                 await TriggerRunner.Run(t, player, ctx);
                 // Phase BG: a spent countdown is noise on the tray — remove it after its one shot.
-                if (Owner != null && Owner.HasPower(GetType()))
+                if (Owner != null)
                     Owner.RemovePowerInternal(this);
             }
         }

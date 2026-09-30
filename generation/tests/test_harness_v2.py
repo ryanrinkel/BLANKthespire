@@ -94,7 +94,9 @@ def test_exemplar_pool_is_schema_valid_and_spans_families():
     pool = harness_v2.load_exemplar_pool()
     # W0.8 (VOCAB_GAP_REMEDIATION_PLAN): the pool grew from 46 to ~80 so every archetype has >=2 exemplars and
     # every vocabulary token is demonstrated (tests/test_exemplars.py holds the per-token/per-archetype floors).
-    assert 60 <= len(pool) <= 120, len(pool)
+    # Wave 5 (v56-v60) added one exemplar per new token -> 127; the ceiling is a sanity bound, not a prompt budget
+    # (a brief samples 3), so it moves with the one-exemplar-per-token rule.
+    assert 60 <= len(pool) <= 150, len(pool)
     # exemplar_validator() registers every pool id so same-family transform_card/graft_card targets resolve.
     v = harness_v2.exemplar_validator()
     for e in pool:
@@ -369,10 +371,11 @@ BP_TOTAL_TRIPWIRE = 120_000   # NOT a per-phase gate — the line at which the s
 # that machinery to the VOCABULARY paste, which is the 55k half: an orb class is shown the Forged-summons rows
 # and the Balance gauge in full. Kind-gating the vocab sections the same way is scoped in
 # VOCAB_GAP_REMEDIATION_PLAN.md (Phase AZ, the rule-0.9 reevaluation) and is NOT built.
-BP_READING = 104_075          # v2, the asserted path — 2026-09-15, Phase BA
-BP_READING_V1 = 103_972       # flag-off, the number the AQ..AY prints continue to show (v2 - v1 = +103, still)
-BP_READING_SCAFFOLD = 45_484  # BP_READING minus VOCABULARY.md (Phase BA: +639 for the signature-potion
-                              # rule + format row; the op table itself went into the vocabulary half)
+BP_READING = 108_282          # v2, the asserted path — 2026-09-30, Wave 5 (BB..BG, v56-v60): +4,207, all but
+                              # +53 of it VOCABULARY.md rows (58,591 -> 62,745)
+BP_READING_V1 = 108_179       # flag-off, the number the AQ..AY prints continue to show (v2 - v1 = +103, still)
+BP_READING_SCAFFOLD = 45_537  # BP_READING minus VOCABULARY.md (Wave 5: +53 net — the vigor pitch paid for by
+                              # the blade_empower clause, the ALSO-AVAILABLE pitches trimmed to stay < 900)
 
 
 def _scaffold_len(bp: str) -> int:

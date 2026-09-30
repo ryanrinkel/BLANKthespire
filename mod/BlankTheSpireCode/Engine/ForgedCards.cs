@@ -809,9 +809,6 @@ public static class ForgedCards
         var invalid = Validate(effects, upgrade, allowCustomOrbs, target, orbNames);
         if (invalid != null) { error = invalid; return false; }
 
-        // Phase BD (v58, gap #58): a held_discount needs a cost to lower — never on a 0-cost or X-cost card.
-        if (effects.Concat(upgrade ?? []).Any(e => e.Op == "held_discount") && (costsX || cost < 1))
-        { error = "'held_discount' needs a card that costs 1+ energy (not 0-cost, not X-cost) — there is nothing to discount."; return false; }
         // Phase BB (v56, gap #55): Sly is a hand keyword for cards you PITCH — an Attack or a Skill (every base-game Sly
         // card is one). A Power auto-played off a discard is a free permanent buff, which is not the fantasy.
         if (type == CardType.Power && effects.Concat(upgrade ?? []).Any(e => e.Op == "sly"))
@@ -845,6 +842,9 @@ public static class ForgedCards
         // (X spends everything → always 0).
         if (effects.Concat(upgrade ?? []).Any(e => e.Scale == "energy") && (costsX || cost != 0))
         { error = "'scale:energy' requires a cost-0 card (the cost is paid before the card resolves, so a paid card would preview one number and deal another)."; return false; }
+        // Phase BD (v58, gap #58): a held_discount needs a cost to lower — never on a 0-cost or X-cost card.
+        if (effects.Concat(upgrade ?? []).Any(e => e.Op == "held_discount") && (costsX || cost < 1))
+        { error = "'held_discount' needs a card that costs 1+ energy (not 0-cost, not X-cost) — there is nothing to discount."; return false; }
 
         // Phase AG (gap #39): an upgrade may LOWER the card's energy cost (absolute, 0..4 since Phase AX). House rules: never on an
         // X-cost card (X has no fixed cost to change); the upgraded cost must be <= the base cost (upgrades cheapen,

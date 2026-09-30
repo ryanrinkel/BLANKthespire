@@ -1012,10 +1012,10 @@ _PRUNABLE_SECTIONS: list[tuple[str, frozenset, str | None, str, str]] = [
     ("RAMPAGE", frozenset({"grow"}), None, "rampage", "rampage (a damage `grow` per replay)"),
     ("IN-RUN UPGRADE", frozenset({"upgrade_card"}), None, "upgrade", "in-run upgrade (upgrade_card, Armaments)"),
     ("DECK-THINNING", frozenset({"purge", "purge_card", "exhaust_card"}), None, "purge",  # Phase BC (v57): hand-burning fuel
-     "deck-thinning (purge / purge_card) + exhaust_card fuel"),
+     "deck-thinning (purge / purge_card / exhaust_card)"),
     ("DISCARD / HAND-CHURN", frozenset({"discard", "scry", "on_discard", "retrieve_card",
                                         "sly"}), None, "discard",  # Phase BB (v56): Sly is discard-class vocabulary
-     "discard / scry income + on_discard / sly fuel cards + retrieve_card recursion"),
+     "discard / scry + on_discard / sly fuel + retrieve_card"),
     ("CORRUPTION", frozenset({"corruption"}), None, "corruption", "corruption (Skills cost 0 but Exhaust)"),
     ("METAMORPH", frozenset({"transform_card", "graft_card"}), None, "transform",
      "metamorph (transform_card / graft_card: a card that permanently becomes another)"),

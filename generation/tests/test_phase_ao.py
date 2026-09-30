@@ -96,7 +96,7 @@ def _t_shape(v: CardValidator) -> None:
         (_card([_cs("attack", 1, "combat")], rarity="uncommon"), "RARE-ONLY", "combat scope on an uncommon"),
         (_card([_cs("attack", 1, "this_turn")], rarity="basic", cost=1), "BASIC", "cost_shift on a basic"),
         (_card([_cs("attack", 1, "this_turn"), _cs("skill", 1, "this_turn")]), "at most one", "two cost_shift on one card"),
-        (_card([{"op": "block", "amount": 5, "card_type": "attack"}]), "only apply to cost_shift", "card_type on block"),
+        (_card([{"op": "block", "amount": 5, "card_type": "attack"}]), "only applies to cost_shift", "card_type on block"),  # Phase BC widened card_type to the hand ops
         (_card([{"op": "block", "amount": 5, "scope": "this_turn"}]), "only apply to cost_shift", "scope on block"),
         (_card([{"op": "block", "amount": 5, "count": 1}]), "only apply to cost_shift", "count on block"),
         (_power("turn_start", [_cs("attack", 1, "this_turn")]), "", "cost_shift inside a trigger payload (card-only)"),
@@ -190,7 +190,7 @@ def _t_contract() -> None:
     eff = schema["$defs"]["effect"]["properties"]
     trig = schema["$defs"]["triggerEffect"]["properties"]
     check("cost_shift" in eff["op"]["enum"] and "cost_shift" not in trig["op"]["enum"], "schema: cost_shift is a card-level op only")
-    check(set(eff["card_type"]["enum"]) == {"attack", "skill", "power", "all"} and set(eff["scope"]["enum"]) == {"this_turn", "combat"}
+    check(set(eff["card_type"]["enum"]) == {"attack", "skill", "power", "all", "non_attack"} and set(eff["scope"]["enum"]) == {"this_turn", "combat"}
           and eff["count"]["maximum"] == 3, "schema: card_type / scope / count properties")
     check(all(k not in trig for k in ("card_type", "scope", "count")), "schema: the three fields are not on triggerEffect")
     vocab = paths.VOCABULARY.read_text(encoding="utf-8")
