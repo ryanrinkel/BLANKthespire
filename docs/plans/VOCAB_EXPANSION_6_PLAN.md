@@ -757,4 +757,15 @@ Open after BH-3 (Ryan): index clause cap is 34 chars at the 6,000 ceiling (raise
 ~8,500 for 12-word clauses); `apply_status` does not pull the Statuses section (vulnerable/weak/strength are
 index-only unless an archetype lists them); the ORB pitch still says "see the 'Orbs' section above" (it is below in
 tree mode). BH-1 needs Ryan's OK on two product fixes: `app.js` donation history "Bought N tokens" → "Token pack",
-and the restored `summon_swarm` pricing sentences in DESIGN_HEURISTICS.md. **Next: Phase BI** (v61).
+and the restored `summon_swarm` pricing sentences in DESIGN_HEURISTICS.md — **both OK'd by Ryan 2026-10-02**; the
+status lookup + orb pitch were fixed in the BH-3 follow-up (388ec64, merged 26fcbd7); the index budget stays 6,000.
+
+**Phase BI DONE 2026-10-02** (f9500db on `wave6`, vocab v61; smokes GAPTESTBI1/BI2 all four `[BI]` tags, 0 mod
+exceptions, 0 localization errors; tester + tags in `generation/tests/gaptest-bi/`). Merged suite: generation **588**,
+web **293**, `test_phase_bh` 101/101. Readings: index 5,924 · per-archetype max 64,742 · all-ops 114,296 ·
+**scaffold 45,951 of 46,000 (49 chars of headroom)** · `full` 108,977.
+**Decision needed before BJ (Ryan):** the scaffold assert (§2.3 d) is measured on the ALL-OPS path, so every pitch
+sentence of every phase is charged to it and BJ–BR cannot fit in 49 chars. §2's own discipline sentence says pitches
+"cost only the forges that select them". Recommended: measure (d) on the pruned per-archetype path (max ~25k today,
+same 46,000 ceiling) and let the all-ops path keep only the 120,000 total tripwire (c). Alternative: raise (d) to
+~48,000 on the all-ops path. **Next: Phase BJ** (v62).
