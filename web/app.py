@@ -1024,8 +1024,8 @@ MODEL_PRICES: dict[str, tuple[float, float, float]] = {
     "gemma4:31b": (0.14, 0.40, 0.05),          # Ollama Cloud per-token list, brainstorm on the primary
     "glm-5.3": (1.40, 4.40, 0.26),             # Ollama Cloud per-token list (ollama.com/pricing 2026-09-24), the primary
     "glm-5.2": (1.40, 4.40, 0.26),             # Ollama Cloud per-token list
-    "z-ai/glm-5.3": (0.91, 2.86, 0.169),       # OpenRouter, the first backup tier (the hosted primary 2026-09-18..24)
-    "z-ai/glm-5.2": (0.5544, 1.7424, 0.10296),  # OpenRouter, the last fallback tier
+    "z-ai/glm-5.3": (0.30, 4.40, 0.24),        # OpenRouter (re-read 2026-10-01), the first backup tier
+    "z-ai/glm-5.2": (1.40, 4.40, 0.26),        # OpenRouter (re-read 2026-10-01), the last fallback tier
     "google/gemma-4-31b-it": (0.09, 0.34, 0.05),  # OpenRouter, brainstorm at every tier
     "typesafe/jev-1.13": (0.042, 0.0, 0.042),  # OpenRouter Decisions API: the card vocab gate (role "gate"),
                                                # output unmetered; its usage also carries the metered `cost`
@@ -1035,56 +1035,69 @@ MODEL_PRICES: dict[str, tuple[float, float, float]] = {
 # figure on the user's own key before they push go. Same unit as MODEL_PRICES: $ per MILLION tokens,
 # (input, output, cache-read). These are the vendors' published LIST prices — advisory, never a bill.
 # A suggested model with no row here is a test failure (web/tests/test_forge_estimate.py), which is how the
-# table stays complete as the suggestion lists change. Checked 2026-09-20 unless a comment says otherwise.
+# table stays complete as the suggestion lists change. Each block says where and when its rates were read.
 BYOK_TEXT_PRICES: dict[str, tuple[float, float, float]] = {
-    # Anthropic (the list the browser used to carry as CLAUDE_PRICES, now server-side like everything else)
+    # --- the current suggestions, refreshed 2026-10-01 -----------------------------------------------------
+    # Anthropic (claude-api model table)
+    "claude-sonnet-5": (2.00, 10.00, 0.20),
+    "claude-opus-5-5": (4.00, 20.00, 0.20),
+    # OpenAI (ids from GET /v1/models on the server key; rates as OpenRouter passes them through). Sol's rate
+    # is a promo "through at least 2026-11-21": re-check after that. Cache WRITES ($12.50 / $2.50) are billed
+    # above plain input and this table has no column for them, so quotes run a little low.
+    "gpt-5.6-sol": (2.00, 10.00, 0.20),
+    "gpt-6.1-sol": (2.00, 10.00, 0.10),
+    "gpt-6-astra": (10.00, 50.00, 1.00),
+    # Ollama Cloud (ids from GET /v1/models; ollama.com/pricing, standard rates - off-peak is half)
+    "gpt-oss:120b": (0.15, 0.60, 0.014),
+    "deepseek-v4.1-flash": (0.30, 1.20, 0.006),
+    "kimi-k2.6": (0.95, 4.00, 0.16),
+    # OpenRouter (GET /api/v1/models; the z-ai slugs are in MODEL_PRICES above)
+    "google/gemini-3.8-flash": (0.75, 3.75, 0.075),
+    "anthropic/claude-sonnet-5": (2.00, 10.00, 0.20),
+    "openai/gpt-6.1-sol": (2.00, 10.00, 0.10),
+    # Groq (console.groq.com/docs/models; no cache rate published, so cached = input). Shared with Together's
+    # openai/gpt-oss-120b, which lists the same $0.15 / $0.60.
+    "openai/gpt-oss-120b": (0.15, 0.60, 0.15),
+    "qwen/qwen3.8-27b": (0.80, 4.00, 0.80),
+    # Google Gemini (both ids seen answering on the native API in prod; rates as OpenRouter passes them through)
+    "gemini-3.5-flash-lite": (0.30, 2.50, 0.03),
+    "gemini-3.8-flash": (0.75, 3.75, 0.075),
+    # xAI (docs.x.ai models page). grok-4.x cannot turn reasoning off; the non-reasoning id is the first pick.
+    "grok-4.20-0309-non-reasoning": (1.25, 2.50, 0.20),
+    "grok-4.3": (1.25, 2.50, 0.20),
+    "grok-4.7": (2.00, 6.00, 0.50),
+    # DeepSeek (api-docs.deepseek.com pricing, PEAK rates - off-peak is half). Also Ollama's deepseek-v4-pro.
+    "deepseek-flash": (0.30, 1.20, 0.006),
+    "deepseek-v4-pro": (1.32, 3.96, 0.044),
+    # Together (ids from docs.together.ai serverless models; together.ai/pricing)
+    "zai-org/GLM-5.3": (1.40, 4.40, 0.26),
+    "deepseek-ai/DeepSeek-V4.1-Flash": (0.30, 1.20, 0.006),
+
+    # --- retired suggestions -------------------------------------------------------------------------------
+    # No longer suggested, but kept so a model saved in a browser (saveByok) or typed by hand still gets a
+    # quote. Rates are the last ones checked (2026-09-20 / 09-28) and won't be refreshed.
     "claude-sonnet-4-6": (3.00, 15.00, 0.30),
     "claude-haiku-4-5": (1.00, 5.00, 0.10),
     "claude-opus-4-8": (5.00, 25.00, 0.50),
-    "claude-opus-5": (5.00, 25.00, 0.50),    # not suggested, but the old browser table priced them and
-    "claude-sonnet-5": (2.00, 10.00, 0.20),  # people type them — keep the quote working
-    # OpenAI — developers.openai.com/api/docs/pricing, short-context standard tier
+    "claude-opus-5": (5.00, 25.00, 0.50),
     "gpt-4o": (2.50, 10.00, 1.25),
     "gpt-4o-mini": (0.15, 0.60, 0.075),
     "gpt-4.1": (2.00, 8.00, 0.50),
     "o4-mini": (1.10, 4.40, 0.275),
-    # Checked 2026-09-28. Cache WRITES ($12.50 / $2.50) are billed above plain input and this table has no
-    # column for them, so quotes run a little low. Long context doubles input and costs 1.5x on output.
-    # Sol's rate is a promo "through at least 2026-11-21": re-check after that.
-    "gpt-6-astra": (10.00, 50.00, 1.00),
-    "gpt-5.6-sol": (2.00, 10.00, 0.20),
-    # Google Gemini, paid tier (ai.google.dev pricing). flash-lite first in the dropdown: cheapest text on
-    # the shim, and the art bill is the same whichever text model is picked.
     "gemini-2.5-flash-lite": (0.10, 0.40, 0.01),
     "gemini-2.5-flash": (0.30, 2.50, 0.03),
     "gemini-3-flash-preview": (0.50, 3.00, 0.05),
     "gemini-2.5-pro": (1.25, 10.00, 0.125),
-    # xAI — docs.x.ai models page, <200k context tier. grok-4-fast is GONE (retired before 2026-09-20);
-    # grok-4.20-0309-non-reasoning is the only explicitly non-reasoning pick and so the first suggestion.
-    "grok-4.20-0309-non-reasoning": (1.25, 2.50, 0.20),
-    "grok-4.3": (1.25, 2.50, 0.20),
     "grok-4.5": (2.00, 6.00, 0.30),
     "grok-4.6": (2.00, 6.00, 0.50),
-    # OpenRouter passes vendor list prices through (the hosted slugs live in MODEL_PRICES above)
     "anthropic/claude-sonnet-4.6": (3.00, 15.00, 0.30),
     "openai/gpt-4o": (2.50, 10.00, 1.25),
     "google/gemini-2.5-pro": (1.25, 10.00, 0.125),
-    # Groq — UNVERIFIED 2026-09-20: groq.com/pricing and console.groq.com/docs/models no longer publish
-    # per-token rates for these ("contact sales"), so these are the last rates Groq did publish.
     "llama-3.3-70b-versatile": (0.59, 0.79, 0.59),
     "moonshotai/kimi-k2-instruct": (1.00, 3.00, 1.00),
-    # Ollama Cloud — ollama.com/pricing, OFF-PEAK rates (12:00-18:00 UTC Mon-Fri costs double). Cache-read
-    # rates are not published per model there: UNVERIFIED 2026-09-20, estimated low.
-    "gpt-oss:120b": (0.15, 0.60, 0.05),
     "qwen3.5:397b": (0.60, 3.60, 0.05),
-    "deepseek-v4-pro": (0.66, 1.98, 0.022),
-    # DeepSeek — api-docs.deepseek.com now lists deepseek-flash / deepseek-v4-pro; the API aliases
-    # deepseek-chat / deepseek-reasoner are UNVERIFIED 2026-09-20 mappings onto those two rows (peak rates,
-    # the pessimistic half of the off-peak/peak pair).
     "deepseek-chat": (0.30, 1.20, 0.006),
     "deepseek-reasoner": (1.32, 3.96, 0.044),
-    # Together — together.ai/pricing lists "Llama 3.3 70B" at $1.04 flat; the -Turbo slug and DeepSeek-V3
-    # are no longer on the page: UNVERIFIED 2026-09-20.
     "meta-llama/Llama-3.3-70B-Instruct-Turbo": (1.04, 1.04, 1.04),
     "deepseek-ai/DeepSeek-V3": (1.25, 1.25, 1.25),
 }

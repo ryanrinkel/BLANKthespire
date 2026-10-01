@@ -141,8 +141,8 @@ def test_usage_ledger_records_rows_and_cost(client, app_module, stub_forge):
     # $4.40/M + 300 cached @ $0.26/M = $0.001938. Nothing metered these calls, so the real-cost column is NULL.
     assert r.est_cost_micros == 1938 and r.metered_cost_micros is None
     assert r.token_kind == "paid" and r.mode == "token" and r.ok == 1
-    # OpenRouter glm-5.2: 500 in @ $0.5544/M + 100 out @ $1.7424/M = $0.000451
-    assert by[("structure", "z-ai/glm-5.2")].est_cost_micros == 451
+    # OpenRouter glm-5.2: 500 in @ $1.40/M + 100 out @ $4.40/M = $0.001140
+    assert by[("structure", "z-ai/glm-5.2")].est_cost_micros == 1140
 
 
 def test_byok_usage_rows_carry_no_cost(client, app_module, stub_forge):

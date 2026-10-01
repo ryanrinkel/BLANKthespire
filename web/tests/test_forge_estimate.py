@@ -82,7 +82,7 @@ def test_the_app_js_parser_sees_every_provider():
     assert set(found) >= {"anthropic", "openai", "ollama", "openrouter", "groq", "google", "xai",
                           "deepseek", "together", "custom"}
     assert found["xai"][0] == "grok-4.20-0309-non-reasoning"   # non-reasoning suggested first
-    assert found["google"][0] == "gemini-2.5-flash-lite"       # cheap first
+    assert found["google"][0] == "gemini-3.5-flash-lite"       # cheap first
     assert sum(len(v) for v in found.values()) >= 25
 
 

@@ -449,43 +449,44 @@ function selectTab(which) {
 // portraits are generated on the user's key; elsewhere a BYOK forge ships without generated art (the mod
 // draws its built-in card doodles) — art is never billed to us.
 //
-// `models` is the suggestion list, CHEAPEST FIRST (the first entry is also the placeholder): the estimate
+// `models` is the suggestion list: a model a forge has actually finished on goes FIRST where the provider has
+// one (it is also the placeholder), then the rest CHEAPEST FIRST. Refreshed 2026-10-01 against each vendor's
+// live model list (OpenAI + Ollama via /models, the rest from their docs or OpenRouter). The estimate
 // under the fields prices whichever one is typed, from /api/forge-estimate's `text_prices`. Every id here
 // MUST have a price in that table — web/tests/test_forge_estimate.py parses this block and fails if one
 // doesn't, so the quote can never quietly go blank on a suggestion we ship.
 const PROVIDERS = {
   anthropic:  { label: "Anthropic", mode: "anthropic", base_url: "",
                 prefix: "sk-ant-", keyFrom: "console.anthropic.com",
-                models: ["claude-sonnet-4-6", "claude-haiku-4-5", "claude-opus-4-8"] },
+                models: ["claude-sonnet-5", "claude-opus-5-5"] },
   openai:     { label: "OpenAI", mode: "byok", base_url: "https://api.openai.com/v1", art: true, artKey: "openai",
                 prefix: "sk-", keyFrom: "platform.openai.com (an API key, not a ChatGPT login)",
-                models: ["gpt-4o", "gpt-4o-mini", "gpt-4.1", "o4-mini"] },
+                models: ["gpt-5.6-sol", "gpt-6.1-sol", "gpt-6-astra"] },
   ollama:     { label: "Ollama Cloud", mode: "byok", base_url: "https://ollama.com/v1",
                 prefix: "", keyFrom: "ollama.com/settings/keys",
-                models: ["glm-5.2", "gemma4:31b", "gpt-oss:120b", "qwen3.5:397b", "deepseek-v4-pro"] },
+                models: ["glm-5.3", "gpt-oss:120b", "deepseek-v4.1-flash", "kimi-k2.6"] },
   openrouter: { label: "OpenRouter", mode: "byok", base_url: "https://openrouter.ai/api/v1", art: true,
                 artKey: "openrouter",
                 prefix: "sk-or-", keyFrom: "openrouter.ai/keys",
-                models: ["anthropic/claude-sonnet-4.6", "openai/gpt-4o", "google/gemini-2.5-pro"] },
+                models: ["z-ai/glm-5.3", "google/gemini-3.8-flash", "anthropic/claude-sonnet-5", "openai/gpt-6.1-sol"] },
   groq:       { label: "Groq", mode: "byok", base_url: "https://api.groq.com/openai/v1",
                 prefix: "gsk_", keyFrom: "console.groq.com/keys",
-                models: ["llama-3.3-70b-versatile", "moonshotai/kimi-k2-instruct"] },
+                models: ["openai/gpt-oss-120b", "qwen/qwen3.8-27b"] },
   google:     { label: "Google Gemini", mode: "byok", art: true, artKey: "gemini",
                 base_url: "https://generativelanguage.googleapis.com/v1beta/openai",
                 prefix: "AIza", keyFrom: "aistudio.google.com/apikey",
-                models: ["gemini-2.5-flash-lite", "gemini-2.5-flash", "gemini-3-flash-preview",
-                         "gemini-2.5-pro"] },
+                models: ["gemini-3.5-flash-lite", "gemini-3.8-flash"] },
   // grok-4.x cannot turn reasoning off (hidden thinking is billed and eats max_tokens), so the
   // explicitly non-reasoning model is suggested first — see forge.py BYOK_HOST_PROFILES.
   xai:        { label: "xAI (Grok)", mode: "byok", base_url: "https://api.x.ai/v1", art: true, artKey: "xai",
                 prefix: "xai-", keyFrom: "console.x.ai",
-                models: ["grok-4.20-0309-non-reasoning", "grok-4.3", "grok-4.6"] },
+                models: ["grok-4.20-0309-non-reasoning", "grok-4.3", "grok-4.7"] },
   deepseek:   { label: "DeepSeek", mode: "byok", base_url: "https://api.deepseek.com/v1",
                 prefix: "", keyFrom: "platform.deepseek.com",
-                models: ["deepseek-chat", "deepseek-reasoner"] },
+                models: ["deepseek-flash", "deepseek-v4-pro"] },
   together:   { label: "Together", mode: "byok", base_url: "https://api.together.xyz/v1",
                 prefix: "", keyFrom: "api.together.xyz/settings/api-keys",
-                models: ["deepseek-ai/DeepSeek-V3", "meta-llama/Llama-3.3-70B-Instruct-Turbo"] },
+                models: ["zai-org/GLM-5.3", "openai/gpt-oss-120b", "deepseek-ai/DeepSeek-V4.1-Flash"] },
   custom:     { label: "Other", mode: "byok", base_url: "", prefix: "", keyFrom: "your provider",
                 models: [] },
 };

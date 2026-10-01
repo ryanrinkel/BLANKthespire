@@ -291,7 +291,7 @@ def test_the_ledger_records_metered_llm_cost(client, app_module, fake_bundle, mo
     with app_module.session_scope() as s:
         row = s.query(ForgeUsage).filter_by(class_id=ev[-1][1]["id"], role="cards").one()
     assert row.metered_cost_micros == 12_300                      # what OpenRouter actually billed
-    assert row.est_cost_micros == 1_482                           # the rate-table guess, kept for comparison
+    assert row.est_cost_micros == 1_180                           # the rate-table guess, kept for comparison
 
 
 def test_art_rows_land_in_the_ledger_and_the_estimate_ignores_them(client, app_module, stub_forge,
