@@ -34,6 +34,10 @@ from .bridges import (MIN_BRIDGES, MIN_BRIDGES_PER_PAIR, TARGET_BRIDGES,  # Phas
 
 # Phase BH-3: the vocabulary tree logs one "[tree]" line per tree-mode blueprint prompt build.
 _tree_log = logging.getLogger("btsgen.tree")
+# The ORB CLASSES pitch's pointer to the ## Orbs rows: the whole-file paste has them ABOVE the pitch; the tree puts
+# them in the VOCABULARY DETAIL block at the END of the prompt (the full wording is the pre-BH bytes — keep it).
+ORBS_REF_FULL = '(see the "Orbs" section above)'
+ORBS_REF_TREE = '(see the "Orbs" rows under VOCABULARY DETAIL at the end)'
 
 
 def triad_enabled(override: bool | None = None) -> bool:
@@ -315,6 +319,8 @@ class _BlueprintContract:
 
     def _system_prompt_legacy(self, vocab: str | None = None) -> str:
         from . import paths
+        # Where the ## Orbs rows sit: above in the whole-file paste, in the DETAIL block at the end under the tree.
+        orbs_ref = ORBS_REF_TREE if vocab is not None else ORBS_REF_FULL
         if vocab is None:  # the whole-file paste (BTS_BLUEPRINT_VOCAB=full / legacy paths); the tree passes its index
             vocab = paths.VOCABULARY.read_text(encoding="utf-8")
         return f"""You are a CLASS designer for "BLANK the spire", a Slay-the-Spire-like deckbuilder. From a \
@@ -352,7 +358,7 @@ whole list. Vulnerable/Weak are generic filler: at most about a quarter of the p
 coverage gate enforces that share), and never as a card's whole identity.
 
 ORB CLASSES (optional — only when the concept fits): the vocabulary includes a Defect-style ORB subsystem \
-(see the "Orbs" section above). If — and ONLY if — the concept is an elemental/channeling/"slot-machine"/ \
+{orbs_ref}. If — and ONLY if — the concept is an elemental/channeling/"slot-machine"/ \
 alchemist identity (storm-caller, elementalist, gambler, etc.), you MAY make this an ORB CLASS: set top-level \
 "orb_slots" to 3, 4 or 5, declare an "orb_pool" (below), make ONE archetype the orb engine (briefs that \
 channel_orb + evoke + a `focus` payoff), and use the orb ops/`focus`/temp_focus freely in THAT archetype's briefs. For \
