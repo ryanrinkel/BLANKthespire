@@ -22,12 +22,16 @@ from btsgen.frontend import load_catalog  # noqa: E402
 
 
 @contextlib.contextmanager
-def _harness(on: bool):
+def _harness(on: bool, vocab: str = "tree"):
+    """Harness v2 on/off, with the blueprint vocabulary layout pinned (Phase BH-3: `tree`, the default, or the
+    `full` rollback) so no test depends on the developer's shell."""
     old = os.environ.get("BTS_HARNESS_V2")
+    old_vocab = os.environ.get("BTS_BLUEPRINT_VOCAB")
     if on:
         os.environ["BTS_HARNESS_V2"] = "1"
     else:
         os.environ.pop("BTS_HARNESS_V2", None)
+    os.environ["BTS_BLUEPRINT_VOCAB"] = vocab
     try:
         yield
     finally:
@@ -35,6 +39,10 @@ def _harness(on: bool):
             os.environ.pop("BTS_HARNESS_V2", None)
         else:
             os.environ["BTS_HARNESS_V2"] = old
+        if old_vocab is None:
+            os.environ.pop("BTS_BLUEPRINT_VOCAB", None)
+        else:
+            os.environ["BTS_BLUEPRINT_VOCAB"] = old_vocab
 
 
 # ---- W0.4: the blueprint prompt no longer contradicts the vocabulary -----------------------------------
@@ -60,17 +68,31 @@ def _also_available_line(prompt: str) -> str:
     return paras[0] if paras else ""
 
 
+_POOL_PITCHES = ("summon_pool", "status_pool", "orbs")
+
+
 def test_pruned_prompt_names_pruned_subsystems() -> None:
+    cat = load_catalog()
+    ops = set(cat.by_id["retain_hold"].ops) | set(cat.by_id["poison_attrition"].ops) \
+        | set(cat.by_id["block_bulwark"].ops)
+    # the `full` rollback (whole-file paste): every pruned subsystem, pool kinds included, is on the menu
+    with _harness(True, vocab="full"):
+        line_full = _also_available_line(_BlueprintContract(mode="dossier", triad=True, seed=1, selected_ops=ops,
+                                                            class_kind="normal").system_prompt())
+        for pitch in ("rampage", "corruption", "purge", "metamorph", "forge", "balance") + _POOL_PITCHES:
+            assert pitch in line_full, pitch
+        assert len(line_full) < 900, ("rule 0.9: the menu is a one-liner, not a paragraph", len(line_full))
     with _harness(True):
-        cat = load_catalog()
-        ops = set(cat.by_id["retain_hold"].ops) | set(cat.by_id["poison_attrition"].ops) \
-            | set(cat.by_id["block_bulwark"].ops)
         pruned = _BlueprintContract(mode="dossier", triad=True, seed=1, selected_ops=ops,
                                     class_kind="normal").system_prompt()
         line = _also_available_line(pruned)
         assert line, "pruned prompt must carry the ALSO AVAILABLE menu"
-        for pitch in ("rampage", "corruption", "purge", "metamorph", "forge", "balance", "summon_pool", "status_pool", "orbs"):
+        for pitch in ("rampage", "corruption", "purge", "metamorph", "forge", "balance"):
             assert pitch in line, pitch
+        # Phase BH-3 (the vocabulary tree): an unowned pool KIND's rows are index-only, so the menu stops
+        # offering it — the class kind was decided before the blueprint
+        for pitch in _POOL_PITCHES:
+            assert pitch not in line, pitch
         assert len(line) < 900, ("rule 0.9: the menu is a one-liner, not a paragraph", len(line))
         # a subsystem an archetype selected is pitched in full, not in the menu
         forge_ops = set(cat.by_id["forge_ramp"].ops)

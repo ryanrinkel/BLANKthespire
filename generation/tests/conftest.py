@@ -52,6 +52,9 @@ for _k in ("BTSGEN_GODOT_ROOT", "BTSGEN_CARD_SCHEMA", "BTSGEN_VOCABULARY", "BTSG
            "BTSGEN_RELIC_VOCABULARY", "BTSGEN_RELICS_DIR", "BTSGEN_GENERATED_RELICS_DIR",
            "BTSGEN_CHARACTER_SCHEMA", "BTSGEN_CHARACTERS_DIR", "BTSGEN_GENERATED_CHARACTERS_DIR"):
     os.environ.pop(_k, None)
+# Phase BH-3: the blueprint vocabulary layout is a droplet/dev-shell knob; the suite runs on its default (tree)
+# unless a test pins it (rule 0.9b item 5: no test passes only because of a developer's shell).
+os.environ.pop("BTS_BLUEPRINT_VOCAB", None)
 
 # --- BH-1 audit (rule 0.9b, item 5): pin the RUNTIME env too. The droplet sets BTS_HARNESS_V2=1 and
 # BTS_VOCAB_GATE=heuristic; a developer shell may carry those, API keys, or model overrides. Before this pin,

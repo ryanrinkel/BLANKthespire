@@ -22,6 +22,7 @@ mod's ForgedRelic runtime — see mod/contract/RELIC_VOCABULARY.md).
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 from dataclasses import dataclass, field
@@ -30,6 +31,9 @@ from pathlib import Path
 from . import bridges as _bridges_mod  # Phase O-2: proactive fusion directives on first generation
 from .bridges import (MIN_BRIDGES, MIN_BRIDGES_PER_PAIR, TARGET_BRIDGES,  # Phase O-1 / Phase 1 triad
                       TARGET_BRIDGES_PER_PAIR)
+
+# Phase BH-3: the vocabulary tree logs one "[tree]" line per tree-mode blueprint prompt build.
+_tree_log = logging.getLogger("btsgen.tree")
 
 
 def triad_enabled(override: bool | None = None) -> bool:
@@ -223,7 +227,8 @@ class _BlueprintContract:
     9/16/7 pool ask) — the legacy f-string is untouched, so the flag-off path never changes."""
 
     def __init__(self, mode: str = "concept", triad: bool | None = None, *, seed: int | None = None,
-                 selected_ops=None, class_kind: str | None = None, nominated_sections=None) -> None:
+                 selected_ops=None, class_kind: str | None = None, nominated_sections=None,
+                 request_ops=None, nominated_ops=None) -> None:
         self.mode = mode
         self.triad = triad_enabled(triad)
         # Creative harness v2 (Fix D), all optional and only read under BTS_HARNESS_V2: `seed` rotates the
@@ -234,13 +239,69 @@ class _BlueprintContract:
         self.selected_ops = set(selected_ops) if selected_ops is not None else None
         self.class_kind = class_kind
         self.nominated_sections = set(nominated_sections) if nominated_sections else set()
+        # Phase BH-3 (the vocabulary tree): the player's explicit-request tokens (frontend.request) and the
+        # tokens a first blueprint pass nominated (`nominate_ops`) join the selection for the DETAIL block.
+        self.request_ops = set(request_ops) if request_ops else set()
+        self.nominated_ops = set(nominated_ops) if nominated_ops else set()
+        self.tree_stats: dict = {}
+
+    def tree_active(self) -> bool:
+        """The vocabulary tree runs on the staged front end's real path only: harness v2 on, the chosen
+        archetypes' ops known (`selected_ops`), and $BTS_BLUEPRINT_VOCAB != full. The legacy one-shot paths
+        (cli_forge_class / ollama_mix) pass no selected_ops and keep the whole-file paste."""
+        from . import gate, harness_v2
+        return harness_v2.enabled() and self.selected_ops is not None and gate.blueprint_mode() == "tree"
+
+    def tree_kinds(self) -> set:
+        """The pool kinds the detail block covers: the class's own (one kind or a hybrid's list) plus any
+        pool section the caller nominated (W0.5 `nominated_sections` keys orb / status / summon)."""
+        ck = self.class_kind
+        kinds = {ck} if isinstance(ck, str) else {str(k) for k in (ck or ())}
+        kinds |= {k for k in self.nominated_sections if k in ("orb", "status", "summon")}
+        kinds.discard("normal")
+        return kinds
+
+    def tree_tokens(self) -> set:
+        """§2.2 point 3: selected_ops ∪ CORE_OPS ∪ the explicit-request tokens ∪ the tokens of every nominated
+        section ∪ the nominated ops (gate.tree_selection then applies the family closure)."""
+        from . import gate
+        toks = set(self.selected_ops or ()) | set(gate.CORE_OPS) | self.request_ops | self.nominated_ops
+        for _head, tokens, _kind, key, _pitch in _PRUNABLE_SECTIONS:
+            if key in self.nominated_sections:
+                toks |= set(tokens)
+        return toks
+
+    def detail_tokens(self) -> frozenset:
+        """The closed token set the DETAIL block documents in full (what a nomination must add to)."""
+        from . import gate, paths
+        vocab = paths.VOCABULARY.read_text(encoding="utf-8")
+        return gate.tree_selection(vocab, self.tree_tokens(), self.tree_kinds())[0]
 
     def system_prompt(self) -> str:
         from . import harness_v2
-        base = self._system_prompt_legacy()
+        tree = self.tree_active()
+        if tree:
+            from . import gate, paths
+            vocab = paths.VOCABULARY.read_text(encoding="utf-8")
+            index = gate.vocab_index(vocab)
+            base = self._system_prompt_legacy(vocab=index + "\n" + gate.TREE_POINTER)
+        else:
+            base = self._system_prompt_legacy()
         if harness_v2.enabled() and self.selected_ops is not None:
-            base = _prune_archetype_sections(base, self.selected_ops, self.class_kind, self.nominated_sections)
-        return base + self._triad_addendum() if self.triad else base
+            base = _prune_archetype_sections(base, self.selected_ops, self.class_kind, self.nominated_sections,
+                                             drop_pool_pitches=tree)
+        out = base + self._triad_addendum() if self.triad else base
+        if tree:
+            detail = gate.vocab_detail(vocab, self.tree_tokens(), self.tree_kinds())
+            out += detail
+            rows = sorted(gate.detail_row_tokens(detail))
+            self.tree_stats = {"index_chars": len(index), "detail_chars": len(detail), "detail_rows": rows,
+                               "prompt_chars": len(out), "kinds": sorted(self.tree_kinds()),
+                               "nominated_ops": sorted(self.nominated_ops)}
+            _tree_log.info("[tree] blueprint prompt %d chars: index %d chars, detail %d chars (%d rows: %s)%s",
+                           len(out), len(index), len(detail), len(rows), ", ".join(rows),
+                           f" + nominated {', '.join(sorted(self.nominated_ops))}" if self.nominated_ops else "")
+        return out
 
     def _homage_examples(self) -> str:
         """The REPRINT HOMAGE rule's examples: the fixed Deflect/Slice/Bludgeon trio (v1, byte-identical), or —
@@ -252,9 +313,10 @@ class _BlueprintContract:
         return ("Deflect: 0-cost skill, gain 4 Block; Slice: 0-cost attack, deal 6 damage; Bludgeon: 3-cost "
                 "attack, deal 32 damage")
 
-    def _system_prompt_legacy(self) -> str:
+    def _system_prompt_legacy(self, vocab: str | None = None) -> str:
         from . import paths
-        vocab = paths.VOCABULARY.read_text(encoding="utf-8")
+        if vocab is None:  # the whole-file paste (BTS_BLUEPRINT_VOCAB=full / legacy paths); the tree passes its index
+            vocab = paths.VOCABULARY.read_text(encoding="utf-8")
         return f"""You are a CLASS designer for "BLANK the spire", a Slay-the-Spire-like deckbuilder. From a \
 player's concept you design a whole new playable class: its identity, HP, TWO synergistic card archetypes, \
 and a one-line design brief for every card in its set. You output ONE JSON "blueprint" — briefs only, NO \
@@ -1045,7 +1107,7 @@ _CONDITIONS_PARAGRAPH = (
 
 
 def _prune_archetype_sections(prompt: str, selected_ops, class_kind: str | None,
-                              nominated_sections=None) -> str:
+                              nominated_sections=None, *, drop_pool_pitches: bool = False) -> str:
     """Drop the pitch paragraphs for subsystems none of the selected archetypes use (see _PRUNABLE_SECTIONS).
 
     W0.5 (VOCAB_GAP_REMEDIATION_PLAN): pruning used to make the dropped subsystems INVISIBLE to the blueprint
@@ -1053,7 +1115,12 @@ def _prune_archetype_sections(prompt: str, selected_ops, class_kind: str | None,
     unless an archetype had already selected them. Now (1) a caller may pre-nominate section KEYS
     (`nominated_sections`, from coverage_nominations.sections) to keep those sections in, and (2) whatever is
     still pruned is named in ONE compact ALSO-AVAILABLE line (a few dozen tokens) so the model knows the
-    subsystem exists and may use its ops in a brief."""
+    subsystem exists and may use its ops in a brief.
+
+    Phase BH-3 (`drop_pool_pitches`, the vocabulary tree): the class's pool KIND is decided before the
+    blueprint, and an unowned pool kind's rows (orbs / custom statuses / summons) are index-only — so the
+    ALSO-AVAILABLE line stops offering those three; the other pruned subsystems stay listed (their rows are
+    in the index and can be nominated)."""
     ops = {str(o) for o in (selected_ops or [])}
     keep_keys = {str(k) for k in (nominated_sections or [])}
     # Phase AW: `class_kind` is one kind string or a hybrid's kind list — a hybrid keeps BOTH pool sections.
@@ -1070,7 +1137,7 @@ def _prune_archetype_sections(prompt: str, selected_ops, class_kind: str | None,
         if (ops & tokens) or (kind is not None and kind in kinds) or key in keep_keys:
             out.append(para)
         else:
-            if pitch and pitch not in pruned_pitches:
+            if pitch and pitch not in pruned_pitches and not (drop_pool_pitches and kind is not None):
                 pruned_pitches.append(pitch)
             if rule[0] == "THE SLOT-MACHINE ARCHETYPE":
                 out.append(_CONDITIONS_PARAGRAPH)

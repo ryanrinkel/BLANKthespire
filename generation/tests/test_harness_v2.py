@@ -369,49 +369,146 @@ BP_TOTAL_TRIPWIRE = 120_000   # NOT a per-phase gate — the line at which the s
 # When the tripwire trips, the answer is a SHRINK, not a raise — and the lever already exists. `_prune_archetype_
 # sections` + the W0.5 "ALSO AVAILABLE" one-liner + `coverage.sanitize_nominations({"sections": …})` prune
 # class_forge's own archetype sections at blueprint stage and let the model nominate one back. Nothing applies
-# that machinery to the VOCABULARY paste, which is the 55k half: an orb class is shown the Forged-summons rows
-# and the Balance gauge in full. Kind-gating the vocab sections the same way is scoped in
-# VOCAB_GAP_REMEDIATION_PLAN.md (Phase AZ, the rule-0.9 reevaluation) and is NOT built.
-BP_READING = 108_282          # v2, the asserted path — 2026-09-30, Wave 5 (BB..BG, v56-v60): +4,207, all but
-                              # +53 of it VOCABULARY.md rows (58,591 -> 62,745)
-BP_READING_V1 = 108_179       # flag-off, the number the AQ..AY prints continue to show (v2 - v1 = +103, still)
-BP_READING_SCAFFOLD = 45_537  # BP_READING minus VOCABULARY.md (Wave 5: +53 net — the vigor pitch paid for by
-                              # the blade_empower clause, the ALSO-AVAILABLE pitches trimmed to stay < 900)
+# that machinery to the VOCABULARY paste, which is the 55k half — until Phase BH-3 built it (below).
+#
+# REPOINTED 2026-10-01 at Phase BH-3 (VOCAB_EXPANSION_6_PLAN §2.2 / §2.3). The asserts used to measure the
+# UNTRIMMED prompt (no selected_ops, no class kind) — a path production never sends. Production (the staged front
+# end, harness v2) now sends the VOCABULARY TREE ($BTS_BLUEPRINT_VOCAB=tree, the default): a ~6k INDEX of every
+# token in the cached head, plus a per-forge DETAIL block with the full rows of what the chosen archetypes
+# selected. So the asserts now run on that real path:
+#   (a) the index <= 6,000 chars;                       (b) every archetype alone <= 70,000;
+#   (c) the all-ops path (every archetype's ops, every pool kind, nothing pruned) <= BP_TOTAL_TRIPWIRE;
+#   (d) the scaffold = that prompt MINUS the index MINUS the detail block (measured from the block markers)
+#       <= BP_SCAFFOLD_BUDGET;
+#   (e) the `full` rollback path is byte-identical to the pre-BH prompt (its scaffold half is snapshotted).
+# The untrimmed reading survives as an INFORMATIONAL print: it is the `full` rollback path.
+BP_ARCHETYPE_CEILING = 70_000  # (b) the design prompt for ONE archetype's selection
+BP_INDEX_CEILING = 6_000       # (a) = gate.INDEX_BUDGET (the index adapts its clause length to stay under it)
+BP_READING = 108_282          # the untrimmed v2 path (= the `full` rollback with no selection) — 2026-09-30, Wave 5
+BP_READING_V1 = 108_179       # flag-off (informational)
+BP_READING_SCAFFOLD = 45_537  # BP_READING minus VOCABULARY.md: the `full` path's scaffold half, snapshotted by (e)
+BP_TREE_READING_SCAFFOLD = 45_789  # (d) on the all-ops tree path at BH-3 (45,537 + the index/detail pointer)
+
+
+def _tree_prompt(ops, kind, **kw) -> str:
+    """The design prompt the staged front end sends under the tree (the caller pins harness v2 + the mode)."""
+    return _BlueprintContract(mode="dossier", triad=True, seed=1, selected_ops=set(ops), class_kind=kind,
+                              **kw).system_prompt()
 
 
 def _scaffold_len(bp: str) -> int:
-    """The prompt minus the vocabulary it pastes in whole — the half rule 0.9 can actually govern."""
-    from btsgen import paths
+    """The prompt minus the vocabulary it carries — the half rule 0.9 can actually govern. On a tree prompt the
+    vocabulary is the INDEX block + the DETAIL block (measured from their markers); on a `full` prompt it is the
+    whole VOCABULARY.md paste."""
+    from btsgen import gate, paths
+    idx, det = gate.tree_blocks(bp)
+    if idx or det:
+        return len(bp) - idx - det
     return len(bp) - len(paths.VOCABULARY.read_text(encoding="utf-8"))
 
 
-def test_rule_0_9_blueprint_scaffolding_stays_within_budget(v2):
-    """The assert with teeth: everything in the prompt that ISN'T the vocabulary row it documents."""
+def _all_ops() -> set:
+    ops: set = set()
+    for e in load_catalog().entries:
+        ops |= set(e.ops)
+    return ops
+
+
+def rule_0_9_readings() -> dict:
+    """Every rule-0.9 reading in one place (the asserts below use the same recipe; tests/test_phase_bh prints
+    them). The caller pins BTS_HARNESS_V2=1 and BTS_BLUEPRINT_VOCAB=tree."""
+    from btsgen import gate, paths
+    vocab = paths.VOCABULARY.read_text(encoding="utf-8")
+    per = {e.id: len(_tree_prompt(e.ops, e.class_kind)) for e in load_catalog().entries}
+    allp = _tree_prompt(_all_ops(), ["orb", "status", "summon"])
+    untrimmed = _BlueprintContract(mode="dossier", triad=True, seed=1).system_prompt()
+    worst = max(per, key=per.get)
+    return {"index": len(gate.vocab_index(vocab)), "index_clause_cap": gate.index_clause_cap(vocab),
+            "per_archetype": per, "archetype_max": per[worst], "archetype_max_id": worst,
+            "all_ops": len(allp), "scaffold": _scaffold_len(allp), "untrimmed": len(untrimmed),
+            "untrimmed_scaffold": _scaffold_len(untrimmed), "vocabulary": len(vocab)}
+
+
+@pytest.fixture
+def tree(monkeypatch):
+    monkeypatch.setenv("BTS_HARNESS_V2", "1")
+    monkeypatch.setenv("BTS_BLUEPRINT_VOCAB", "tree")
+    return True
+
+
+def test_rule_0_9_untrimmed_reading_is_informational(v2):
+    """The untrimmed prompt (no selection) is the `full` rollback path now — printed, not asserted."""
     bp = _BlueprintContract(mode="dossier", triad=True, seed=1).system_prompt()
+    print(f"rule 0.9 (informational): untrimmed v2 blueprint prompt {len(bp):,} chars "
+          f"({len(bp) - BP_READING:+,} vs {BP_READING:,}); scaffold {_scaffold_len(bp):,}")
+
+
+def test_rule_0_9_index_within_budget(tree):
+    """(a) the shared index — every forge pays for it, so it has its own ceiling."""
+    from btsgen import gate, paths
+    idx = gate.vocab_index(paths.VOCABULARY.read_text(encoding="utf-8"))
+    assert len(idx) <= BP_INDEX_CEILING, (
+        f"the vocabulary index is {len(idx):,} chars, past {BP_INDEX_CEILING:,}: the adaptive clause length hit "
+        f"its floor. Shrink the token set or raise the ceiling (and gate.INDEX_BUDGET) on purpose, here.")
+
+
+def test_rule_0_9_every_archetype_alone_under_the_ceiling(tree):
+    """(b) the real path: each archetype's own selection (its ops + its class kind)."""
+    over = {}
+    for e in load_catalog().entries:
+        n = len(_tree_prompt(e.ops, e.class_kind))
+        if n > BP_ARCHETYPE_CEILING:
+            over[e.id] = n
+    assert not over, f"rule 0.9: design prompts past {BP_ARCHETYPE_CEILING:,} chars: {over}"
+
+
+def test_rule_0_9_total_prompt_stays_under_the_tripwire(tree):
+    """(c) the all-ops path (every archetype selected, every pool kind, nothing pruned) — the only place the old
+    120k tripwire survives. Trips long before the model notices, on purpose."""
+    bp = _tree_prompt(_all_ops(), ["orb", "status", "summon"])
+    assert len(bp) < BP_TOTAL_TRIPWIRE, (
+        f"the all-ops blueprint prompt is {len(bp):,} chars, past the {BP_TOTAL_TRIPWIRE:,} tripwire. The answer "
+        f"is a SHRINK, not a raise: tighten the tree's selection or the pitches.")
+
+
+def test_rule_0_9_blueprint_scaffolding_stays_within_budget(tree):
+    """(d) the assert with teeth: everything in the all-ops tree prompt that is NOT the index or the detail."""
+    bp = _tree_prompt(_all_ops(), ["orb", "status", "summon"])
     scaffold = _scaffold_len(bp)
     assert scaffold < BP_SCAFFOLD_BUDGET, (
         f"rule 0.9: the blueprint scaffolding is {scaffold:,} chars, past the {BP_SCAFFOLD_BUDGET:,} ceiling "
-        f"({scaffold - BP_READING_SCAFFOLD:+,} since the {BP_READING_SCAFFOLD:,} recorded at Phase AZ). This is "
-        f"prompt text that is NOT a vocabulary row: pay for it with a removal of equal size, or make it a "
+        f"({scaffold - BP_TREE_READING_SCAFFOLD:+,} since the {BP_TREE_READING_SCAFFOLD:,} recorded at Phase BH-3). "
+        f"This is prompt text that is NOT a vocabulary row: pay for it with a removal of equal size, or make it a "
         f"one-line menu pointer. Raise the ceiling only on purpose, here.")
 
 
-def test_rule_0_9_total_prompt_stays_under_the_tripwire(v2):
-    """The whole prompt, vocabulary included. Trips long before the model notices — on purpose."""
-    bp = _BlueprintContract(mode="dossier", triad=True, seed=1).system_prompt()
-    assert len(bp) < BP_TOTAL_TRIPWIRE, (
-        f"the blueprint prompt is {len(bp):,} chars, past the {BP_TOTAL_TRIPWIRE:,} tripwire "
-        f"({len(bp) - BP_READING:+,} since the {BP_READING:,} recorded at Phase AZ). The answer here is a SHRINK, "
-        f"not a raise: kind-gate the VOCABULARY paste behind the nomination machinery W0.5 already built. See the "
-        f"note above this assert.")
+def test_rule_0_9_full_path_is_byte_identical(v2, monkeypatch):
+    """(e) BTS_BLUEPRINT_VOCAB=full is the rollback: exactly the pre-BH prompt (the whole-file paste + the W0.5
+    pitch pruning), and its scaffold half is today's snapshot."""
+    from btsgen import class_forge as cf
+    from btsgen import gate
+    monkeypatch.setenv("BTS_BLUEPRINT_VOCAB", "full")
+    cat = load_catalog()
+    ops = set(cat.by_id["retain_hold"].ops) | set(cat.by_id["orb_channel"].ops)
+    c = _BlueprintContract(mode="dossier", triad=True, seed=1, selected_ops=ops, class_kind="orb")
+    legacy = cf._prune_archetype_sections(c._system_prompt_legacy(), ops, "orb", set()) + c._triad_addendum()
+    assert c.system_prompt() == legacy
+    assert gate.tree_blocks(legacy) == (0, 0)
+    untrimmed = _BlueprintContract(mode="dossier", triad=True, seed=1).system_prompt()
+    assert _scaffold_len(untrimmed) == BP_READING_SCAFFOLD, (
+        f"the `full` rollback prompt's scaffold is {_scaffold_len(untrimmed):,}, not the {BP_READING_SCAFFOLD:,} "
+        f"snapshot: a pitch/rule edit changed it — re-take BP_READING_SCAFFOLD (and BP_TREE_READING_SCAFFOLD) here.")
+    # the tree never touches the untrimmed path either (no selected_ops -> the whole-file paste)
+    monkeypatch.setenv("BTS_BLUEPRINT_VOCAB", "tree")
+    assert _BlueprintContract(mode="dossier", triad=True, seed=1).system_prompt() == untrimmed
 
 
 def test_rule_0_9_v2_is_the_worst_case(v1):
-    """Both ceilings are asserted under v2 because v2 is the LONGER path; this keeps that assumption honest."""
+    """Informational since BH-3: the flag-off prompt never sees the tree (no harness v2, no selection)."""
+    from btsgen import gate
     bp_v1 = _BlueprintContract(mode="dossier", triad=True, seed=1).system_prompt()
-    assert len(bp_v1) <= BP_READING, (
-        f"the flag-off prompt is {len(bp_v1):,} chars, past the v2 reading {BP_READING:,} — v2 is no longer the "
-        f"worst case, so the budget asserts above are measuring the wrong path.")
+    print(f"rule 0.9 (informational): flag-off blueprint prompt {len(bp_v1):,} chars (v2 untrimmed {BP_READING:,})")
+    assert gate.tree_blocks(bp_v1) == (0, 0), "harness v1 must never get the tree"
 
 
 def test_homage_examples_rotate_per_forge(v2):

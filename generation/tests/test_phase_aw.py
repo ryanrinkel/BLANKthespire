@@ -145,7 +145,9 @@ def _t_prune_and_kinds() -> None:
 
     # pruning is a harness-v2 behaviour (system_prompt prunes only under BTS_HARNESS_V2) — flip it on for the render
     old = os.environ.get(harness_v2.FLAG)
+    old_vocab = os.environ.get("BTS_BLUEPRINT_VOCAB")
     os.environ[harness_v2.FLAG] = "1"
+    os.environ["BTS_BLUEPRINT_VOCAB"] = "tree"  # Phase BH-3: the live blueprint layout (pinned, not the shell's)
     try:
         hyb = cf._BlueprintContract(mode="dossier", triad=True, seed=1, selected_ops=set(),
                                     class_kind=["orb", "status"]).system_prompt()
@@ -155,6 +157,23 @@ def _t_prune_and_kinds() -> None:
             os.environ.pop(harness_v2.FLAG, None)
         else:
             os.environ[harness_v2.FLAG] = old
+        if old_vocab is None:
+            os.environ.pop("BTS_BLUEPRINT_VOCAB", None)
+        else:
+            os.environ["BTS_BLUEPRINT_VOCAB"] = old_vocab
+    # Phase BH-3 analog: the VOCABULARY DETAIL block carries BOTH pool kinds' sections (+ the hybrid rules) for a
+    # hybrid, and only the orb section for a plain orb class
+    from btsgen import gate
+    hyb_detail = hyb[hyb.rfind(gate.DETAIL_HEADER):]
+    orb_detail = orb[orb.rfind(gate.DETAIL_HEADER):]
+    check(gate.DETAIL_HEADER in hyb and gate.DETAIL_HEADER in orb, "both prompts carry a VOCABULARY DETAIL block")
+    check("\n## Orbs" in hyb_detail and "\n## Forged statuses" in hyb_detail and "\n## Hybrid classes" in hyb_detail,
+          "hybrid ['orb','status'] detail keeps ## Orbs + ## Forged statuses + ## Hybrid classes")
+    check("\n## Forged summons" not in hyb_detail, "hybrid ['orb','status'] detail leaves ## Forged summons index-only")
+    check({"channel_orb", "apply_status_custom"} <= gate.detail_row_tokens(hyb_detail),
+          "hybrid detail has the channel_orb AND apply_status_custom rows")
+    check("\n## Orbs" in orb_detail and "\n## Forged statuses" not in orb_detail and "\n## Hybrid classes" not in orb_detail,
+          "a plain orb class's detail has ## Orbs only")
     check(_has(hyb, heads["orb"]) and _has(hyb, heads["status"]), "hybrid ['orb','status'] keeps the ORB and STATUS sections")
     check(not _has(hyb, heads["summon"]), "hybrid ['orb','status'] still prunes the SUMMON section")
     check(_has(orb, heads["orb"]) and not _has(orb, heads["status"]), "a plain 'orb' string still prunes the STATUS section")
