@@ -206,7 +206,9 @@ def _t_codec() -> None:
                             "orb_slots": 0, "forge_persist": True, "starting_deck": []},
               "cards": []}
     code = bts1.encode_class(json.dumps(bundle))
-    check(code.startswith("BTSC.54."), f"the class code stamps v54, got {code[:12]!r}")
+    # The codec stamps the CURRENT vocab (>= 54), not the version AY landed at (BH-1 audit: was pinned to "54").
+    check(bts1.VOCAB_VERSION >= 54 and code.startswith(f"BTSC.{bts1.VOCAB_VERSION}."),
+          f"the class code stamps the current vocab (v{bts1.VOCAB_VERSION} >= 54), got {code[:12]!r}")
     payload, kind = bts1.decode(code)
     check(kind == "class", f"decodes as a class bundle, got {kind!r}")
     check(json.loads(payload)["character"]["forge_persist"] is True, "forge_persist survives the round trip")
@@ -244,6 +246,14 @@ def main() -> int:
     _t_contract()
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return 1 if _FAIL else 0
+
+
+def test_phase_ay_all() -> None:
+    # Rule 0.10 (BH-1 audit): run the standalone main() under pytest too, so a check outside the
+    # individual test_* functions can never go unrun again.
+    global _PASS, _FAIL
+    _PASS = _FAIL = 0
+    assert main() == 0, f"{_FAIL} Phase AY check(s) failed - see the FAIL lines above"
 
 
 if __name__ == "__main__":

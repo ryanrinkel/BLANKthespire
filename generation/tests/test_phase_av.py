@@ -15,7 +15,7 @@ Exits nonzero on any failure. Covers the v52 change in lockstep with the C#:
      autonomous one, on_nth_attack n 2..5, the tightened autonomous output caps, <=2 entries), and the v15
      _REMOVED_SUMMON_FIELDS rejection is gone;
   6. the contract wording (VOCABULARY no longer says "exactly one" / "disabled for now"; the schema enum carries
-     sacrifice_summon), the sacrifice exemplar validates, app.js renders the new pool shape, and the rule-0.9
+     sacrifice_summon), the sacrifice exemplar validates, render.js renders the new pool shape, and the rule-0.9
      prompt budget is printed.
 """
 from __future__ import annotations
@@ -38,7 +38,7 @@ _FAIL = 0
 
 MOD_CODE = paths.VOCABULARY.parents[1] / "BlankTheSpireCode"   # mod/contract/.. -> mod/BlankTheSpireCode
 CARD_SCHEMA = paths.VOCABULARY.parent / "card.schema.json"
-APP_JS = paths.VOCABULARY.parents[2] / "web" / "static" / "app.js"
+APP_JS = paths.VOCABULARY.parents[2] / "web" / "static" / "render.js"
 EXEMPLAR_POOL = pathlib.Path(cf.__file__).parent / "data" / "exemplar_pool.json"
 BP_AU = 93_623      # the blueprint prompt size Phase AU left behind (see the AU STATUS paragraph)
 
@@ -273,7 +273,10 @@ def _t_summon_pool() -> None:
 def _t_contract() -> None:
     print("contract: the autonomous model is documented again, the 'disabled' caveat is gone:")
     vocab = paths.VOCABULARY.read_text(encoding="utf-8")
-    summons = vocab[vocab.index("## Forged summons"):vocab.index("## Card shape")]
+    # Slice to the NEXT section heading: Phase BA (v55) put "## The signature potion" (which says "exactly one
+    # custom potion") between the summon section and "## Card shape" (BH-1 audit).
+    _s0 = vocab.index("## Forged summons")
+    summons = vocab[_s0:vocab.index("\n## ", _s0 + 1)]
     check("is disabled for now" not in vocab and "disabled for now" not in vocab,
           "VOCABULARY.md: the 'the autonomous model is disabled for now' paragraph is gone")
     check("exactly one" not in summons.lower(), "VOCABULARY.md: the summon section no longer says 'exactly one'")
@@ -299,7 +302,7 @@ def _t_contract() -> None:
     check(trig_enum is None or "sacrifice_summon" not in trig_enum.group(1),
           "card.schema.json: the trigger payload op enum does NOT carry it (card-only)")
 
-    print("generation lockstep: prompt section, heuristics, archetypes, exemplar, app.js:")
+    print("generation lockstep: prompt section, heuristics, archetypes, exemplar, render.js:")
     src = pathlib.Path(cf.__file__).read_text(encoding="utf-8")
     section = src[src.index("THE SUMMON POOL (optional"):src.index("STRATEGIC LINES (REQUIRED")]
     for token in ("AUTONOMOUS", "ETHEREAL", "on_nth_attack", "sacrifice_summon", "COMMANDER", "SWARM"):
@@ -325,11 +328,11 @@ def _t_contract() -> None:
     check(not bad, f"every exemplar still validates under exemplar_validator: {bad}")
 
     js = APP_JS.read_text(encoding="utf-8")
-    check('case "sacrifice_summon": return "Sacrifice your minion";' in js, "app.js labels the sacrifice card op")
-    check("Ethereal (cannot be attacked)" in js, "app.js renders an ethereal minion")
-    check("Each turn: " in js and "Turn ${i + 1}" in js, "app.js renders the move cycle (single + rotation)")
+    check('case "sacrifice_summon": return "Sacrifice your minion";' in js, "render.js labels the sacrifice card op")
+    check("Ethereal (cannot be attacked)" in js, "render.js renders an ethereal minion")
+    check("Each turn: " in js and "Turn ${i + 1}" in js, "render.js renders the move cycle (single + rotation)")
     for label in ("On summon: ", "On death: ", "th hit: "):
-        check(label in js, f"app.js renders '{label.strip()}'")
+        check(label in js, f"render.js renders '{label.strip()}'")
 
     bp = cf._BlueprintContract(mode="dossier", triad=True, seed=1).system_prompt()
     print(f"  (rule 0.9) blueprint prompt: {len(bp):,} chars (AU left {BP_AU:,}; delta {len(bp) - BP_AU:+,})")
@@ -350,6 +353,14 @@ def main() -> int:
     _t_contract()
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return 1 if _FAIL else 0
+
+
+def test_phase_av_all() -> None:
+    # Rule 0.10 (BH-1 audit): run the standalone main() under pytest too, so a check outside the
+    # individual test_* functions can never go unrun again.
+    global _PASS, _FAIL
+    _PASS = _FAIL = 0
+    assert main() == 0, f"{_FAIL} Phase AV check(s) failed - see the FAIL lines above"
 
 
 if __name__ == "__main__":

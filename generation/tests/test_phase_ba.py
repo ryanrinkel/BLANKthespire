@@ -304,9 +304,9 @@ def _t_contract() -> None:
           f"the ONE ceiling lives in tests/test_harness_v2.py)")
 
     print("contract: the website renders it (a potion carries no card text):")
-    js = (REPO / "web" / "static" / "app.js").read_text(encoding="utf-8")
-    check('pool: "potion_pool"' in js, "app.js lists potion_pool among the class mechanics")
-    check("function potionLines(" in js, "app.js formats the potion's lines")
+    js = (REPO / "web" / "static" / "render.js").read_text(encoding="utf-8")
+    check('pool: "potion_pool"' in js, "render.js lists potion_pool among the class mechanics")
+    check("function potionLines(" in js, "render.js formats the potion's lines")
     check("Drops alongside the usual potions" in js, "... and tells the player it is an ADDITION to the table")
     check('potion: "How\'s this potion?"' in js, "the feedback popout has a potion prompt")
     fg = (REPO / "web" / "forge.py").read_text(encoding="utf-8")

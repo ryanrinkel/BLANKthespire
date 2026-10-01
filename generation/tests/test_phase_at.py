@@ -12,7 +12,7 @@ Exits nonzero on any failure. Covers the v50 change on the generation side, in l
      rejected without it (buff_summon is class-only) — the same rule as before, nothing new to learn;
   4. the contract wording drops "card": VOCABULARY.md, card.schema.json, RELIC_VOCABULARY.md all say the summon's hits
      count; DESIGN_HEURISTICS' summon_swarm note names the on_damage_dealt + summon_attack engine; the new exemplar
-     ex_blood_scent (needs summon) validates under exemplar_validator; app.js keeps its label; rule-0.9 budget printed.
+     ex_blood_scent (needs summon) validates under exemplar_validator; render.js keeps its label; rule-0.9 budget printed.
 """
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ _PASS = 0
 _FAIL = 0
 
 MOD_CODE = paths.VOCABULARY.parents[1] / "BlankTheSpireCode"   # mod/contract/.. -> mod/BlankTheSpireCode
-WEB_APP = paths.VOCABULARY.parents[2] / "web" / "static" / "app.js"
+WEB_APP = paths.VOCABULARY.parents[2] / "web" / "static" / "render.js"
 CARD_SCHEMA = paths.VOCABULARY.parent / "card.schema.json"
 RELIC_VOCAB = paths.VOCABULARY.parent / "RELIC_VOCABULARY.md"
 HEURISTICS = paths.VOCABULARY.parent / "DESIGN_HEURISTICS.md"
@@ -74,7 +74,10 @@ def test_version() -> None:
 def _t_csharp_mirror() -> None:
     print("C# mirror: ForgedTriggerPower / ForgedRelic accept a pet dealer (the ReaperForm / HandDrill idiom):")
     tp = (MOD_CODE / "Powers" / "ForgedTriggerPower.cs").read_text(encoding="utf-8")
-    body = tp.split("AfterDamageGiven", 1)[1].split("AfterBlockGained", 1)[0]
+    # Anchor on the method declarations: Phase BE's on_poison_damage comment inside AfterDamageGiven names
+    # AfterBlockGained, so a bare-word split cut the body off before the on_damage_dealt branch (BH-1 audit).
+    body = tp.split("public override async Task AfterDamageGiven", 1)[1].split(
+        "public override async Task AfterBlockGained", 1)[0]
     check("bool byCard = dealer == Owner && cardSource != null;" in body, "card path unchanged: dealer == Owner && cardSource != null")
     check("dealer.PetOwner?.Creature == Owner" in body, "pet path: dealer.PetOwner?.Creature == Owner")
     check("dealer != Owner" in body, "pet path never double-counts the owner itself")
@@ -156,7 +159,7 @@ def _t_contract() -> None:
               and ex["card"]["effects"][0]["effects"][0]["op"] == "buff_summon", "the exemplar IS the on_damage_dealt -> buff_summon engine")
     check(len(pool["exemplars"]) >= 113, f"pool grew to >= 113 (got {len(pool['exemplars'])})")
     app = WEB_APP.read_text(encoding="utf-8")
-    check('on_damage_dealt: "On damage dealt"' in app, "app.js keeps the on_damage_dealt label (no new token)")
+    check('on_damage_dealt: "On damage dealt"' in app, "render.js keeps the on_damage_dealt label (no new token)")
     bp = cf._BlueprintContract(mode="dossier", triad=True, seed=1).system_prompt()
     print(f"  (rule 0.9) blueprint prompt: {len(bp):,} chars (the ONE ceiling lives in tests/test_harness_v2.py)")
     # AT's rule-0.9 contribution is a WORDING swap in VOCABULARY / card.schema.json / RELIC_VOCABULARY (asserted
@@ -171,6 +174,14 @@ def main() -> int:
     _t_contract()
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return 1 if _FAIL else 0
+
+
+def test_phase_at_all() -> None:
+    # Rule 0.10 (BH-1 audit): run the standalone main() under pytest too, so a check outside the
+    # individual test_* functions can never go unrun again.
+    global _PASS, _FAIL
+    _PASS = _FAIL = 0
+    assert main() == 0, f"{_FAIL} Phase AT check(s) failed - see the FAIL lines above"
 
 
 if __name__ == "__main__":

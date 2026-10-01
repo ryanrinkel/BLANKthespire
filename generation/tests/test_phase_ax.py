@@ -15,7 +15,7 @@ Exits nonzero on any failure. Covers the v53 change in lockstep with the C#:
   7. `spread_debuffs` (flag-op, single-enemy cards only, card-only, never on a BASIC, one per card);
   8. describe is a byte-match contract: cardgen.describe() == the C# sentences for both new ops;
   9. the contract surfaces — VOCABULARY rows, the schema enum + clauses, the exemplars, featured/harness menus,
-     census counters and app.js — plus the rule-0.9 prompt budget.
+     census counters and render.js — plus the rule-0.9 prompt budget.
 """
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ _FAIL = 0
 
 MOD_CODE = paths.VOCABULARY.parents[1] / "BlankTheSpireCode"   # mod/contract/.. -> mod/BlankTheSpireCode
 CARD_SCHEMA = paths.VOCABULARY.parent / "card.schema.json"
-APP_JS = paths.VOCABULARY.parents[2] / "web" / "static" / "app.js"
+APP_JS = paths.VOCABULARY.parents[2] / "web" / "static" / "render.js"
 EXEMPLAR_POOL = pathlib.Path(cf.__file__).parent / "data" / "exemplar_pool.json"
 
 
@@ -325,7 +325,7 @@ def _t_describe() -> None:
 
 # --------------------------------------------------------------------------- 9. the contract surfaces
 def _t_contract() -> None:
-    print("contract surfaces (vocabulary / schema / exemplars / menus / app.js):")
+    print("contract surfaces (vocabulary / schema / exemplars / menus / render.js):")
     vocab = paths.VOCABULARY.read_text(encoding="utf-8")
     check("| `spend_forge`" in vocab, "VOCABULARY has a spend_forge op row")
     check("| `spread_debuffs`" in vocab, "VOCABULARY has a spread_debuffs op row")
@@ -363,8 +363,8 @@ def _t_contract() -> None:
     check("spread_debuffs" in harness_v2._PREFERRED_OPS, "spread_debuffs is a preferred compositional op")
 
     js = APP_JS.read_text(encoding="utf-8")
-    check('case "spend_forge": return `Spend ${a ?? 1} Forge`;' in js, "app.js renders spend_forge")
-    check('case "spread_debuffs":' in js, "app.js renders spread_debuffs")
+    check('case "spend_forge": return `Spend ${a ?? 1} Forge`;' in js, "render.js renders spend_forge")
+    check('case "spread_debuffs":' in js, "render.js renders spread_debuffs")
 
     bp = cf._BlueprintContract(mode="dossier", triad=True, seed=1).system_prompt()
     print(f"  (rule 0.9) blueprint prompt: {len(bp):,} chars (the ONE ceiling lives in tests/test_harness_v2.py)")
@@ -385,6 +385,14 @@ def main() -> int:
     _t_contract()
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return 1 if _FAIL else 0
+
+
+def test_phase_ax_all() -> None:
+    # Rule 0.10 (BH-1 audit): run the standalone main() under pytest too, so a check outside the
+    # individual test_* functions can never go unrun again.
+    global _PASS, _FAIL
+    _PASS = _FAIL = 0
+    assert main() == 0, f"{_FAIL} Phase AX check(s) failed - see the FAIL lines above"
 
 
 if __name__ == "__main__":

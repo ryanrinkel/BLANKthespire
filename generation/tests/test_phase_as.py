@@ -15,7 +15,7 @@ Exits nonzero on any failure. Covers the v48 additions on the generation side, i
      type, shows the counter, adds attack_base in ModifyDamageAdditive; EffectRunner runs discard + the self-debuff;
      the VocabVersion stamp is 48;
   4. the contract carries the tokens: RELIC_VOCABULARY.md rows/sections, DESIGN_HEURISTICS relic forms ("Counter relic",
-     "Boon with a price") reach relic_forms() and the relic prompt, app.js labels, the smoke + fake relics validate.
+     "Boon with a price") reach relic_forms() and the relic prompt, render.js labels, the smoke + fake relics validate.
 """
 from __future__ import annotations
 
@@ -38,7 +38,7 @@ _PASS = 0
 _FAIL = 0
 
 MOD_CODE = paths.VOCABULARY.parents[1] / "BlankTheSpireCode"   # mod/contract/.. -> mod/BlankTheSpireCode
-WEB_APP = paths.VOCABULARY.parents[2] / "web" / "static" / "app.js"
+WEB_APP = paths.VOCABULARY.parents[2] / "web" / "static" / "render.js"
 RELIC_SCHEMA = paths.VOCABULARY.parent / "relic.schema.json"
 RELIC_VOCAB = paths.VOCABULARY.parent / "RELIC_VOCABULARY.md"
 
@@ -246,8 +246,8 @@ def _t_contract() -> None:
     bp = cf._BlueprintContract(mode="dossier", triad=True, seed=1).system_prompt()
     print(f"  (rule 0.9) blueprint prompt: {len(bp):,} chars (unchanged by AS — the relic vocab is not embedded there)")
     app = WEB_APP.read_text(encoding="utf-8")
-    check('attack_base: "damage on every attack"' in app and 'max_hp: "max HP"' in app, "app.js labels both modifiers")
-    check("h.every_n" in app and "h.card_type" in app and 'on_hp_lost: "On HP lost"' in app, "app.js renders every_n / card_type (+ the missing on_hp_lost label)")
+    check('attack_base: "damage on every attack"' in app and 'max_hp: "max HP"' in app, "render.js labels both modifiers")
+    check("h.every_n" in app and "h.card_type" in app and 'on_hp_lost: "On HP lost"' in app, "render.js renders every_n / card_type (+ the missing on_hp_lost label)")
 
 
 def main() -> int:

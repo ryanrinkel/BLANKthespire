@@ -13,7 +13,7 @@ Exits nonzero on any failure. Covers the v47 additions on the generation side, i
      VocabVersion stamp is 47;
   3. the card level is unchanged: a card applying a v47 status validates through the same apply_status_custom path
      (Apply N <Name> / Gain N <Name>), and the two new exemplars validate under the pool's placeholder context;
-  4. the contract carries the tokens: VOCABULARY.md rows + the mode bullet, DESIGN_HEURISTICS pricing, app.js labels,
+  4. the contract carries the tokens: VOCABULARY.md rows + the mode bullet, DESIGN_HEURISTICS pricing, render.js labels,
      archetype metaphors, the blueprint prompt (status-pool paragraph + the burn/flurry fantasy pointers), and the
      rule-0.9 prompt budget is reported.
 """
@@ -37,7 +37,7 @@ _PASS = 0
 _FAIL = 0
 
 MOD_CODE = paths.VOCABULARY.parents[1] / "BlankTheSpireCode"   # mod/contract/.. -> mod/BlankTheSpireCode
-WEB_APP = paths.VOCABULARY.parents[2] / "web" / "static" / "app.js"
+WEB_APP = paths.VOCABULARY.parents[2] / "web" / "static" / "render.js"
 
 
 def check(cond: bool, msg: str) -> None:
@@ -182,7 +182,7 @@ def _t_contract() -> None:
     check("damage_over_time" in heur and "hit_count" in heur and "multiplicative" in heur, "DESIGN_HEURISTICS.md prices all three")
     app = WEB_APP.read_text(encoding="utf-8")
     check("damage_over_time:" in app and "hit_count:" in app and 'st.mode === "multiplicative"' in app,
-          "app.js labels both hooks and the multiplicative mode")
+          "render.js labels both hooks and the multiplicative mode")
     data = pathlib.Path(paths.__file__).parent / "data"
     arch = json.loads((data / "archetypes.json").read_text(encoding="utf-8"))
     sig = next(a for a in arch["archetypes"] if a["id"] == "status_signature")

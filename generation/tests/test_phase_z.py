@@ -150,5 +150,13 @@ def main() -> int:
     return 1 if _FAIL else 0
 
 
+def test_phase_z_all() -> None:
+    # Rule 0.10 (BH-1 audit): run the standalone main() under pytest too, so a check outside the
+    # individual test_* functions can never go unrun again.
+    global _PASS, _FAIL
+    _PASS = _FAIL = 0
+    assert main() == 0, f"{_FAIL} Phase Z check(s) failed - see the FAIL lines above"
+
+
 if __name__ == "__main__":
     sys.exit(main())

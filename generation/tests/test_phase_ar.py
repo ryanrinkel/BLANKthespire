@@ -15,7 +15,7 @@ Exits nonzero on any failure. Covers the v49 additions on the generation side, i
      shared Conditions.Validate, OrbRunner gates at fire time (+ [AR] tag, tooltip clause), ForgedOrb overrides
      AfterTurnStartOrbTrigger (the game's Plasma hook) and the VocabVersion stamp is 49;
   5. the contract carries the tokens: VOCABULARY.md bullets + recipes, the Conditions cross-reference, DESIGN_HEURISTICS
-     orb_channel note, app.js labels (turn_start passive + the later condition kinds), the PHASE_I plan deferrals marked
+     orb_channel note, render.js labels (turn_start passive + the later condition kinds), the PHASE_I plan deferrals marked
      LANDED, the offline fake orb blueprint validates, the blueprint prompt carries the sentence; rule-0.9 budget printed.
 """
 from __future__ import annotations
@@ -37,7 +37,7 @@ _PASS = 0
 _FAIL = 0
 
 MOD_CODE = paths.VOCABULARY.parents[1] / "BlankTheSpireCode"   # mod/contract/.. -> mod/BlankTheSpireCode
-WEB_APP = paths.VOCABULARY.parents[2] / "web" / "static" / "app.js"
+WEB_APP = paths.VOCABULARY.parents[2] / "web" / "static" / "render.js"
 CARD_SCHEMA = paths.VOCABULARY.parent / "card.schema.json"
 PHASE_I_PLAN = paths.VOCABULARY.parents[2] / "docs" / "plans" / "PHASE_I_FORGED_ORBS_PLAN.md"
 
@@ -277,11 +277,11 @@ def _t_contract() -> None:
           "DESIGN_HEURISTICS orb_channel note prices the gated orb + the Plasma passive")
     app = WEB_APP.read_text(encoding="utf-8")
     check('passive_turn_start: "At the start of each turn while channeled"' in app
-          and 'orb.passive_timing === "turn_start"' in app, "app.js labels a turn_start passive")
+          and 'orb.passive_timing === "turn_start"' in app, "render.js labels a turn_start passive")
     for kind in ("draw_pile_empty", "hp_lost_ge", "dark_ge", "light_ge", "centered", "target_hp_below_half",
                  "target_has_block", "energy_ge", "cards_played_this_turn_ge"):
-        check(f'case "{kind}":' in app, f"app.js condCore renders {kind}")
-    check("e.when && e.when.kind ? condText(e.when)" in app, "app.js fmtEffect appends the gate (orb chips inherit it)")
+        check(f'case "{kind}":' in app, f"render.js condCore renders {kind}")
+    check("e.when && e.when.kind ? condText(e.when)" in app, "render.js fmtEffect appends the gate (orb chips inherit it)")
     plan = PHASE_I_PLAN.read_text(encoding="utf-8")
     check("**LANDED — Phase AR (2026-09-10, vocab v49)**" in plan and "LANDED in Phase AR (v49" in plan,
           "PHASE_I plan deferrals (:95, :118) marked LANDED")
@@ -299,6 +299,14 @@ def main() -> int:
     _t_contract()
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return 1 if _FAIL else 0
+
+
+def test_phase_ar_all() -> None:
+    # Rule 0.10 (BH-1 audit): run the standalone main() under pytest too, so a check outside the
+    # individual test_* functions can never go unrun again.
+    global _PASS, _FAIL
+    _PASS = _FAIL = 0
+    assert main() == 0, f"{_FAIL} Phase AR check(s) failed - see the FAIL lines above"
 
 
 if __name__ == "__main__":
