@@ -154,8 +154,8 @@ def _t_detail() -> None:
         check("\n## The signature potion" in d, f"the signature potion section is in the detail for kinds {kinds}")
     check("\n## The signature potion" not in gate.vocab_detail(v, core, (), keep_potion=False), "keep_potion=False drops it")
     check(gate.detail_row_tokens(normal) >= core, "every CORE op row is in a normal detail")
-    check(not ({"corruption", "balance_step", "vulnerable", "hp_below_half"} & gate.detail_row_tokens(normal))
-          and "\n## Statuses" not in normal and "\n## Conditions" not in normal,
+    check(not ({"corruption", "balance_step", "hp_below_half"} & gate.detail_row_tokens(normal))
+          and "\n## Conditions" not in normal,
           "unselected rows / sections stay index-only")
     # family closure (§2.2 point 2)
     forge = gate.vocab_detail(v, core | {"spend_forge"}, ())
@@ -165,6 +165,26 @@ def _t_detail() -> None:
     check("\n## Triggers" in normal and "`on_poison_damage`" in normal, "add_trigger (core) pulls the trigger kinds")
     check("\n## Structural mechanics" not in normal and "\n## Structural mechanics" in gate.vocab_detail(v, core | {"scale"}, ()),
           "a `scale` selection pulls the scale-source section")
+    # BH-3 follow-up: a `status`-field op (apply_status is core) pulls the ## Statuses rows + intro; the class-tagged
+    # rows (focus / temp_focus = [orb]) stay with their family.
+    check("\n## Statuses" in normal and "Every status takes an `amount`" in normal
+          and {"vulnerable", "weak", "strength", "dexterity", "poison"} <= gate.detail_row_tokens(normal),
+          "apply_status pulls the ## Statuses rows + intro prose into the detail")
+    check(not ({"focus", "temp_focus"} & gate.detail_row_tokens(normal))
+          and {"focus", "temp_focus"} <= gate.detail_row_tokens(orb),
+          "the [orb] status rows (focus / temp_focus) stay governed by the orb kind")
+    no_st = gate.vocab_detail(v, {"damage", "block"}, ())
+    check("\n## Statuses" not in no_st and "vulnerable" not in gate.detail_row_tokens(no_st),
+          "no `status`-field op selected -> no ## Statuses section")
+    th = gate.vocab_detail(v, {"damage", "target_has_status"}, ())
+    check({"vulnerable", "weak"} <= gate.detail_row_tokens(th), "target_has_status (a `status` field) pulls them too")
+    check({"vulnerable", "weak"} <= gate.tree_selection(v, {"apply_status"})[0],
+          "the closure itself carries the status rows (so nominating `vulnerable` is a no-op)")
+    with _env(BTS_HARNESS_V2="1", BTS_BLUEPRINT_VOCAB="tree"):
+        e = next(x for x in load_catalog().entries if x.class_kind == "normal" and "apply_status" in x.ops)
+        d_bp = _detail_of(_contract(e.ops, "normal").system_prompt())
+    check(rows["vulnerable"] in d_bp and rows["weak"] in d_bp,
+          f"a normal-kind blueprint ({e.id}, lists apply_status) has the vulnerable + weak rows in its detail")
     summ = gate.vocab_detail(v, core | {"buff_summon"}, ())
     check("\n## Forged summons" in summ and rows["summon"] in summ, "any summon op pulls the summon family")
     hyb = gate.vocab_detail(v, core, ("orb", "summon"))
@@ -214,6 +234,16 @@ def _t_prompt_layout() -> None:
             + c._triad_addendum()
     check(full == legacy, "BTS_BLUEPRINT_VOCAB=full is byte-identical to the pre-BH prompt (paste + pitch pruning)")
     check(not c.tree_active(), "full mode: tree_active() is False")
+    # BH-3 follow-up: the ORB CLASSES pitch points at the ## Orbs rows where they actually are
+    with _env(BTS_HARNESS_V2="1", BTS_BLUEPRINT_VOCAB="full"):
+        full_orb = _contract(cat.by_id["orb_channel"].ops, "orb").system_prompt()
+    check(cf.ORBS_REF_TREE in b and "section above" not in b and cf.ORBS_REF_FULL not in b,
+          "tree: the orb pitch points at the Orbs rows under VOCABULARY DETAIL, never 'section above'")
+    check(b.find(cf.ORBS_REF_TREE) < b.find(gate.DETAIL_HEADER) < b.rfind("\n## Orbs"),
+          "tree: ... and the ## Orbs rows really are in the detail block after the pitch")
+    check(cf.ORBS_REF_FULL in full_orb and cf.ORBS_REF_TREE not in full_orb
+          and 0 <= full_orb.find("\n## Orbs") < full_orb.find(cf.ORBS_REF_FULL),
+          "full: the orb pitch keeps the pre-BH 'section above' wording (and the section is above)")
     with _env(BTS_HARNESS_V2=None, BTS_BLUEPRINT_VOCAB="tree"):
         check(not _contract({"damage"}, "normal").tree_active(), "harness v1 never gets the tree")
     with _env(BTS_HARNESS_V2="1", BTS_BLUEPRINT_VOCAB="bogus"):

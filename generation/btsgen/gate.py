@@ -723,6 +723,7 @@ _ALWAYS_DETAIL = ("## Effect order", "## Targeting", "## Card shape", "## Rarity
 _POTION = "## The signature potion"
 _TRIGGERS = "## Triggers"
 _STRUCTURAL = "## Structural mechanics"
+_STATUSES = "## Statuses"
 _TOKEN_RE = re.compile(r"`([a-z][a-z0-9_]*)`")          # = frontend.catalog._TOKEN_RE (live_vocab_tokens)
 _BULLET_RE = re.compile(r'^\s*-\s+`"?([a-z][a-z0-9_]*)"?`\s*(.*)$')
 _MAX_WORDS = 12              # §2.2: "first clause of its meaning, ≤ 12 words"
@@ -813,6 +814,10 @@ class _VocabTree:
         self.row_text: dict[str, str] = {}          # token -> its own row/bullet text (for the class tags)
         self.index: str | None = None               # vocab_index's rendering, memoized with its clause cap
         self.index_cap = 0
+        # BH-3 follow-up: the rows that document a `status` FIELD (apply_status, buff_summon, target_has_status —
+        # the schema's if/then `status` requirements) and the ## Statuses rows such a selection pulls along.
+        self.status_field: set[str] = set()
+        self.status_rows: list[str] = []
         for i, (title, sec) in enumerate(self.sections):
             if title.startswith(_POTION) or title.startswith("## Card shape"):
                 continue                            # field tables, not mechanics: listed by name below
@@ -821,6 +826,14 @@ class _VocabTree:
                     self.home[tok] = i
                     self.meaning[tok] = mean
                     self.row_text[tok] = mean
+        for title, sec in self.sections:
+            if title.startswith(_STATUSES):
+                self.status_rows += [t for t, _m in _table_rows(sec) if t not in self.status_rows]
+                continue
+            for line in sec.splitlines():
+                m = _ROW_RE.match(line.strip())
+                if m and "`status`" in line.strip()[m.end():].rsplit("|", 2)[0]:
+                    self.status_field.add(m.group(1))
         # every other backticked token: home = the section that mentions it most (the first one on a tie)
         counts: dict[str, list[int]] = {}
         for i, (_t, sec) in enumerate(self.sections):
@@ -934,7 +947,10 @@ def _render_index(tree: "_VocabTree", cap: int) -> str:
 def tree_selection(vocab_text: str, tokens, kinds=()) -> tuple[frozenset, frozenset]:
     """(the closed token set, the active families) for one forge — §2.2 point 2's closure rule: a family is
     active when the class OWNS its kind or any of its trigger tokens is selected, and an active family pulls
-    all its tokens; two class-kind families make a hybrid. Tokens not in the vocabulary are dropped."""
+    all its tokens; two class-kind families make a hybrid. A selected token whose row documents a `status` field
+    (`apply_status`, `buff_summon`, `target_has_status`) pulls every ## Statuses row that carries no class tag
+    (the `[orb]` focus rows stay with the orb family; custom statuses stay with theirs). Tokens not in the
+    vocabulary are dropped."""
     known = vocab_tokens(vocab_text)
     sel = {str(t) for t in (tokens or ()) if str(t) in known}
     kinds = {kinds} if isinstance(kinds, str) else {str(k) for k in (kinds or ())}
@@ -944,6 +960,9 @@ def tree_selection(vocab_text: str, tokens, kinds=()) -> tuple[frozenset, frozen
             fams.add(fam)
     for fam in fams:
         sel |= {t for t in TREE_FAMILY_PULL.get(fam, ()) if t in known}
+    tree = _tree(vocab_text)
+    if sel & tree.status_field:
+        sel |= {t for t in tree.status_rows if not tree.tag(t)}
     if sum(1 for f in ("orbs", "custom_status", "summons") if f in fams) >= 2:
         fams.add("hybrid")
     return frozenset(sel), frozenset(fams)
@@ -953,7 +972,8 @@ def vocab_detail(vocab_text: str, tokens, kinds=(), *, keep_potion: bool = True)
     """The DETAIL block for one forge: the FULL rows for `tokens` (after tree_selection's closure) plus the
     prose that gives them meaning — the non-row text of every table section that contributed a row, the
     class-identity sections (SECTION_FAMILY) of the families the class owns or selected, the whole Triggers
-    section when any trigger token is selected (add_trigger is a core op, so in practice always), the whole
+    section when any trigger token is selected (add_trigger is a core op, so in practice always), the ## Statuses
+    rows + intro when a `status`-field op is selected (apply_status is core, so in practice always), the whole
     Structural section when any of its tokens (`scale`, a scale source, `hits`, `grow` …) is selected, the short
     universal sections (_ALWAYS_DETAIL), and ALWAYS `## The signature potion` (the blueprint declares it).
     Sections keep the file's order and bytes; only unselected table rows are cut."""
