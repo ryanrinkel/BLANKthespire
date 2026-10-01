@@ -118,9 +118,10 @@ build) · `building` · `done` (now in vocabulary) · `rejected` · `not planned
 - **Mechanic sketch:** A status effect that applies a 'frozen' state (e.g., prevents action until a condition is met) and resolves into a burst (e.g., Vulnerable/Weak for N turns or a damage-over-time effect).
 - **Buildable today?** No — surfaced as off-vocabulary by the map stage.
 - **Priority:** unset (triage).
-- **Status:** **rejected (2026-07-14, wave-4 scout triage)**
+- **Status:** **planned (Wave 6, Phase BR, vocab v70 — re-opened 2026-10-01; was rejected 2026-07-14, wave-4 scout triage)**
 - **Triage (2026-07-14, wave-4 scout):** the burst half is expressible (`apply_status` vulnerable/weak/poison + `ripen`), but the freeze half needs an enemy STUN primitive (prevent enemy action) that has no surface in the vocab or scouted API. Re-open only if a stun/disable power is ever scouted.
 - **Update (2026-09-10, Phase AQ, vocab v47):** the "resolves into a damage-over-time effect" reading is now a first-class class shape — a `status_pool` debuff with hook **`damage_over_time`** (the afflicted enemy loses HP = stacks at its turn start, Poison-shaped, must decay), plus `mode: multiplicative` on `damage_taken` for the "shatter" amplifier. The stun half stays rejected.
+- **Re-triage (2026-10-01, Wave 6 BH-2): re-opened as `planned`.** The 2026-07-14 re-open condition ("if a stun/disable power is ever scouted") is met: the base game ships `CreatureCmd.Stun(Creature, nextMoveId?)` and the Ancient card `Whistle` uses it (`VOCAB_BASE_GAME_AUDIT.md`, "Missing — already logged"). Sketch: flag-op `stun`, `target:"enemy"` only, guarded on a non-empty `MoveStateMachine.StateLog` (the call throws otherwise); the stun only lands if the enemy's next move `CanTransitionAway`, so locked boss moves and phase transitions are naturally immune and a second stun the same turn is a no-op. "Stun the enemy." **Guard rails (a repeatable stun is a hard lock):** never a payload; requires `exhaust`; cost ≥ 2; uncommon/rare only; ≤ 1 stun card per class; never on a card with `return_to_hand` / `retrieve_card` loops (cross-check Phase BO). Target: Phase BR, vocab v70 (`docs/plans/VOCAB_EXPANSION_6_PLAN.md`, §7 decision 7); flip to `done` when BR ships.
 
 ### 12. Ice Shatter
 - **Surfaced by:** staged front-end ("a frost mage who freezes then shatters")
@@ -389,6 +390,7 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Priority:** unset (triage).
 - **Status:** **rejected (2026-07-14, wave-4 scout triage)**
 - **Triage (2026-07-14, wave-4 scout):** force-play / card-locking would override the game's choice loop; no hook exists, and it breaks the closed-vocabulary safety model.
+- **Re-triage 2026-10-01 (Wave 6 BH-2):** still rejected for forced play FROM HAND (`StampedePower`, `HellraiserPower`); the base-game audit's auto-play row is split off — playing from the DRAW pile as an effect the player chose (Havoc / Mayhem) is planned as #73 (Phase BN). Re-evaluate forced-from-hand after #73 is in players' hands (Wave 6 plan §6).
 
 ### 38. Reconfigure
 - **Surfaced by:** staged front-end ("A frontier gunsmith duelist who carries ")
@@ -433,6 +435,7 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Priority:** Low.
 - **Status:** **rejected (2026-09-09, W0.11 triage)**
 - **Triage (2026-09-09, W0.11):** needs a fourth pile — `ForgedCards.cs:289` piles are hand/draw/discard only, and "buried cards resurface on their own" needs a timer per buried card. Nearest expressible shape TODAY: a `ripen` power whose payload `add_card`s a copy of the "buried" token back into hand/discard after N turns (plant now, the dead claw back later). Re-open only if a graveyard pile is built (#43).
+- **Re-triage 2026-10-01 (Wave 6 BH-2):** the base game's own version (`HowlFromBeyond`, `Bombardment`: auto-play self from the EXHAUST pile each turn) needs no fourth pile, only auto-play from `PileType.Exhaust` — it stays deferred until #73 (`autoplay`, Phase BN) is in players' hands, then re-evaluate together with #37 (Wave 6 plan §6). Status unchanged.
 
 ### 43. Grave-plot cycling
 - **Surfaced by:** staged front-end ("a gravekeeper who tends a hungry garden ")
@@ -442,6 +445,7 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Priority:** Low.
 - **Status:** **rejected (2026-09-09, W0.11 triage)**
 - **Triage (2026-09-09, W0.11):** a dedicated burial zone is a new card pile; `ForgedCards.cs:289` supports hand/draw/discard only, so "dig it back out" cannot be a literal zone. Nearest expressible shape: exhaust as burial + `ripen` + `add_card` of a "buried" token as the exhumation (a token_conjurer/countdown_ripen pairing) — the recurring-resource feel without a fourth pile.
+- **Re-triage 2026-10-01 (Wave 6 BH-2):** see #42 — the exhaust-pile self-replay form (`HowlFromBeyond`) is deferred behind #73 (`autoplay`); the dedicated burial pile itself stays rejected. Status unchanged.
 
 ### 44. Coin & Ledger economy
 - **Surfaced by:** staged front-end ("a stormchaser who bottles lightning and ")
@@ -652,3 +656,243 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
   (registered as `PowerLoc` ExtraLoc — the old in-Localization flip was dead code, baked once at `ModelDb.Init`); the
   description states the number is the lean, the name the pole, and that 8+ is a PENALTY (Dark −3 HP / Light +1 Weak
   per turn). Verify-first still open: whether a Counter power renders "0" or hides the badge at Amount 0.
+
+### 62. Card trigger filters (card type, every Nth, this turn, random enemy)
+- **Surfaced by:** base-game audit (2026-10-01, `docs/plans/VOCAB_BASE_GAME_AUDIT.md`), Partial rows "`on_card_played` filters", "Turn-scoped reactive powers", "Draw-triggered effects" and "Random-target trigger payloads": `RagePower`, `StormPower`, `CalamityPower`, `JugglingPower`, `PanachePower`, `IterationPower`, `JuggernautPower` (11 cards).
+- **Fantasy it serves:** powers that care WHAT you play: "whenever you play an Attack", "every 5th card", a Rage that lasts only this turn, a payoff that lands on a random enemy.
+- **Mechanic sketch:** port the relic v48 hook filters to card `add_trigger`: `card_type` (attack/skill/power/non_attack, + `status` on `on_card_drawn` only) on `on_card_played` / `on_card_drawn`; `every_n` 2..9 on multi-fire kinds (never with `once_per_combat`; priced at amount / n); `scope:"this_turn"` on reactive kinds (the power removes itself at your turn end, the `RagePower` recipe); payload target `random_enemy`. Describe: "Whenever you play an Attack, …" / "Every 3rd time you play an Attack, …" / "This turn, whenever you play an Attack, gain 3 Block." / "… to a random enemy". Defaults (plan §7): `every_n` counts per combat (relic parity, not per turn like base Panache); a this-turn power stays Single-stack (a second Rage in one turn adds no payload — priced, not multiplied).
+- **Buildable today?** Partly: unfiltered `on_card_played` / `on_card_drawn` exist and relics already have `card_type` + `every_n`; card triggers do not.
+- **Priority:** High — the cheapest high-count win of Wave 6.
+- **Status:** **planned (Wave 6, Phase BI, vocab v61)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BI.
+
+### 63. Combat-history scales, draw to hand size, double energy
+- **Surfaced by:** base-game audit (2026-10-01), "New history/state scale sources", "Draw to hand size N" and "Energy multiplication" rows: `AshenStrike`, `MementoMori`, `Murder`, `DeathMarch`, `TearAsunder`, `HelixDrill`, `Supermassive`, `Stack`, `Mirage`, `Bully`, `TimesUp`, `Expertise`, `DoubleEnergy` (~20 cards).
+- **Fantasy it serves:** cards that read the fight so far: hit harder for every card you burned, discarded, drew or spent energy on; the poison on the whole room; how exposed this enemy already is.
+- **Mechanic sketch:** new `scale` values off combat History: `exhaust_pile_size`, `discard_pile_size`, `discards_this_turn`, `cards_drawn_this_turn`, `cards_drawn_this_combat`, `energy_spent_this_turn` (minus this card's own cost), `hp_loss_events_this_combat`, `cards_generated_this_combat`, `total_enemy_poison`, and `target_status_stacks` + `status` (vulnerable/weak/poison/doom; single-enemy, per-target calc-var). Plus `draw` with `scale:"to_hand_size"` ("Draw cards until you have {Cards} in hand.") and `gain_energy scale:"energy"` ("Double your energy."). Damage/block only, card-only except `total_enemy_poison` / `exhaust_pile_size` (payload-legal). Default (plan §7): replace-semantics ("equal to"); the additive base + N×count form is deferred (#90).
+- **Buildable today?** No — the History reads are new; the mechanism is the existing `plays_this_combat` / `hp_lost_this_turn` path.
+- **Priority:** High — ~25 base cards with #64.
+- **Status:** **planned (Wave 6, Phase BJ, vocab v62)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BJ.
+
+### 64. Conditions: exhausted this turn, played N+ last turn, enemy intends to attack
+- **Surfaced by:** base-game audit (2026-10-01), "Turn-history conditions" and "Read enemy intent" rows: `EvilEye`, `PaleBlueDotPower`, `GoForTheEyes`.
+- **Fantasy it serves:** rewards for what you did (burned a card this turn, had a big turn last turn) and for reading the enemy ("if it's about to attack, Weaken it").
+- **Mechanic sketch:** three `when` kinds: `exhausted_this_turn` ("you have Exhausted a card this turn"), `played_cards_last_turn_ge {value}` ("you played {N}+ cards last turn"), `target_intends_attack` ("the enemy intends to attack"; a target kind, so single-enemy only and never in triggers). Read from `CombatManager.Instance.History` and `MonsterModel.IntendsToAttack`.
+- **Buildable today?** No.
+- **Priority:** Medium — small, ships with #63.
+- **Status:** **planned (Wave 6, Phase BJ, vocab v62)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BJ.
+
+### 65. `hits_scale` — scaled hit counts and X-cost hits
+- **Surfaced by:** base-game audit (2026-10-01), Partial rows "X-cost" and "Scaled hit counts": `Whirlwind`, `Skewer`, `Finisher`, `Flechettes`, `HelixDrill`, `TearAsunder`, `FiendFire`, `Barrage` (24 cards).
+- **Fantasy it serves:** "Deal 5 damage X times", "for each Attack you played this turn" — the hit count IS the payoff.
+- **Mechanic sketch:** effect field `hits_scale` on `damage`, sources `x`, `cards_in_hand`, `plays_this_combat`, `attacks_played_this_turn`, `skills_in_hand`, `orb_count` and #63's `exhaust_pile_size` / `hp_loss_events_this_combat` / `energy_spent_this_turn`. Exclusive with `hits`, `scale`, `grow`, `grow_held`; counts as the card's one multi-hit; upgrades touch per-hit damage only; 0 hits = logged skip. Describe: "Deal {Damage} damage X times." / "Deal {Damage} damage for each Attack you played this turn." Default (plan §7): runtime cap 10 hits, logged.
+- **Buildable today?** No — `scale` and `hits` exclude each other.
+- **Priority:** High — 24 base cards.
+- **Status:** **planned (Wave 6, Phase BK, vocab v63)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BK.
+
+### 66. Enemy Strength loss + strip Block / Artifact
+- **Surfaced by:** base-game audit (2026-10-01), "Enemy Strength loss" and "Strip enemy Block / Artifact" rows: `PiercingWail`, `DarkShackles`, `Mangle`, `EnfeeblingTouch`, `Malaise`, `SharedFate`, `Expose` (12 cards).
+- **Fantasy it serves:** defang the enemy — make its next hit weaker, or weaker for good; tear off its armour before the strike.
+- **Mechanic sketch:** `apply_status temp_strength_down` (until the end of the enemy's turn; the wrapper power MUST be a Debuff so Artifact blocks the whole thing) → "Apply Strength Down."; `strength_down` (permanent, a literal negative Strength apply under its own `StrengthLoss` var) → "The enemy loses {StrengthLoss} Strength." / "ALL enemies lose …"; flag-ops `strip_block` ("Remove all of the enemy's Block.") and `strip_artifact` ("Remove the enemy's Artifact."), single-enemy, card-only, ordered before the debuff. Caps ≤ 3 permanent / ≤ 9 temporary. Default (plan §7): Strength Down counts as a debuff for `spread_debuffs` / `target_debuff_count` (base Misery copies it).
+- **Buildable today?** No — `strength` is self-only and the custom-status path is buff-only.
+- **Priority:** High — the Artifact sign-flip is the wave's biggest correctness risk, so the tester must face an Artifact enemy.
+- **Status:** **planned (Wave 6, Phase BL, vocab v64)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BL.
+
+### 67. Doom (execute debuff)
+- **Surfaced by:** base-game audit (2026-10-01), "Doom" row: `Scourge`, `Deathbringer`, `BlightStrike`, `NoEscape`, `TimesUp`, `EndOfDays`, `CountdownPower`, `ReaperFormPower` (13 cards, Necrobinder).
+- **Fantasy it serves:** marking an enemy for death — stack Doom until its HP falls under it, and it dies at the end of its turn.
+- **Mechanic sketch:** enemy debuff `doom` (base `DoomPower`: kills at the end of ITS turn if HP ≤ Doom, never decays, respects bosses), wired everywhere `poison` is (card, trigger payload, relic, `target_has_status`, `target_debuff_count`); `apply_status status:doom` with `scale:"damage_dealt_unblocked"` (BlightStrike); `target_status_stacks status:doom` comes from #63. Describe: "Apply Doom." / "Apply Doom equal to the unblocked damage dealt."; condition "the enemy has doom". Default (plan §7): cap 12 per card, ≤ 4 Doom cards per class, rare for ≥ 10.
+- **Buildable today?** No.
+- **Priority:** High — gives any class Necrobinder's execute axis.
+- **Status:** **planned (Wave 6, Phase BL, vocab v64)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BL.
+
+### 68. Self-drawback statuses (price-for-power debuffs on yourself)
+- **Surfaced by:** base-game audit (2026-10-01), "Self-drawback debuffs" row: `BattleTrance`, `BulletTime`, `ExpectAFight`, `PanicButton`, `WraithForm`, `BiasedCognition`, `Hyperbeam`, `Friendship`, `SharedFate` (15 cards).
+- **Fantasy it serves:** the big card with a cost attached — draw 3 but no more this turn, 30 Block but none from cards next turn, Intangible that eats your Dexterity.
+- **Mechanic sketch:** a self-debuff route for `apply_status` (cards have none today) onto sealed base powers: `no_draw` ("You cannot draw additional cards this turn."), `no_energy_gain`, `no_block` ("You cannot gain Block from cards for {N} turns."), `dex_decay` / `focus_decay` ("At the start of your turn, lose {N} Dexterity."), and literal `lose_strength` / `lose_dexterity` / `lose_focus` ("Lose {N} Strength."). Priced negative like `lose_hp`; `no_draw` needs a draw or energy payoff on the same card; your own Artifact eats them. `end_turn` (VoidForm) is NOT here (#81).
+- **Buildable today?** No — `apply_status` requires amount ≥ 1 and routes debuffs to enemies.
+- **Priority:** Medium-High — 15 base cards, and the relic self-debuff path is the precedent.
+- **Status:** **planned (Wave 6, Phase BM, vocab v65)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BM.
+
+### 69. Replay: play the next card(s) twice
+- **Surfaced by:** base-game audit (2026-10-01), "Replay / play-twice" row: `Burst`, `OneTwoPunch`, `SignalBoost`, `EchoForm`, `Transfigure`, `HiddenGem`, `SwordSagePower` (8 cards).
+- **Fantasy it serves:** "your next Skill is played twice" — the echo, the double-cast, the follow-through.
+- **Mechanic sketch:** op `replay_next {card_type: skill|attack|power|all, count: 1..2}` as sugar over the base powers (`BurstPower` / `OneTwoPunchPower` / `SignalBoostPower` / `DuplicationPower`, the last rare-only), and `echo_form` via `apply_status` (`EchoFormPower`, rare Power, amount 1). Describe: "This turn, your next 2 Skills are played twice." / "Your next Power is played twice." / "The first card you play each turn is played twice." Not a payload. A replay re-runs the whole card, so `spend_forge` spends twice by design.
+- **Buildable today?** No.
+- **Priority:** Medium.
+- **Status:** **planned (Wave 6, Phase BM, vocab v65)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BM.
+
+### 70. Next-turn Block and retain your hand
+- **Surfaced by:** base-game audit (2026-10-01), "Block carry and reflect variants" and "Retain variants" rows: `Prolong`, `ToricToughness`, `Equilibrium`.
+- **Fantasy it serves:** banking defence for tomorrow; holding your whole hand for the turn it matters.
+- **Mechanic sketch:** `block_next_turn {amount | scale:"block"}` (base `BlockNextTurnPower`; the scaled form is an op because `apply_status` doesn't scale) → "Next turn, gain 8 Block." / "Next turn, gain Block equal to your current Block."; self-buff `retain_hand` (base `RetainHandPower`) → "Retain your hand this turn." Reflect stays out.
+- **Buildable today?** Partly — `ripen` can delay a fixed Block, but cannot carry `scale:"block"`, and there is no whole-hand retain.
+- **Priority:** Medium — small, ships with #68/#69.
+- **Status:** **planned (Wave 6, Phase BM, vocab v65)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BM.
+
+### 71. On-kill payoff (`when target_killed`)
+- **Surfaced by:** base-game audit (2026-10-01), "On-kill payoff" row: `Feed`, `Sunder`, `KnockoutBlow`, `HandOfGreed`, `TheHunt`, `EchoingSlash` (6 cards).
+- **Fantasy it serves:** the reaper's reward — gain Max HP, energy or a second swing only when the blow is fatal.
+- **Mechanic sketch:** `when {kind:"target_killed"}` on an effect AFTER a `damage` op (the `damage_dealt_unblocked` ordering rule), never in `add_trigger` / trigger `when` / orb `when`; minions and reattaching parts don't pay out (as Feed). Phrase "this kills the enemy" → "Gain 3 Max HP if this kills the enemy."; negated "unless this kills the enemy". Gated `gain_max_hp` repriced Feed-exact. Default (plan §7): on AoE it reads "if this kills an enemy" (any kill).
+- **Buildable today?** No — `gain_max_hp` is unconditional (a Feed approximation).
+- **Priority:** Medium.
+- **Status:** **planned (Wave 6, Phase BN, vocab v66)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BN.
+
+### 72. `add_random_card` (random generation from the class pool)
+- **Surfaced by:** base-game audit (2026-10-01), "Random card generation" row: `InfernalBlade`, `WhiteNoise`, `Discovery`, `Splash`, `Quasar`, `JackOfAllTrades`, `Calamity`, `CreativeAiPower` (19 cards).
+- **Fantasy it serves:** the improviser — pull a random Attack from your class out of thin air, or pick 1 of 3.
+- **Mechanic sketch:** op `add_random_card {card_type?, pile, amount? 1..2, choose_of? 2..3, free_this_turn?}` over the forged class pool (excluding cards that themselves carry `add_random_card`, guarding an empty pool); `choose_of` uses the base choose-a-card screen (max 3). Payload form on `turn_start` only, without `choose_of`. Describe: "Add a random Attack to your hand. It costs 0 this turn." / "Choose 1 of 3 random Skills to add to your hand. It costs 0 this turn."; fragment "add a random Power to your hand". Colorless source out of scope.
+- **Buildable today?** No — `add_card` names a fixed same-class id.
+- **Priority:** High — 19 base cards.
+- **Status:** **planned (Wave 6, Phase BN, vocab v66)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BN.
+
+### 73. `autoplay` (play cards from your draw pile)
+- **Surfaced by:** base-game audit (2026-10-01), "Auto-play other cards" row: `Havoc`, `Cascade`, `MayhemPower`, `Uproar`, `Catastrophe` (13 cards incl. the deferred forms).
+- **Fantasy it serves:** chaos — flip the top card and let it fire.
+- **Mechanic sketch:** op `autoplay {from: draw_top|draw_random, amount? 1..2, card_type?}`. `draw_top` is Havoc (the played card is ALWAYS exhausted, else a top-card loop cycles the deck forever); `draw_random` plays a random (typed) playable card from the draw pile at a random enemy. Static depth guard ≤ 3; `autoplay` cards are never autoplay candidates. Payload form on `turn_start` (Mayhem). Describe: "Play the top card of your draw pile and Exhaust it." / "Play a random Attack from your draw pile." Default (plan §7): GO — this is an effect the player chose to play, not #37's override; forced play from hand stays rejected and Howl-from-Beyond stays deferred (#37 / #42 / #43).
+- **Buildable today?** No — but AutoSlay already plays every card through `CardCmd.AutoPlay`, so the path is exercised.
+- **Priority:** Medium.
+- **Status:** **planned (Wave 6, Phase BN, vocab v66)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BN.
+
+### 74. Self-routing recursion, put-back, draw-pile tutor, `on_shuffle`
+- **Surfaced by:** base-game audit (2026-10-01), "Self-routing recursion", "Put-back / draw-pile ordering" and "Tutor from the draw pile" rows: `ParticleWall`, `Bolas`, `MakeItSo`, `ReboundPower`, `Headbutt`, `ThinkingAhead`, `Reboot`, `SecretWeapon`, `SecretTechnique`, `Wish`, `StratagemPower` (23 cards).
+- **Fantasy it serves:** the card that comes back; stacking your next draw; reaching into the deck for exactly the card you need.
+- **Mechanic sketch:** flag-ops (one per card, exclusive with each other and with `exhaust` / `purge` / Power) `return_to_hand` ("Returns to your hand after you play it."; cost ≥ 1, no `gain_energy` / `draw` on the card), `to_draw_top` ("Goes on top of your draw pile after you play it."), `return_next_turn` ("At the start of your next turn, return this to your hand."; never from exhaust/purge). `put_back {from: hand|discard, cards: choose, amount: 1}` ("Put a card from your hand on top of your draw pile."), optional `shuffle_hand`. `retrieve_card pile:"draw"` + `card_type` ("Put an Attack from your draw pile into your hand.") and `exhaust_card pile:"draw"`. Trigger `on_shuffle` ("Whenever you shuffle your draw pile, …"). Default (plan §7): accept reversing the "never the draw pile" `retrieve_card` rule, said in the row.
+- **Buildable today?** No — `retrieve_card` reads discard/exhaust only and no card routes itself.
+- **Priority:** Medium.
+- **Status:** **planned (Wave 6, Phase BO, vocab v67)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BO.
+
+### 75. `grant_keyword` (give another card Retain / Ethereal / Sly)
+- **Surfaced by:** base-game audit (2026-10-01), "Grant a keyword to another card" row: `HandTrick`, `SculptingStrike`, `Snap`, `MasterPlannerPower` (6 cards).
+- **Fantasy it serves:** preparing a card for later — hold it, make it fleeting, or make it a free discard trick.
+- **Mechanic sketch:** op `grant_keyword {keyword: retain|ethereal|sly, cards: choose, card_type?}` through the existing hand picker (the `graft_card` path), skipping cards that already have it. Describe: "Choose a card in your hand. It gains Retain." / "Choose a Skill in your hand. It is Sly this turn." Card-only.
+- **Buildable today?** No.
+- **Priority:** Low-Medium.
+- **Status:** **planned (Wave 6, Phase BO, vocab v67)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BO.
+
+### 76. Self cost modification (`cost_delta`)
+- **Surfaced by:** base-game audit (2026-10-01), "Self cost modification" row: `Stomp`, `Pinpoint`, `MomentumStrike`, `UpMySleeve`, `Modded`, `KinglyKick`, `Transfigure` (13 cards).
+- **Fantasy it serves:** a card that gets cheaper as the turn builds, or free for the rest of the fight once it's paid off.
+- **Mechanic sketch:** card field `cost_delta {on, amount, scope}` (like `held_discount`): `on` ∈ `played` | `drawn` | `attack_played` | `skill_played` | `card_played` | `card_exhausted`; `amount` −2..+1 (+1 only with `played`); `scope` `this_turn` | `combat`; `set_zero:true` with `played` = Momentum Strike. Describe: "Costs 1 less this turn for each Skill you play." / "After you play this, it costs 0 for the rest of combat." / "Whenever you draw this, it costs 1 less this combat." / "Costs 1 more each time you play it." Not on 0/X cost; AutoSlay proves only the cost READ.
+- **Buildable today?** Partly — `held_discount` mutates cost on one event (retained).
+- **Priority:** Medium.
+- **Status:** **planned (Wave 6, Phase BP, vocab v68)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BP.
+
+### 77. Triggers: card generated, debuff applied (→ that enemy), orb evoked
+- **Surfaced by:** base-game audit (2026-10-01), "Whenever a card is generated" and "Whenever you apply a debuff" rows + the orb Partial row: `ArsenalPower`, `SmokestackPower`, `PillarOfCreationPower`, `ViciousPower`, `SleightOfFleshPower`, `ShroudPower`, `ConsumingShadowPower` (11 cards).
+- **Fantasy it serves:** engines that feed on your own actions — every token you make, every debuff you land, every orb you pop.
+- **Mechanic sketch:** reactive `add_trigger` kinds `on_card_generated` (fires for `add_status_card` Wounds too, as base Smokestack), `on_debuff_applied` (your debuffs on enemies, temporary wrappers excluded, optional `status` filter) with new payload target `that_enemy`, and `on_evoke` (orb classes only). Describe: "Whenever you create a card, …" / "Whenever you apply Vulnerable, …" / "Whenever you Evoke an orb, …"; fragment "deal 3 damage to that enemy". `on_energy_spent` is NOT built (#82).
+- **Buildable today?** No.
+- **Priority:** Medium.
+- **Status:** **planned (Wave 6, Phase BP, vocab v68)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BP.
+
+### 78. Orb extras (evoke variants, trigger passive, Loop, slot loss, orb scales, per-enemy channel)
+- **Surfaced by:** base-game audit (2026-10-01), Partial row "Orb operations": `Dualcast`, `MultiCast`, `Darkness`, `TeslaCoil`, `LoopPower`, `BulkUp`, `CompileDriver`, `Barrage`, `Chill` (17 cards).
+- **Fantasy it serves:** the orb class catching up to Defect — double-evokes, passive pumps, orb-count payoffs.
+- **Mechanic sketch:** `evoke` + `keep:true` ("Evoke your next orb twice.") and `which:"newest"`; `trigger_passive {amount, orbs: first|all}` ("Trigger the passive of your next orb 2 times."); self-buff `loop` (base `LoopPower`); card-only drawback `lose_orb_slot {amount:1}` (class must have ≥ 3 slots); scales `orb_count` / `orb_types` on damage/block/draw; `orb_count_ge` + an `orb` filter; `channel_orb` + `per_enemy:true`. Prerequisite: `ForgedOrb` must override `Passive` (today `LoopPower` / `OrbCmd.Passive` silently no-op on custom orbs). `on_evoke` ships with #77.
+- **Buildable today?** Partly — channel / evoke oldest / slots / Focus exist.
+- **Priority:** Medium (orb classes only).
+- **Status:** **planned (Wave 6, Phase BQ, vocab v69)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BQ.
+
+### 79. Discard your hand + `cards_removed` scale; growing turn-start damage
+- **Surfaced by:** base-game audit (2026-10-01), Partial row "Hand-wide discard / exhaust with a count" and "Growing per-turn damage power": `FiendFire`, `CalculatedGamble`, `StormOfSteel`, `Stoke`, `RollingBoulder`.
+- **Fantasy it serves:** dump everything for one huge payoff; a boulder that rolls harder every turn.
+- **Mechanic sketch:** `discard cards:"all"` ("Discard your hand.", Sly still fires) and `scale:"cards_removed"` (cards just discarded/exhausted by this play) → "Exhaust your hand. Deal damage equal to the cards Exhausted."; with #65, `hits_scale:"cards_removed"` is Fiend Fire proper. `grow` allowed in a `turn_start` payload on a targeted `damage` only (mod-native counter, NOT the base `RollingBoulderPower`, which waits on VFX) → "At the start of your turn, deal 5 damage to ALL enemies. Increases by 5 each turn."
+- **Buildable today?** Partly — `exhaust_card cards:"all"` exists; `discard` is random/choose only and payloads reject `grow`.
+- **Priority:** Low-Medium.
+- **Status:** **planned (Wave 6, Phase BR, vocab v70)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BR.
+
+### 80. Stars (Regent's second spendable resource)
+- **Surfaced by:** base-game audit (2026-10-01), "Stars" row: `Venerate`, `Comet`, `Stardust`, `ChildOfTheStars`, `BlackHole`, `Genesis` (31 cards, Regent).
+- **Fantasy it serves:** a royal class that banks stars and pays for its biggest cards in them.
+- **Mechanic sketch:** a second spendable counter plus a star-cost channel on `DataCard` (`gain_stars`, star costs, star-X, star triggers); `forge` / `spend_forge` is the template. Scout B9: the star state, HUD and card frame are generic, not Regent-gated. **What unblocks it:** a Wave 7 whose sole deliverable is a `royal_stars` class kind, after a 2 h spike confirms the star pip renders on a forged card (then 14–18 h build).
+- **Buildable today?** No.
+- **Priority:** High demand (31 base cards), but too big for Wave 6 (plan §6, §7 decision 9).
+- **Status:** captured (deferred from Wave 6, 2026-10-01)
+
+### 81. `end_turn` (VoidForm)
+- **Surfaced by:** base-game audit (2026-10-01), "Self-drawback debuffs" row: `VoidForm`.
+- **Fantasy it serves:** a card so strong that playing it ends your turn.
+- **Mechanic sketch:** op `end_turn` → `PlayerCmd.EndTurn(owner, canBackOut:false)`. Deferred because ending the turn inside OnPlay races AutoSlay's queued plays (hang risk at "Combat turn N"). **What unblocks it:** a 2–3 h AutoSlay spike.
+- **Buildable today?** No.
+- **Priority:** Low (1 base card).
+- **Status:** captured (deferred from Wave 6, 2026-10-01)
+
+### 82. `on_energy_spent` trigger (Orbit)
+- **Surfaced by:** base-game audit (2026-10-01), "Energy multiplication / energy-spent triggers" row: `OrbitPower`.
+- **Fantasy it serves:** "every 4 energy you spend, gain 1 energy" — rewards for big spending turns.
+- **Mechanic sketch:** reactive kind `on_energy_spent` (+ `every_n` from #62) on `AfterEnergySpent`. AutoSlay plays through `CardCmd.AutoPlay` and never spends energy, so the hook can't be smoke-proven. **What unblocks it:** a manual in-game check protocol.
+- **Buildable today?** No.
+- **Priority:** Low (1 base card).
+- **Status:** captured (deferred from Wave 6, 2026-10-01)
+
+### 83. Run-economy effects (gold, potions, extra rewards, upgrade at combat end)
+- **Surfaced by:** base-game audit (2026-10-01), "Run-economy effects" row: `HandOfGreed`, `RoyaltiesPower`, `Alchemize`, `TheHunt`, `ForbiddenGrimoirePower`, `ImprovementPower` (7 cards).
+- **Fantasy it serves:** the merchant / treasure hunter whose fights pay out beyond the fight.
+- **Mechanic sketch:** `PlayerCmd.GainGold`, `PotionCmd.TryToProcure`, `room.AddExtraReward`, upgrade-at-combat-end; the relic `combat_end` hook exists for the heal form only. Run-level balance risk. **What unblocks it:** Ryan's call on run-economy in forged classes.
+- **Buildable today?** No.
+- **Priority:** Low until the policy call.
+- **Status:** captured (deferred from Wave 6, 2026-10-01)
+
+### 84. Damage / Block multipliers and debuff amplifiers
+- **Surfaced by:** base-game audit (2026-10-01), "Damage/Block multipliers" row: `CrueltyPower`, `DebilitatePower`, `TrackingPower`, `LethalityPower`, `UnmovablePower`, `ColossusPower` (8 cards).
+- **Fantasy it serves:** "Vulnerable is stronger", "×2 against Weak targets", "your first Block each turn is doubled".
+- **Mechanic sketch:** forged powers on `ModifyDamageMultiplicative` / `ModifyBlockMultiplicative`; the only analog today is custom-status `mode: multiplicative` (+10%/stack, ×2 cap). **What unblocks it:** Phase BM proving the base-power status pipe at scale.
+- **Buildable today?** No.
+- **Priority:** Medium.
+- **Status:** captured (deferred from Wave 6, 2026-10-01)
+
+### 85. Combat-scoped transform
+- **Surfaced by:** base-game audit (2026-10-01), Partial row "Combat-scoped transform": `PrimalForce`, `Compact`, `Begone`, `Guards`, `Charge`, `Seance`, `EntropyPower` (7 cards).
+- **Fantasy it serves:** turn every Attack in hand into a boulder for this fight only.
+- **Mechanic sketch:** `transform_card` / `graft_card` are run-permanent by design (#35 / #7); this wants combat-only, all/up-to-N of a type, draw-pile source, random target. **What unblocks it:** a `scope:"combat"` on the transform family.
+- **Buildable today?** No (run-permanent forms only).
+- **Priority:** Low-Medium.
+- **Status:** captured (deferred from Wave 6, 2026-10-01)
+
+### 86. Copy another chosen card
+- **Surfaced by:** base-game audit (2026-10-01), "Copy another chosen card" row: `DualWield`, `HeirloomHammer`, `Nightmare`, `JugglingPower` (4 cards).
+- **Fantasy it serves:** "choose a card in your hand, add a copy of it" — doubling down on what you have.
+- **Mechanic sketch:** `CreateClone()` of a hand pick + `AddGeneratedCardToCombat` (the `add_card` path with a chosen source), under `add_card`'s depth-1 loop rule. **What unblocks it:** a small follow-up after #72 (`add_random_card`) lands the picker.
+- **Buildable today?** No.
+- **Priority:** Low-Medium.
+- **Status:** captured (deferred from Wave 6, 2026-10-01)
+
+### 87. Status-card synergy
+- **Surfaced by:** base-game audit (2026-10-01), "Status-card synergy" row: `FlakCannon`, `Compact` (the `IterationPower` Status-drawn filter ships in #62).
+- **Fantasy it serves:** a class that turns its own junk (Burns, Wounds, Dazed) into fuel.
+- **Mechanic sketch:** `card_type:"status"` filters on `exhaust_card` / `on_card_drawn` plus a `status_cards_owned` scale. **What unblocks it:** Phase BP's `on_card_generated` (#77) + a `status_cards_owned` scale.
+- **Buildable today?** No (`add_status_card` makes the cards; nothing reads them).
+- **Priority:** Low.
+- **Status:** captured (deferred from Wave 6, 2026-10-01)
+
+### 88. Shared growth across copies
+- **Surfaced by:** base-game audit (2026-10-01), "Shared or persistent growth across copies" row: `Claw`, `Maul`, `KinglyPunch`, `Thrash` (4 cards).
+- **Fantasy it serves:** every copy of the card grows when any one is played (Claw).
+- **Mechanic sketch:** `grow` is per-instance (#23). **What unblocks it:** a `grow_shared` field iterating `PlayerCombatState.AllCards` by id (the Claw `BuffFromClawPlay` pattern).
+- **Buildable today?** No.
+- **Priority:** Low.
+- **Status:** captured (deferred from Wave 6, 2026-10-01)
+
+### 89. Per-card-played enemy debuff (Strangle)
+- **Surfaced by:** base-game audit (2026-10-01), "Per-card-played debuff on the enemy" row: `Strangle`, `Oblivion`, `MadScience` (Choking) (3 cards).
+- **Fantasy it serves:** "this turn, whenever you play a card, the enemy loses 2 HP".
+- **Mechanic sketch:** a forged instanced enemy debuff on `BeforeCardPlayed` / `AfterCardPlayed` (the `StranglePower` pattern). **What unblocks it:** a custom-status hook `on_opponent_card_played`.
+- **Buildable today?** No.
+- **Priority:** Low.
+- **Status:** captured (deferred from Wave 6, 2026-10-01)
+
+### 90. Additive history scales (base + N × count)
+- **Surfaced by:** base-game audit (2026-10-01), "New history/state scale sources" + "Additive debuff-count damage" rows: `Murder`, `MementoMori`, `Rend`.
+- **Fantasy it serves:** the exact base shape — "deal 6 damage, +2 for each card discarded this turn".
+- **Mechanic sketch:** #63 ships replace-semantics ("equal to"); the base cards are `base + N×count`. **What unblocks it:** an `additive` flag on `scale` (plan §7 decision 4 follow-up).
+- **Buildable today?** No (replace form only, after #63).
+- **Priority:** Low.
+- **Status:** captured (deferred from Wave 6, 2026-10-01)
+
+### 91. Playability restriction ("unplayable unless") + cost 5+ with self-reduction
+- **Surfaced by:** base-game audit (2026-10-01), Partial rows "Playability restriction" and "Cost ceiling": `GrandFinale`, `Clash`, `HighFive`, `MeteorStrike`, `BansheesCry` (5 cards).
+- **Fantasy it serves:** the card you can only play when the moment is right; the giant spell that costs 9 until you earn it down.
+- **Mechanic sketch:** true greyed-out "unplayable unless {condition}" (today only a `when` gate on the payoff); cost 5+ paired with self-reduction. **What unblocks it:** Phase BP's `cost_delta` (#76) makes 5-cost + reduction expressible later; the playability half stays niche.
+- **Buildable today?** Partly (a `when` gate approximates it).
+- **Priority:** Low.
+- **Status:** captured (deferred from Wave 6, 2026-10-01)
