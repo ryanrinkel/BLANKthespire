@@ -386,8 +386,9 @@ BP_ARCHETYPE_CEILING = 70_000  # (b) the design prompt for ONE archetype's selec
 BP_INDEX_CEILING = 6_000       # (a) = gate.INDEX_BUDGET (the index adapts its clause length to stay under it)
 BP_READING = 108_282          # the untrimmed v2 path (= the `full` rollback with no selection) — 2026-09-30, Wave 5
 BP_READING_V1 = 108_179       # flag-off (informational)
-BP_READING_SCAFFOLD = 45_537  # BP_READING minus VOCABULARY.md: the `full` path's scaffold half, snapshotted by (e)
-BP_TREE_READING_SCAFFOLD = 45_789  # (d) on the all-ops tree path at BH-3 (45,537 + the index/detail pointer)
+BP_READING_SCAFFOLD = 45_673  # BP_READING minus VOCABULARY.md: the `full` path's scaffold half, snapshotted by (e)
+                              # (45,537 at BH-3; +136 Phase BI v61: the TRIGGERS pitch's one-line filter sentence)
+BP_TREE_READING_SCAFFOLD = 45_925  # (d) on the all-ops tree path (45,789 at BH-3 = 45,537 + the index/detail pointer; +136 BI)
 
 
 def _tree_prompt(ops, kind, **kw) -> str:

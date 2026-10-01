@@ -666,6 +666,7 @@ public static class EffectRunner
         "skill"      => c.Type == CardType.Skill,
         "power"      => c.Type == CardType.Power,
         "non_attack" => c.Type != CardType.Attack,
+        "status"     => c.Type == CardType.Status, // Phase BI (v61): the on_card_drawn Iteration filter
         _            => true,
     };
 

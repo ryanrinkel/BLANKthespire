@@ -190,7 +190,8 @@ def _t_contract() -> None:
     eff = schema["$defs"]["effect"]["properties"]
     trig = schema["$defs"]["triggerEffect"]["properties"]
     check("cost_shift" in eff["op"]["enum"] and "cost_shift" not in trig["op"]["enum"], "schema: cost_shift is a card-level op only")
-    check(set(eff["card_type"]["enum"]) == {"attack", "skill", "power", "all", "non_attack"} and set(eff["scope"]["enum"]) == {"this_turn", "combat"}
+    # Phase BI (v61): + `status` (the on_card_drawn add_trigger filter — the add_trigger clause admits it, cost_shift's does not)
+    check(set(eff["card_type"]["enum"]) == {"attack", "skill", "power", "all", "non_attack", "status"} and set(eff["scope"]["enum"]) == {"this_turn", "combat"}
           and eff["count"]["maximum"] == 3, "schema: card_type / scope / count properties")
     check(all(k not in trig for k in ("card_type", "scope", "count")), "schema: the three fields are not on triggerEffect")
     vocab = paths.VOCABULARY.read_text(encoding="utf-8")

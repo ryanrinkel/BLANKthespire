@@ -78,6 +78,10 @@ namespace BlankTheSpire.BlankTheSpireCode.Engine;
 /// Phase AP also reuses <see cref="Cards"/> on <c>discard</c> (<c>"random"</c> / <c>"choose"</c> — the player picks which
 /// cards to discard) and on <c>retrieve_card</c> (random / choose), and <see cref="Pile"/> on <c>retrieve_card</c>
 /// (<c>"discard"</c> / <c>"exhaust"</c> — the pile a card is returned to your hand from).</param>
+/// <param name="EveryN">Phase BI (v61, gap #62): on an <c>add_trigger</c> op with a power-hosted multi-fire trigger, the
+/// payload fires only on the Nth, 2Nth… matching event (2..9; Panache / Juggling). Counted PER COMBAT on the granted power
+/// instance (relic <c>every_n</c> parity). 0 = every event. Phase BI also reuses <see cref="CardKind"/> on add_trigger (the
+/// played/drawn card filter) and <see cref="Scope"/> (<c>"this_turn"</c>: the power removes itself at your turn end — Rage).</param>
 public sealed record EffectSpec(string Op, int Amount = 0, string? Status = null, int Hits = 1, string? Scale = null,
     string? Orb = null, Condition? When = null, string? Trigger = null, EffectSpec[]? Triggered = null,
     string? StatusName = null, string? SummonName = null, bool OncePerTurn = false, string? Target = null,
@@ -86,7 +90,8 @@ public sealed record EffectSpec(string Op, int Amount = 0, string? Status = null
     bool Unblockable = false, // Phase AN (v44): a `damage` op that IGNORES Block (ValueProp.Unblockable on its damage var)
     string? CardKind = null, string? Scope = null, int Count = 0, // Phase AO (v45): the cost_shift filter / lifetime / use budget
     string? StatusCard = null, // Phase AP (v46): the add_status_card kind (dazed/wound/burn)
-    int GrowHeld = 0) // Phase BD (v58, gap #57): +GrowHeld damage/Block per turn THIS card was retained (Windmill Strike)
+    int GrowHeld = 0, // Phase BD (v58, gap #57): +GrowHeld damage/Block per turn THIS card was retained (Windmill Strike)
+    int EveryN = 0) // Phase BI (v61, gap #62): on add_trigger, fire only on every Nth event (2..9, counted per combat)
 {
     /// <summary>Phase BD (v58, gap #57): this <c>damage</c>/<c>block</c> op's amount INCREASES by <see cref="GrowHeld"/>
     /// for each end-of-turn flush THIS card instance survived in hand (Retain) — <c>amount + GrowHeld × turns held</c>

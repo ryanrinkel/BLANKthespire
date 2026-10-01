@@ -51,6 +51,10 @@ def card_tokens(card: dict) -> set[str]:
         toks.add("unblockable")
     if cc.grow_held:  # Phase BD (v58): the held-turn growth field is a token too (retain_hold claims it)
         toks.add("grow_held")
+    if cc.trigger_card_types:  # Phase BI (v61): the trigger filters are tokens power_ramp / strike_tempo claim
+        toks.add("card_type")
+    if cc.every_n:
+        toks.add("every_n")
     return toks
 
 

@@ -90,6 +90,10 @@ class CardCensus:
     upgrade_cost: bool = False                             # the upgrade carries an absolute `cost` (Phase AG)
     once_per_turn: int = 0                                 # add_trigger effects flagged once_per_turn
     once_per_combat: int = 0                               # Phase AK (v41): add_trigger effects flagged once_per_combat
+    # Phase BI (v61, gap #62): the add_trigger filters — card_type kinds, every_n triggers, this_turn triggers.
+    trigger_card_types: Counter = field(default_factory=Counter)
+    every_n: int = 0
+    this_turn_triggers: int = 0
     ripen_amounts: Counter = field(default_factory=Counter)    # ripen trigger countdowns (amount -> count)
     targeted_payloads: int = 0                             # effects INSIDE a trigger payload carrying a `target`
     # Phase AL (v42): what the trigger PAYLOADS reach for — the op tally inside payloads (so a class-kind engine
@@ -178,6 +182,12 @@ def _walk_effects(effects, cc: CardCensus, *, in_payload: bool = False) -> None:
                 cc.once_per_turn += 1
             if eff.get("once_per_combat") is True:  # Phase AK (v41)
                 cc.once_per_combat += 1
+            if isinstance(eff.get("card_type"), str) and eff.get("card_type"):  # Phase BI (v61)
+                cc.trigger_card_types[eff["card_type"].strip().lower()] += 1
+            if isinstance(eff.get("every_n"), int) and not isinstance(eff.get("every_n"), bool) and eff["every_n"] > 1:
+                cc.every_n += 1
+            if str(eff.get("scope") or "").strip().lower() == "this_turn":
+                cc.this_turn_triggers += 1
             _walk_effects(eff.get("effects"), cc, in_payload=True)  # nested payload
         when = eff.get("when")
         if isinstance(when, dict):
@@ -248,6 +258,9 @@ class Census:
     upgrade_cost_cards: int = 0
     once_per_turn: int = 0
     once_per_combat: int = 0
+    trigger_card_types: Counter = field(default_factory=Counter)  # Phase BI (v61)
+    every_n: int = 0
+    this_turn_triggers: int = 0
     ripen_amounts: Counter = field(default_factory=Counter)
     targeted_payloads: int = 0
     grow: int = 0
@@ -307,6 +320,9 @@ class Census:
             self.upgrade_cost_cards += 1
         self.once_per_turn += cc.once_per_turn
         self.once_per_combat += cc.once_per_combat
+        self.trigger_card_types.update(cc.trigger_card_types)  # Phase BI (v61)
+        self.every_n += cc.every_n
+        self.this_turn_triggers += cc.this_turn_triggers
         self.ripen_amounts.update(cc.ripen_amounts)
         self.targeted_payloads += cc.targeted_payloads
         self.grow += cc.grow
@@ -325,10 +341,11 @@ class Census:
         self.cost4 += other.cost4  # Phase AX (v53)
         self.forge_persist += other.forge_persist  # Phase AY (v54)
         for name in ("ops", "statuses", "triggers", "whens", "scales", "keywords", "custom_statuses",
-                     "summon_buffs", "ripen_amounts", "payload_ops"):
+                     "summon_buffs", "ripen_amounts", "payload_ops", "trigger_card_types"):
             getattr(self, name).update(getattr(other, name))
         for name in ("multi_hit", "tagged_cards", "upgrade_cost_cards", "once_per_turn", "once_per_combat",
-                     "targeted_payloads", "grow", "grow_held", "scaled_payloads", "multi_hit_payloads"):
+                     "targeted_payloads", "grow", "grow_held", "scaled_payloads", "multi_hit_payloads",
+                     "every_n", "this_turn_triggers"):
             setattr(self, name, getattr(self, name) + getattr(other, name))
 
 
@@ -449,6 +466,8 @@ def format_report(named: list[tuple[str, Census]]) -> str:
                f"  | all: {_all(agg.triggers)}")
     out.append(f"  trigger extras: once_per_turn={agg.once_per_turn}  once_per_combat={agg.once_per_combat}"
                f"  targeted_payloads={agg.targeted_payloads}  ripen_amounts: {_all(agg.ripen_amounts)}")
+    out.append(f"  trigger filters (BI, v61): card_type: {_all(agg.trigger_card_types)}  every_n={agg.every_n}"
+               f"  this_turn={agg.this_turn_triggers}")
     out.append(f"  trigger payloads (AL): scaled_payloads={agg.scaled_payloads}  multi_hit_payloads={agg.multi_hit_payloads}"
                f"  payload_ops: {_all(agg.payload_ops)}")
     out.append(f"  when: {_order(agg.whens, ['turn_at_least','enemy_count_ge','hp_below_half'])}  | all: {_all(agg.whens)}")

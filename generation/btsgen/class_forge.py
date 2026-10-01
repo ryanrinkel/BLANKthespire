@@ -409,7 +409,7 @@ make a class snowball; give most classes one or two. Keep per-turn numbers small
 payload's numeric effect may also `scale` to "cards_retained" / "cards_in_hand" / "unspent_energy_last_turn" / \
 "forged" (e.g. "power: at end of turn, gain Block equal to cards retained"); a payload damage may carry "hits"; \
 a SUMMON class may fire summon_attack / buff_summon and a STATUS class apply_status_custom inside a payload (the \
-minion strikes / the signature status ticks every turn on its own).
+minion strikes / the signature status ticks every turn on its own). Filters (v61): card_type ("whenever you play an Attack"), every_n ("every 3rd"), scope "this_turn" (Rage), payload target random_enemy.
 
 SCALED AMOUNTS / RETAIN PAYOFF (`scale`): a damage/block/draw card effect can make its amount a LIVE value \
 instead of a fixed number by adding `"scale": "<source>"` (keep a nominal "amount"; it is ignored). Sources: \

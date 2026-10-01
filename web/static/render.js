@@ -486,6 +486,30 @@ const TRIGGER_PREFIX = {
   ripen: "After it ripens in hand", on_hp_lost: "Whenever you lose HP",
   on_poison_damage: "Whenever an enemy takes Poison damage", // Phase BE (v59, gap #56)
 };
+// Phase BI (v61, gap #62): the card-trigger filters read exactly like the card text (cardgen._trigger_head /
+// ForgedCards.TriggerSentence): "Whenever you play an Attack", "Every 3rd time you play an Attack",
+// "Every 5th card you play", "This turn, whenever you play an Attack".
+const REACTIVE_HEAD = {
+  on_hp_lost: "Whenever you lose HP", on_exhaust: "Whenever a card is Exhausted",
+  on_card_played: "Whenever you play a card", on_card_drawn: "Whenever you draw a card",
+  on_damage_dealt: "Whenever you deal damage", on_block_gained: "Whenever you gain Block",
+  attacked: "Whenever you are attacked", on_blade_played: "Whenever you play your blade",
+  on_poison_damage: "Whenever an enemy takes Poison damage",
+};
+const TRIGGER_KIND_WORDS = { attack: "an Attack", skill: "a Skill", power: "a Power", non_attack: "a non-Attack card", status: "a Status" };
+function trigHead(e) {
+  const n = e.every_n > 1 ? e.every_n : 0;
+  if (!e.card_type && !n && e.scope !== "this_turn") return TRIGGER_PREFIX[e.trigger] || "Each turn";
+  const typed = e.card_type && (e.trigger === "on_card_played" || e.trigger === "on_card_drawn");
+  let when = typed ? `Whenever you ${e.trigger === "on_card_drawn" ? "draw" : "play"} ${TRIGGER_KIND_WORDS[e.card_type] || "a card"}`
+                   : (REACTIVE_HEAD[e.trigger] || TRIGGER_PREFIX[e.trigger] || "Each turn");
+  if (n) {
+    if (!typed && e.trigger === "on_card_played") when = `Every ${ordinal(n)} card you play`;
+    else if (!typed && e.trigger === "on_card_drawn") when = `Every ${ordinal(n)} card you draw`;
+    else if (when.startsWith("Whenever ")) when = `Every ${ordinal(n)} time ${when.slice(9)}`;
+  }
+  return e.scope === "this_turn" ? `This turn, ${when[0].toLowerCase()}${when.slice(1)}` : when;
+}
 const SCALE_SUFFIX = {
   cards_in_hand: " per card in hand", cards_retained: " per card retained",
   unspent_energy_last_turn: " per unspent energy",
@@ -584,8 +608,8 @@ function effPhrase(e, target) {
     case "buff_summon": return `Give your minion +${a ?? ""} ${statusName(e.status)}`;
     case "sacrifice_summon": return "Sacrifice your minion"; // Phase AV (v52): consume it (its on_death rattle fires)
     case "add_trigger":
-      return `${TRIGGER_PREFIX[e.trigger] || "Each turn"}: `
-             + (e.effects || []).map((x) => effPhrase(x, "self")).join(", ");
+      return `${trigHead(e)}: ` // Phase BI (v61): the filtered heads + "to a random enemy"
+             + (e.effects || []).map((x) => effPhrase(x, "self") + (x.target === "random_enemy" ? " to a random enemy" : "")).join(", ");
     default: return a != null ? `${titleCase(e.op)} ${a}` : titleCase(e.op);
   }
 }

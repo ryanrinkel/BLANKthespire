@@ -197,6 +197,13 @@ def effect_literal(e: dict) -> str:
         nested = "[" + ", ".join(effect_literal(x) for x in e.get("effects", [])) + "]"
         # Amount carries the "ripen" countdown (turns to wait); 0/unused for turn_start/turn_end.
         lit = f'new EffectSpec("add_trigger", {e.get("amount", 0)}, Trigger: "{e.get("trigger", "")}", Triggered: {nested})'
+        # Phase BI (v61, gap #62): the trigger filters as named args, lockstep with ForgedCards.ParseEffects.
+        if e.get("card_type"):
+            lit = f'{lit[:-1]}, CardKind: "{str(e["card_type"]).lower()}")'
+        if e.get("scope"):
+            lit = f'{lit[:-1]}, Scope: "{str(e["scope"]).lower()}")'
+        if e.get("every_n"):
+            lit = f"{lit[:-1]}, EveryN: {int(e['every_n'])})"
     elif op == "apply_status_custom":
         # Phase J: named StatusName arg (the class status_pool entry, resolved against the class at runtime).
         name = str(e.get("status_name", "")).replace("\\", "\\\\").replace('"', '\\"')
@@ -398,7 +405,9 @@ def _trigger_fragment(e: dict) -> str:
     hits = hits if isinstance(hits, int) and not isinstance(hits, bool) else 1
     tgt = e.get("target")
     # H4: targeted AoE suffix (single enemy → none); Phase AK (v41): the riposte target reads "to the attacker".
-    to = " to ALL enemies" if tgt == "all_enemies" else " to the attacker" if tgt == "attacker" else ""
+    # Phase BI (v61): "… to a random enemy" for the Juggernaut target.
+    to = (" to ALL enemies" if tgt == "all_enemies" else " to the attacker" if tgt == "attacker"
+          else " to a random enemy" if tgt == "random_enemy" else "")
     if op == "damage":  # H4 (gap #14): only meaningful with a target
         if not tgt:
             return ""
@@ -462,6 +471,38 @@ def _trigger_fragment(e: dict) -> str:
     return ""
 
 
+# Phase BI (v61, gap #62): the add_trigger card filter as a noun phrase. Mirrors ForgedCards.TriggerKindWord.
+_TRIGGER_KIND_WORDS = {"attack": "an Attack", "skill": "a Skill", "power": "a Power",
+                       "non_attack": "a non-Attack card", "status": "a Status"}
+
+
+def _ordinal(n: int) -> str:
+    # Phase BI (v61): 2nd / 3rd / 4th … (every_n is 2..9). Mirrors ForgedCards.Ordinal.
+    return f"{n}{'nd' if n == 2 else 'rd' if n == 3 else 'th'}"
+
+
+def _trigger_head(t: dict, when: str) -> str:
+    """Phase BI (v61, gap #62): reword the trigger head for the filters — "Whenever you play an Attack" /
+    "Whenever you draw a Status"; "Every 3rd time you play an Attack" / "Every 5th card you play"; and the
+    "This turn, whenever …" prefix. Mirrors the Phase BI block of ForgedCards.TriggerSentence."""
+    trig = t.get("trigger")
+    kind = str(t.get("card_type") or "").lower() or None
+    if kind and trig in ("on_card_played", "on_card_drawn"):
+        when = f"Whenever you {'draw' if trig == 'on_card_drawn' else 'play'} {_TRIGGER_KIND_WORDS.get(kind, 'a card')}"
+    n = t.get("every_n")
+    if isinstance(n, int) and not isinstance(n, bool) and n > 1:
+        nth = _ordinal(n)
+        if not kind and trig == "on_card_played":
+            when = f"Every {nth} card you play"
+        elif not kind and trig == "on_card_drawn":
+            when = f"Every {nth} card you draw"
+        elif when.startswith("Whenever "):
+            when = f"Every {nth} time {when[len('Whenever '):]}"
+    if str(t.get("scope") or "").lower() == "this_turn":
+        when = f"This turn, {when[0].lower()}{when[1:]}"
+    return when
+
+
 def trigger_sentence(t: dict) -> str:
     # The trigger sentence WITHOUT its condition (the caller weaves When). Mirrors ForgedCards.TriggerSentence.
     trig = t.get("trigger")
@@ -492,6 +533,7 @@ def trigger_sentence(t: dict) -> str:
         when = "Whenever an enemy takes Poison damage"
     else:
         when = "At the end of your turn"
+    when = _trigger_head(t, when)
     frags = [f for f in (_trigger_fragment(x) for x in t.get("effects", [])) if f]
     # H4 once_per_turn; Phase AK (v41) once_per_combat (never both — the validator rejects the pair)
     once = " (once per combat)" if t.get("once_per_combat") else " (once per turn)" if t.get("once_per_turn") else ""

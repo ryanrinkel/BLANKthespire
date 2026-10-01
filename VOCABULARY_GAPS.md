@@ -663,7 +663,7 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Mechanic sketch:** port the relic v48 hook filters to card `add_trigger`: `card_type` (attack/skill/power/non_attack, + `status` on `on_card_drawn` only) on `on_card_played` / `on_card_drawn`; `every_n` 2..9 on multi-fire kinds (never with `once_per_combat`; priced at amount / n); `scope:"this_turn"` on reactive kinds (the power removes itself at your turn end, the `RagePower` recipe); payload target `random_enemy`. Describe: "Whenever you play an Attack, …" / "Every 3rd time you play an Attack, …" / "This turn, whenever you play an Attack, gain 3 Block." / "… to a random enemy". Defaults (plan §7): `every_n` counts per combat (relic parity, not per turn like base Panache); a this-turn power stays Single-stack (a second Rage in one turn adds no payload — priced, not multiplied).
 - **Buildable today?** Partly: unfiltered `on_card_played` / `on_card_drawn` exist and relics already have `card_type` + `every_n`; card triggers do not.
 - **Priority:** High — the cheapest high-count win of Wave 6.
-- **Status:** **planned (Wave 6, Phase BI, vocab v61)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BI.
+- **Status:** **done (2026-10-02, vocab v61, Phase BI)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BI.
 
 ### 63. Combat-history scales, draw to hand size, double energy
 - **Surfaced by:** base-game audit (2026-10-01), "New history/state scale sources", "Draw to hand size N" and "Energy multiplication" rows: `AshenStrike`, `MementoMori`, `Murder`, `DeathMarch`, `TearAsunder`, `HelixDrill`, `Supermassive`, `Stack`, `Mirage`, `Bully`, `TimesUp`, `Expertise`, `DoubleEnergy` (~20 cards).

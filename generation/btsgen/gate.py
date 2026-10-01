@@ -127,8 +127,9 @@ FIELD_UNITS = {
     "card_id": ("add_card", "transform_card", "graft_card"),
     "pile": ("add_card", "add_status_card", "retrieve_card"),
     "cards": ("discard", "retrieve_card", "upgrade_card", "exhaust_card"),  # Phase BC (v57)
-    "pole": ("balance_step",), "card_type": ("cost_shift", "exhaust_card", "draw_until"),  # Phase BC (v57)
-    "scope": ("cost_shift",), "count": ("cost_shift",),
+    "pole": ("balance_step",), "card_type": ("cost_shift", "exhaust_card", "draw_until", "add_trigger"),  # Phase BC (v57) / BI (v61)
+    "scope": ("cost_shift", "add_trigger"), "count": ("cost_shift",),
+    "every_n": ("add_trigger",),  # Phase BI (v61, gap #62): the trigger filters
     "card": ("add_status_card",),
 }
 DEF_UNITS = {"triggerEffect": ("add_trigger",)}

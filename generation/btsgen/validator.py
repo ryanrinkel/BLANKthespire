@@ -136,6 +136,13 @@ _PICK_MODES = {"random", "choose"}
 # ForgedCards.ExhaustPickModes / HandKindFilters / ExhaustCardMaxAmount + the schema clauses. Both ops are card-only.
 _EXHAUST_PICK_MODES = {"choose", "random", "up_to", "all"}
 _HAND_KIND_FILTERS = {"attack", "skill", "power", "non_attack"}
+# Phase BI (v61, gap #62): the add_trigger filters (the relic v48 hook filters ported to cards). `card_type` = the hand
+# filters + `status` (on_card_drawn only — Iteration); `every_n` 2..9 and `scope:"this_turn"` on the POWER-HOSTED
+# reactive kinds (the counter / the self-removal live on the per-combat power; the card-latent on_discard has none).
+# Mirrors ForgedCards.TriggerCardKinds / TriggerCardKindTriggers / MinEveryN / MaxEveryN + the schema clauses.
+_TRIGGER_CARD_KINDS = _HAND_KIND_FILTERS | {"status"}
+_TRIGGER_CARD_KIND_TRIGGERS = {"on_card_played", "on_card_drawn"}
+_EVERY_N_MIN, _EVERY_N_MAX = 2, 9
 _EXHAUST_CARD_MAX = 3
 _STATUS_CARDS = {"dazed", "wound", "burn"}
 _RETRIEVE_MAX = 2
@@ -669,10 +676,13 @@ class CardValidator:
                     out.append(f"cost_shift 'count' (the plays it applies to) must be 1..{_COST_SHIFT_MAX_COUNT}; got {cn!r}.")
                 if sc == "combat" and ca != 1:
                     out.append("cost_shift with scope 'combat' must use amount 1 (a whole-combat -2 is degenerate).")
-            elif e.get("scope") is not None or e.get("count") is not None:
-                out.append(f"'scope'/'count' only apply to cost_shift (op '{op}').")
-            elif e.get("card_type") is not None and op not in ("exhaust_card", "draw_until"):  # Phase BC (v57)
-                out.append(f"'card_type' only applies to cost_shift/exhaust_card/draw_until (op '{op}').")
+            # Phase BI (v61): add_trigger also takes `scope` ("this_turn") + `card_type` (checked with the trigger rules).
+            elif e.get("count") is not None or (e.get("scope") is not None and op != "add_trigger"):
+                out.append(f"'scope'/'count' only apply to cost_shift ('scope':'this_turn' also to add_trigger) (op '{op}').")
+            elif e.get("card_type") is not None and op not in ("exhaust_card", "draw_until", "add_trigger"):  # Phase BC (v57)
+                out.append(f"'card_type' only applies to cost_shift/exhaust_card/draw_until/add_trigger (op '{op}').")
+            if e.get("every_n") is not None and op != "add_trigger":  # Phase BI (v61)
+                out.append(f"'every_n' only applies to add_trigger (op '{op}').")
             if scale:
                 if scale not in _SUPPORTED_SCALES:
                     out.append(f"unsupported scale '{scale}' (one of {'/'.join(sorted(_SUPPORTED_SCALES))}).")
@@ -1033,9 +1043,39 @@ class CardValidator:
                            f"({'/'.join(sorted(_ONCE_PER_COMBAT_TRIGGERS))}); got '{e.get('trigger')}'.")
             if e.get("once_per_combat") and e.get("once_per_turn"):
                 out.append("'once_per_combat' already implies once per turn — set one, not both.")
+            # Phase BI (v61, gap #62): the trigger filters. Mirrors ForgedCards.ValidateTrigger.
+            trig = e.get("trigger")
+            ck = e.get("card_type")
+            if ck is not None:
+                ck = str(ck).strip().lower()
+                if trig not in _TRIGGER_CARD_KIND_TRIGGERS:
+                    out.append(f"an add_trigger 'card_type' only applies to on_card_played/on_card_drawn (got '{trig}').")
+                elif ck not in _TRIGGER_CARD_KINDS:
+                    out.append(f"an add_trigger 'card_type' must be one of {'/'.join(sorted(_TRIGGER_CARD_KINDS))}; got '{ck}'.")
+                elif ck == "status" and trig != "on_card_drawn":
+                    out.append("an add_trigger 'card_type':'status' only applies to on_card_drawn (a Status is never played).")
+            en = e.get("every_n")
+            if en is not None:
+                if trig not in _ONCE_PER_COMBAT_TRIGGERS:
+                    out.append(f"'every_n' only applies to a power-hosted multi-fire trigger "
+                               f"({'/'.join(sorted(_ONCE_PER_COMBAT_TRIGGERS))}); got '{trig}'.")
+                if not (isinstance(en, int) and not isinstance(en, bool) and _EVERY_N_MIN <= en <= _EVERY_N_MAX):
+                    out.append(f"'every_n' must be {_EVERY_N_MIN}..{_EVERY_N_MAX}; got {en!r}.")
+                if e.get("once_per_combat"):
+                    out.append("'every_n' can't be combined with 'once_per_combat' (it would fire once, on the Nth event — use one or the other).")
+            sc = e.get("scope")
+            if sc is not None:
+                if str(sc).strip().lower() != "this_turn":
+                    out.append(f"an add_trigger 'scope' must be 'this_turn' (got '{sc}').")
+                elif trig not in _ONCE_PER_COMBAT_TRIGGERS:
+                    out.append(f"'scope':'this_turn' only applies to a power-hosted reactive trigger "
+                               f"({'/'.join(sorted(_ONCE_PER_COMBAT_TRIGGERS))}); got '{trig}'.")
             for t in (e.get("effects") or []):
                 if not isinstance(t, dict):
                     continue
+                if any(t.get(k) is not None for k in ("every_n", "card_type", "scope", "count")):  # Phase BI (v61)
+                    out.append("'every_n' / 'card_type' / 'scope' / 'count' are not allowed on a trigger payload effect "
+                               "(put the filter on the add_trigger op).")
                 op = t.get("op")
                 tgt = t.get("target")
                 ts = str(t.get("scale", "")).strip().lower()
@@ -1371,7 +1411,12 @@ class CardValidator:
         if op == "add_trigger":
             # Phase H3: a per-turn engine. Score one round of the payload (a conservative lower bound — the
             # real value compounds over the fight; _has_composite keeps it off the flat-rare floor).
-            return sum(self._score_effect(t) for t in eff.get("effects", []))
+            payload = sum(self._score_effect(t) for t in eff.get("effects", []))
+            # Phase BI (v61, gap #62): an every-N payload lands on one event in N — price it at amount / n.
+            n = eff.get("every_n")
+            if isinstance(n, int) and not isinstance(n, bool) and n > 1:
+                return payload / n
+            return payload
         return 0.0
 
     def _score_legacy_prototype_effect(self, op: str, eff: dict) -> float:

@@ -1094,12 +1094,16 @@
           "unblockable",
           "apply_status",
           "add_status_card",
-          "draw_until"
+          "draw_until",
+          "card_type",
+          "every_n"
         ],
         "class_kind": "normal"
       },
       "buildable": true,
-      "gap_refs": [],
+      "gap_refs": [
+        "VOCABULARY_GAPS#62"
+      ],
       "base_synergies": {
         "hooks": [
           "attacks_per_turn",
@@ -1195,7 +1199,7 @@
           "Needs card flow"
         ]
       },
-      "build_notes": "Cheap swings in volume, and `draw_until` (v57, Pillage) as the attack that digs through the Attacks for the one Skill or Power the turn needs."
+      "build_notes": "Cheap swings in volume, and `draw_until` (v57, Pillage) as the attack that digs through the Attacks for the one Skill or Power the turn needs. A Juggling power (`every_n` Attacks: damage to a random enemy) pays off the volume (v61)."
     },
     {
       "id": "orb_channel",
@@ -2088,12 +2092,16 @@
         "ops": [
           "add_trigger",
           "apply_status",
-          "scale"
+          "scale",
+          "card_type",
+          "every_n"
         ],
         "class_kind": "normal"
       },
       "buildable": true,
-      "gap_refs": [],
+      "gap_refs": [
+        "VOCABULARY_GAPS#62"
+      ],
       "base_synergies": {
         "hooks": [
           "powers_played",

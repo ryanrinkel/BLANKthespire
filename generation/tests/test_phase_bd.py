@@ -98,7 +98,7 @@ def _t_engine() -> None:
     check("else if (e.HasGrowHeld) WithCalculatedDamage(0, HeldBonusFor(e, up), dprops);" in dc, "damage grow_held is a CalculatedDamage var")
     check("else if (e.HasGrowHeld) WithCalculatedBlock(0, HeldBonusFor(e, up));" in dc, "block grow_held is a CalculatedBlock var")
     cs = _cs("Engine", "CardSpec.cs")
-    check("int GrowHeld = 0)" in cs and "public bool HasGrowHeld => GrowHeld != 0;" in cs, "EffectSpec carries GrowHeld")
+    check("int GrowHeld = 0" in cs and "public bool HasGrowHeld => GrowHeld != 0;" in cs, "EffectSpec carries GrowHeld")
     fc = _cs("Engine", "ForgedCards.cs")
     check('int growHeld = e.ContainsKey("grow_held") ? Int(e, "grow_held") : 0;' in fc and "GrowHeld: growHeld" in fc, "the importer parses grow_held")
     check('"held_discount"' in fc.split("SupportedOps =", 1)[1].split("];", 1)[0], "SupportedOps carries held_discount")

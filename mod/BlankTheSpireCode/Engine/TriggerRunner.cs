@@ -276,6 +276,16 @@ public static class TriggerRunner
         var cs = player.Creature.CombatState;
         if (target == "all_enemies") return cs.HittableEnemies.Where(c => c.IsAlive).ToList();
         if (target == "attacker") return attacker != null && attacker.IsAlive ? [attacker] : [];
+        // Phase BI (v61, gap #62): a fresh random hittable enemy per fire, rolled on the combat-targets stream exactly
+        // like the base game's JuggernautPower / SerpentFormPower.
+        if (target == "random_enemy")
+        {
+            var hittable = cs.HittableEnemies.Where(c => c.IsAlive).ToList();
+            var pick = hittable.Count > 0 ? player.RunState.Rng.CombatTargets.NextItem(hittable) : null;
+            MainFile.Logger.Info($"[BI] random_enemy payload -> {(pick != null ? pick.Monster?.GetType().Name ?? "enemy" : "none (no hittable enemy)")} " +
+                                 $"(of {hittable.Count}).");
+            return pick != null ? [pick] : [];
+        }
         var first = cs.HittableEnemies.FirstOrDefault(c => c.IsAlive);
         return first != null ? [first] : [];
     }

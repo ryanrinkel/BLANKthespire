@@ -339,6 +339,15 @@ Rage in one turn does NOT double the payload — accept and price, or multiply p
 (Attack filter, this_turn), "every 3rd Attack → 4 damage to a random enemy", Iteration (Status drawn, with
 `add_status_card` fuel). **Tags:** `[BI] card_type <kind> matched`, `[BI] every_n count n/N — waiting|FIRES`,
 `[BI] this_turn trigger removed`, `[BI] random_enemy payload -> <monster>`.
+**Findings (BI, done 2026-10-02 on `wave6`):** (1) `every_n` and `scope:"this_turn"` are legal on the POWER-HOSTED
+reactive kinds (`OncePerCombatTriggers`), not all of `MultiFireTriggers`: the card-latent `on_discard` has no power
+instance to hold the counter or remove itself. (2) `status` went into a separate `TriggerCardKinds` set, not
+`HandKindFilters` (that would have let `exhaust_card` / `draw_until` take `status`). (3) The tester + tag greps live
+in `generation/tests/gaptest-bi/` (TEST_AUDIT §7). (4) GAPTESTBI1 stalled after the base merchant threw "There is no
+item to purchase" (one non-basic Attack/Skill in the pool; no mod frame); the tester gained two pool fillers and
+GAPTESTBI2 completed the run. All four tags fired on both seeds; 0 mod exceptions, 0 localization errors. (5) Rule
+0.9: the `full` scaffold snapshot was re-taken (+136, the TRIGGERS pitch sentence); readings index 5,924 ·
+per-archetype max 62,512 (`forge_ramp`) · all-ops 113,349 · scaffold 45,925 / 46,000. Defaults 1-3 of §7 taken.
 
 ### Phase BJ — Combat-history scales + conditions (v62; gaps #63, #64; ~1½ days) — ~25 base cards
 

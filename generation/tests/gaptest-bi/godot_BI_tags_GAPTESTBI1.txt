@@ -1,0 +1,51 @@
+# Phase BI AutoSlay smoke — seed GAPTESTBI1 (godot.log grep, 5258 lines)
+# [BI] lines: 433
+# Auto-selected: 5 (no picker in this tester)
+# mod exceptions: 0
+# BlankTheSpire stack frames: 0
+# Localization formatting errors: 0
+# exception lines (any source): 27
+# run end: [ERROR] [AutoSlay] Run failed with seed=GAPTESTBI1: Watchdog timeout: No progress for 30.0s. Last activity: Navigating map
+# --- distinct [BI] tags (count  tag) ---
+  149  [BI] card_type status matched (on_card_drawn: 'Wound').
+   79  [BI] card_type attack matched (on_card_played: 'Reckless Swing').
+   30  [BI] this_turn trigger removed at turn end ('Battle Fury', on_card_played).
+   29  [BI] card_type attack matched (on_card_played: 'Strike').
+   13  [BI] card_type attack matched (on_card_played: 'Strike+').
+   12  [BI] every_n count 1/3 — waiting (on_card_played attack).
+   12  [BI] every_n count 2/3 — waiting (on_card_played attack).
+   10  [BI] every_n count 3/3 — FIRES (on_card_played attack).
+   10  [BI] every_n count 4/3 — waiting (on_card_played attack).
+   10  [BI] every_n count 5/3 — waiting (on_card_played attack).
+    9  [BI] card_type status matched (on_card_drawn: 'Dazed').
+    8  [BI] every_n count 6/3 — FIRES (on_card_played attack).
+    7  [BI] every_n count 7/3 — waiting (on_card_played attack).
+    6  [BI] random_enemy payload -> CeremonialBeast (of 1).
+    5  [BI] every_n count 8/3 — waiting (on_card_played attack).
+    4  [BI] every_n count 9/3 — FIRES (on_card_played attack).
+    3  [BI] card_type status matched (on_card_drawn: 'Infection').
+    3  [BI] every_n count 10/3 — waiting (on_card_played attack).
+    3  [BI] random_enemy payload -> Tunneler (of 1).
+    3  [BI] random_enemy payload -> HunterKiller (of 1).
+    2  [BI] random_enemy payload -> Fogmog (of 1).
+    2  [BI] random_enemy payload -> SlitheringStrangler (of 1).
+    2  [BI] every_n count 11/3 — waiting (on_card_played attack).
+    2  [BI] every_n count 12/3 — FIRES (on_card_played attack).
+    2  [BI] random_enemy payload -> none (no hittable enemy) (of 0).
+    2  [BI] random_enemy payload -> Chomper (of 2).
+    1  [BI] random_enemy payload -> TwigSlimeM (of 1).
+    1  [BI] random_enemy payload -> Wriggler (of 4).
+    1  [BI] random_enemy payload -> Wriggler (of 2).
+    1  [BI] random_enemy payload -> FuzzyWurmCrawler (of 1).
+    1  [BI] every_n count 13/3 — waiting (on_card_played attack).
+    1  [BI] every_n count 14/3 — waiting (on_card_played attack).
+    1  [BI] every_n count 15/3 — FIRES (on_card_played attack).
+    1  [BI] every_n count 16/3 — waiting (on_card_played attack).
+    1  [BI] every_n count 17/3 — waiting (on_card_played attack).
+    1  [BI] every_n count 18/3 — FIRES (on_card_played attack).
+    1  [BI] every_n count 19/3 — waiting (on_card_played attack).
+    1  [BI] every_n count 20/3 — waiting (on_card_played attack).
+    1  [BI] every_n count 21/3 — FIRES (on_card_played attack).
+    1  [BI] random_enemy payload -> Exoskeleton (of 3).
+    1  [BI] random_enemy payload -> Exoskeleton (of 1).
+    1  [BI] random_enemy payload -> Chomper (of 1).

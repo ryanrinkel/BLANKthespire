@@ -4,6 +4,7 @@ using BaseLib.Abstracts;
 using BaseLib.Utils;
 using BlankTheSpire.BlankTheSpireCode.Engine;
 using MegaCrit.Sts2.Core.Combat;
+using MegaCrit.Sts2.Core.Commands; // Phase BI (v61): PowerCmd.Remove (the this_turn self-removal, RagePower)
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Entities.Players;
@@ -50,18 +51,26 @@ public abstract class ForgedTriggerPower : BlankTheSpirePower
     // Phase AK (v41): kinds that already fired THIS COMBAT, for the `once_per_combat` gate. Never cleared — this
     // power is a fresh instance per combat application (the relic-hook firedOnce pattern, RelicRunner.Fire).
     private readonly HashSet<string> _firedThisCombat = [];
+    // Phase BI (v61, gap #62): the every_n occurrence count — matching events this combat (the relic `counters`
+    // pattern, RelicRunner.Fire; a fresh power per combat, so it is never reset). Advanced BEFORE `when`.
+    private int _everyNCount;
 
     public override PowerType Type => PowerType.Buff;
     // One trigger per card; replaying the same card doesn't stack the effect (literal-amount payload).
     // Phase BG (gap #60): a RIPEN power is Counter purely so the icon DRAWS A NUMBER — NPower only renders
     // DisplayAmount for Counter powers (the ForgedBalancePower finding) — and DisplayAmount below is the countdown,
     // never the stack; the ripen logic reads _ripenLeft, so a replay stacking Amount is harmless.
-    public override PowerStackType StackType => Trigger?.Trigger == "ripen" ? PowerStackType.Counter : PowerStackType.Single;
+    // Phase BI (v61): an every_n power is Counter for the same reason (the icon shows how many events are left).
+    public override PowerStackType StackType =>
+        Trigger?.Trigger == "ripen" || (Trigger?.EveryN ?? 0) > 1 ? PowerStackType.Counter : PowerStackType.Single;
 
     /// <summary>Phase BG (gap #60): the number on the icon. For a ripen power it is the TURNS LEFT (the full
-    /// countdown before the first turn-start initializes it), so the player always sees when it lands.</summary>
+    /// countdown before the first turn-start initializes it), so the player always sees when it lands.
+    /// Phase BI (v61): for an every_n power it is the EVENTS LEFT until the next fire (N, N-1, … 1).</summary>
     public override int DisplayAmount =>
-        Trigger?.Trigger == "ripen" ? (_ripenLeft < 0 ? System.Math.Max(1, Trigger.Amount) : _ripenLeft) : Amount;
+        Trigger?.Trigger == "ripen" ? (_ripenLeft < 0 ? System.Math.Max(1, Trigger.Amount) : _ripenLeft)
+        : (Trigger?.EveryN ?? 0) > 1 ? Trigger!.EveryN - _everyNCount % Trigger.EveryN
+        : Amount;
 
     /// <summary>Grant trigger power <typeparamref name="T"/> to the player (self), amount 1. Done from the card
     /// leaf because the generic apply needs the concrete power type at the call site.</summary>
@@ -78,6 +87,13 @@ public abstract class ForgedTriggerPower : BlankTheSpirePower
         {
             Flash();
             await TriggerRunner.Run(t, Owner.Player, ctx);
+        }
+        // Phase BI (v61, gap #62): a `scope:"this_turn"` reactive power lasts only the turn it was granted — remove it
+        // at the end of the owner's own turn (RagePower.AfterSideTurnEnd; PowerCmd.Remove so AfterRemoved runs).
+        if (t?.Scope == "this_turn" && side == Owner.Side && participants.Contains(Owner))
+        {
+            MainFile.Logger.Info($"[BI] this_turn trigger removed at turn end ('{SourceSpec?.Title ?? SourceSpec?.Id}', {t.Trigger}).");
+            await PowerCmd.Remove(this);
         }
     }
 
@@ -128,6 +144,7 @@ public abstract class ForgedTriggerPower : BlankTheSpirePower
             if (_firingHpLost) return;
             if (t.OncePerTurn && _firedThisTurn.Contains("on_hp_lost")) return;
             if (t.OncePerCombat && _firedThisCombat.Contains("on_hp_lost")) return; // Phase AK (v41)
+            if (!EveryNFires(t, "on_hp_lost")) return; // Phase BI (v61)
             _firingHpLost = true;
             try
             {
@@ -169,7 +186,7 @@ public abstract class ForgedTriggerPower : BlankTheSpirePower
         var kind = Trigger?.Trigger;
         if (kind is not ("on_card_played" or "on_blade_played") || cardPlay?.Card?.Owner != Owner.Player) return;
         if (kind == "on_blade_played" && cardPlay.Card is not DataCard { SpecIsToken: true }) return;
-        await FireReactive(kind, ctx);
+        await FireReactive(kind, ctx, cardFilter: cardPlay.Card);
     }
 
     // on_card_drawn: each time the owner draws a card. Guarded against a draw→draw payload loop by _firing.
@@ -177,7 +194,7 @@ public abstract class ForgedTriggerPower : BlankTheSpirePower
     {
         _combatCtx = ctx;
         if (Trigger?.Trigger != "on_card_drawn" || card?.Owner != Owner.Player) return;
-        await FireReactive("on_card_drawn", ctx);
+        await FireReactive("on_card_drawn", ctx, cardFilter: card);
     }
 
     // on_damage_dealt: when the owner deals CARD damage (dealer is us + cardSource != null → excludes our own
@@ -230,13 +247,21 @@ public abstract class ForgedTriggerPower : BlankTheSpirePower
     /// condition doesn't burn a once-slot). <paramref name="attacker"/> is the creature that just hit us — supplied
     /// only by the <c>attacked</c> hook (Phase AK, v41) so a payload with target:"attacker" hits it back. Mirrors
     /// ForgedRelic.FireGuarded.</summary>
-    private async Task FireReactive(string kind, PlayerChoiceContext ctx, Creature? attacker = null)
+    private async Task FireReactive(string kind, PlayerChoiceContext ctx, Creature? attacker = null, CardModel? cardFilter = null)
     {
         var t = Trigger;
         if (t == null || t.Trigger != kind) return;
         if (_firing.Contains(kind)) return;
+        // Phase BI (v61, gap #62): the card_type filter (on_card_played / on_card_drawn hand in the card) — the relic
+        // v48 filter (RelicRunner.Fire), with EffectRunner.HandKindMatches mapping attack/skill/power/non_attack/status.
+        if (t.CardKind != null)
+        {
+            if (cardFilter == null || !EffectRunner.HandKindMatches(cardFilter, t.CardKind)) return;
+            MainFile.Logger.Info($"[BI] card_type {t.CardKind} matched ({kind}: '{cardFilter.Title}').");
+        }
         if (t.OncePerTurn && _firedThisTurn.Contains(kind)) return;
         if (t.OncePerCombat && _firedThisCombat.Contains(kind)) return;
+        if (!EveryNFires(t, kind)) return; // Phase BI (v61): counted before `when` (relic parity)
         if (t.When != null)
         {
             bool open = Conditions.Evaluate(t.When, Owner.Player, null);
@@ -261,6 +286,18 @@ public abstract class ForgedTriggerPower : BlankTheSpirePower
             }
         }
         finally { _firing.Remove(kind); }
+    }
+
+    /// <summary>Phase BI (v61, gap #62): advance the every_n counter for one matching event and say whether THIS one
+    /// fires (the Nth, 2Nth…). A trigger without every_n always fires. Counted per combat (open decision 1).</summary>
+    private bool EveryNFires(EffectSpec t, string kind)
+    {
+        if (t.EveryN <= 1) return true;
+        int n = ++_everyNCount;
+        InvokeDisplayAmountChanged();
+        bool fires = n % t.EveryN == 0;
+        MainFile.Logger.Info($"[BI] every_n count {n}/{t.EveryN} — {(fires ? "FIRES" : "waiting")} ({kind}{(t.CardKind != null ? " " + t.CardKind : "")}).");
+        return fires;
     }
 
     // In-code localization: the buff icon's tooltip is the trigger's synthesized sentence (no .pck rebuild).

@@ -42,7 +42,15 @@ public static class ForgedCards
     /// v10 (forged statuses, Phase J): + CharacterSpec.StatusPool (a class's ≤4 custom modifier-family statuses
     /// read from `status_pool`; see ForgedCharacters / ForgedStatusPower). Class cards may apply a custom status
     /// by pool name via the `apply_status_custom` op (class-only, like custom-orb channels).</summary>
-    public const int VocabVersion = 60; // 60: Phase BF (VOCAB_EXPANSION_5, gap #54) — NEXT-ATTACK AMPLIFIERS, from the
+    public const int VocabVersion = 61; // 61: Phase BI (VOCAB_EXPANSION_6, gap #62) — CARD TRIGGER FILTERS, the relic v48
+                                        //     hook filters ported to card add_trigger: `card_type` (attack/skill/power/
+                                        //     non_attack on on_card_played + on_card_drawn; `status` on on_card_drawn only —
+                                        //     Rage / Iteration), `every_n` 2..9 on the power-hosted multi-fire kinds (counted
+                                        //     PER COMBAT on the power instance; Counter stack so the icon shows the count —
+                                        //     Panache / Juggling), `scope:"this_turn"` on those reactive kinds (the power
+                                        //     removes itself at your turn end via PowerCmd.Remove — RagePower), and payload
+                                        //     target `random_enemy` (Rng.CombatTargets — Juggernaut). No codec change.
+                                        // 60: Phase BF (VOCAB_EXPANSION_5, gap #54) — NEXT-ATTACK AMPLIFIERS, from the
                                         //     base game: two new self-buff statuses mapped straight onto sealed base-game
                                         //     powers (no new power class, shipped loc + icons). `vigor` = VigorPower: +N
                                         //     damage to your next Attack, then consumed (Pen Nib / Vigor); legal on cards,
@@ -559,6 +567,12 @@ public static class ForgedCards
     // Lockstep with validator._EXHAUST_PICK_MODES / _HAND_KIND_FILTERS / _EXHAUST_CARD_MAX + the schema clauses.
     private static readonly HashSet<string> ExhaustPickModes = ["choose", "random", "up_to", "all"];
     private static readonly HashSet<string> HandKindFilters = ["attack", "skill", "power", "non_attack"];
+    // Phase BI (v61, gap #62): the add_trigger card filter = the hand filters + `status` (on_card_drawn only — Iteration;
+    // a Status is never PLAYED). Kept separate from HandKindFilters so exhaust_card / draw_until never take `status`.
+    // Lockstep with validator._TRIGGER_CARD_KINDS + the schema's add_trigger card_type clause.
+    private static readonly HashSet<string> TriggerCardKinds = ["attack", "skill", "power", "non_attack", "status"];
+    private static readonly HashSet<string> TriggerCardKindTriggers = ["on_card_played", "on_card_drawn"];
+    private const int MinEveryN = 2, MaxEveryN = 9; // Phase BI: the relic band (ForgedCharacters' MinEveryN/MaxEveryN)
     private const int ExhaustCardMaxAmount = 3;
     // Phase BD (v58, gap #58): the held_discount band — Sands of Time / Establishment lower by 1 per turn; 2 is the ceiling
     // (a 3-cost card free after two held turns is already the whole fantasy). Lockstep with validator._HELD_DISCOUNT_MAX.
@@ -1019,11 +1033,13 @@ public static class ForgedCards
             // Phase BD (v58, gap #57): `grow_held` is the per-held-turn damage/Block step (Windmill Strike). 0 = none;
             // legality (damage/block, ⊥scale/grow, 1..9, ≤amount, needs retain) validated in Validate.
             int growHeld = e.ContainsKey("grow_held") ? Int(e, "grow_held") : 0;
+            // Phase BI (v61, gap #62): `every_n` on an add_trigger — fire on every Nth event (legality in ValidateTrigger).
+            int everyN = e.ContainsKey("every_n") ? Int(e, "every_n") : 0;
             list.Add(new EffectSpec(op, amount, status, hits, scale, orb, when, trigger, triggered, statusName,
                                     summonName, oncePerTurn, target, cardId, pile, pole, grow, cards, tag,
                                     OncePerCombat: oncePerCombat, Unblockable: unblockable,
                                     CardKind: cardKind, Scope: scope, Count: count, StatusCard: statusCard,
-                                    GrowHeld: growHeld));
+                                    GrowHeld: growHeld, EveryN: everyN));
         }
         return list.ToArray();
     }
@@ -1068,12 +1084,17 @@ public static class ForgedCards
                 var cserr = ValidateCostShift(e);
                 if (cserr != null) return cserr;
             }
-            else if (e.Scope != null || e.Count != 0)
-                return $"'scope'/'count' only apply to cost_shift (op '{e.Op}').";
+            // Phase BI (v61): add_trigger also takes `scope` ("this_turn") and `card_type` (the trigger filter) — both are
+            // checked in ValidateTrigger; `count` stays cost_shift-only.
+            else if (e.Count != 0 || (e.Scope != null && e.Op != "add_trigger"))
+                return $"'scope'/'count' only apply to cost_shift ('scope':'this_turn' also to add_trigger) (op '{e.Op}').";
             // Phase BC (v57): `card_type` is shared by cost_shift (its own attack/skill/power/all band, above) and the two
             // hand ops (attack/skill/power/non_attack, below); anywhere else it is a stray field.
-            else if (e.CardKind != null && e.Op is not ("exhaust_card" or "draw_until"))
-                return $"'card_type' only applies to cost_shift/exhaust_card/draw_until (op '{e.Op}').";
+            else if (e.CardKind != null && e.Op is not ("exhaust_card" or "draw_until" or "add_trigger"))
+                return $"'card_type' only applies to cost_shift/exhaust_card/draw_until/add_trigger (op '{e.Op}').";
+            // Phase BI (v61): `every_n` belongs to add_trigger alone.
+            if (e.EveryN != 0 && e.Op != "add_trigger")
+                return $"'every_n' only applies to add_trigger (op '{e.Op}').";
             // Phase BC (v57, gap #52): exhaust_card — a pick mode, an amount for the counted modes (1..3), an optional
             // hand filter. `all` takes every matching card (amount is meaningless there). Card-only: not in TriggerOps.
             if (e.Op == "exhaust_card")
@@ -1658,8 +1679,42 @@ public static class ForgedCards
             return $"'once_per_combat' only applies to a power-hosted reactive trigger ({string.Join("/", OncePerCombatTriggers)}); got '{e.Trigger}'.";
         if (e.OncePerCombat && e.OncePerTurn)
             return "'once_per_combat' already implies once per turn — set one, not both.";
+        // Phase BI (v61, gap #62): the relic v48 hook filters on a card trigger.
+        //  card_type — which played/drawn card counts (on_card_played / on_card_drawn only; `status` only when DRAWN).
+        if (e.CardKind != null)
+        {
+            if (!TriggerCardKindTriggers.Contains(e.Trigger))
+                return $"an add_trigger 'card_type' only applies to on_card_played/on_card_drawn (got '{e.Trigger}').";
+            if (!TriggerCardKinds.Contains(e.CardKind))
+                return $"an add_trigger 'card_type' must be one of {string.Join("/", TriggerCardKinds)}; got '{e.CardKind}'.";
+            if (e.CardKind == "status" && e.Trigger != "on_card_drawn")
+                return "an add_trigger 'card_type':'status' only applies to on_card_drawn (a Status is never played).";
+        }
+        //  every_n — 2..9 on a POWER-HOSTED multi-fire kind (the counter lives on the per-combat power instance; the
+        //  card-latent on_discard has none). Meaningless with once_per_combat.
+        if (e.EveryN != 0)
+        {
+            if (!OncePerCombatTriggers.Contains(e.Trigger))
+                return $"'every_n' only applies to a power-hosted multi-fire trigger ({string.Join("/", OncePerCombatTriggers)}); got '{e.Trigger}'.";
+            if (e.EveryN < MinEveryN || e.EveryN > MaxEveryN)
+                return $"'every_n' must be {MinEveryN}..{MaxEveryN}; got {e.EveryN}.";
+            if (e.OncePerCombat)
+                return "'every_n' can't be combined with 'once_per_combat' (it would fire once, on the Nth event — use one or the other).";
+        }
+        //  scope — "this_turn" only: a REACTIVE power that removes itself at your turn end (Rage). Never on
+        //  turn_start/turn_end/ripen (they fire at most once a turn) nor the card-latent on_discard.
+        if (e.Scope != null)
+        {
+            if (e.Scope != "this_turn")
+                return $"an add_trigger 'scope' must be 'this_turn' (got '{e.Scope}').";
+            if (!OncePerCombatTriggers.Contains(e.Trigger))
+                return $"'scope':'this_turn' only applies to a power-hosted reactive trigger ({string.Join("/", OncePerCombatTriggers)}); got '{e.Trigger}'.";
+        }
         foreach (var t in e.Triggered)
         {
+            // Phase BI (v61): the trigger filters go on the add_trigger op, never on a payload effect.
+            if (t.EveryN != 0 || t.CardKind != null || t.Scope != null || t.Count != 0)
+                return "'every_n' / 'card_type' / 'scope' / 'count' are not allowed on a trigger payload effect (put the filter on the add_trigger op).";
             // Phase U (gap #23): `grow` is a per-card-play attack mechanic (a card growing as YOU replay IT) — it
             // has no meaning in a trigger payload (which re-runs from a granted power, not a card the player replays).
             if (t.HasGrow)
@@ -1681,8 +1736,9 @@ public static class ForgedCards
             // Phase AL: + summon_attack / a custom-debuff apply_status_custom); without a target it stays self/orb-only.
             if (t.Target != null)
             {
-                if (t.Target != "enemy" && t.Target != "all_enemies" && t.Target != "attacker")
-                    return $"a trigger effect 'target' must be 'enemy', 'all_enemies' or 'attacker' (got '{t.Target}').";
+                // Phase BI (v61): + `random_enemy` (a fresh random hittable enemy per fire — Juggernaut).
+                if (t.Target != "enemy" && t.Target != "all_enemies" && t.Target != "attacker" && t.Target != "random_enemy")
+                    return $"a trigger effect 'target' must be 'enemy', 'all_enemies', 'random_enemy' or 'attacker' (got '{t.Target}').";
                 // Phase AK (v41): 'attacker' (the creature that just hit you) only exists on the `attacked` trigger.
                 if (t.Target == "attacker" && e.Trigger != "attacked")
                     return $"a trigger effect target 'attacker' is only valid on the 'attacked' trigger (got '{e.Trigger}').";
@@ -2115,11 +2171,34 @@ public static class ForgedCards
             "on_poison_damage" => "Whenever an enemy takes Poison damage", // Phase BE (v59, gap #56)
             _                 => "At the end of your turn",
         };
+        // Phase BI (v61, gap #62): the filters reword the head. Lockstep with cardgen._trigger_head.
+        if (t.CardKind != null && t.Trigger is ("on_card_played" or "on_card_drawn"))
+            when = $"Whenever you {(t.Trigger == "on_card_drawn" ? "draw" : "play")} {TriggerKindWord(t.CardKind)}";
+        if (t.EveryN > 1)
+        {
+            string nth = Ordinal(t.EveryN);
+            if (t.CardKind == null && t.Trigger == "on_card_played") when = $"Every {nth} card you play";
+            else if (t.CardKind == null && t.Trigger == "on_card_drawn") when = $"Every {nth} card you draw";
+            else if (when.StartsWith("Whenever ")) when = $"Every {nth} time {when["Whenever ".Length..]}";
+        }
+        if (t.Scope == "this_turn")
+            when = $"This turn, {char.ToLowerInvariant(when[0])}{when[1..]}";
         var frags = (t.Triggered ?? []).Select(TriggerFragment).Where(s => s.Length > 0).ToList();
         // Phase AK (v41): once_per_combat reads "(once per combat)"; it is never combined with once_per_turn.
         string once = t.OncePerCombat ? " (once per combat)" : t.OncePerTurn ? " (once per turn)" : "";
         return $"{when}, {(frags.Count > 0 ? string.Join(", ", frags) : "do nothing")}{once}.";
     }
+
+    /// <summary>Phase BI (v61): the add_trigger card filter as a noun phrase ("an Attack" / "a non-Attack card" /
+    /// "a Status"). Lockstep with cardgen._TRIGGER_KIND_WORDS.</summary>
+    private static string TriggerKindWord(string? kind) => kind switch
+    {
+        "attack" => "an Attack", "skill" => "a Skill", "power" => "a Power",
+        "non_attack" => "a non-Attack card", "status" => "a Status", _ => "a card",
+    };
+
+    /// <summary>Phase BI (v61): 2nd / 3rd / 4th … (every_n is 2..9). Lockstep with cardgen._ordinal.</summary>
+    private static string Ordinal(int n) => n + (n == 2 ? "nd" : n == 3 ? "rd" : "th");
 
     /// <summary>Phase AL (v42): the "equal to …" phrase for a REPLACE-semantics payload scalar. cards_retained keeps
     /// its F5 wording ("equal to cards retained"); the two new player reads reuse the card-level ScalePhrase text.
@@ -2141,7 +2220,9 @@ public static class ForgedCards
         string eq = TriggerScalePhrase(e.Scale);
         // H4 (gap #14): a targeted payload effect is worded "… to ALL enemies" for AoE (single-enemy → no suffix,
         // matching the base-card Describe convention). Phase AK (v41): "… to the attacker" for the riposte target.
-        string to = e.Target == "all_enemies" ? " to ALL enemies" : e.Target == "attacker" ? " to the attacker" : "";
+        // Phase BI (v61): "… to a random enemy" for the Juggernaut target.
+        string to = e.Target == "all_enemies" ? " to ALL enemies" : e.Target == "attacker" ? " to the attacker"
+                  : e.Target == "random_enemy" ? " to a random enemy" : "";
         return e.Op switch
         {
             "damage"        => e.Target == null ? ""

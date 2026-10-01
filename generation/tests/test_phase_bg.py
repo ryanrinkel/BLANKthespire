@@ -35,7 +35,9 @@ def _cs(*parts: str) -> str:
 def test_ripen_countdown() -> None:
     print("ripen countdown (gap #60):")
     tp = _cs("Powers", "ForgedTriggerPower.cs")
-    check('Trigger?.Trigger == "ripen" ? PowerStackType.Counter : PowerStackType.Single' in tp, "a ripen power is Counter (so the icon draws a number)")
+    # Phase BI (v61) widened the same expression: an every_n power is Counter too.
+    check('Trigger?.Trigger == "ripen" || (Trigger?.EveryN ?? 0) > 1 ? PowerStackType.Counter : PowerStackType.Single' in tp,
+          "a ripen power is Counter (so the icon draws a number)")
     check("public override int DisplayAmount =>" in tp and "_ripenLeft < 0 ? System.Math.Max(1, Trigger.Amount) : _ripenLeft" in tp,
           "DisplayAmount is the turns left (the full countdown before init)")
     check("InvokeDisplayAmountChanged(); // Phase BG" in tp and "[BG] ripen" in tp, "the tick refreshes the badge and logs [BG]")

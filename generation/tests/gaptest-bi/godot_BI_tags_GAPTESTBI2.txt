@@ -1,0 +1,81 @@
+# Phase BI AutoSlay smoke — seed GAPTESTBI2 (godot.log grep, 12052 lines)
+# [BI] lines: 856
+# Auto-selected: 26 (no picker in this tester)
+# mod exceptions: 0
+# BlankTheSpire stack frames: 0
+# Localization formatting errors: 0
+# exception lines (any source): 18
+# run end: [ERROR] [AutoSlay] Run failed with seed=GAPTESTBI2: Node /root/Game/RootSceneContainer/Run/GlobalUi/TopBar/RightAlignedStuff/Options of type NButton not found
+# --- distinct [BI] tags (count  tag) ---
+  145  [BI] card_type status matched (on_card_drawn: 'Wound').
+   89  [BI] card_type attack matched (on_card_played: 'Strike').
+   77  [BI] card_type attack matched (on_card_played: 'Reckless Swing').
+   77  [BI] this_turn trigger removed at turn end ('Battle Fury', on_card_played).
+   64  [BI] card_type attack matched (on_card_played: 'Sweeping Cut').
+   51  [BI] card_type attack matched (on_card_played: 'Reckless Swing+').
+   25  [BI] every_n count 1/3 — waiting (on_card_played attack).
+   24  [BI] every_n count 2/3 — waiting (on_card_played attack).
+   22  [BI] every_n count 3/3 — FIRES (on_card_played attack).
+   19  [BI] every_n count 4/3 — waiting (on_card_played attack).
+   18  [BI] card_type attack matched (on_card_played: 'Neow's Fury').
+   17  [BI] every_n count 5/3 — waiting (on_card_played attack).
+   15  [BI] every_n count 6/3 — FIRES (on_card_played attack).
+   14  [BI] every_n count 7/3 — waiting (on_card_played attack).
+   11  [BI] every_n count 8/3 — waiting (on_card_played attack).
+   11  [BI] every_n count 9/3 — FIRES (on_card_played attack).
+   10  [BI] card_type status matched (on_card_drawn: 'Burn').
+    9  [BI] every_n count 10/3 — waiting (on_card_played attack).
+    9  [BI] random_enemy payload -> TestSubject (of 1).
+    8  [BI] random_enemy payload -> none (no hittable enemy) (of 0).
+    8  [BI] every_n count 11/3 — waiting (on_card_played attack).
+    8  [BI] every_n count 12/3 — FIRES (on_card_played attack).
+    8  [BI] every_n count 13/3 — waiting (on_card_played attack).
+    6  [BI] card_type attack matched (on_card_played: 'Sweeping Cut+').
+    6  [BI] every_n count 14/3 — waiting (on_card_played attack).
+    6  [BI] every_n count 15/3 — FIRES (on_card_played attack).
+    6  [BI] random_enemy payload -> FrogKnight (of 1).
+    5  [BI] every_n count 16/3 — waiting (on_card_played attack).
+    5  [BI] every_n count 17/3 — waiting (on_card_played attack).
+    5  [BI] every_n count 18/3 — FIRES (on_card_played attack).
+    5  [BI] card_type attack matched (on_card_played: 'Strike+').
+    4  [BI] every_n count 19/3 — waiting (on_card_played attack).
+    4  [BI] every_n count 20/3 — waiting (on_card_played attack).
+    4  [BI] card_type status matched (on_card_drawn: 'Dazed').
+    4  [BI] random_enemy payload -> LouseProgenitor (of 1).
+    4  [BI] random_enemy payload -> Rocket (of 2).
+    4  [BI] random_enemy payload -> MechaKnight (of 1).
+    4  [BI] random_enemy payload -> SoulNexus (of 1).
+    3  [BI] random_enemy payload -> KinPriest (of 1).
+    3  [BI] card_type attack matched (on_card_played: 'Neow's Fury+').
+    3  [BI] random_enemy payload -> ToughEgg (of 3).
+    3  [BI] random_enemy payload -> OwlMagistrate (of 1).
+    2  [BI] random_enemy payload -> Fogmog (of 1).
+    2  [BI] random_enemy payload -> KinFollower (of 2).
+    2  [BI] random_enemy payload -> Entomancer (of 1).
+    1  [BI] random_enemy payload -> Nibbit (of 1).
+    1  [BI] random_enemy payload -> FuzzyWurmCrawler (of 1).
+    1  [BI] random_enemy payload -> AxeRubyRaider (of 3).
+    1  [BI] random_enemy payload -> Wriggler (of 4).
+    1  [BI] random_enemy payload -> KinFollower (of 3).
+    1  [BI] random_enemy payload -> BowlbugRock (of 1).
+    1  [BI] random_enemy payload -> ToughEgg (of 5).
+    1  [BI] random_enemy payload -> Ovicopter (of 1).
+    1  [BI] random_enemy payload -> Myte (of 2).
+    1  [BI] random_enemy payload -> Myte (of 1).
+    1  [BI] random_enemy payload -> Exoskeleton (of 2).
+    1  [BI] random_enemy payload -> Crusher (of 2).
+    1  [BI] random_enemy payload -> Crusher (of 1).
+    1  [BI] random_enemy payload -> LivingShield (of 2).
+    1  [BI] random_enemy payload -> TurretOperator (of 2).
+    1  [BI] random_enemy payload -> MagiKnight (of 3).
+    1  [BI] random_enemy payload -> SpectralKnight (of 3).
+    1  [BI] every_n count 21/3 — FIRES (on_card_played attack).
+    1  [BI] every_n count 22/3 — waiting (on_card_played attack).
+    1  [BI] every_n count 23/3 — waiting (on_card_played attack).
+    1  [BI] every_n count 24/3 — FIRES (on_card_played attack).
+    1  [BI] every_n count 25/3 — waiting (on_card_played attack).
+    1  [BI] every_n count 26/3 — waiting (on_card_played attack).
+    1  [BI] every_n count 27/3 — FIRES (on_card_played attack).
+    1  [BI] every_n count 28/3 — waiting (on_card_played attack).
+    1  [BI] every_n count 29/3 — waiting (on_card_played attack).
+    1  [BI] every_n count 30/3 — FIRES (on_card_played attack).
