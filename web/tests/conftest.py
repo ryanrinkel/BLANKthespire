@@ -79,6 +79,12 @@ def app_module():
     # Generated art (splash/sprite/cards.zip) goes to the throwaway temp tree: a test run must never
     # litter the real web/static/forged/ with classes the repo's own deploy then serves.
     app_mod.STATIC_FORGED_DIR = _TMP / "forged"
+    # The offline forge's card quarantine: web/forge.py's import-time point_btsgen_at_mod_contract() aims it at
+    # the gitignored generation/scratch/_class_gen, where every test run used to drop ~20 card files (and the
+    # validator's known_cards snapshot read them all back). BH-1 audit: keep it in the throwaway tree.
+    from btsgen import paths as _btsgen_paths
+    _btsgen_paths.GENERATED_DIR = _TMP / "class_gen"
+    _btsgen_paths.GENERATED_RELICS_DIR = _TMP / "class_gen" / "relics"
     return app_mod
 
 

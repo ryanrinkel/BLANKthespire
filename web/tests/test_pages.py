@@ -152,3 +152,46 @@ def test_every_static_page_links_the_favicon(app_module):
         assert 'rel="icon"' in html, page.name
         assert "/static/img/favicon-32.png" in html, page.name
         assert 'rel="apple-touch-icon"' in html, page.name
+
+
+# --- pricing v3 copy rule (BH-1 audit): donor-facing copy never says "buy" / "purchase" --------------------
+# The only sanctioned uses are the two NEGATIONS docs/plans/PRICING_V3_COPY.md itself prescribes. Identifiers
+# (element ids, /api/purchases, the ?purchase= return flag) are not copy: HTML is checked as rendered text
+# (tags, comments, scripts stripped) and JS only inside string literals that contain a space (i.e. prose).
+_SANCTIONED = ("nothing to buy", "not purchases of goods or services")
+
+
+def _banned_words():
+    import re
+    return re.compile(r"\b(buy\w*|bought|purchas\w*)\b", re.I)
+
+
+def test_donor_facing_copy_never_says_buy_or_purchase(app_module):
+    import re
+    banned = _banned_words()
+    static = app_module.WEB_DIR / "static"
+    hits = []
+    for page in sorted(static.glob("*.html")):
+        s = re.sub(r"<!--.*?-->", "", page.read_text(encoding="utf-8"), flags=re.S)
+        s = re.sub(r"<script.*?</script>|<style.*?</style>", "", s, flags=re.S)
+        text = re.sub(r"<[^>]+>", " ", s)
+        for ok in _SANCTIONED:
+            text = text.replace(ok, "")
+        hits += [f"{page.name}: ...{text[max(0, m.start() - 30):m.end() + 20]!r}" for m in banned.finditer(text)]
+    lit = re.compile(r'"(?:[^"\\\n]|\\.)*"|\'(?:[^\'\\\n]|\\.)*\'|`(?:[^`\\]|\\.)*`')
+    for js in sorted(static.glob("*.js")):
+        src = re.sub(r"/\*.*?\*/", "", js.read_text(encoding="utf-8"), flags=re.S)
+        src = re.sub(r"(?m)^\s*//.*$", "", src)
+        for m in lit.finditer(src):
+            prose = m.group(0)
+            for ok in _SANCTIONED:
+                prose = prose.replace(ok, "")
+            if " " in prose and banned.search(prose):
+                hits.append(f"{js.name}: {prose[:100]}")
+    assert not hits, "donor-facing copy says buy/purchase (pricing v3 rule):\n" + "\n".join(hits)
+
+
+def test_the_copy_rule_scanner_catches_a_violation():
+    """The scanner above must not pass vacuously."""
+    assert _banned_words().search("Bought 4 tokens") and _banned_words().search("purchase more")
+    assert not _banned_words().search("buoyant busy")

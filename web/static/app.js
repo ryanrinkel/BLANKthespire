@@ -1279,7 +1279,7 @@ function renderPurchases(purchases) {
       ? (typeof p.net_cents === "number"
         ? `Donated ${gross} (${fmtMoney(p.net_cents, p.currency)} + ${fmtMoney(fee, p.currency)} card fee)`
         : `Donated ${gross}`)
-      : `Bought ${p.tokens} token${p.tokens === 1 ? "" : "s"} for ${gross}`;
+      : `Token pack, ${gross}`;   // a pre-v3 pack row: never "buy"/"purchase" in donor copy (pricing v3)
     li.innerHTML = `<div class="lr-main"><span class="lr-name">${esc(what)}</span>`
       + `<span class="lr-meta">+${p.tokens} token${p.tokens === 1 ? "" : "s"} · ${esc(when)}`
       + (p.status === "refunded" ? ' · <span class="refunded">refunded</span>' : "") + `</span></div>`;

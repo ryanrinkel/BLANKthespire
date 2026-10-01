@@ -371,6 +371,29 @@ def test_a_session_just_inside_the_limit_still_writes(client, app_module):
     assert client.post(f"/api/admin/users/{uid}/tokens", json={"balance": 2}, headers=H).status_code == 200
 
 
+def test_the_write_window_defaults_to_four_hours(app_module):
+    """BH-1 audit: the live rule is 4 h. conftest drops BTSWEB_ADMIN_WRITE_MAX_AGE_S, so this is the default
+    the droplet runs with (it sets no override)."""
+    assert app_module.ADMIN_WRITE_MAX_AGE_S == 4 * 3600
+
+
+def test_admin_emails_unset_means_no_operator_even_with_an_unlimited_list():
+    """BH-1 audit: BTSWEB_ADMIN_EMAILS is required — it no longer falls back to BTSWEB_UNLIMITED_EMAILS.
+    auth reads both at import, so check a fresh interpreter with only the unlimited list set."""
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+    web = Path(__file__).resolve().parents[1]
+    env = {k: v for k, v in os.environ.items() if k != "BTSWEB_ADMIN_EMAILS"}
+    env["BTSWEB_UNLIMITED_EMAILS"] = "boss@example.com"
+    env["PYTHONPATH"] = os.pathsep.join([str(web), str(web.parent / "generation")])
+    out = subprocess.run([sys.executable, "-c", "import auth; print(sorted(auth.ADMIN_EMAILS))"],
+                         capture_output=True, text=True, env=env, cwd=str(web), timeout=120)
+    assert out.returncode == 0, out.stderr
+    assert out.stdout.strip().splitlines()[-1] == "[]", out.stdout
+
+
 def test_a_non_admin_with_a_fresh_session_is_still_forbidden(client, app_module):
     """Freshness is a second gate, never a substitute for the first."""
     uid = _make(client, app_module, "fresh-nosy@example.com")
