@@ -388,9 +388,32 @@ def test_provider_field_only_on_openrouter() -> None:
     check(captured[0].get("reasoning") == {"effort": "low"}, "other extra_body keys are untouched")
 
 
+def test_stub_block_expires_after_an_hour() -> None:
+    # BH-1 audit: the live rule is "blocked for 1 h, then another chance" — pin the TTL and the expiry.
+    print("a stub-blocked provider is skipped for exactly PROVIDER_IGNORE_TTL_S (1 h), then released...")
+    check(_generator.PROVIDER_IGNORE_TTL_S == 3600, f"the block lasts an hour (got {_generator.PROVIDER_IGNORE_TTL_S})")
+    real = _generator.time.monotonic
+    clock = [1000.0]
+    _generator.time.monotonic = lambda: clock[0]
+    try:
+        _generator._reset_ignored_providers()
+        _generator.ignore_provider("Wafer")
+        check("Wafer" in _generator.ignored_providers() and "ModelRun" in _generator.ignored_providers(),
+              "freshly blocked provider + the static ModelRun block")
+        clock[0] += 3599
+        check("Wafer" in _generator.ignored_providers(), "still blocked a second before the hour")
+        clock[0] += 2
+        check("Wafer" not in _generator.ignored_providers(), "released after the hour")
+        check("ModelRun" in _generator.ignored_providers(), "the static block never expires")
+    finally:
+        _generator.time.monotonic = real
+        _generator._reset_ignored_providers()
+
+
 def main() -> int:
     test_looks_like_stub()
     test_stub_answer_blocks_provider_and_retries()
+    test_stub_block_expires_after_an_hour()
     test_provider_field_only_on_openrouter()
     test_sse_reassembly_and_usage()
     test_plain_json_fallback()

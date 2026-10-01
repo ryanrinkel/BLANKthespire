@@ -71,6 +71,7 @@ def test_card_system_prompt_v2_drops_ironclad_and_names_real_ops(v2):
 
 
 def test_card_system_prompt_v1_unchanged(v1):
+    """ROLLBACK PATH (BTS_HARNESS_V2 unset): production sends the v2 prompt above; this pins the kill-switch."""
     sp = contract.system_prompt()
     assert "Ironclad" in sp and '"id": "strike"' in sp
 
@@ -526,5 +527,9 @@ def test_bench_fake_reports_every_metric_row(v2, monkeypatch, tmp_path):
     assert "v2 (BTS_HARNESS_V2=1)" in report
     assert len(cli_bench.CONCEPTS) == 12
     out = tmp_path / "HARNESS_BENCH.md"
+    # main() re-points the contract, which RELOADS btsgen.paths and resets the quarantine to the real
+    # generation/scratch/_class_gen (every run dropped ~20 cards there). conftest already pinned the mod
+    # contract + a temp quarantine, so make the re-point a no-op here (BH-1 audit).
+    monkeypatch.setattr(cli_bench, "point_btsgen_at_mod_contract", lambda: None)
     rc = cli_bench.main(["--fake", "--concepts", "1", "--quiet", "--out", str(out), "--ledger", str(tmp_path / "l2.jsonl")])
     assert rc == 0 and out.exists() and "| Metric | Value | Target |" in out.read_text(encoding="utf-8")

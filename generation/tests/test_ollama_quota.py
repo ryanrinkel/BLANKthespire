@@ -105,6 +105,14 @@ def test_ceilings() -> None:
     Q._reset()
     with _env(BTSGEN_OLLAMA_WEEKLY_CEILING="0.5"):
         check(Q.saturated(KEY, fetch=_Fetch(_raw(0.1, 0.6)), now=0.0) is not None, "the ceilings are env knobs")
+    # BH-1 audit: pin the LIVE defaults exactly (session 0.95, weekly 0.97) at both sides of each line.
+    for sess, week, gated, why in ((0.95, 0.1, True, "session at exactly 95% is the line"),
+                                   (0.94, 0.1, False, "session at 94% still has headroom"),
+                                   (0.1, 0.97, True, "week at exactly 97% is the line"),
+                                   (0.1, 0.96, False, "week at 96% still has headroom")):
+        Q._reset()
+        got = Q.saturated(KEY, fetch=_Fetch(_raw(sess, week)), now=0.0)
+        check((got is not None) is gated, f"default ceilings: {why} (got {got})")
     Q._reset()
     check(Q.saturated("", fetch=_Fetch(_raw(0.99, 0.99)), now=0.0) is None, "no key -> no gate")
 
