@@ -43,10 +43,15 @@ DECOMP, `BaseLib-StS2\` = BL). MOD = `mod/BlankTheSpireCode/`.
 - **0.7 Commit convention.** One commit per phase: `mod+forge: Phase <XX> — <mechanic> (vocab v<N>)`; generation-only
   phases `forge: Phase <XX> — …`.
 - **0.8 Vocab versions** are assigned in build order from **v61**. Reorder → renumber.
-- **0.9 Prompt budget — READ §2 FIRST.** Scaffold headroom is **463 chars for the whole wave**; the flag-off
-  worst-case reading has **103 chars** of room, so the FIRST VOCABULARY.md row trips
-  `test_rule_0_9_v2_is_the_worst_case`. Phase BH builds the shrink lever and re-takes the readings BEFORE any
-  vocab row lands.
+- **0.9 Prompt budget — READ §2 FIRST.** Today's rule-0.9 tests measure the UNTRIMMED blueprint prompt, a path
+  production never sends, and they have **463 chars** (scaffold) / **103 chars** (worst-case reading) of room,
+  so the FIRST VOCABULARY.md row trips `test_rule_0_9_v2_is_the_worst_case`. Phase BH replaces the whole-file
+  paste with the **vocabulary tree** (index + per-forge detail, §2) and repoints the tests at the real prompt
+  BEFORE any vocab row lands. After BH, a new VOCABULARY row costs one index line (~80 chars) on every forge and
+  its full row only on forges that select it.
+- **0.9b Tests are part of the deliverable.** BH-1 is a full audit of `generation/tests` + `web/tests` against
+  what BTS does today (stale paths, tests measuring dead code paths, phase tests with no pytest wrapper); §4
+  repeats the pass before the release. A phase is not done while a test asserts something the code no longer does.
 - **0.10 Phase tests run under pytest.** `def test_phase_<xx>_all(): assert main() == 0`. Run from `generation/`
   with `uv run python -m pytest`. conftest's `_FAIL` guard also catches a bare `test_version`.
 - **0.11 Release ordering.** The codec rejects codes newer than the installed mod (`BTS1Codec.cs:65-67`). **The
@@ -82,8 +87,10 @@ uv run btsgen-autoslay-smoke --seeds GAPTESTBI1 GAPTESTBI2 --character class4 --
    (:54); `trigger.enum` (:56); `triggerEffect` (:223, its `op.enum` :229) ONLY if legal as a payload; `$defs.condition`
    (:307, `kind` enum :313). The effect object is `additionalProperties:false` (:32) — every new FIELD is declared here.
 2. `mod/contract/VOCABULARY.md` — op rows :10-54 (`add_trigger` row :32); Conditions :205 (rows :214-234); Triggers :246
-   (list prose ~:264). Pasted whole into the blueprint prompt (`class_forge.py:257/265`) — gated after BH — and into the
-   card prompt (`contract.py:311/327`, already kind-gated by `gate.py`).
+   (list prose ~:264). Pasted whole into the blueprint prompt today (`class_forge.py:257/265`) — after BH-3 the
+   blueprint gets the INDEX plus the per-forge DETAIL block (§2.2) — and into the card prompt (`contract.py:311/327`,
+   already tiered by `gate.py`). A new row therefore needs: the row itself, its token in `GATED_OP_ORDER` or a
+   family, and nothing else for the index (it is derived).
 3. `generation/btsgen/bts1.py:28` — bump `VOCAB_VERSION`, add the `"NN: Phase XX — …"` comment (the test greps it).
 
 **Card text + C# emit**
@@ -116,7 +123,8 @@ uv run btsgen-autoslay-smoke --seeds GAPTESTBI1 GAPTESTBI2 --character class4 --
 12. `class_forge.py` — translation paragraph (:270-291), archetype pitch sections (:292-597), `_PRUNABLE_SECTIONS`
     (:1006-1034) + ALSO-AVAILABLE (:1036), `_ORB_CONDITION_KINDS` (:2099) for any new condition (`test_phase_ar.py:186-202`
     asserts schema == C# `Conditions.Kinds` == this set, plus `TargetKinds` :199-202), uptime heuristic `_cond_uptime`
-    (:1361, kind branches :1378-1390). **All prose here counts against the 463-char scaffold budget.**
+    (:1361, kind branches :1378-1390). Pitch prose is pruned per forge, but keep additions to a sentence or two:
+    the §2.3 scaffold assert (46k on the real path) still applies.
 
 **Catalog + exemplars + heuristics + web**
 13. `data/archetypes.json` — the archetype's `vocabulary.ops` += token; `build_notes` reworded; every token must be
@@ -135,7 +143,7 @@ uv run btsgen-autoslay-smoke --seeds GAPTESTBI1 GAPTESTBI2 --character class4 --
 
 ---
 
-## 2. Rule 0.9 — the budget, and the shrink lever that Phase BH builds
+## 2. Rule 0.9 — the budget, and the vocabulary tree that Phase BH builds
 
 Readings 2026-10-01 (`tests/test_harness_v2.py`, `_BlueprintContract(mode="dossier", triad=True, seed=1)`):
 
@@ -146,22 +154,78 @@ Readings 2026-10-01 (`tests/test_harness_v2.py`, `_BlueprintContract(mode="dossi
 | `test_rule_0_9_v2_is_the_worst_case` (:408) — flag-off vs `BP_READING` (:374) | 108,282 | 108,179 | **103** |
 
 - VOCABULARY.md is 62,745 chars. Wave 5 rows measured 422–808 chars per op row (not 250) and the file grew ~830
-  chars per phase. Ten vocab phases at that rate → ~119k total: the tripwire is reached in the last phases.
-- **The scaffold budget binds first:** ≤ **+38 net scaffold chars per phase**. Every `class_forge.py` pitch sentence is
-  paid for by a cut. Prefer the ALSO-AVAILABLE one-liner + a `_PRUNABLE_SECTIONS` keep-set over new paragraphs.
-- **The lever (BH-3):** the card prompt is already kind-gated live (`gate.py`, `BTS_VOCAB_GATE=heuristic` on the
-  droplet). The blueprint prompt still pastes VOCABULARY.md whole (`class_forge.py:257/265`) even though the class
-  kind is known there (`frontend/builder.py:480-483` passes `class_kind`). Factor `gate.kind_gate_vocab(vocab, kinds,
-  keep_potion=True)` out of `GatedPrompt.__init__` (split on `^## `, drop `SECTION_FAMILY` families + their
-  `FAMILY_OPS` rows + the orb condition rows for kinds the class doesn't own; KEEP `## The signature potion`), call it
-  in `_BlueprintContract.system_prompt()` (:238) when `harness_v2.enabled() and self.class_kind is not None`, honour
-  `nominated_sections`. Measured saving: 13.4k (normal), 7.5–10k (single kind), 3.4–5.9k (hybrid).
-- **The catch:** the three asserts measure an ungated path production never runs. BH must (a) keep the ungated reading
-  as an informational print, (b) assert the tripwire on the worst REAL path (max over kinds with nothing pruned —
-  about orb+summon), and (c) change `_scaffold_len` (:381) to subtract the GATED vocab length (measure between
-  "expressible with ONLY these:\n" and "\n\nThere are NO ops"). Fix `test_wave0_prompts.py:63-105` (ALSO-AVAILABLE must
-  stop naming pool kinds whose vocab is gated out). Add: orb keeps `## Orbs` + `channel_orb` row; normal has neither;
-  hybrid keeps `## Hybrid classes`; potion section present for every kind; nominated `summon` re-adds its section.
+  chars per phase. Ten vocab phases at that rate → ~119k on the untrimmed path: without the tree the tripwire is
+  reached in the last phases, and the 463-char scaffold room would force a cut for every pitch sentence.
+- **After the tree (2.2 + 2.3) the per-phase discipline is:** keep pitch additions short (the pitches are pruned
+  per forge, so they cost only the forges that select them); add every new op to `GATED_OP_ORDER`; and print the
+  three readings in the phase test (informational) so growth stays visible.
+### 2.1 What exists today (so BH builds on it, not beside it)
+
+- **Card prompt: already a two-tier tree, live.** `gate.py` (`BTS_VOCAB_GATE=heuristic` on the droplet) lays the
+  card prompt out as a byte-identical CORE (always-on sections + the core ops + the schema's core half) followed by
+  per-card ADD-ONS chosen by keyword rules over the brief (or Jev), in canonical order so provider prefix caching
+  survives (`gate.py` docstring; `GatedPrompt` :373, `build` :653, `SECTION_FAMILY` :72, `FAMILY_OPS` :93,
+  `CORE_OPS` :104, `GATED_OP_ORDER` :108, `_split_op_table`). Measured: normal-class core 32k vs 122k full.
+- **Blueprint (design) prompt: still pastes VOCABULARY.md whole** (`class_forge.py:_system_prompt_legacy` :255,
+  `vocab = paths.VOCABULARY.read_text()` :257, interpolated at :265) even though by then the pipeline already knows
+  (a) the chosen archetypes' ops — `frontend/builder.py:480-483` passes `selected_ops` — and (b) the class kind.
+  `_prune_archetype_sections` (:1047) uses them to prune the PITCH paragraphs only. The W0.5 **nominate** hook
+  (`nominated_sections`, :236/:241) lets the model ask for a pruned pitch section and the front end re-adds it —
+  the exact mechanism a tree needs for "I want a mechanic you did not detail".
+
+### 2.2 The vocabulary tree (BH-3) — index for everyone, detail for what this forge selected
+
+Design, all in `gate.py` so the card tier and the design tier share one parser:
+
+1. **`gate.vocab_index(vocab_text) -> str`** — a deterministic one-line-per-token index built FROM VOCABULARY.md
+   (never a hand-kept copy, so a new row shows up automatically): for every op / status / condition / trigger kind
+   / scale source / keyword row, `` `token` — <first clause of its meaning, ≤ 12 words> ``, grouped under the file's
+   own `## ` headings, class-only tokens tagged `[orb]` / `[status]` / `[summon]` / `[forge]`. Target ≤ 6k chars.
+   Unit-test that every backticked token `catalog.live_vocab_tokens()` finds in VOCABULARY.md appears in the index.
+2. **`gate.vocab_detail(vocab_text, tokens, kinds, *, keep_potion=True) -> str`** — the FULL rows for `tokens`,
+   plus the prose that gives those rows meaning: the section intro paragraphs of any section that contributed a
+   row ("Effect order is a design lever", the Triggers / Conditions / Scaled-amounts intros), the class-identity
+   sections (`SECTION_FAMILY`) for kinds the class owns, and ALWAYS `## The signature potion` (the blueprint
+   declares the potion). Closure rule: selecting any op of a `FAMILY_OPS` family pulls the whole family (e.g.
+   `spend_forge` → `forge`, `forged_ge`, `summon_blade`); an `add_trigger` selection pulls the trigger-kind rows;
+   a `scale` selection pulls the scale-source rows. Reuse `_split_op_table`'s row regex; do not restructure
+   VOCABULARY.md (`test_exemplars.vocab_ops`, `catalog.live_vocab_tokens`, the card gate all parse it).
+3. **Token selection for the design call** = `selected_ops` (chosen archetypes' `vocabulary.ops`) ∪ `CORE_OPS` ∪
+   the tokens `frontend/request.py` (explicit-request check) names for this request ∪ the rows of any
+   `nominated_sections` kind ∪ family closure. Everything else is index-only.
+4. **Layout (cache-safe, the card-gate rule):** `[fixed head + translation paragraph + INDEX + schema pointer]`
+   identical for every forge → `[pruned archetype pitches]` → `[VOCABULARY DETAIL for this forge]` → `[task]`.
+   Put the index BEFORE the pruned pitches so the cached prefix is as long as possible. Mark the detail block
+   with a header like the card gate's `ADDON_HEADER` and a pointer in the head ("the full rules for the mechanics
+   this class selected are under VOCABULARY DETAIL at the end; the index above lists every other mechanic by name;
+   to use one of those, nominate it").
+5. **Nominate tokens, not just sections.** Extend the W0.5 contract: the blueprint JSON may carry
+   `nominate_ops: [...]` (tokens from the index). `frontend/builder.py` re-issues the design call ONCE with those
+   rows added to the detail block (same retry shape as `nominated_sections`). Log `[tree] nominated <tokens>`; if
+   more than ~20% of forges nominate, the selection rule in step 3 is too narrow — widen it, don't drop the tree.
+6. **Switch + rollback:** `BTS_BLUEPRINT_VOCAB = tree | full` (default `tree` once BH's tests are green; `full` is
+   byte-identical to today's prompt, the `BTS_VOCAB_GATE=off` idiom). The legacy one-shot paths
+   (`cli_forge_class.py:117/132`, `ollama_mix.py:551`) pass no `selected_ops` and keep `full`.
+7. **Card-side hygiene stays:** every new op of this wave is appended to `GATED_OP_ORDER` (:108) or a `FAMILY_OPS`
+   family, otherwise it lands in the card core and every card pays for it.
+
+**Expected size:** index ~5k + detail for a typical 2–3-archetype class ~12–20k, versus the 62.7k paste today:
+the design prompt drops from ~108k to roughly 50–60k, and later waves add ~80 chars per row to the shared part.
+
+### 2.3 Repoint the rule-0.9 tests at the real prompt (same commit as 2.2)
+
+- Keep the untrimmed reading as an INFORMATIONAL print (it is the `full` rollback path), not an assert.
+- New asserts, all on `BTS_BLUEPRINT_VOCAB=tree` and `harness_v2.enabled()`:
+  (a) `vocab_index` ≤ 6,000 chars; (b) for EVERY archetype in `data/archetypes.json` alone (`selected_ops` = its
+  ops, its `class_kind`), the design prompt ≤ 70,000; (c) the all-ops path (`selected_ops` = every archetype's
+  ops, nothing pruned) ≤ `BP_TOTAL_TRIPWIRE` 120,000 — this is the only place the old number survives; (d) scaffold
+  = prompt minus index minus detail block ≤ 46,000, measured from the block markers (replace `_scaffold_len` :381,
+  which subtracts the whole file); (e) the `full` path is byte-identical to today's prompt (snapshot the length).
+- Fix `test_wave0_prompts.py:63-105`: the ALSO-AVAILABLE line must stop naming pool kinds whose rows are now
+  index-only (it may name them as "in the index"). `test_phase_aw.py:146-160` (hybrid keeps ORB + STATUS pitch
+  sections) gets a detail-block analog. New tests: an orb-kind blueprint's detail has `## Orbs` + the `channel_orb`
+  row and a normal-kind one has neither; the potion section is present for every kind; `nominate_ops:["doom"]`
+  re-issues with the `doom` row present; every archetype's own ops appear in full in its detail block.
 
 ---
 
@@ -169,21 +233,48 @@ Readings 2026-10-01 (`tests/test_harness_v2.py`, `_BlueprintContract(mode="dossi
 
 Ordered by (base-card coverage × generality) / cost, with the budget prep first.
 
-### Phase BH — Prep: ship v0.3.0, green baseline, shrink lever, gap entries (no vocab bump; ~½ day)
+### Phase BH — Prep: v0.3.0 shipped, test audit, gap entries, the vocabulary tree (no vocab bump; ~1½ days)
 
-- **BH-0 Release v0.3.0 (wave 5).** Build from HEAD → `package_release.ps1 -Version 0.3.0` → smoke one seed on the
-  fresh DLL → Workshop upload (`workshop/build_workspace.ps1`, visibility `public`, `previews/.gitkeep` moved aside,
-  `~/tools/ModUploader/ModUploader.exe upload -w workshop/workspace`, restore `.gitkeep`) → scp zip to
-  `/opt/btsweb/web/static/releases/` + `chown btsweb:btsweb` → commit the `mod/BlankTheSpire.json` bump + `workshop.json`
-  → push → `sudo /opt/btsweb/deploy.sh` → `curl https://blankthespire.com/download` shows v0.3.0. (In progress
-  2026-10-01; see §7.)
-- **BH-1 Green baseline.** Repoint the 7 stale checks in `test_phase_aq.py` / `test_phase_as.py` / `test_phase_ba.py`
-  from `app.js` to `render.js` (`potionLines` is `render.js:253`). Baseline becomes 551 passed / 0 failed.
+- **BH-0 Release v0.3.0 (wave 5) — DONE 2026-10-01** (commit e84f613; zip on the droplet, Workshop item updated,
+  deploy healthy, `/download` serves v0.3.0). Recipe recorded in §4. One lesson for §4: an EMPTY `previews/` folder
+  makes the uploader delete every preview on the item — remove the folder entirely or fill it with all real
+  images (<1 MB each); the three screenshots were restored as JPEGs the same day.
+- **BH-1 Test audit — a full pass over `generation/tests` (551 tests) and `web/tests` (289) against what BTS does
+  today.** Write the findings + fixes to `docs/plans/TEST_AUDIT_2026-10.md` and fix in the same commit(s):
+  1. Run both suites; fix the known stale set first (`test_phase_aq/as/ba` grep `web/static/app.js` for code that
+     lives in `render.js` since the web refactor — `potionLines` is `render.js:253`, `effPhrase` :527, `condCore` :497).
+  2. Grep every test for file paths, symbols, line-anchored comments and prompt wording that no longer exist
+     (`case "op":`, `app.js` renderers, `_system_prompt_v1`-era strings, old archetype ids, `MODEL_PRICES` zeros,
+     `BTS_HARNESS_V2` assumptions). Repoint or delete; never skip-mark.
+  3. Rule 0.10 sweep: every `test_phase_*.py` must expose `test_phase_<xx>_all()` calling `main()` (AX/AY only
+     exposed `test_version`, so their real checks never ran under pytest). Add the wrapper where missing and fix
+     whatever those checks then reveal.
+  4. Tests that measure a code path production no longer sends: the rule-0.9 trio (repointed in BH-3), and any
+     test building prompts with `harness_v2` off / `BTS_VOCAB_GATE=off` as if that were the live path — keep those
+     as rollback-path tests but label them so, and add the live-path twin where missing.
+  5. Environment pins: tests that depend on droplet-only env (`BTSWEB_ADMIN_EMAILS`, `BTS_VOCAB_GATE`,
+     `BTS_HARNESS_V2`, model/price tables) must set it explicitly; a test that passes only because of a developer's
+     shell is a bug.
+  6. Coverage of what changed since the tests were written: the pricing v3 tiers + Stripe fee, the two-model BYOK
+     split, the admin panel's 4-hour sign-in rule, the magic-link auth, `/workshop` redirect + download-page version
+     read, the hosted route (Ollama primary + cost gate), the stub-provider retry pinning, the explicit-request check,
+     site-traffic reporting. Each needs at least one live-path test or a written "not testable offline, smoke by X".
+  7. The gap-tester folders the plans cite (`generation/scratch/gaptest-bb..bf`) are not in this checkout; note it,
+     and make each new phase's tester self-contained (`build_tester.py` + its saved tag grep).
+  8. C# has no test project: the AutoSlay smoke is the only engine test. State that in the audit; the per-phase
+     tags (rule 0.3) are the engine's regression record, so every phase's test must grep its tags file into the
+     repo (`generation/scratch/gaptest-<xx>/godot_<XX>_tags_<SEED>.txt`).
+  Exit bar: both suites green, no test asserts a dead path, the audit doc lists what is covered only by smokes.
 - **BH-2 Gap entries.** Append `### 62.`–`### 79.` to `VOCABULARY_GAPS.md` per §3's table below (Status `planned`),
   plus the deferred set as `captured` (§6). Re-triage `### 11.` (stun) from `rejected` to `planned` — its own re-open
   condition ("if a stun primitive is ever scouted") is met: `CreatureCmd.Stun` exists and `Whistle` uses it.
-- **BH-3 Shrink lever + readings** (§2). One commit, readings in the message.
-- **Test:** `tests/test_phase_bh.py` (lever tests + the re-taken readings). No tester, no smoke.
+- **BH-3 The vocabulary tree + repointed budget tests** (§2.2 + §2.3). One commit, the new readings in the message
+  (index size, per-archetype max, all-ops path, scaffold). Verify end-to-end with one live-shaped dry run:
+  `uv run btsgen-forge-class` (or the staged front end's dry-run) on a normal, an orb and a hybrid request with
+  `BTS_BLUEPRINT_VOCAB=tree`, confirming the detail block holds exactly the selected rows and the `[tree]` log line.
+  Do NOT deploy it in isolation — it ships with the wave's web deploy (§4), after the mod.
+- **Test:** `tests/test_phase_bh.py` (tree unit tests, nominate round-trip, the §2.3 asserts, the audit's exit bar as
+  a checklist printed by `main()`). No tester, no smoke.
 
 | gap | mechanic | phase |
 |---|---|---|
@@ -554,14 +645,21 @@ Calculated Gamble, Rolling Boulder power. **Tags:** `[BR] stun '<enemy>': next m
 
 ## 4. Release (one mod release for the wave)
 
-Merge to main → bump `mod/BlankTheSpire.json` (v0.3.0 → **v0.4.0**, vocab v70) → build from HEAD →
+**Pre-release test re-pass (rule 0.9b):** re-run the BH-1 checklist against the finished tree — both suites green,
+every `test_phase_b[i-r].py` exposes its `_all` wrapper and its describe byte-match, each phase's tags file is in
+`generation/scratch/gaptest-<xx>/`, the §2.3 readings printed and recorded in `TEST_AUDIT_2026-10.md`, and the
+C# build is clean from a fresh clone (gitignored `mod/Directory.Build.props` + `.editorconfig` noted).
+
+Then: merge to main → bump `mod/BlankTheSpire.json` (v0.3.0 → **v0.4.0**, vocab v70) → build from HEAD →
 `mod/tools/package_release.ps1 -Version 0.4.0` → smoke one seed on the packaged DLL → Workshop update
-(`workshop/build_workspace.ps1 -Version 0.4.0 -ChangeNote "…"`, keep `visibility: public`, move `previews/.gitkeep`
-aside, `~/tools/ModUploader/ModUploader.exe upload -w workshop/workspace`, restore) → scp zip to
-`/opt/btsweb/web/static/releases/` + `chown btsweb:btsweb` → commit + push → `sudo /opt/btsweb/deploy.sh` → check
-`/download` shows v0.4.0. **Never deploy the web before the zip + Workshop item are live (rule 0.11).** Players on
-v0.3.0 get "this code needs a newer BLANK the spire" until they update; the welcome banner already points at the
-Workshop item.
+(`workshop/build_workspace.ps1 -Version 0.4.0 -ChangeNote "…"`, keep `visibility: public`; **either move the whole
+`previews/` folder out of the tree (previews unchanged) or leave it holding the complete set of real images <1 MB —
+never empty, never with `.gitkeep` inside**; `~/tools/ModUploader/ModUploader.exe upload -w workshop/workspace`;
+restore) → scp zip to `/opt/btsweb/web/static/releases/` + `chown btsweb:btsweb` → commit + push →
+`sudo /opt/btsweb/deploy.sh` (this is also when the BH-3 tree goes live) → check `/download` shows v0.4.0 and the
+droplet's `bts1.py` VOCAB_VERSION matches the zip. **Never deploy the web before the zip + Workshop item are live
+(rule 0.11).** Players on v0.3.0 get "this code needs a newer BLANK the spire" until they update; the welcome banner
+already points at the Workshop item.
 
 If the window closes mid-wave: release whatever is merged (the phases are independent, each is a vocab bump), as long
 as every merged phase passed its smoke.
@@ -572,13 +670,13 @@ as every merged phase passed its smoke.
 
 | Phase | Gaps | Vocab | Scout est. | Base cards | What the forge can newly say |
 |---|---|---|---|---|---|
-| BH | — (+ #62–#79 logged) | — | ½ day | — | v0.3.0 shipped; green baseline; blueprint prompt kind-gated; readings re-taken |
+| BH | — (+ #62–#79 logged) | — | 1½ days | — | v0.3.0 shipped ✔; full test audit (both suites green, no dead-path asserts); the vocabulary tree (index + per-forge detail) replaces the whole-file paste; budget tests measure the real prompt |
 | BI | #62 | v61 | 1 day | 11 | Rage / Storm / Panache / Juggling / Iteration engines; random-enemy payloads |
 | BJ | #63, #64 | v62 | 1½ days | ~25 | Ashen Strike, Memento Mori, Helix Drill, Mirage, Bully, Expertise, Double Energy, Evil Eye, Go for the Eyes |
 | BK | #65 | v63 | 1 day | 24 | Whirlwind / Skewer (X hits), Finisher, Flechettes, Fiend Fire-style rippers |
 | BL | #66, #67 | v64 | 1½ days | 24 | Piercing Wail, Dark Shackles, Malaise, Expose; Doom executes (Necrobinder's axis for any class) |
 | BM | #68–#70 | v65 | 1 day | 30 | Battle Trance, Panic Button, Wraith Form prices; Burst / Double Tap / Echo Form; Prolong; Equilibrium |
-| **cut line** | | | **~6½ days of scout estimate (Wave 5 ran ~5 estimated days in one real day)** | **~114** | |
+| **cut line** | | | **~7½ days of scout estimate (Wave 5 ran ~5 estimated days in one real day)** | **~114** | |
 | BN | #71–#73 | v66 | 1½ days | 38 | Feed / Sunder on-kill; Discovery / Infernal Blade; Havoc / Uproar / Mayhem |
 | BO | #74, #75 | v67 | 1½ days | 29 | Particle Wall, Bolas, Headbutt, Secret Weapon, Reboot; Snap / Hand Trick |
 | BP | #76, #77 | v68 | 1 day | 24 | Stomp / Momentum Strike / Kingly Kick; Arsenal, Vicious, Sleight of Flesh |
@@ -628,5 +726,9 @@ without it). Run smokes serially (one game instance); batch two testers per smok
 11. **Release cadence**: **one v0.4.0 at the end**; no mid-wave release.
 12. **Strength Down counts as a debuff** for `spread_debuffs` / `target_debuff_count` (BL): **yes** (base Misery copies it).
 
-**Status of BH-0 (2026-10-01):** v0.3.0 zip packaged, Workshop workspace staged (visibility public), pre-release smoke
-running on the fresh DLL. Upload + scp + commit + deploy follow a clean smoke.
+13. **Tree selection width** (BH-3): **selected archetypes' ops + core ops + explicit-request tokens + family
+    closure**, with one nominate retry; widen if more than ~20% of forges nominate.
+
+**Status (2026-10-01 evening):** BH-0 done (v0.3.0 live everywhere, commit e84f613). Next up: BH-1 test audit →
+BH-2 gap entries → BH-3 tree, then BI. Ryan will clear context before execution starts; this file plus
+`docs/plans/wave6_scouts/*.md` and `VOCAB_BASE_GAME_AUDIT.md` are the full hand-off.
