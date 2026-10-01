@@ -155,6 +155,19 @@ def requested_ids(reqs) -> list[str]:
     return out
 
 
+def requested_tokens(reqs, catalog) -> set[str]:
+    """The vocabulary tokens the player's explicit asks name: every `vocabulary.ops` token of every archetype
+    that satisfies a requirement. Phase BH-3: these rows join the blueprint's VOCABULARY DETAIL even when the
+    chosen candidate did not carry the requested archetype (the ask is "as best we can")."""
+    by_id = getattr(catalog, "by_id", {}) or {}
+    out: set[str] = set()
+    for aid in requested_ids(reqs):
+        e = by_id.get(aid)
+        if e is not None:
+            out |= {str(o) for o in (getattr(e, "ops", None) or ())}
+    return out
+
+
 def request_line(reqs) -> str:
     """The HARD RULE paragraph for the map / compose prompts ("" when there is nothing to ask)."""
     if not reqs:

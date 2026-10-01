@@ -11,6 +11,7 @@ sink. The human checkpoint is an injected callback `checkpoint(candidates, dossi
 """
 from __future__ import annotations
 
+import logging
 import os
 from collections import Counter
 
@@ -477,12 +478,18 @@ class BlueprintBuilder:
             # W0.5: a caller's pre-nominated section keys (coverage_nominations.sections) survive pruning.
             from .. import coverage as _coverage
             _sections = _coverage.sanitize_nominations(getattr(brief, "coverage_nominations", None)).get("sections")
+            # Phase BH-3: the player's explicit asks name vocabulary rows the DETAIL block must carry.
+            try:
+                _request_ops = request_mod.requested_tokens(dossier.requirements, self._catalog)
+            except Exception:  # noqa: BLE001 — an enhancement; never break the forge
+                _request_ops = set()
             bp_contract = _BlueprintContract(mode="dossier", triad=self._triad,
                                              seed=harness_v2.seed_for(concept), selected_ops=selected_ops,
                                              class_kind=(chosen.class_kinds or chosen.class_kind),
-                                             nominated_sections=_sections)
+                                             nominated_sections=_sections, request_ops=_request_ops)
         bp = self._run_stage(self._make_gen(bp_contract, max_tokens=48000),
                              dbrief, validate_blueprint_for(declared), "blueprint")
+        bp = self._tree_nominations(bp, bp_contract, dbrief, declared)
         if harness_v2.enabled():
             # thread the v2 identity material to the card stage: the strategy lines (for the per-card system
             # prompt's identity block) + the metaphors to strip from every card-call context.
@@ -511,6 +518,53 @@ class BlueprintBuilder:
             }
         self._enrich_archetypes(bp, dossier)
         return bp
+
+    # --- Phase BH-3: the vocabulary tree ----------------------------------------------------------------
+    def _tree_nominations(self, bp: dict, bp_contract, dbrief, declared) -> dict:
+        """Under the vocabulary tree, log the prompt's [tree] line and honor the blueprint's `nominate_ops`:
+        tokens it took from the INDEX whose full rows it wants. The design call is re-issued ONCE with those
+        rows added to the DETAIL block (a second pass's own nominations are ignored, never a loop). A failed
+        re-issue keeps the first blueprint — a nomination is a wish, never a dead forge."""
+        if not isinstance(bp, dict) or not bp_contract.tree_active():
+            return bp
+        from .. import gate, paths
+        if not bp_contract.tree_stats:
+            bp_contract.system_prompt()  # fakes never read the prompt; build it so the [tree] reading exists
+        self._note(self._tree_line(bp_contract))
+        raw = bp.pop("nominate_ops", None)
+        vocab = paths.VOCABULARY.read_text(encoding="utf-8")
+        noms = gate.sanitize_nominate_ops(raw, vocab, have=bp_contract.detail_tokens())
+        if not noms:
+            return bp
+        self._note(f"      [tree] nominated {', '.join(noms)} -- re-issuing the blueprint once with their rows")
+        logging.getLogger("btsgen.tree").info("[tree] nominated %s", ", ".join(noms))
+        again = _BlueprintContract(mode="dossier", triad=bp_contract.triad, seed=bp_contract.seed,
+                                   selected_ops=bp_contract.selected_ops, class_kind=bp_contract.class_kind,
+                                   nominated_sections=bp_contract.nominated_sections,
+                                   request_ops=bp_contract.request_ops, nominated_ops=noms)
+        try:
+            bp2 = self._run_stage(self._make_gen(again, max_tokens=48000), dbrief,
+                                  validate_blueprint_for(declared), "blueprint (nominated)")
+        except BlueprintBuildError as e:
+            self._note(f"      [tree] the nominated re-issue failed ({e}); keeping the first blueprint")
+            bp["tree_nominated"] = noms
+            return bp
+        if not again.tree_stats:
+            again.system_prompt()
+        self._note(self._tree_line(again))
+        if isinstance(bp2, dict):
+            bp2.pop("nominate_ops", None)
+            bp2["tree_nominated"] = noms
+            return bp2
+        return bp
+
+    @staticmethod
+    def _tree_line(contract) -> str:
+        s = contract.tree_stats or {}
+        rows = s.get("detail_rows") or []
+        return (f"      [tree] blueprint prompt {s.get('prompt_chars', 0):,} chars: index {s.get('index_chars', 0):,}, "
+                f"detail {s.get('detail_chars', 0):,} ({len(rows)} rows)"
+                + (f", nominated {', '.join(s['nominated_ops'])}" if s.get("nominated_ops") else ""))
 
     # --- the player's explicit asks (frontend.request) ------------------------------------------------
     def _narrate_requests(self, dossier: Dossier) -> None:

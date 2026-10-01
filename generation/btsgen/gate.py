@@ -132,6 +132,8 @@ FIELD_UNITS = {
     "card": ("add_status_card",),
 }
 DEF_UNITS = {"triggerEffect": ("add_trigger",)}
+# One vocabulary table row: `| \`token\` | ...`. Shared by the card gate's op-table split and the blueprint tree.
+_ROW_RE = re.compile(r"^\|\s*`([a-z_]+)`\s*\|")
 SCHEMA_ADDITIONS_HEADER = ("## Schema additions (for the add-ons above: they EXTEND `$defs.effect` in THE JSON SCHEMA; "
                            "the validator checks the complete schema)\n")
 
@@ -562,7 +564,7 @@ class GatedPrompt:
             gateable |= class_ops
         keep, head_lines = [], []
         for line in sec.splitlines():
-            m = re.match(r"^\|\s*`([a-z_]+)`\s*\|", line)
+            m = _ROW_RE.match(line)
             if not m:
                 if line.startswith("|") and not self.op_rows and len(head_lines) < 2:
                     head_lines.append(line)
@@ -671,3 +673,346 @@ def summary(decision: Decision, gp: GatedPrompt, text: str) -> dict:
             "ops": sorted(decision.ops) if decision.ops is not None else None,
             "chars": len(text), "full_chars": len(gp.full), "core_chars": len(gp.core),
             "jev_cost": round(decision.jev_cost, 6), "error": decision.error}
+
+
+# ============================================================================================================
+# Phase BH-3 (VOCAB_EXPANSION_6_PLAN §2.2): the vocabulary TREE for the blueprint (design) prompt.
+#
+# The design prompt used to paste VOCABULARY.md whole. By the time the staged front end writes the blueprint it
+# already knows the chosen archetypes' ops and the class kind, so the tree lays the vocabulary out in two parts:
+#
+#   INDEX  (vocab_index)  one line per token, derived from VOCABULARY.md, identical for every forge -> it sits in
+#                         the cached head of the prompt, and a new vocabulary row costs one ~80-char line there;
+#   DETAIL (vocab_detail) the FULL rows (+ the prose that gives them meaning) for the tokens this forge selected,
+#                         at the END of the system prompt under DETAIL_HEADER.
+#
+# A token that is only in the index can be asked for: the blueprint may carry `"nominate_ops": [...]`, and the
+# front end re-issues the design call ONCE with those rows added to the detail (frontend/builder.py).
+# $BTS_BLUEPRINT_VOCAB = tree (default) | full (the whole-file paste, byte-identical to the pre-BH prompt).
+# ============================================================================================================
+BLUEPRINT_ENV = "BTS_BLUEPRINT_VOCAB"
+BLUEPRINT_MODES = ("tree", "full")
+INDEX_HEADER = "# VOCABULARY INDEX (every mechanic, one line each; [orb]/[status]/[summon]/[forge] = that kind only)\n"
+INDEX_END = "\n# END OF VOCABULARY INDEX\n"
+TREE_POINTER = ("The full rules for the mechanics this class selected are under VOCABULARY DETAIL at the end; the "
+                "index above names every other one. To use one of those, nominate it: add \"nominate_ops\": "
+                "[\"token\", ...] to the blueprint for one more pass with its rules.")
+DETAIL_HEADER = ("\n\n# VOCABULARY DETAIL (the full rules for the mechanics this class selected — same rules, same "
+                 "closed set as the INDEX above)\n")
+NOMINATE_MAX = 8
+
+# Tree families: the card gate's FAMILY_OPS, plus the tokens a family's detail always carries along. Selecting
+# any TRIGGER token pulls the whole family (its pulled tokens + its vocabulary section); `forge` is a core op,
+# so it is pulled by the forge family but never triggers it.
+TREE_FAMILY_PULL = {
+    "orbs": FAMILY_OPS["orbs"] + ("focus", "temp_focus", "orbs_match", "orb_count_ge"),
+    "custom_status": FAMILY_OPS["custom_status"],
+    "summons": FAMILY_OPS["summons"],
+    "forge": FAMILY_OPS["forge"] + ("forge", "forged_ge", "on_blade_played"),
+}
+TREE_FAMILY_TRIGGER = {f: tuple(t for t in toks if t not in CORE_OPS) for f, toks in TREE_FAMILY_PULL.items()}
+TREE_TAG = {"orbs": "[orb]", "custom_status": "[status]", "summons": "[summon]", "forge": "[forge]"}
+_TEXT_TAGS = (("ORB-CLASS", "[orb]"), ("STATUS-CLASS", "[status]"), ("SUMMON-CLASS", "[summon]"),
+              ("FORGE-CLASS", "[forge]"))
+# Sections whose tokens get a meaning line in the index; every other section is listed by name only (its prose
+# is a class knob / card JSON shape / always in the detail).
+_MEANING_SECTIONS = ("## Effect ops", "## Statuses", "## Conditions", "## Structural mechanics", "## Triggers")
+# Sections the detail always carries whole (short, universal rules every design needs).
+_ALWAYS_DETAIL = ("## Effect order", "## Targeting", "## Card shape", "## Rarity guidance")
+_POTION = "## The signature potion"
+_TRIGGERS = "## Triggers"
+_STRUCTURAL = "## Structural mechanics"
+_TOKEN_RE = re.compile(r"`([a-z][a-z0-9_]*)`")          # = frontend.catalog._TOKEN_RE (live_vocab_tokens)
+_BULLET_RE = re.compile(r'^\s*-\s+`"?([a-z][a-z0-9_]*)"?`\s*(.*)$')
+_MAX_WORDS = 12              # §2.2: "first clause of its meaning, ≤ 12 words"
+# §2.3 (a): the index stays <= INDEX_BUDGET chars. ~210 backticked tokens at 12 words each is ~8k, so the clause
+# length ADAPTS: vocab_index uses the longest per-clause char cap (from _CLAUSE_CAPS) that fits the budget. A new
+# vocabulary row therefore costs one name line and makes every clause a little terser — the index never grows past
+# the budget until the names-only floor (~3.5k today) is reached.
+INDEX_BUDGET = 6_000
+_CLAUSE_CAPS = tuple(range(72, 15, -2))
+_DANGLING = frozenset("a an the of to and or for at by in on with your its that this is are from into as "
+                      "per when if it then".split())
+
+
+def blueprint_mode() -> str:
+    """$BTS_BLUEPRINT_VOCAB, read at call time: `tree` (default) or `full`. Unknown values mean tree."""
+    m = (os.environ.get(BLUEPRINT_ENV) or "tree").strip().lower()
+    return m if m in BLUEPRINT_MODES else "tree"
+
+
+def _sections(vocab_text: str) -> list[tuple[str, str]]:
+    """(title line, whole section text) per `## ` section, in file order; the preamble is dropped."""
+    out = []
+    for sec in re.split(r"^(?=## )", vocab_text, flags=re.M):
+        if sec.startswith("## "):
+            out.append((sec.splitlines()[0], sec))
+    return out
+
+
+def _table_rows(sec: str):
+    """(token, meaning cell) per table row of a section (indented tables too), in order."""
+    ncols = 0
+    for line in sec.splitlines():
+        s = line.strip()
+        if not s.startswith("|"):
+            ncols = 0
+            continue
+        m = _ROW_RE.match(s)
+        if not m:
+            if ncols == 0:
+                ncols = s.count("|") - 1          # the header row fixes the column count (a cell may hold "|x|")
+            continue
+        cells = s[m.end():].split("|", max(0, ncols - 2))
+        yield m.group(1), cells[-1].strip(" |")
+
+
+def _bullet_rows(sec: str):
+    for line in sec.splitlines():
+        m = _BULLET_RE.match(line)
+        if m:
+            yield m.group(1), m.group(2)
+
+
+def _clause(text: str, max_chars: int = 72) -> str:
+    """The first clause of a meaning cell — markdown and parentheticals stripped, at most _MAX_WORDS words and
+    `max_chars` chars, cut at a word and never on a dangling article/preposition. A short bold lead that only
+    restates the name ("**Forge N** — stoke ...") is skipped; the `amount` / `value` params read as N."""
+    s = text.strip()
+    lead = re.match(r"^\*\*([^*]+)\*\*", s)
+    if lead and len(lead.group(1).split()) <= 3 and len(s) > lead.end() + 12:
+        s = s[lead.end():]
+    s = re.sub(r"`(?:amount|value)`", "N", s)
+    s = s.replace("**", "").replace("`", "").replace('"', "").replace("\\|", "|")
+    prev = None
+    while prev != s:
+        prev, s = s, re.sub(r"\s*\([^()]*\)", "", s)
+    s = s.strip(" |—-:")
+    parts = [p.split() for p in re.split(r"(?<=[a-z0-9%])\.\s|\s—\s|;\s|:\s", s)]
+    words = next((p for p in parts if len(p) >= 2), s.split())[:_MAX_WORDS]
+    while len(" ".join(words)) > max_chars and len(words) > 2:
+        words = words[:-1]
+    while len(words) > 2 and words[-1].lower().strip(",") in _DANGLING:
+        words = words[:-1]
+    return " ".join(words).rstrip(".,")
+
+
+def _family_of(title: str) -> str | None:
+    return next((f for t, f in SECTION_FAMILY.items() if title.startswith(t)), None)
+
+
+class _VocabTree:
+    """VOCABULARY.md parsed once: its sections, each token's HOME section, and the text its index line uses."""
+
+    def __init__(self, vocab_text: str) -> None:
+        self.text = vocab_text
+        self.sections = _sections(vocab_text)
+        self.home: dict[str, int] = {}              # token -> section index
+        self.meaning: dict[str, str] = {}           # token -> meaning text (rows / bullets / trigger parens)
+        self.row_text: dict[str, str] = {}          # token -> its own row/bullet text (for the class tags)
+        self.index: str | None = None               # vocab_index's rendering, memoized with its clause cap
+        self.index_cap = 0
+        for i, (title, sec) in enumerate(self.sections):
+            if title.startswith(_POTION) or title.startswith("## Card shape"):
+                continue                            # field tables, not mechanics: listed by name below
+            for tok, mean in list(_table_rows(sec)) + list(_bullet_rows(sec)):
+                if tok not in self.home:
+                    self.home[tok] = i
+                    self.meaning[tok] = mean
+                    self.row_text[tok] = mean
+        # every other backticked token: home = the section that mentions it most (the first one on a tie)
+        counts: dict[str, list[int]] = {}
+        for i, (_t, sec) in enumerate(self.sections):
+            for tok in _TOKEN_RE.findall(sec):
+                counts.setdefault(tok, [0] * len(self.sections))[i] += 1
+        for tok, per in counts.items():
+            if tok in self.home:
+                continue
+            self.home[tok] = max(range(len(per)), key=lambda k: (per[k], -k))
+            title, sec = self.sections[self.home[tok]]
+            if title.startswith(_TRIGGERS):         # trigger kinds read "`on_hp_lost` (you lose HP ...)"
+                m = re.search(r"`" + re.escape(tok) + r"`\s*\(([^)]*)\)", sec)
+                if m and len(m.group(1).split()) >= 3:
+                    self.meaning[tok] = m.group(1)
+
+    def tokens(self) -> set[str]:
+        return set(self.home)
+
+    def tag(self, tok: str) -> str:
+        for fam, toks in TREE_FAMILY_PULL.items():
+            if tok in toks and tok not in CORE_OPS:
+                return TREE_TAG[fam]
+        fam = _family_of(self.sections[self.home[tok]][0]) if tok in self.home else None
+        if fam in TREE_TAG:
+            return TREE_TAG[fam]
+        row = self.row_text.get(tok, "")
+        return next((t for marker, t in _TEXT_TAGS if marker in row), "")
+
+    def section_tokens(self, i: int) -> list[str]:
+        """The tokens whose HOME is section i, in order of first mention."""
+        return [t for t in dict.fromkeys(_TOKEN_RE.findall(self.sections[i][1])) if self.home.get(t) == i]
+
+
+_TREE_CACHE: dict[str, _VocabTree] = {}
+
+
+def _tree(vocab_text: str) -> _VocabTree:
+    t = _TREE_CACHE.get(vocab_text)
+    if t is None:
+        if len(_TREE_CACHE) >= 4:
+            _TREE_CACHE.pop(next(iter(_TREE_CACHE)))
+        t = _TREE_CACHE[vocab_text] = _VocabTree(vocab_text)
+    return t
+
+
+def vocab_tokens(vocab_text: str) -> set[str]:
+    """Every backticked token of VOCABULARY.md (the set catalog.live_vocab_tokens reads from the same file)."""
+    return _tree(vocab_text).tokens()
+
+
+def vocab_index(vocab_text: str) -> str:
+    """The INDEX: one line per mechanic, derived from VOCABULARY.md (never hand-kept), grouped under the file's
+    own `## ` headings (the part before any parenthesis). Mechanic sections (ops / statuses / conditions /
+    scale sources / triggers) get `` `token` — <first clause of its meaning> [tag] ``; their remaining backticked
+    names (parameters, values) and the class-knob sections are listed by name; tokens every forge's DETAIL
+    carries are listed as such. Deterministic: the same file always gives the same bytes (so the index rides the
+    cached prompt head), and it fits INDEX_BUDGET by using the longest clause cap that does (see _CLAUSE_CAPS)."""
+    tree = _tree(vocab_text)
+    cached = tree.index
+    if cached is None:
+        text = ""
+        for cap in _CLAUSE_CAPS:
+            text = _render_index(tree, cap)
+            if len(text) <= INDEX_BUDGET:
+                break
+        tree.index, tree.index_cap = text, cap
+        cached = text
+    return cached
+
+
+def index_clause_cap(vocab_text: str) -> int:
+    """The per-clause char cap vocab_index settled on (a reading for the phase tests; it shrinks as rows land)."""
+    vocab_index(vocab_text)
+    return _tree(vocab_text).index_cap
+
+
+def _render_index(tree: "_VocabTree", cap: int) -> str:
+    # Tokens EVERY forge's detail carries (the core op rows, the Triggers section — add_trigger is a core op —
+    # the universal sections, the potion) are listed by name only: their full rules are always at the end.
+    always = set(CORE_OPS) | {t for i, (title, _s) in enumerate(tree.sections)
+                              if any(title.startswith(p) for p in (_TRIGGERS, _POTION) + _ALWAYS_DETAIL)
+                              for t in tree.section_tokens(i)}
+    blocks: list[str] = []
+    for i, (title, _sec) in enumerate(tree.sections):
+        toks = tree.section_tokens(i)
+        if not toks:
+            continue
+        lines: list[str] = []
+        detailed: list[str] = []
+        listed: list[str] = []
+        meaning_sec = any(title.startswith(p) for p in _MEANING_SECTIONS)
+        for tok in toks:
+            mean = tree.meaning.get(tok) if meaning_sec else None
+            if tok in always:
+                detailed.append(tok)
+            elif mean:
+                tag = tree.tag(tok)
+                lines.append(f"`{tok}` — {_clause(mean, cap)}" + (f" {tag}" if tag else ""))
+            else:
+                listed.append(tok)
+        if detailed:
+            lines.insert(0, "always in DETAIL: " + " ".join(f"`{t}`" for t in detailed))
+        if listed:
+            tag = TREE_TAG.get(_family_of(title) or "", "")
+            lines.append(("also" if lines else "names") + (f" {tag}" if tag else "") + ": "
+                         + " ".join(f"`{t}`" for t in listed))
+        blocks.append(title.split(" (")[0] + "\n" + "\n".join(lines))
+    return INDEX_HEADER + "\n".join(blocks) + INDEX_END
+
+
+def tree_selection(vocab_text: str, tokens, kinds=()) -> tuple[frozenset, frozenset]:
+    """(the closed token set, the active families) for one forge — §2.2 point 2's closure rule: a family is
+    active when the class OWNS its kind or any of its trigger tokens is selected, and an active family pulls
+    all its tokens; two class-kind families make a hybrid. Tokens not in the vocabulary are dropped."""
+    known = vocab_tokens(vocab_text)
+    sel = {str(t) for t in (tokens or ()) if str(t) in known}
+    kinds = {kinds} if isinstance(kinds, str) else {str(k) for k in (kinds or ())}
+    fams = {KIND_FAMILY[k] for k in kinds if k in KIND_FAMILY}
+    for fam, trig in TREE_FAMILY_TRIGGER.items():
+        if sel & set(trig):
+            fams.add(fam)
+    for fam in fams:
+        sel |= {t for t in TREE_FAMILY_PULL.get(fam, ()) if t in known}
+    if sum(1 for f in ("orbs", "custom_status", "summons") if f in fams) >= 2:
+        fams.add("hybrid")
+    return frozenset(sel), frozenset(fams)
+
+
+def vocab_detail(vocab_text: str, tokens, kinds=(), *, keep_potion: bool = True) -> str:
+    """The DETAIL block for one forge: the FULL rows for `tokens` (after tree_selection's closure) plus the
+    prose that gives them meaning — the non-row text of every table section that contributed a row, the
+    class-identity sections (SECTION_FAMILY) of the families the class owns or selected, the whole Triggers
+    section when any trigger token is selected (add_trigger is a core op, so in practice always), the whole
+    Structural section when any of its tokens (`scale`, a scale source, `hits`, `grow` …) is selected, the short
+    universal sections (_ALWAYS_DETAIL), and ALWAYS `## The signature potion` (the blueprint declares it).
+    Sections keep the file's order and bytes; only unselected table rows are cut."""
+    tree = _tree(vocab_text)
+    sel, fams = tree_selection(vocab_text, tokens, kinds)
+    out: list[str] = []
+    for i, (title, sec) in enumerate(tree.sections):
+        fam = _family_of(title)
+        if title.startswith(_POTION):
+            keep = keep_potion
+        elif any(title.startswith(p) for p in _ALWAYS_DETAIL):
+            keep = True
+        elif fam in CLASS_FAMILIES or fam == "forge":
+            keep = fam in fams
+        elif title.startswith(_TRIGGERS):           # the trigger-kind "rows" are this section's prose
+            keep = "add_trigger" in sel or bool(sel & set(tree.section_tokens(i)))
+        elif title.startswith(_STRUCTURAL):         # the scale-source "rows" are this section's bullets
+            keep = "scale" in sel or bool(sel & set(tree.section_tokens(i)))
+        else:
+            rows = [t for t, _m in _table_rows(sec)]
+            if not rows:
+                keep = True                           # a prose-only section the tree doesn't know: keep it
+            elif sel & set(rows):
+                lines = [ln for ln in sec.splitlines()
+                         if not ((m := _ROW_RE.match(ln.strip())) and m.group(1) not in sel)]
+                out.append("\n".join(lines) + ("\n" if sec.endswith("\n") else ""))
+                continue
+            else:
+                keep = False
+        if keep:
+            out.append(sec)
+    body = "".join(s if s.endswith("\n") else s + "\n" for s in out)
+    return DETAIL_HEADER + body.rstrip("\n") + "\n"
+
+
+def detail_row_tokens(detail_text: str) -> set[str]:
+    """The tokens whose table ROWS appear in a rendered detail block (tests + the [tree] log)."""
+    return {m.group(1) for line in detail_text.splitlines() if (m := _ROW_RE.match(line.strip()))}
+
+
+def sanitize_nominate_ops(raw, vocab_text: str, *, have=()) -> list[str]:
+    """A blueprint's `nominate_ops`: known vocabulary tokens only, not already selected, deduplicated, capped."""
+    if not isinstance(raw, (list, tuple)):
+        return []
+    known = vocab_tokens(vocab_text)
+    have = set(have or ())
+    out: list[str] = []
+    for t in raw:
+        t = str(t or "").strip().strip("`").lower()
+        if t in known and t not in have and t not in out:
+            out.append(t)
+    return out[:NOMINATE_MAX]
+
+
+def tree_blocks(prompt: str) -> tuple[int, int]:
+    """(index chars, detail chars) of a tree-mode prompt, measured from the block markers; 0 for a missing one."""
+    idx = 0
+    a = prompt.find(INDEX_HEADER)
+    if a >= 0:
+        b = prompt.find(INDEX_END, a)
+        idx = (b + len(INDEX_END) - a) if b >= 0 else 0
+    d = prompt.rfind(DETAIL_HEADER)
+    return idx, (len(prompt) - d if d >= 0 else 0)
