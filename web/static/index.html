@@ -38,14 +38,23 @@
 
   <!-- Forge view -->
   <main id="view-forge" class="hidden">
-    <!-- Welcome banner (2026-09-28): forged classes only play with the Steam Workshop mod installed, so every
-         signed-in account sees this until it is dismissed (bts_mod_banner_dismissed). The key-or-tokens
-         nudge it replaced lives on in the chooser below. -->
-    <div id="v3-banner" class="banner warn hidden" role="status">
-      <span class="banner-icon" aria-hidden="true">⚠</span>
-      <span id="v3-banner-text">BLANK the spire needs its Steam Workshop mod to play your forged classes.
-        <a href="/workshop" target="_blank" rel="noopener">Subscribe to the mod on Steam Workshop</a>.</span>
-      <span class="spacer"></span>
+    <!-- Welcome banner (2026-09-30): a five-step "how it works" tutorial, shown to every signed-in account
+         until it is dismissed (bts_tutorial_banner_dismissed). It replaced the 2026-09-28 "subscribe to the
+         mod" warning: people were reaching this page and leaving, so the whole flow is spelled out up front.
+         The full illustrated version lives on /help. -->
+    <div id="v3-banner" class="banner tutorial hidden" role="status">
+      <span class="banner-icon" aria-hidden="true">⚒</span>
+      <div id="v3-banner-text" class="tutorial-body">
+        <strong>How it works</strong>
+        <ol class="tutorial-steps">
+          <li><a href="/workshop" target="_blank" rel="noopener">Subscribe to the mod</a> on Steam Workshop (once).</li>
+          <li>Pick how to pay: paste your own API key (free) or get a forge token (one token = one forge). The Forge button stays off until you do.</li>
+          <li>Describe a class below and press Forge. You get a code.</li>
+          <li>In Slay the Spire 2: Mods → BLANK the spire → <em>Import a class code</em> → paste → Import.</li>
+          <li>Restart the game and pick your class.</li>
+        </ol>
+        <a class="tutorial-more" href="/help">Full guide with screenshots</a>
+      </div>
       <button id="v3-banner-x" class="banner-x" aria-label="Dismiss">×</button>
     </div>
 

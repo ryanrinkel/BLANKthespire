@@ -415,7 +415,7 @@ if (scenario === "forge") {
   await shot("v3-account");
   await evaluate(`document.getElementById('nav-forge').click()`); await sleep(300);
   await evaluate(`document.getElementById('v3-banner-x').click()`); await sleep(300);
-  console.log("banner dismissed:", await evaluate(`document.getElementById('v3-banner').classList.contains('hidden') + ' ' + localStorage.getItem('bts_v3_banner_dismissed')`));
+  console.log("banner dismissed:", await evaluate(`document.getElementById('v3-banner').classList.contains('hidden') + ' ' + localStorage.getItem('bts_tutorial_banner_dismissed')`));
   for (const p of ["terms", "privacy", ""]) { await nav(`${base}/${p}`); await sleep(500); await shot("v3-page-" + (p || "landing")); }
   console.log("landing pricing:", await evaluate(`[...document.querySelectorAll('.pricing li')].map(l => l.innerText.replace(/\\s+/g, ' ')).join(' || ')`));
 } else if (scenario === "pages") {

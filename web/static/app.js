@@ -257,14 +257,14 @@ function chooseToken() {
   renderChooser();
 }
 
-// --- "get the mod" welcome banner -----------------------------------------------------------------
-// Forged classes only play with the Steam Workshop mod installed, so every signed-in account sees this
-// (text + link are static in index.html) until it is dismissed. It replaced the v3 "enter a key or get
-// tokens" nudge on 2026-09-28; the chooser still covers that. New dismiss key so everyone sees it once.
+// --- "how it works" tutorial banner ---------------------------------------------------------------
+// Five steps (subscribe, key-or-token, forge, import, restart) that every signed-in account sees until dismissed; the
+// text is static in index.html. It replaced the 2026-09-28 "subscribe to the mod" warning on 2026-09-30
+// because people were reaching the forge and leaving. New dismiss key so everyone sees it once.
 function renderBanner() {
   const bar = el("v3-banner");
   if (!bar) return;
-  bar.classList.toggle("hidden", !(ME && !lsGet("bts_mod_banner_dismissed")));
+  bar.classList.toggle("hidden", !(ME && !lsGet("bts_tutorial_banner_dismissed")));
 }
 
 // --- BYOK cost estimate ---------------------------------------------------------------------------
@@ -1520,7 +1520,7 @@ el("signout").onclick = async () => { await fetch("/logout", { method: "POST" })
 el("load-models").onclick = loadModels;
 el("choose-byok").onclick = chooseByok;
 el("choose-token").onclick = chooseToken;
-el("v3-banner-x").onclick = () => { lsSet("bts_mod_banner_dismissed", "1"); renderBanner(); };
+el("v3-banner-x").onclick = () => { lsSet("bts_tutorial_banner_dismissed", "1"); renderBanner(); };
 
 // feedback overlay: close on the × button, a backdrop click, or Escape; submit posts the rating.
 el("fb-close").onclick = closeFeedback;
