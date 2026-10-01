@@ -27,6 +27,29 @@ _TMP = Path(tempfile.mkdtemp(prefix="btsweb-tests-"))
 DB_PATH = _TMP / "test.db"
 
 os.environ["BTSWEB_NO_DOTENV"] = "1"  # never load a real web/.env (the droplet has one)
+# BH-1 audit (item 5): every other runtime knob the app or btsgen reads is dropped, so the suite sees the
+# same env-clean defaults on any shell (a droplet-like shell with RESEND_API_KEY set used to refuse to boot,
+# and BTS_HARNESS_V2 / route / price overrides leaked into forge-path tests). Tests that need one set it.
+for _k in ("BTSWEB_SECRET_KEY", "BTSWEB_ENV", "BTSWEB_SECURE_COOKIES", "BTSWEB_BEHIND_PROXY", "BTSWEB_DB_SSL",
+           "BTSWEB_DB_SSL_CA", "BTSWEB_ADMIN_WRITE_MAX_AGE_S", "BTSWEB_ALERT_EMAILS", "BTSWEB_ALERT_COOLDOWN_S",
+           "BTSWEB_BYOK_ART_FALLBACK", "BTSWEB_BYOK_CARD_ART_MAX_USD", "BTSWEB_CARD_ART", "BTSWEB_CARD_ART_BUDGET_S",
+           "BTSWEB_CARD_ART_MAX_USD", "BTSWEB_CHOICE_TIMEOUT_S", "BTSWEB_FEEDBACK_HOURLY_CAP",
+           "BTSWEB_FORGE_MAX_CONCURRENT", "BTSWEB_FORGE_MAX_QUEUE", "BTSWEB_FORGE_MAX_SECONDS",
+           "BTSWEB_FORGE_QUEUE_TIMEOUT_S", "BTSWEB_MAIL_FROM", "BTSWEB_MODEL_PRICES", "BTSWEB_WORKSHOP_URL", "PORT",
+           "RESEND_API_KEY", "SENTRY_DSN", "STRIPE_WEBHOOK_SECRET", "STRIPE_FEE_PCT", "STRIPE_FEE_FIXED_CENTS",
+           "DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET", "GITHUB_CLIENT_ID", "GITHUB_CLIENT_SECRET",
+           "BTS_HARNESS_V2", "BTS_VOCAB_GATE", "BTS_VOCAB_GATE_SCHEMA", "BTS_TRIAD", "BTS_BLUEPRINT_VOCAB",
+           "BTS_STAGE_ATTEMPTS", "BTSGEN_MODEL", "BTSGEN_OPENROUTER_MODEL", "BTSGEN_OPENROUTER_CARD_MODEL",
+           "BTSGEN_OPENROUTER_CARD_MODELS", "BTSGEN_OPENROUTER_SPRITE_MODEL", "BTSGEN_OPENROUTER_RESOLUTION",
+           "BTSGEN_OLLAMA_QUOTA", "BTSGEN_OLLAMA_QUOTA_POLL_S", "BTSGEN_OLLAMA_SESSION_CEILING",
+           "BTSGEN_OLLAMA_WEEKLY_CEILING", "BTSGEN_OLLAMA_METERED_HOLD_S", "BTSGEN_PROMPT_ENRICH",
+           "BTSGEN_PROMPT_ENRICH_MODEL", "BTSGEN_IMAGE_BACKEND", "BTSGEN_IMAGE_MODEL", "BTSGEN_IMAGE_QUALITY",
+           "BTSGEN_IMAGE_CARD_MODEL", "BTSGEN_IMAGE_CARD_QUALITY", "BTSGEN_IMAGE_CARD_BACKGROUND",
+           "BTSGEN_IMAGE_SPRITE_MODEL", "BTSGEN_IMAGE_SPRITE_QUALITY", "BTSGEN_IMAGE_API_KEY",
+           "OPENROUTER_API_KEY", "OLLAMA_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GEMINI_API_KEY",
+           "XAI_API_KEY"):
+    os.environ.pop(_k, None)
+os.environ["BTS_FORGE_LEDGER"] = str(Path(tempfile.mkdtemp(prefix="btsweb-tests-ledger-")) / "forge_ledger.jsonl")
 os.environ["BTSWEB_DATABASE_URL"] = f"sqlite:///{DB_PATH.as_posix()}"
 os.environ["BTSWEB_DEV_AUTH"] = "1"
 os.environ.pop("GOOGLE_CLIENT_ID", None)
