@@ -1543,11 +1543,19 @@ async function loadModels() {
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
+    // The server drops models that can't run a forge (embeddings, speech, images, OpenRouter :free routes,
+    // small or short-context models) and lists the ones a forge has finished on first, labelled "tested".
     const dl = el("model-list");
     dl.innerHTML = "";
-    for (const id of d.models) { const o = document.createElement("option"); o.value = id; dl.appendChild(o); }
+    const tested = new Set(d.recommended || []);
+    for (const id of d.models) {
+      const o = document.createElement("option"); o.value = id;
+      if (tested.has(id)) o.label = "tested";
+      dl.appendChild(o);
+    }
     saveByok();
-    toast(`Loaded ${d.models.length} models — pick from either model box.`);
+    const hid = d.hidden ? ` (hid ${d.hidden} that can't run a forge)` : "";
+    toast(`Loaded ${d.models.length} models${hid}. Pick from either model box.`);
     el("model").focus();
   } catch (e) {
     toast(e.message);

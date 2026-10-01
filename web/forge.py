@@ -13,6 +13,7 @@ import contextlib
 import datetime
 import json
 import os
+import re
 from pathlib import Path
 
 # btsgen is installed non-editable on the droplet (`pip install ./generation`), so its own repo-root
@@ -497,9 +498,79 @@ def _make_gen_factory(key: dict | None, hosted: bool, fake: bool, model: str | N
     raise ForgeError("no generation path selected (need a BYOK key, a token, or fake).")
 
 
-def list_models(base_url: str, api_key: str) -> list[str]:
-    """List model ids from any OpenAI-compatible endpoint (`GET {base_url}/models`). Used by the website so a
-    BYOK user who doesn't know the model name can pick one. The key is used once, here, and never persisted."""
+# --- BYOK model picker filter ----------------------------------------------------------------------
+# "Load models" used to dump every id the endpoint listed, so a user could pick an embedding model, a TTS
+# model or a rate-limited OpenRouter `:free` route and burn a forge on it (teapotsofdoom, 2026-10-01: 17
+# BYOK attempts, 0 classes, several on `:free` slugs their OpenRouter privacy settings then refused). The
+# list is now filtered to models that can plausibly run a forge. A forge needs a text-in/text-out chat model
+# that holds ~25K-token card prompts and returns strict closed-vocab JSON. The model box stays free text, so
+# anything hidden here can still be typed by hand: this is guidance, not a lock.
+
+# Proven on the prod ledger (a forge on this model reached status "done"). Listed first and marked
+# "tested" in the picker. Re-check with the forge_usage x forge_jobs join when adding to it.
+KNOWN_GOOD_MODELS = frozenset({
+    "glm-5.3", "glm-5.2", "gemma4:31b",            # Ollama Cloud (the hosted primary)
+    "z-ai/glm-5.3", "z-ai/glm-5.2",                # OpenRouter (the hosted fallbacks)
+    "gpt-5.6-sol", "gpt-6-astra",                  # OpenAI BYOK, 2026-09-28
+})
+
+# Ids that name a non-chat model (embeddings, speech, images, video, moderation, rerankers, search
+# agents, legacy completions). Case-insensitive; the short or common words only match whole, so a vendor
+# like "nousresearch/" doesn't read as a search model.
+_NON_CHAT_RE = re.compile(
+    r"embed|whisper|transcri|speech|audio|realtime|moderation|dall-e|image|lyria|rerank|guard|"
+    r"computer-use|babbage|davinci|robotics|"
+    r"\b(tts|aqa|veo|sora|ada|live|search|research)\b", re.I)
+# An explicit parameter count in the id ("llama-3.1-8b", "qwen3:4b", "gemma-3-12b-it"). Models under this
+# size don't hold the closed card vocabulary well enough to finish a forge.
+_PARAMS_RE = re.compile(r"(?<![\d.])(\d+(?:\.\d+)?)b(?![a-z])", re.I)
+_MIN_PARAMS_B = 20
+# A card prompt is ~25K tokens; below this the endpoint truncates or rejects it. Only OpenRouter reports it.
+_MIN_CONTEXT = 32_000
+
+
+def _model_unfit(item: dict, model_id: str) -> bool:
+    """True when the listing says (or the id strongly implies) this model can't run a forge."""
+    mid = model_id.lower()
+    if mid.endswith(":free") or _NON_CHAT_RE.search(mid):
+        return True
+    sizes = [float(m) for m in _PARAMS_RE.findall(mid)]
+    # "8x7b"-style MoE ids multiply out bigger than they read; only judge a single plain size.
+    if len(sizes) == 1 and not re.search(r"\d+x\d", mid) and sizes[0] < _MIN_PARAMS_B:
+        return True
+    # OpenRouter's listing carries real metadata; other hosts only send ids, so these checks are skipped there.
+    ctx = item.get("context_length")
+    if isinstance(ctx, int) and 0 < ctx < _MIN_CONTEXT:
+        return True
+    arch = item.get("architecture")
+    if isinstance(arch, dict):
+        outs = arch.get("output_modalities")
+        if isinstance(outs, list) and "text" not in outs:
+            return True
+    return False
+
+
+def filter_models(items: list) -> dict:
+    """Reduce a raw /models listing to {"models": ids (tested first, then A-Z), "recommended": the tested
+    subset, "hidden": how many ids were dropped as unfit}."""
+    seen: dict[str, dict] = {}
+    for m in items:
+        if isinstance(m, dict) and (mid := m.get("id") or m.get("name")):
+            seen.setdefault(str(mid), m)
+    kept = [mid for mid, m in seen.items() if not _model_unfit(m, mid)]
+
+    def tested(mid: str) -> bool:
+        return mid.removeprefix("models/") in KNOWN_GOOD_MODELS
+
+    recommended = sorted(mid for mid in kept if tested(mid))
+    rest = sorted(mid for mid in kept if not tested(mid))
+    return {"models": recommended + rest, "recommended": recommended, "hidden": len(seen) - len(kept)}
+
+
+def list_models(base_url: str, api_key: str) -> dict:
+    """List the models on any OpenAI-compatible endpoint (`GET {base_url}/models`) that can plausibly run a
+    forge (see filter_models). Used by the website so a BYOK user who doesn't know the model name can pick
+    one. The key is used once, here, and never persisted."""
     import urllib.error
     import urllib.request
 
@@ -517,8 +588,7 @@ def list_models(base_url: str, api_key: str) -> list[str]:
     except urllib.error.URLError as e:
         raise ForgeError(f"could not reach the endpoint: {e.reason}") from e
     items = data.get("data") or data.get("models") or (data if isinstance(data, list) else [])
-    ids = {m.get("id") or m.get("name") for m in items if isinstance(m, dict)}
-    return sorted(i for i in ids if i)
+    return filter_models(items if isinstance(items, list) else [])
 
 
 def forge_to_bundle(concept: str, *, key: dict | None = None, hosted: bool = False,

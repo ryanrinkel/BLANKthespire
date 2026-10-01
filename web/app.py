@@ -928,14 +928,15 @@ def _persist_class(user_id: int, concept: str, out: dict, forge_meta: dict | Non
 @app.route("/api/models", methods=["POST"])
 @require_login
 def api_models():
-    """Proxy GET {base_url}/models for a BYOK user (browsers can't call OpenAI directly — CORS). The posted
+    """Proxy GET {base_url}/models for a BYOK user (browsers can't call OpenAI directly — CORS), filtered to
+    models that can plausibly run a forge (forge.filter_models): {models, recommended, hidden}. The posted
     key is used once here and never stored."""
     body = request.get_json(silent=True) or {}
     try:
-        ids = list_models((body.get("base_url") or "").strip(), (body.get("api_key") or "").strip())
+        listing = list_models((body.get("base_url") or "").strip(), (body.get("api_key") or "").strip())
     except ForgeError as e:
         return jsonify({"error": str(e)}), 400
-    return jsonify({"models": ids})
+    return jsonify(listing)
 
 
 def _token_state(u: User) -> dict:
