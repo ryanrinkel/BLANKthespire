@@ -53,6 +53,33 @@ for _k in ("BTSGEN_GODOT_ROOT", "BTSGEN_CARD_SCHEMA", "BTSGEN_VOCABULARY", "BTSG
            "BTSGEN_CHARACTER_SCHEMA", "BTSGEN_CHARACTERS_DIR", "BTSGEN_GENERATED_CHARACTERS_DIR"):
     os.environ.pop(_k, None)
 
+# --- BH-1 audit (rule 0.9b, item 5): pin the RUNTIME env too. The droplet sets BTS_HARNESS_V2=1 and
+# BTS_VOCAB_GATE=heuristic; a developer shell may carry those, API keys, or model overrides. Before this pin,
+# `BTS_HARNESS_V2=1 pytest` failed 5 tests (test_coverage x4, test_featured) because they silently assumed the
+# flag was unset. The suite's default is now the env-clean ROLLBACK path for every flag below; a test that
+# exercises the live path sets it explicitly (monkeypatch.setenv / the _V2 helper), and says so.
+# Keys are dropped so no test can ever reach a vendor by accident; the forge ledger is pointed at a temp file
+# so a test that forgets to scope it never writes the developer's real ledger.
+_RUNTIME_ENV = (
+    # behaviour flags (live values on the droplet: BTS_HARNESS_V2=1, BTS_VOCAB_GATE=heuristic)
+    "BTS_HARNESS_V2", "BTS_VOCAB_GATE", "BTS_VOCAB_GATE_SCHEMA", "BTS_TRIAD", "BTS_BLUEPRINT_VOCAB",
+    "BTS_STAGE_ATTEMPTS",
+    # model / route / image overrides
+    "BTSGEN_MODEL", "BTSGEN_OPENROUTER_MODEL", "BTSGEN_OPENROUTER_CARD_MODEL", "BTSGEN_OPENROUTER_CARD_MODELS",
+    "BTSGEN_OPENROUTER_SPRITE_MODEL", "BTSGEN_OPENROUTER_RESOLUTION", "BTSGEN_OLLAMA_QUOTA",
+    "BTSGEN_OLLAMA_QUOTA_POLL_S", "BTSGEN_OLLAMA_SESSION_CEILING", "BTSGEN_OLLAMA_WEEKLY_CEILING",
+    "BTSGEN_OLLAMA_METERED_HOLD_S", "BTSGEN_PROMPT_ENRICH", "BTSGEN_PROMPT_ENRICH_MODEL",
+    "BTSGEN_FEEDBACK_EXTRA", "BTSGEN_FEEDBACK_FILE", "BTSGEN_IMAGE_BACKEND", "BTSGEN_IMAGE_MODEL",
+    "BTSGEN_IMAGE_QUALITY", "BTSGEN_IMAGE_CARD_MODEL", "BTSGEN_IMAGE_CARD_QUALITY", "BTSGEN_IMAGE_CARD_BACKGROUND",
+    "BTSGEN_IMAGE_SPRITE_MODEL", "BTSGEN_IMAGE_SPRITE_QUALITY", "BTSGEN_CARD_ART_COLORS",
+    # vendor keys
+    "OPENROUTER_API_KEY", "OLLAMA_API_KEY", "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "BTSGEN_IMAGE_API_KEY",
+    "GEMINI_API_KEY", "XAI_API_KEY",
+)
+for _k in _RUNTIME_ENV:
+    os.environ.pop(_k, None)
+os.environ["BTS_FORGE_LEDGER"] = str(Path(tempfile.mkdtemp(prefix="btsgen_pytest_ledger_")) / "forge_ledger.jsonl")
+
 from btsgen import paths  # env-clean here -> MOD contract defaults
 
 importlib.reload(paths)             # in case a paths-bearing module was imported before the env was cleaned

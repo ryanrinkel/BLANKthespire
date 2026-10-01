@@ -195,7 +195,27 @@ def test_exclusion_and_presence() -> None:
 
 
 def test_coverage_targets_featured() -> None:
-    print("a missing featured mechanic joins the coverage repair round with its own directive + WARNING:")
+    # Runs on BOTH harness paths (BH-1 audit): v2 is live on the droplet (BTS_HARNESS_V2=1) and adds a keyword
+    # quota, so the base pool carries two keyword kinds; v1 is the rollback path. Before the audit this test read
+    # the developer's shell and failed under BTS_HARNESS_V2=1.
+    import os
+    saved = os.environ.get("BTS_HARNESS_V2")
+    try:
+        for on in (True, False):
+            if on:
+                os.environ["BTS_HARNESS_V2"] = "1"
+            else:
+                os.environ.pop("BTS_HARNESS_V2", None)
+            _coverage_targets_featured("v2 live path" if on else "v1 rollback path")
+    finally:
+        if saved is None:
+            os.environ.pop("BTS_HARNESS_V2", None)
+        else:
+            os.environ["BTS_HARNESS_V2"] = saved
+
+
+def _coverage_targets_featured(label: str) -> None:
+    print(f"a missing featured mechanic joins the coverage repair round with its own directive + WARNING ({label}):")
     # a small pool with plenty of variety so the ONLY shortfall is the featured mechanic
     def m(effects, name):
         return {"plan": {"role": "common", "rarity": "common", "theme": "", "type": "skill"},
@@ -212,6 +232,9 @@ def test_coverage_targets_featured() -> None:
         m([{"op": "damage", "amount": 5}, {"op": "apply_status", "status": "metallicize", "amount": 3, "when": {"kind": "hp_below_half"}}], "x2"),
         m([{"op": "damage", "amount": 1, "scale": "cards_in_hand"}], "s1"),
         m([{"op": "damage", "amount": 6}], "plainvictim"),
+        # two keyword kinds (multi-hit + retain): the v2 keyword quota is met too
+        m([{"op": "damage", "amount": 3, "hits": 2, "when": {"kind": "no_block"}}], "k1"),
+        m([{"op": "block", "amount": 5, "when": {"kind": "has_block"}}, {"op": "retain"}], "k2"),
     ]
     rep = coverage.measure(made)
     check(not rep.violations, f"the base pool meets every quota (so only featured can be short): {rep.violations}")

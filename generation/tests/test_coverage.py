@@ -58,9 +58,36 @@ def _pool():
     ]
 
 
+class _V2:
+    """Toggle BTS_HARNESS_V2 for one block (the flag is read at call time)."""
+
+    def __init__(self, on: bool) -> None:
+        self.on = on
+        self.saved = None
+
+    def __enter__(self):
+        import os
+        self.saved = os.environ.get("BTS_HARNESS_V2")
+        if self.on:
+            os.environ["BTS_HARNESS_V2"] = "1"
+        else:
+            os.environ.pop("BTS_HARNESS_V2", None)
+        return self
+
+    def __exit__(self, *a):
+        import os
+        if self.saved is None:
+            os.environ.pop("BTS_HARNESS_V2", None)
+        else:
+            os.environ["BTS_HARNESS_V2"] = self.saved
+
+
 def test_measure_math() -> None:
-    print("measure(): census math + violations over the non-basic pool:")
-    rep = coverage.measure(_pool())
+    # ROLLBACK PATH (harness v1, BTS_HARNESS_V2 unset). Production runs v2; the v2 quotas (scale + keyword) are
+    # covered by test_w2_* and test_measure_clean_pool_v2 below. Pinned explicitly (BH-1 audit, item 4/5).
+    print("measure(): census math + violations over the non-basic pool (v1 rollback path):")
+    with _V2(False):
+        rep = coverage.measure(_pool())
     check(rep.pool_size == 7, f"7 measurable cards (basics+blade excluded), got {rep.pool_size}")
     check(rep.plain_denom == 6, f"plain denom excludes the reprint -> 6, got {rep.plain_denom}")
     check(rep.plain == 3, f"3 plain among denom (A,B,E), got {rep.plain}")
@@ -79,7 +106,8 @@ def test_measure_math() -> None:
 
 
 def test_measure_clean_pool() -> None:
-    print("measure(): a rich pool trips no violations:")
+    # ROLLBACK PATH (v1). The live twin is test_measure_clean_pool_v2.
+    print("measure(): a rich pool trips no violations (v1 rollback path):")
     made = [
         _m("common", [{"op": "add_trigger", "trigger": "attacked", "effects": [{"op": "damage", "amount": 4}]}], name="r1"),
         _m("common", [{"op": "add_trigger", "trigger": "on_hp_lost", "effects": [{"op": "block", "amount": 3}]}], name="r2"),
@@ -90,14 +118,46 @@ def test_measure_clean_pool() -> None:
         _m("common", [{"op": "apply_status", "status": "metallicize", "amount": 3, "when": {"kind": "has_block"}}], name="x2"),
         _m("common", [{"op": "damage", "amount": 1, "scale": "cards_in_hand"}], name="s1"),
     ]
-    rep = coverage.measure(made)
+    with _V2(False):
+        rep = coverage.measure(made)
     check(not rep.violations, f"a rich pool has no violations, got {rep.violations}")
 
 
+def _rich_pool() -> list[dict]:
+    return [
+        _m("common", [{"op": "add_trigger", "trigger": "attacked", "effects": [{"op": "damage", "amount": 4}]}], name="r1"),
+        _m("common", [{"op": "add_trigger", "trigger": "on_hp_lost", "effects": [{"op": "block", "amount": 3}]}], name="r2"),
+        _m("common", [{"op": "damage", "amount": 6, "when": {"kind": "hp_below_half"}}], name="w1"),
+        _m("common", [{"op": "block", "amount": 6, "when": {"kind": "turn_at_least"}}], name="w2"),
+        _m("common", [{"op": "damage", "amount": 6, "when": {"kind": "enemy_count_ge"}, "target": "all_enemies"}], name="w3"),
+        _m("common", [{"op": "apply_status", "status": "thorns", "amount": 3, "when": {"kind": "no_block"}}], name="x1"),
+        _m("common", [{"op": "apply_status", "status": "metallicize", "amount": 3, "when": {"kind": "has_block"}}], name="x2"),
+        _m("common", [{"op": "damage", "amount": 1, "scale": "cards_in_hand"}], name="s1"),
+    ]
+
+
+def test_measure_clean_pool_v2() -> None:
+    # LIVE PATH (BTS_HARNESS_V2=1, as on the droplet) — the twin of test_measure_clean_pool (BH-1 audit, item 4).
+    print("measure() v2: the same rich pool is short only on keywords; two keyword kinds clear every quota:")
+    with _V2(True):
+        rep = coverage.measure(_rich_pool())
+        check(len(rep.violations) == 1 and "keyword kind(s) < 2" in rep.violations[0],
+              f"v2 adds the keyword quota and nothing else: {rep.violations}")
+        made = _rich_pool() + [_m("common", [{"op": "damage", "amount": 3, "hits": 2}], name="k1"),
+                               _m("common", [{"op": "block", "amount": 5}, {"op": "retain"}], name="k2")]
+        rep2 = coverage.measure(made)
+        check(not rep2.violations, f"a rich pool with 2 keyword kinds has no v2 violations, got {rep2.violations}")
+        log: list[str] = []
+        s = coverage.enforce_coverage(made, lambda p, o, d: None, log.append, kinds={""})
+        check(s["attempted"] == 0 and any("quotas met" in l for l in log), f"v2: a clean pool skips repair: {log}")
+
+
 def test_plan_repairs() -> None:
-    print("plan_repairs(): deficit-driven, budget-capped directive list:")
-    rep = coverage.measure(_pool())
-    directives = coverage.plan_repairs(rep)
+    # ROLLBACK PATH (v1). The live (v2) planner is covered by test_w2_repair_walks_new_menus.
+    print("plan_repairs(): deficit-driven, budget-capped directive list (v1 rollback path):")
+    with _V2(False):
+        rep = coverage.measure(_pool())
+        directives = coverage.plan_repairs(rep)
     # reactive needs +1, when needs +2, exotic needs +1  => 4 directives; plain resolves via those
     check(len(directives) == 4, f"4 directives (1 reactive, 2 when, 1 exotic), got {len(directives)}: {directives}")
     joined = " ".join(directives)
@@ -107,7 +167,8 @@ def test_plan_repairs() -> None:
     check(not any("attacked" in d for d in directives), "does not re-request a reactive kind already present")
 
     # budget clamps the list
-    tiny = coverage.plan_repairs(rep, budget=2)
+    with _V2(False):
+        tiny = coverage.plan_repairs(rep, budget=2)
     check(len(tiny) == 2, f"budget=2 clamps directives to 2, got {len(tiny)}")
 
 
@@ -130,7 +191,14 @@ def test_victim_selection() -> None:
 
 
 def test_enforce_plumbing() -> None:
-    print("enforce_coverage(): repair plumbing with a controlled stub generator:")
+    # ROLLBACK PATH (v1): the 4-repair count is the v1 quota set. The v2 plumbing (kinds, keyword line) is
+    # covered by test_w2_repair_walks_new_menus and test_measure_clean_pool_v2.
+    with _V2(False):
+        _enforce_plumbing_v1()
+
+
+def _enforce_plumbing_v1() -> None:
+    print("enforce_coverage(): repair plumbing with a controlled stub generator (v1 rollback path):")
     made = _pool()
     log: list[str] = []
 
@@ -179,30 +247,6 @@ def test_enforce_plumbing() -> None:
 
 
 # --------------------------------------------------------------- W2.2: widen the menus, gate by class kind
-class _V2:
-    """Toggle BTS_HARNESS_V2 for one block (the flag is read at call time)."""
-
-    def __init__(self, on: bool) -> None:
-        self.on = on
-        self.saved = None
-
-    def __enter__(self):
-        import os
-        self.saved = os.environ.get("BTS_HARNESS_V2")
-        if self.on:
-            os.environ["BTS_HARNESS_V2"] = "1"
-        else:
-            os.environ.pop("BTS_HARNESS_V2", None)
-        return self
-
-    def __exit__(self, *a):
-        import os
-        if self.saved is None:
-            os.environ.pop("BTS_HARNESS_V2", None)
-        else:
-            os.environ["BTS_HARNESS_V2"] = self.saved
-
-
 def _w2_keys() -> list[str]:
     """The keys W2.2 ADDED (the v1 when keys + hand_size_ge pre-date it)."""
     old_when = {k for k, _ in coverage.WHEN_MENU} | {"hand_size_ge"}
@@ -329,8 +373,8 @@ def test_w2_nominations_and_gating() -> None:
 def test_w2_repair_walks_new_menus() -> None:
     print("W2.2: plan_repairs walks the scale + keyword menus (v2) and the keyword quota is v2-only:")
     from btsgen import census
-    rep = coverage.measure(_pool())
     with _V2(False):
+        rep = coverage.measure(_pool())
         check(not any("keyword" in v for v in rep.violations), "v1: no keyword violation")
         d1 = coverage.plan_repairs(rep)
         check(len(d1) == 4, f"v1 plan unchanged (4 directives), got {len(d1)}")
@@ -372,6 +416,7 @@ def test_w2_repair_walks_new_menus() -> None:
 def main() -> int:
     test_measure_math()
     test_measure_clean_pool()
+    test_measure_clean_pool_v2()
     test_plan_repairs()
     test_victim_selection()
     test_enforce_plumbing()
