@@ -59,6 +59,14 @@ DECOMP, `BaseLib-StS2\` = BL). MOD = `mod/BlankTheSpireCode/`.
   between produced un-importable codes.** Rule: NO web deploy of a vocab bump until the mod zip + Workshop item are
   live. Build BI→BR on one branch, ONE mod release (v0.4.0) at the end, THEN deploy (§4). The v0.3.0 wave-5 release
   is step 0 of Phase BH.
+- **0.13 Keep the mobile tracker current.** Ryan follows the wave from the artifact **Wave 6 Tracker**
+  (https://claude.ai/artifact/HLDCp8LSudRp1YY9JZz3SU). Its status lives in the artifact database, so update it with
+  the `ArtifactData` tool (never republish the page for a status change): collection `phases`, one doc per phase id
+  (`bh`, `bi` … `br`, `rel`) with `{status: "todo"|"doing"|"done"|"blocked", done_items: [...], note: "..."}`; the
+  item ids are `bh0..bh3` for BH, `eng` / `harn` / `smoke` for BI–BR, `tests` / `zip` / `ws` / `deploy` for REL. The
+  banner is doc `meta/wave` `{headline, updated (ISO), vocab}`. Cadence: when a phase starts (`doing` + headline),
+  when its smoke passes (`done_items` += `smoke`), when it ships (`done`, headline names the next phase), and
+  immediately on any `blocked`. Short plain sentences; it is a phone checklist, not a log.
 - **0.12 Gap log is the catalog's switch.** `frontend/catalog.py:gap_status` reads `### N.` + `**Status:**`; flipping
   an entry to `done` is what makes an archetype BUILDABLE. New entries start at **#62** (droplet copy checked
   2026-10-01: max is #61; the map stage auto-appends `captured` entries, so re-check before numbering).
