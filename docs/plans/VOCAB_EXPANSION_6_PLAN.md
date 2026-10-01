@@ -737,6 +737,15 @@ without it). Run smokes serially (one game instance); batch two testers per smok
 13. **Tree selection width** (BH-3): **selected archetypes' ops + core ops + explicit-request tokens + family
     closure**, with one nominate retry; widen if more than ~20% of forges nominate.
 
-**Status (2026-10-01 evening):** BH-0 done (v0.3.0 live everywhere, commit e84f613). Next up: BH-1 test audit →
-BH-2 gap entries → BH-3 tree, then BI. Ryan will clear context before execution starts; this file plus
-`docs/plans/wave6_scouts/*.md` and `VOCAB_BASE_GAME_AUDIT.md` are the full hand-off.
+**Status (2026-10-01 night):** **Phase BH DONE** on branch `wave6` (not pushed, not deployed — rule 0.11). BH-0
+v0.3.0 (e84f613). BH-1 test audit: `docs/plans/TEST_AUDIT_2026-10.md`, generation 580 → web 293 green, 27 phase
+files gained their rule-0.10 wrapper (32 hidden failures fixed), both conftests pin the runtime env. BH-2: gaps
+#62–#79 `planned`, #80–#91 `captured`, #11 re-opened (next free number **#92**). BH-3: the vocabulary tree
+(`gate.vocab_index` / `vocab_detail` / `tree_selection`, `BTS_BLUEPRINT_VOCAB=tree|full`, `nominate_ops` retry)
+— readings: index 5,914 · per-archetype max 61,807 (`forge_ramp`) · all-ops 112,644 · scaffold 45,789 · `full`
+108,282 unchanged; typical triads 55–70k. Merged suite: generation **586**, web **293**, `test_phase_bh` 92/92.
+Open after BH-3 (Ryan): index clause cap is 34 chars at the 6,000 ceiling (raise `gate.INDEX_BUDGET` + the test to
+~8,500 for 12-word clauses); `apply_status` does not pull the Statuses section (vulnerable/weak/strength are
+index-only unless an archetype lists them); the ORB pitch still says "see the 'Orbs' section above" (it is below in
+tree mode). BH-1 needs Ryan's OK on two product fixes: `app.js` donation history "Bought N tokens" → "Token pack",
+and the restored `summon_swarm` pricing sentences in DESIGN_HEURISTICS.md. **Next: Phase BI** (v61).

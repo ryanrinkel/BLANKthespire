@@ -226,6 +226,22 @@ through source greps (`_t_engine` / `_cs(...)`), which prove that wiring text ex
 5. Backfill `gaptest-bb..bf` testers + tag files into the repo if the wave-5 worktree still has them.
 6. The phase tests' flag-off blueprint wording checks (§4) can move to the real prompt once BH-3's tree lands.
 
+## Rule-0.9 readings after BH-3 (merged tree, 2026-10-01)
+
+Printed by `uv run python -m tests.test_phase_bh` (harness v2 on, `BTS_BLUEPRINT_VOCAB=tree`, dossier, triad, seed 1).
+Re-record here at the §4 pre-release re-pass.
+
+| reading | chars | ceiling |
+|---|---|---|
+| `vocab_index` | 5,914 (210 tokens, clause cap 34) | 6,000 |
+| largest single-archetype prompt (`forge_ramp`) | 61,807 | 70,000 |
+| all-ops path | 112,644 | 120,000 |
+| scaffold on the all-ops path (from the block markers) | 45,789 | 46,000 |
+| `full` path, untrimmed (byte-identical to pre-BH) | 108,282 | snapshot |
+| dry run normal / orb / hybrid | 54,778 / 64,437 / 70,514 | — |
+
+Merged suite after BH-1 + BH-2 + BH-3: generation **586 passed**, web **293 passed**, `test_phase_bh` 92/92.
+
 ## Exit bar
 
 - generation suite green: `uv run python -m pytest` from generation/ (580 passed at BH-1)
