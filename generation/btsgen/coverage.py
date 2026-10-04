@@ -73,6 +73,8 @@ EXOTIC_MENU_V2 = [
     ("temp_thorns", 'REQUIRED: apply_status temp_thorns (Thorns for this turn only - a one-turn bristle that punishes the attacks coming this turn).'),
     # Phase BF (v60): the base-game Vigor — +N to your next Attack, then consumed.
     ("vigor", 'REQUIRED: apply_status vigor (amount 3-6: your NEXT Attack deals that much more damage, then it is spent - a setup card that wants an attack the same turn).'),
+    # Phase BL (v64, gap #66): the base-game Piercing Wail — blunt the enemy's next attack.
+    ("temp_strength_down", 'REQUIRED: on an enemy-target card, apply_status temp_strength_down (amount 3-9: the enemy loses that much Strength until the end of its turn - Piercing Wail).'),
 ]
 REACTIVE_MENU_V2 = REACTIVE_MENU + [
     ("on_card_drawn", 'REQUIRED: add an ongoing power (op "add_trigger", trigger "on_card_drawn", once_per_turn) that rewards drawing a card.'),

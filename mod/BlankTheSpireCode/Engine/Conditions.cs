@@ -48,7 +48,8 @@ public static class Conditions
     public const int CardsPlayedGeMax = 10;
 
     /// <summary>Statuses that <c>target_has_status</c> can test (a debuff subset — maps to a HasPower&lt;T&gt;).</summary>
-    public static readonly HashSet<string> StatusChecks = ["poison", "vulnerable", "weak", "frail"];
+    public static readonly HashSet<string> StatusChecks = ["poison", "vulnerable", "weak", "frail",
+        "doom"]; // Phase BL (v64, gap #67): "if the enemy has doom" (Time's Up / Reaper follow-ups)
 
     /// <summary>Returns null if the condition is well-formed, else a human-readable reason (for the validator).</summary>
     public static string? Validate(Condition c)
@@ -179,6 +180,7 @@ public static class Conditions
         "vulnerable" => t.HasPower<VulnerablePower>(),
         "weak"       => t.HasPower<WeakPower>(),
         "frail"      => t.HasPower<FrailPower>(),
+        "doom"       => t.HasPower<DoomPower>(), // Phase BL (v64)
         _ => false,
     };
 

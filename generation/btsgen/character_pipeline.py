@@ -33,7 +33,7 @@ from .character_contract import Brief
 from .character_validator import (BlueprintValidator, CharacterValidator,
                                   balance_pairing_warnings, balance_payoff_density_warnings,
                                   balance_reachability_warnings, blade_empower_warnings, combo_loop_warnings,
-                                  debuff_monotony_warnings,
+                                  debuff_monotony_warnings, doom_warnings,
                                   corruption_warnings, cost_shift_warnings, forge_manipulation_warnings,
                                   forge_pairing_warnings,
                                   identity_overlap_warnings, lifesteal_warnings, purge_warnings,
@@ -233,6 +233,12 @@ def generate_character(brief: Brief, model: str | None = None, fake: bool = Fals
         res.warnings["status_card"] = scw
         for w in scw:
             note("  STATUS-CARD WARN " + w)
+    # Phase BL (v64, gap #67): at most four Doom cards per class (it never decays). Advisory, same treatment.
+    dw = doom_warnings([m["card"] for m in made])
+    if dw:
+        res.warnings["doom"] = dw
+        for w in dw:
+            note("  DOOM WARN " + w)
     # Phase AC (gap #2): a class with heal_summon/shield_summon but no summon op — the medic ops always no-op.
     sw = summon_support_warnings([m["card"] for m in made])
     if sw:

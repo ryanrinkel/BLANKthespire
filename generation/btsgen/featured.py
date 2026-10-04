@@ -191,6 +191,12 @@ FEATURED_MENU: list[Featured] = [
              '(vulnerable / weak / frail / poison) and THEN carries op "spread_debuffs" (no amount) - the debuffs on '
              'the struck enemy are copied onto every other living enemy. Never on a basic; one per card.',
              lambda cc: "spread_debuffs" in cc.ops),
+    # Phase BL (v64, gap #66): Expose — strip the chosen enemy's Block / Artifact, THEN debuff it.
+    Featured("expose_strip", 'a card that STRIPS an enemy\'s Block or Artifact before debuffing it (op "strip_block" / "strip_artifact")',
+             'REQUIRED: add a single-enemy card (target "enemy") that FIRST carries op "strip_block" and/or '
+             '"strip_artifact" (flag-ops, no amount) and THEN applies a debuff (vulnerable / weak / temp_strength_down) - '
+             'Expose. The strips must come before the debuff; one of each per card.',
+             lambda cc: bool(cc.ops.keys() & {"strip_block", "strip_artifact"})),
     # Phase BF (v60, gap #54): the setup-then-release beat on the base game's own amplifiers.
     Featured("setup_spike", 'a SETUP card that spikes your next Attack (apply_status vigor) or a rare that doubles your Attacks for a turn (apply_status double_damage)',
              'REQUIRED: add a skill with apply_status vigor (amount 3-6: your NEXT Attack deals that much more, then it '

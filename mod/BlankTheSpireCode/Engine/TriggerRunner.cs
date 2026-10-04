@@ -311,6 +311,10 @@ public static class TriggerRunner
         "weak"       => ApplyTo<WeakPower>(ctx, source, target, amount),
         "frail"      => ApplyTo<FrailPower>(ctx, source, target, amount),
         "poison"     => ApplyTo<PoisonPower>(ctx, source, target, amount),
+        // Phase BL (v64, gaps #66/#67): Doom and the one-turn Strength Down ride a targeted payload too, through the
+        // shared literal path that logs the [BL] tags (and the Artifact check).
+        "doom"               => EffectRunner.ApplyBlStatus("doom", ctx, target, source, amount),
+        "temp_strength_down" => EffectRunner.ApplyBlStatus("temp_strength_down", ctx, target, source, amount),
         _ => Task.CompletedTask,
     };
 

@@ -403,7 +403,7 @@ Expertise, Double Energy, Evil Eye, Go for the Eyes. **Tags:** `[BJ] scale <name
 `PhaseAmScales` (:1059) membership, `[BJ] draw to_hand_size: hand <h> -> draw <n>`, `[BJ] gain_energy x energy`, the
 `[AM]` gate line for the conditions.
 **Findings (BJ, done 2026-10-04 on `wave6`):** (1) `target_status_stacks` reads vulnerable / weak / poison only — Doom
-does not exist until Phase BL (add it to `StatusStackStatuses` + the schema `if/then` there). It is single-enemy only
+does not exist until Phase BL (add it to `StatusStackStatuses` + the schema `if/then` there) — **`doom` joins vulnerable / weak / poison (Phase BL, done)**: `StatusStackStatuses`, `EffectRunner.StatusStacks`, the schema `if/then` and `validator._STATUS_STACK_STATUSES` all carry it. It is single-enemy only
 (target `enemy`), damage/block. (2) `energy_spent_this_turn` clamps at 0: the base HelixDrill recipe subtracts the
 card's cost while it sits in the Play pile even when nothing was paid (AutoPlay / Sly), which would go negative.
 (3) `to_hand_size` takes `amount` 2..10 (the target hand size); `gain_energy` + `scale:"energy"` is legal at any cost
@@ -496,6 +496,27 @@ Expose, a Doom stacker + Time's Up, **an Artifact-enemy check** (seed through an
 **Tags:** `[BL] temp_strength_down +N on '<monster>' (Str now <s>)`, `[BL] temp_strength_down expired`, `[BL]
 strength_down -N`, `[BL] strip_block <b>->0`, `[BL] strip_artifact (had <n>)`, `[BL] doom +N on '<monster>' (HP <hp>,
 Doom <d>, doomed=<bool>)`.
+**Findings (BL, built 2026-10-04 on `wave6`, smoke pending Ryan's go-ahead):** (1) Verify-first held: BaseLib
+`CustomTemporaryPowerModel.Type => InternallyAppliedPower.Type` (Buff for Strength), so the `PowerType.Debuff` override
+on `ForgedTempStrengthDownPower` is in; DECOMP `PowerCmd.Apply` calls `BeforeApplied` with the Artifact-modified amount
+(0 → applies -0 = nothing) and `ApplyInternal` skips a 0-amount power, so a blocked shell leaves NOTHING to restore.
+(2) The trio applies through ONE literal per-target path (`EffectRunner.ApplyBlStatus`, also used by payloads and
+`spread_debuffs`): required for `strength_down` (the -N literal, no PowerVar) and Blight Strike (`unblockedDealt`), and
+it lets every tag read Artifact / Strength / Doom before and after; DataCard still declares the PowerVars (hover tips).
+(3) `strength_down` is card-only and one per card (its `StrengthLoss` var); `temp_strength_down` + `doom` are
+payload-legal, payload Doom capped at 5 per fire (it never decays). The trio is rejected on a self-target card (it would
+land on you) — both validators. (4) The strip ops are NOT in `census.KEYWORD_OPS` (effects, not card-shape keywords —
+the `spread_debuffs` precedent); relic / orb / summon status sets are unchanged (scope). (5) Artifact check: Artifact
+monsters (Chomper, Punch Construct) live in Hive / Underdocks, not act 1, so the tester INJECTS it with a GAPTEST-only
+card op `gaptest_enemy_artifact` (in `ForgedCards.SupportedOps` like `apply_custom` / `summon_spike`; not in the schema,
+the LLM contract or the Python validator) on an Innate 0-cost card — a card op, because a targeted payload
+`apply_status` is debuff-only. (6) Doom band: ≤ 12 per card (both sides), 10+ rare-only (generation-side), ≤ 4 Doom cards
+per class = `character_validator.doom_warnings` (advisory, wired in `character_pipeline`). (7) Harness: coverage
+`EXOTIC_MENU_V2` += `temp_strength_down`; featured += `expose_strip`; `bridges.card_tokens` surfaces a
+`target_status_stacks` status (Time's Up touches `doom`); exemplar-pool ceiling 150 → 175 (156); `full` scaffold
+snapshot 46,045 → 46,385 (+340, the PRECISION READS sentence); stale pins in test_phase_bf / bj updated.
+(8) Readings: index 8,065 (cap 72) · per-archetype max 70,043 (`exhaust_pyre`) · per-archetype scaffold max 26,056 ·
+triads 63,021 / 72,817 / 79,252 · all-ops 120,084 · all-ops scaffold 46,663 (informational) · `full` 112,782.
 
 ### Phase BM — Base-power statuses: self-drawbacks, replay, next-turn Block, retain hand (v65; gaps #68–#70; ~1 day) — 30 base cards
 
@@ -825,3 +846,9 @@ tester + tags in `generation/tests/gaptest-bk/`). All-ops tripwire raised to 140
 generation **594**, web **293**, `test_phase_bk` 151/151. Readings: index 7,743 (cap 72) · per-archetype max 68,796
 (`exhaust_pyre`) · per-archetype scaffold max 25,716 · triads 61,774 / 71,570 / 77,647 · all-ops 118,479 · all-ops
 scaffold 46,323 (informational) · `full` 111,499 (scaffold snapshot 46,045, +145). **Next: Phase BL** (v64).
+
+**Phase BL BUILT 2026-10-04** (on `wave6`, vocab v64; smoke PENDING — Ryan approves the game launch first). Ceilings
+raised first for the rest of the wave (0774055: per-archetype 80,000, triads 90,000). Merged suite: generation **596**,
+web **293**, `test_phase_bl` 197/197 (smoke record pending). Readings: index 8,065 · per-archetype max 70,043
+(`exhaust_pyre`) · per-archetype scaffold max 26,056 · triads 63,021 / 72,817 / 79,252 · all-ops 120,084 · `full`
+112,782 (scaffold snapshot 46,385, +340). Tester: `generation/tests/gaptest-bl/` (`--validate-only` green).

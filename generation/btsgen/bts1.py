@@ -25,7 +25,12 @@ import sys
 import zlib
 from pathlib import Path
 
-VOCAB_VERSION = 63  # must be <= ForgedCards.VocabVersion (63: Phase BK — HIT-COUNT SCALING: the damage field
+VOCAB_VERSION = 64  # must be <= ForgedCards.VocabVersion (64: Phase BL — ENEMY STRENGTH LOSS, STRIP, DOOM: statuses
+                    # temp_strength_down (Piercing Wail), strength_down (Malaise, permanent) and doom (dies at the end of
+                    # its turn when HP <= Doom; Blight Strike = scale damage_dealt_unblocked, Time's Up =
+                    # target_status_stacks doom, target_has_status doom), flag-ops strip_block / strip_artifact
+                    # (Expose). No codec change.)
+                    # 63: Phase BK — HIT-COUNT SCALING: the damage field
                     # `hits_scale` sets the hit COUNT from a live read — x (X-cost, Whirlwind), attacks_played_this_turn
                     # (Finisher), cards_in_hand, skills_in_hand (Flechettes), plays_this_combat, exhaust_pile_size,
                     # hp_loss_events_this_combat, energy_spent_this_turn, orb_count; capped at 10. No codec change.)

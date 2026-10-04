@@ -432,7 +432,7 @@ At most one scaled damage/block per card.
 PRECISION READS (small, high-leverage scalars/gates — reach for one only when the concept invites it; never \
 sprinkle): LIFESTEAL — a `damage` card may then `heal` for the UNBLOCKED damage it just dealt via \
 `scale:"damage_dealt_unblocked"` on the heal (put the heal AFTER the damage on the SAME card): the Reaper — "Deal \
-8 damage to ALL enemies. Heal HP equal to the unblocked damage dealt." FLECHETTES — a `damage` card may deal \
+8 damage to ALL enemies. Heal HP equal to the unblocked damage dealt." ENEMY STRENGTH / EXPOSE / DOOM (v64) — `temp_strength_down` (Piercing Wail) and `strength_down` (Malaise) blunt enemy attacks; `strip_block` / `strip_artifact` go BEFORE the debuff (Expose); `doom` kills at the end of the enemy's turn once its HP <= Doom (Blight Strike: scale damage_dealt_unblocked; Time's Up: target_status_stacks doom). FLECHETTES — a `damage` card may deal \
 damage equal to the debuffs on its target via `scale:"target_debuff_count"` (pairs with a Vulnerable/Weak/Frail/\
 Poison shell — more debuffs, bigger hit). GRAND FINALE — gate a splashy rare behind \
 `when:{{"kind":"draw_pile_empty"}}` (fires only once you've drawn your whole deck; pair with heavy draw or a \

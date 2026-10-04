@@ -683,6 +683,30 @@ def status_card_warnings(cards: list[dict]) -> list[str]:
     return []
 
 
+def _applies_doom(card: dict) -> bool:
+    """Does any effect (base, upgrade, or a trigger payload) apply Doom? (Phase BL, v64)"""
+    def walk(effects) -> bool:
+        for e in effects or []:
+            if not isinstance(e, dict):
+                continue
+            if e.get("op") == "apply_status" and str(e.get("status", "")).strip().lower() == "doom":
+                return True
+            if walk(e.get("effects")):
+                return True
+        return False
+    return walk(card.get("effects")) or walk((card.get("upgrade") or {}).get("effects"))
+
+
+def doom_warnings(cards: list[dict]) -> list[str]:
+    """Set-level Doom discipline (Phase BL, v64, gap #67; plan §7 decision 6): Doom never decays, so stacking it is a
+    guaranteed execute — at most FOUR Doom cards per class. Advisory (a human decides), like status_card_warnings."""
+    doom = sorted({str(c.get("id", "?")) for c in cards if isinstance(c, dict) and _applies_doom(c)})
+    if len(doom) > 4:
+        return [f"more than four Doom cards: {', '.join(doom)} each apply Doom — it never decays, so the stack is a "
+                "guaranteed execute; keep Doom to at most four cards per class."]
+    return []
+
+
 def blade_empower_warnings(cards: list[dict]) -> list[str]:
     """Set-level Blade-Empower pairing (Phase AF, gap #41): `blade_empower` multiplies the forge class's signature
     blade — it is dead in a class with no `forge` income (no blade to empower). A class shipping blade_empower must

@@ -220,6 +220,9 @@ public abstract class DataCard : ConstructedCardModel
                 case "sacrifice_summon":      // Phase AV (v52): consumes the summon in OnPlay (flag-op, no card var); text via Describe
                 case "spend_forge":           // Phase AX (v53, gap #44): spends the Forge counter in OnPlay (literal, no var); text via Describe
                 case "spread_debuffs":        // Phase AX (v53, gaps #45-#47): copies the target's debuffs in OnPlay (flag-op, no var); text via Describe
+                case "strip_block":           // Phase BL (v64, gap #66): Expose — the target loses all Block in OnPlay (flag-op, no var)
+                case "strip_artifact":        // Phase BL (v64, gap #66): Expose — the target's Artifact is removed in OnPlay (flag-op, no var)
+                case "gaptest_enemy_artifact": // PHASE BL GAPTEST (not in the LLM contract): Artifact on the target(s) in OnPlay
                 case "add_card":              // Phase Q (gap #16): generates card copies in OnPlay (no card var)
                 case "retrieve_card":         // Phase AP (v46): returns pile card(s) to hand in OnPlay (literal, no var); text via Describe
                 case "exhaust_card":          // Phase BC (v57, gap #52): exhausts hand cards in OnPlay (literal, no var); text via Describe
@@ -251,6 +254,17 @@ public abstract class DataCard : ConstructedCardModel
                         case "weak":           Power<WeakPower>(vname, e.Amount, up); break;
                         case "frail":          Power<FrailPower>(vname, e.Amount, up); break;
                         case "poison":         Power<PoisonPower>(vname, e.Amount, up); break;
+                        // Phase BL (v64, gap #67): the base game's generic DoomPower (sealed, concrete — NoEscape applies it
+                        // with a plain PowerCmd.Apply). The Blight Strike form (scale damage_dealt_unblocked) declares no var:
+                        // its amount is this play's unblocked damage (EffectRunner applies it literally).
+                        case "doom":           if (!e.IsScaled) Power<DoomPower>(vname, e.Amount, up); break;
+                        // Phase BL (v64, gap #66): enemy Strength loss. The temp shell is our Debuff-typed
+                        // ForgedTempStrengthDownPower (the PowerVar gives the hover tip; EffectRunner applies it literally).
+                        // The PERMANENT form must NOT reuse Power<StrengthPower> — that PowerVar is positive (it would GIVE
+                        // the enemy Strength) and collides with a self `strength` on the same card — so it declares the
+                        // base PiercingWail / DarkShackles var name "StrengthLoss" ({StrengthLoss} in the text).
+                        case "temp_strength_down": Power<ForgedTempStrengthDownPower>(vname, e.Amount, up); break;
+                        case "strength_down":  WithVar("StrengthLoss", e.Amount, up); break;
                         case "strength":       Power<StrengthPower>(vname, e.Amount, up); break;
                         case "dexterity":      Power<DexterityPower>(vname, e.Amount, up); break;
                         case "thorns":         Power<ThornsPower>(vname, e.Amount, up); break;

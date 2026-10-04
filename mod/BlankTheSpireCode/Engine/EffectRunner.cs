@@ -200,6 +200,25 @@ public static class EffectRunner
                         MainFile.Logger.Info($"[AJ] random_enemy debuff '{e.Status}' from '{card.Id}' (BaseLib GetTargets rolls one enemy).");
                     if (e.Status is "temp_thorns" or "temp_focus") // Phase AN (v44) smoke: the one-turn shells apply (expiry logs from the power)
                         MainFile.Logger.Info($"[AN] {e.Status} +{amt} (this turn only) from '{card.Id}'.");
+                    // Phase BL (v64, gaps #66/#67): the enemy Strength-loss pair + Doom apply LITERALLY per target (so each
+                    // target's Artifact / Strength / Doom can be read before + after — the smoke's sign-flip proof). The
+                    // permanent `strength_down` MUST take this path: the card's "StrengthLoss" var is not a PowerVar, so
+                    // CommonActions has nothing to read, and the apply is the NEGATIVE amount (Malaise:
+                    // PowerCmd.Apply<StrengthPower>(target, -N)). Doom "equal to the unblocked damage dealt" (Blight
+                    // Strike) reads this play's unblockedDealt — a number no PowerVar can carry.
+                    if (BlStatuses.Contains(e.Status ?? ""))
+                    {
+                        int n = Math.Max(1, amt);
+                        if (e.Status == "doom" && e.Scale == "damage_dealt_unblocked")
+                        {
+                            n = unblockedDealt;
+                            MainFile.Logger.Info($"[BL] doom from unblocked {n} ('{spec.Title ?? spec.Id}').");
+                        }
+                        if (n > 0)
+                            foreach (var t in CustomStatusTargets(card, play))
+                                await ApplyBlStatus(e.Status!, ctx, t, card.Owner.Creature, n);
+                        break;
+                    }
                     // Phase AX (v53): a card may declare the SAME status twice when the second one is `when`-gated.
                     // The first copy keeps the canonical PowerVar path (CommonActions reads the card's var); the
                     // second declares a SUFFIXED var ("Weak2", see DataCard) that CommonActions can't find, so it
@@ -276,6 +295,36 @@ public static class EffectRunner
                     await SpreadDebuffs(card, ctx, play);
                     break;
                 }
+                case "strip_block":
+                    // Phase BL (v64, gap #66): the base-game Expose recipe (Expose.cs) — LoseBlock(target, target.Block). A
+                    // single-enemy flag-op (validator-gated), ordered BEFORE the card's debuff.
+                    foreach (var t in CustomStatusTargets(card, play))
+                    {
+                        int had = (int)t.Block;
+                        if (had > 0) await CreatureCmd.LoseBlock(t, t.Block);
+                        MainFile.Logger.Info($"[BL] strip_block {had}->{(int)t.Block} on '{MonsterName(t)}' ('{spec.Title ?? spec.Id}').");
+                    }
+                    break;
+                case "strip_artifact":
+                    // Phase BL (v64, gap #66): Expose's second half — remove ALL Artifact (null-safe Remove<T>, guarded like
+                    // the base card). Placed BEFORE the debuff so the debuff that follows is not eaten.
+                    foreach (var t in CustomStatusTargets(card, play))
+                    {
+                        int had = t.GetPowerAmount<ArtifactPower>();
+                        if (t.HasPower<ArtifactPower>()) await PowerCmd.Remove<ArtifactPower>(t);
+                        MainFile.Logger.Info($"[BL] strip_artifact (had {had}) on '{MonsterName(t)}' ('{spec.Title ?? spec.Id}').");
+                    }
+                    break;
+                case "gaptest_enemy_artifact":
+                    // PHASE BL GAPTEST (not in the LLM contract — like apply_custom / summon_spike): give the card's
+                    // target(s) N Artifact, so the smoke can prove an Artifact enemy does NOT gain Strength from a
+                    // blocked (temp_)strength_down (the sign-flip risk). Only the tests/gaptest-bl tester carries it.
+                    foreach (var t in CustomStatusTargets(card, play))
+                    {
+                        await RelicApplyT<ArtifactPower>(ctx, t, card.Owner.Creature, Math.Max(1, amt));
+                        MainFile.Logger.Info($"[BL] gaptest: '{MonsterName(t)}' gains Artifact {Math.Max(1, amt)} (now {t.GetPowerAmount<ArtifactPower>()}).");
+                    }
+                    break;
                 case "balance_step":
                     // Phase S (gap #1): move the signed Balance gauge toward a pole (light/dark). Shared executor
                     // owns the arithmetic + display; the light_ge/dark_ge/centered conditions read it, and the gauge
@@ -1231,6 +1280,7 @@ public static class EffectRunner
             "vulnerable" => target.GetPowerAmount<VulnerablePower>(),
             "weak"       => target.GetPowerAmount<WeakPower>(),
             "poison"     => target.GetPowerAmount<PoisonPower>(),
+            "doom"       => target.GetPowerAmount<DoomPower>(), // Phase BL (v64): Time's Up
             _ => 0,
         };
     }
@@ -1326,6 +1376,14 @@ public static class EffectRunner
         Take<WeakPower>("weak");
         Take<FrailPower>("frail");
         Take<PoisonPower>("poison");
+        // Phase BL (v64): Doom spreads like Poison; Strength Down counts as a debuff (plan §7 decision 12, base Misery
+        // copies it): the temp shell's stacks as temp_strength_down, and any Strength below that (a permanent loss, net
+        // of the temp part the shell already accounts for) as strength_down.
+        Take<DoomPower>("doom");
+        int shell = source.GetPowerAmount<ForgedTempStrengthDownPower>();
+        if (shell > 0) stacks.Add(("temp_strength_down", shell));
+        int permLoss = -(source.GetPowerAmount<StrengthPower>() + shell);
+        if (permLoss > 0) stacks.Add(("strength_down", permLoss));
         // The struck target is usually DEAD by now (the card's own leading `damage` killed it), and a dead creature's
         // CombatState is null — found 2026-09-15 by a real forged class ("Carrier Wave": deal 6, spread) that NRE'd
         // here on two seeds. Its powers are still readable (the Take<> calls above succeed), so the spread still
@@ -1344,7 +1402,10 @@ public static class EffectRunner
         }
         foreach (var (status, amount) in stacks)
             foreach (var other in others)
-                await RelicApply(status, ctx, other, card.Owner.Creature, amount);
+            {
+                if (BlStatuses.Contains(status)) await ApplyBlStatus(status, ctx, other, card.Owner.Creature, amount); // Phase BL
+                else await RelicApply(status, ctx, other, card.Owner.Creature, amount);
+            }
         MainFile.Logger.Info($"[AX] spread_debuffs: copied {string.Join(", ", stacks.Select(t => $"{t.Status} {t.Amount}"))} " +
                              $"to {others.Count} other enemy(ies) ('{card.Id}').");
     }
@@ -1357,6 +1418,9 @@ public static class EffectRunner
         if (target.HasPower<WeakPower>()) n++;
         if (target.HasPower<FrailPower>()) n++;
         if (target.HasPower<PoisonPower>()) n++;
+        if (target.HasPower<DoomPower>()) n++; // Phase BL (v64)
+        // Phase BL (v64, plan §7 decision 12): Strength Down is a debuff — the temp shell, or Strength below 0.
+        if (target.HasPower<ForgedTempStrengthDownPower>() || target.GetPowerAmount<StrengthPower>() < 0) n++;
         return n;
     }
 
@@ -1441,6 +1505,8 @@ public static class EffectRunner
             "weak"           => ApplyPower<WeakPower>(self, card, ctx, play),
             "frail"          => ApplyPower<FrailPower>(self, card, ctx, play),
             "poison"         => ApplyPower<PoisonPower>(self, card, ctx, play),
+            "doom"           => ApplyPower<DoomPower>(self, card, ctx, play), // Phase BL (v64): Execute routes it via ApplyBlStatus first (tags)
+            "temp_strength_down" => ApplyPower<ForgedTempStrengthDownPower>(self, card, ctx, play), // Phase BL (v64), likewise
             "strength"       => ApplyPower<StrengthPower>(self, card, ctx, play),
             "dexterity"      => ApplyPower<DexterityPower>(self, card, ctx, play),
             "thorns"         => ApplyPower<ThornsPower>(self, card, ctx, play),
@@ -1728,6 +1794,9 @@ public static class EffectRunner
             "weak"           => RelicApplyT<WeakPower>(ctx, target, source, amount),
             "frail"          => RelicApplyT<FrailPower>(ctx, target, source, amount),
             "poison"         => RelicApplyT<PoisonPower>(ctx, target, source, amount),
+            "doom"           => RelicApplyT<DoomPower>(ctx, target, source, amount),                       // Phase BL (v64)
+            "temp_strength_down" => RelicApplyT<ForgedTempStrengthDownPower>(ctx, target, source, amount), // Phase BL (v64)
+            "strength_down"  => RelicApplyT<StrengthPower>(ctx, target, source, -amount), // Phase BL (v64): Malaise — the NEGATIVE apply
             "strength"       => RelicApplyT<StrengthPower>(ctx, target, source, amount),
             "dexterity"      => RelicApplyT<DexterityPower>(ctx, target, source, amount),
             "thorns"         => RelicApplyT<ThornsPower>(ctx, target, source, amount),
@@ -1748,6 +1817,40 @@ public static class EffectRunner
             "double_damage"  => RelicApplyT<DoubleDamagePower>(ctx, target, source, amount),     // Phase BF (v60)
             _ => Task.CompletedTask,
         };
+
+    /// <summary>Phase BL (v64, gaps #66/#67): the three enemy statuses that apply through the literal per-target path.</summary>
+    internal static readonly HashSet<string> BlStatuses = ["temp_strength_down", "strength_down", "doom"];
+
+    private static string MonsterName(Creature t) => t.Monster?.GetType().Name ?? "creature";
+
+    /// <summary>Phase BL (v64): apply one of <see cref="BlStatuses"/> to <paramref name="t"/> with a literal amount and log
+    /// the smoke tags. A Strength-down that leaves Strength unchanged while an Artifact stack was spent is the ARTIFACT
+    /// CHECK: the shell is a Debuff (ForgedTempStrengthDownPower.Type), so Artifact negates the WHOLE shell — no -N now,
+    /// no +N restore at the enemy's turn end (the "shell" read must stay 0). Shared by cards, payloads, spread_debuffs.</summary>
+    internal static async Task ApplyBlStatus(string status, PlayerChoiceContext ctx, Creature t, Creature source, int n)
+    {
+        string m = MonsterName(t);
+        int art0 = t.GetPowerAmount<ArtifactPower>();
+        int str0 = t.GetPowerAmount<StrengthPower>();
+        int shell0 = t.GetPowerAmount<ForgedTempStrengthDownPower>();
+        await RelicApply(status, ctx, t, source, n);
+        int art1 = t.GetPowerAmount<ArtifactPower>();
+        int str1 = t.GetPowerAmount<StrengthPower>();
+        bool blocked = art0 > 0 && art1 < art0;
+        if (status == "doom")
+        {
+            int d = t.GetPowerAmount<DoomPower>();
+            MainFile.Logger.Info($"[BL] doom +{n} on '{m}' (HP {t.CurrentHp}, Doom {d}, doomed={t.CurrentHp <= d})" +
+                                 (blocked ? $" - blocked by Artifact {art0}." : "."));
+        }
+        else if (blocked && str1 == str0)
+            MainFile.Logger.Info($"[BL] artifact check: '{m}' Artifact {art0} blocked {status}, Str now {str1} " +
+                                 $"(shell {shell0}->{t.GetPowerAmount<ForgedTempStrengthDownPower>()}).");
+        else if (status == "temp_strength_down")
+            MainFile.Logger.Info($"[BL] temp_strength_down +{n} on '{m}' (Str now {str1}).");
+        else
+            MainFile.Logger.Info($"[BL] strength_down -{n} on '{m}' (Str now {str1}).");
+    }
 
     private static Task RelicApplyT<T>(PlayerChoiceContext ctx, Creature target, Creature source, int amount)
         where T : PowerModel

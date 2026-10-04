@@ -1,0 +1,6 @@
+{
+  "id": "doom",
+  "name": "Doom",
+  "kind": "debuff",
+  "decay": "none"
+}

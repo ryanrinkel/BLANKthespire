@@ -480,6 +480,7 @@ const STATUS_NAMES = {
   focus: "Focus", temp_strength: "Strength (this turn)", temp_dexterity: "Dexterity (this turn)",
   temp_thorns: "Thorns (this turn)", temp_focus: "Focus (this turn)", // Phase AN (v44)
   vigor: "Vigor", double_damage: "Double Damage", // Phase BF (v60, gap #54)
+  temp_strength_down: "Strength Down (this turn)", strength_down: "Strength (permanent loss)", doom: "Doom", // Phase BL (v64)
 };
 const TRIGGER_PREFIX = {
   turn_start: "At the start of each turn", turn_end: "At the end of each turn",
@@ -630,6 +631,8 @@ function effPhrase(e, target) {
     case "forge": return `Forge ${a ?? 1}`; // Phase M (gap #36): stoke the Forge counter
     case "spend_forge": return `Spend ${a ?? 1} Forge`; // Phase AX (v53, gap #44): the ramp cash-out (the card's price)
     case "spread_debuffs": return "Copy the target's debuffs to all other enemies"; // Phase AX (v53, gaps #45-#47)
+    case "strip_block": return "Remove all of the enemy's Block"; // Phase BL (v64, gap #66): Expose, lockstep with cardgen.describe
+    case "strip_artifact": return "Remove the enemy's Artifact"; // Phase BL (v64, gap #66)
     case "exhaust": return "Exhaust";
     case "innate": return "Innate";
     case "retain": return "Retain";
@@ -638,6 +641,11 @@ function effPhrase(e, target) {
     case "evoke": return "Evoke your next orb";
     case "channel_orb": return `Channel ${titleCase(e.orb || "an orb")}${a > 1 ? ` ×${a}` : ""}`;
     case "apply_status":
+      // Phase BL (v64, gaps #66/#67): the permanent Strength loss + Blight Strike's Doom read like the card text.
+      if (e.status === "strength_down")
+        return target === "all_enemies" ? `ALL enemies lose ${a ?? ""} Strength`
+             : target === "random_enemy" ? `A random enemy loses ${a ?? ""} Strength` : `The enemy loses ${a ?? ""} Strength`;
+      if (e.status === "doom" && e.scale === "damage_dealt_unblocked") return "Apply Doom equal to the unblocked damage dealt";
       return target === "self" ? `Gain ${a ?? ""} ${statusName(e.status)}`
                                : `Apply ${a ?? ""} ${statusName(e.status)}${toAll}`;
     case "apply_status_custom": return `Apply ${a ?? ""} ${e.status_name || "status"}`;

@@ -829,12 +829,16 @@
           "block",
           "apply_status",
           "add_trigger",
-          "scale"
+          "scale",
+          "temp_strength_down",
+          "strength_down"
         ],
         "class_kind": "normal"
       },
       "buildable": true,
-      "gap_refs": [],
+      "gap_refs": [
+        "VOCABULARY_GAPS#66"
+      ],
       "base_synergies": {
         "hooks": [
           "block_stack",
@@ -936,7 +940,8 @@
           "Slow to kill",
           "Weak to enemy scaling"
         ]
-      }
+      },
+      "build_notes": "Enemy Strength loss (v64) is Block's twin: `temp_strength_down` (Piercing Wail) blunts the hit you are about to take, `strength_down` (Malaise) every hit after."
     },
     {
       "id": "strength_berserk",
@@ -1839,7 +1844,7 @@
       "id": "debuff_expose",
       "name": "Expose / hex",
       "description": "Crack the enemy open with Vulnerable and Weak, then exploit it: the more debuffs pile up, the harder you hit.",
-      "build_notes": "Touchstone: the base-game Flechettes. `target_status_stacks` (v62) hits for the enemy's Vulnerable / Weak / Poison stacks (Bully).",
+      "build_notes": "Touchstone: the base-game Flechettes. `target_status_stacks` (v62) hits for the enemy's Vulnerable / Weak / Poison stacks (Bully). Expose (v64): `strip_block` / `strip_artifact` before the debuff; Strength Down and `doom` (an execute that never decays) count as debuffs.",
       "metaphors": [
         "the opening",
         "the chink",
@@ -1876,13 +1881,20 @@
           "damage",
           "target_debuff_count",
           "spread_debuffs",
-          "target_status_stacks"
+          "target_status_stacks",
+          "temp_strength_down",
+          "strength_down",
+          "strip_block",
+          "strip_artifact",
+          "doom"
         ],
         "class_kind": "normal"
       },
       "buildable": true,
       "gap_refs": [
-        "VOCABULARY_GAPS#63"
+        "VOCABULARY_GAPS#63",
+        "VOCABULARY_GAPS#66",
+        "VOCABULARY_GAPS#67"
       ],
       "base_synergies": {
         "hooks": [
@@ -1964,7 +1976,7 @@
       "id": "reaper_lifesteal",
       "name": "Reaper / lifesteal",
       "description": "Heal yourself with every hit: dealing damage and gaining life are the same action.",
-      "build_notes": "A LifeLink build: attacks heal for the unblocked damage they deal (`heal` scaled by `damage_dealt_unblocked`). Vulnerable and multi-hit get more damage through; area damage is optional, not the identity.",
+      "build_notes": "A LifeLink build: attacks heal for the unblocked damage they deal (`heal` scaled by `damage_dealt_unblocked`). Vulnerable and multi-hit get more damage through; area damage is optional, not the identity. Blight Strike (v64): `doom` scaled by `damage_dealt_unblocked` marks what the hit did not kill.",
       "metaphors": [
         "the reaper",
         "the red harvest",
@@ -1995,13 +2007,15 @@
         "ops": [
           "damage",
           "heal",
-          "damage_dealt_unblocked"
+          "damage_dealt_unblocked",
+          "doom"
         ],
         "class_kind": "normal"
       },
       "buildable": true,
       "gap_refs": [
-        "VOCABULARY_GAPS#21"
+        "VOCABULARY_GAPS#21",
+        "VOCABULARY_GAPS#67"
       ],
       "base_synergies": {
         "hooks": [
@@ -2208,7 +2222,7 @@
       "id": "countdown_ripen",
       "name": "Ripening / delayed payoff",
       "description": "Plant something that does nothing now and goes off a few turns later.",
-      "build_notes": "Every ripening effect must be trackable: the player should always see how many turns are left before it goes off (shown as a buff on the player that counts down). Mix a few ripening cards with cards that keep the player alive in the meantime, so the wait feels like planning, not dead turns. A `target_intends_attack` gate (v62) times a payoff to the enemy's attack turn.",
+      "build_notes": "Every ripening effect must be trackable: the player should always see how many turns are left before it goes off (shown as a buff on the player that counts down). Mix a few ripening cards with cards that keep the player alive in the meantime, so the wait feels like planning, not dead turns. A `target_intends_attack` gate (v62) times a payoff to the enemy's attack turn. `doom` (v64) is the enemy's own countdown: it dies at the end of its turn once its HP is at or below its Doom.",
       "metaphors": [
         "the seed",
         "dormancy",
@@ -2239,14 +2253,16 @@
         "ops": [
           "ripen",
           "add_trigger",
-          "target_intends_attack"
+          "target_intends_attack",
+          "doom"
         ],
         "class_kind": "normal"
       },
       "buildable": true,
       "gap_refs": [
         "VOCABULARY_GAPS#6",
-        "VOCABULARY_GAPS#64"
+        "VOCABULARY_GAPS#64",
+        "VOCABULARY_GAPS#67"
       ],
       "base_synergies": {
         "hooks": [
@@ -3669,7 +3685,7 @@
       "id": "untouchable_ward",
       "name": "Untouchable / exotic mitigation",
       "description": "Negate, absorb and phase through damage instead of stacking flat Block.",
-      "build_notes": "The toolkit is Buffer, Artifact, Intangible and Blur, and the class needs an ENGINE that brings them back (a power or trigger that regrants Buffer or Blur, a ripening countdown to the next Intangible, cards that recycle a ward) rather than a pile of one-off shields. Include enough Intangible that the plan works, gated so it can't be permanent.",
+      "build_notes": "The toolkit is Buffer, Artifact, Intangible and Blur, and the class needs an ENGINE that brings them back (a power or trigger that regrants Buffer or Blur, a ripening countdown to the next Intangible, cards that recycle a ward) rather than a pile of one-off shields. Include enough Intangible that the plan works, gated so it can't be permanent. `temp_strength_down` (v64, Piercing Wail) wards by weakening the hit instead of absorbing it.",
       "metaphors": [
         "the ghost",
         "the ward",
@@ -3701,12 +3717,15 @@
           "buffer",
           "artifact",
           "intangible",
-          "blur"
+          "blur",
+          "temp_strength_down"
         ],
         "class_kind": "normal"
       },
       "buildable": true,
-      "gap_refs": [],
+      "gap_refs": [
+        "VOCABULARY_GAPS#66"
+      ],
       "base_synergies": {
         "hooks": [
           "mitigation",

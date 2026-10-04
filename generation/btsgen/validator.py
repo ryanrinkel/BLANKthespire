@@ -35,6 +35,10 @@ _STATUS_WEIGHT = {
     "temp_thorns": 1.0, "temp_focus": 1.5,         # Phase AN (v44): this-turn only, ~half of thorns / focus
     "vigor": 1.2,           # Phase BF (v60): +N on ONE attack, then gone — a touch over the damage it adds
     "double_damage": 12.0,  # Phase BF (v60): a whole turn of doubled attacks — rare-tier per turn (amount = turns)
+    # Phase BL (v64, gaps #66/#67): enemy Strength loss + Doom. A one-turn Strength Down blunts ONE enemy attack (~Weak);
+    # a permanent loss blunts every attack all fight (priced like your own Strength, a touch under); Doom never decays,
+    # but it only pays off once the stack reaches the enemy's HP (an execute line, priced per stack below a hit).
+    "temp_strength_down": 0.6, "strength_down": 3.0, "doom": 0.8,
     "thorns": 2.0,          # pays out per enemy hit taken
     "regen": 2.0,           # heal per turn, decaying
     "metallicize": 3.0,     # STS2 Plating: N + (N-1) + ... + 1 Block over N turns
@@ -105,7 +109,8 @@ _DAMAGE_BLOCK_ONLY_SCALES = {"block", "hp_lost_this_turn", "draw_pile_count", "p
 # Phase BJ (v62): damage-only reads — the two unbounded combat counts + the board-wide Poison sum (ForgedCards.DamageOnlyScales).
 _DAMAGE_ONLY_SCALES = {"cards_drawn_this_combat", "hp_loss_events_this_combat", "total_enemy_poison"}
 # Phase BJ (v62): target_status_stacks reads one of these on the chosen target (ForgedCards.StatusStackStatuses).
-_STATUS_STACK_STATUSES = {"vulnerable", "weak", "poison"}
+_STATUS_STACK_STATUSES = {"vulnerable", "weak", "poison",
+                          "doom"}  # Phase BL (v64, gap #67): Time's Up — damage equal to the enemy's Doom
 # Phase BJ (v62): to_hand_size's amount is the target hand size (ForgedCards.Min/MaxHandSizeTarget).
 _HAND_SIZE_TARGET_MIN, _HAND_SIZE_TARGET_MAX = 2, 10
 # Phase BK (v63, gap #65): the live reads a damage op's `hits_scale` may take (the hit COUNT; mirrors
@@ -145,7 +150,15 @@ _MULTI_FIRE_TRIGGERS = {"on_hp_lost", "on_exhaust", "on_card_played", "on_card_d
                         "on_discard",  # Phase R (gap #17): a card can be discarded, redrawn, discarded again
                         "on_blade_played",  # Phase AJ (v40): the blade can be played several times a turn (C# parity)
                         "on_poison_damage"}  # Phase BE (v59, gap #56): each poisoned enemy ticks separately
-_ENEMY_DEBUFF_STATUSES = {"vulnerable", "weak", "frail", "poison"}
+_ENEMY_DEBUFF_STATUSES = {"vulnerable", "weak", "frail", "poison",
+                          "temp_strength_down", "doom"}  # Phase BL (v64): payload-legal (strength_down is card-only)
+# Phase BL (v64, gaps #66/#67): the enemy Strength-loss / Doom bands (plan §7 decision 6: Doom 12 per card, rare for 10+,
+# <= 4 Doom cards per class — character_validator.doom_warnings; strength_down 3 permanent / 9 temporary). A payload Doom
+# fires every turn and never decays, so it caps at 5 per fire. Lockstep with ForgedCards.BlStatusCaps / PayloadDoomMax.
+_BL_STATUS_CAPS = {"temp_strength_down": 9, "strength_down": 3, "doom": 12}
+_PAYLOAD_DOOM_MAX = 5
+_DOOM_RARE_MIN = 10
+_STRIP_OPS = ("strip_block", "strip_artifact")
 # Phase AK (v41): the POWER-HOSTED reactive kinds eligible for 'once_per_combat' (mirror ForgedCards.OncePerCombatTriggers)
 # — every multi-fire kind except the card-latent on_discard (no power instance to carry the fired flag).
 _ONCE_PER_COMBAT_TRIGGERS = _MULTI_FIRE_TRIGGERS - {"on_discard"}
@@ -712,6 +725,26 @@ class CardValidator:
                 out.append(f"'card_type' only applies to cost_shift/exhaust_card/draw_until/add_trigger (op '{op}').")
             if e.get("every_n") is not None and op != "add_trigger":  # Phase BI (v61)
                 out.append(f"'every_n' only applies to add_trigger (op '{op}').")
+            # Phase BL (v64, gaps #66/#67): the enemy Strength-loss / Doom bands; all three are enemy debuffs (never on a
+            # self-target card). Mirrors ForgedCards.Validate (the rarity rule is generation-side only).
+            if op == "apply_status" and str(e.get("status", "")).strip().lower() in _BL_STATUS_CAPS:
+                bst = str(e.get("status", "")).strip().lower()
+                bamt = e.get("amount")
+                if not scale and isinstance(bamt, int) and not isinstance(bamt, bool) and bamt > _BL_STATUS_CAPS[bst]:
+                    out.append(f"apply_status '{bst}' amount may be at most {_BL_STATUS_CAPS[bst]}; got {bamt}.")
+                if str(card.get("target", "")).strip().lower() == "self":
+                    out.append(f"apply_status '{bst}' is an enemy debuff — the card needs an enemy target "
+                               "(enemy / all_enemies / random_enemy).")
+                if (bst == "doom" and not scale and isinstance(bamt, int) and bamt >= _DOOM_RARE_MIN
+                        and str(card.get("rarity", "")).strip().lower() != "rare"):
+                    out.append(f"Doom {_DOOM_RARE_MIN}+ on one card is RARE-only (a guaranteed execute; got "
+                               f"'{card.get('rarity')}').")
+            # Phase BL (v64, gap #66): the Expose flag-ops act on the CHOSEN enemy and carry nothing of their own.
+            if op in _STRIP_OPS:
+                if any(e.get(k) is not None for k in ("amount", "status")) or scale or (isinstance(hits, int) and hits > 1):
+                    out.append(f"{op} is a flag-op (no amount / status / scale / hits).")
+                if str(card.get("target", "")).strip().lower() != "enemy":
+                    out.append(f'{op} needs a single-enemy card (target "enemy") — it strips the CHOSEN enemy.')
             # Phase BK (v63, gap #65): `hits_scale` — the hit COUNT from a live read; THE card's one multi-hit, so never with
             # a fixed `hits`, a `scale` on the amount, or a growth rule. Mirrors ForgedCards.Validate.
             hsc = e.get("hits_scale")
@@ -735,8 +768,13 @@ class CardValidator:
                 # Phase P (gaps #21/#22): lifesteal is heal-ONLY (replace-semantics; the preceding-damage rule
                 # runs per list below); debuff-count is damage-ONLY. Everything else stays damage/block/draw.
                 if scale == "damage_dealt_unblocked":
-                    if op != "heal":
-                        out.append("'scale:damage_dealt_unblocked' only applies to heal (lifesteal — heal the unblocked damage this card dealt).")
+                    # Phase BL (v64, gap #67): + apply_status doom (Blight Strike). Mirrors ForgedCards.Validate.
+                    is_doom = op == "apply_status" and str(e.get("status", "")).strip().lower() == "doom"
+                    if op != "heal" and not is_doom:
+                        out.append("'scale:damage_dealt_unblocked' only applies to heal (lifesteal) or apply_status doom (Blight Strike).")
+                    if is_doom and str(card.get("target", "")).strip().lower() != "enemy":
+                        out.append('a \'scale:damage_dealt_unblocked\' Doom needs a single-enemy card (target "enemy") — '
+                                   "it dooms the enemy it struck.")
                 elif scale == "target_debuff_count":
                     if op != "damage":
                         out.append("'scale:target_debuff_count' only applies to damage (deal damage equal to the debuffs on the target).")
@@ -846,10 +884,25 @@ class CardValidator:
         # upgrade checked independently — the runtime runs each list top-to-bottom). Mirrors ForgedCards.Validate.
         for lst in (effects, up_effects):
             for i, ef in enumerate(lst):
-                if (ef.get("op") == "heal" and str(ef.get("scale", "")).lower() == "damage_dealt_unblocked"
+                if (ef.get("op") in ("heal", "apply_status")  # Phase BL (v64): + the Blight Strike Doom
+                        and str(ef.get("scale", "")).lower() == "damage_dealt_unblocked"
                         and not any(p.get("op") == "damage" for p in lst[:i])):
-                    out.append("a 'scale:damage_dealt_unblocked' heal needs a 'damage' op earlier in the same card "
-                               "(you heal the damage you dealt).")
+                    out.append("a 'scale:damage_dealt_unblocked' heal / Doom needs a 'damage' op earlier in the same card "
+                               "(it reads the damage you dealt).")
+        # Phase BL (v64, gaps #66/#67): one strip_block / strip_artifact / permanent strength_down per effect list, and the
+        # strips come BEFORE every enemy debuff on the card (the Expose order). Mirrors ForgedCards.Validate.
+        for lst in (effects, up_effects):
+            for one in _STRIP_OPS:
+                if sum(1 for ef in lst if ef.get("op") == one) > 1:
+                    out.append(f"at most one '{one}' effect per card.")
+            if sum(1 for ef in lst if ef.get("op") == "apply_status"
+                   and str(ef.get("status", "")).strip().lower() == "strength_down") > 1:
+                out.append("at most one 'strength_down' effect per card (raise the amount instead).")
+            for i, ef in enumerate(lst):
+                if ef.get("op") in _STRIP_OPS and any(
+                        q.get("op") == "apply_status" and str(q.get("status", "")).strip().lower() not in _SELF_BUFF_STATUSES
+                        for q in lst[:i]):
+                    out.append(f"'{ef.get('op')}' must come BEFORE the card's debuffs (the Expose order: strip, then debuff).")
         # Phase W (gap #19): self-purge. purge ⊥ exhaust (both mean "the card leaves after this play"; a card can't
         # do both). Never on a BASIC card — a purgeable basic could thin a class's floors (and reads as a trap). The
         # >3-per-class / merchant-floor concerns are class-level (character_validator). Mirrors ForgedCards.Validate.
@@ -1177,6 +1230,13 @@ class CardValidator:
                     if op == "apply_status" and str(t.get("status", "")).strip().lower() not in _ENEMY_DEBUFF_STATUSES:
                         out.append(f"a targeted trigger apply_status must be an enemy debuff "
                                    f"({'/'.join(sorted(_ENEMY_DEBUFF_STATUSES))}); got '{t.get('status')}'.")
+                    # Phase BL (v64): the payload bands (mirrors ForgedCards.ValidateTrigger).
+                    _pst, _pamt = str(t.get("status", "")).strip().lower(), t.get("amount")
+                    if op == "apply_status" and isinstance(_pamt, int) and not isinstance(_pamt, bool):
+                        if _pst == "doom" and _pamt > _PAYLOAD_DOOM_MAX:
+                            out.append(f"a trigger apply_status 'doom' may apply at most {_PAYLOAD_DOOM_MAX} per fire; got {_pamt}.")
+                        if _pst == "temp_strength_down" and _pamt > _BL_STATUS_CAPS[_pst]:
+                            out.append(f"a trigger apply_status 'temp_strength_down' may be at most {_BL_STATUS_CAPS[_pst]}; got {_pamt}.")
                     # Phase AL (v42): a targeted payload DAMAGE may be scaled ("deal damage equal to the cards in your
                     # hand to ALL enemies"); a targeted debuff / summon strike / custom status stays literal.
                     if ts and op != "damage":
@@ -1460,7 +1520,15 @@ class CardValidator:
             # price it as a modest build-around utility, like purge_card / transform_card.
             return 4.0
         if op == "apply_status":
+            # Phase BL (v64): Blight Strike's Doom equals the unblocked damage dealt — priced at a typical 6-damage hit.
+            if (eff.get("status") == "doom"
+                    and str(eff.get("scale", "")).strip().lower() == "damage_dealt_unblocked"):
+                return 6.0 * float(_STATUS_WEIGHT["doom"])
             return self._amt(eff.get("amount", 0)) * float(_STATUS_WEIGHT.get(eff.get("status", ""), 2.0))
+        if op in _STRIP_OPS:
+            # Phase BL (v64, gap #66): Expose's halves — wiping Block is a burst of free damage (~a 4-damage hit); stripping
+            # Artifact only matters against an Artifact enemy (it un-eats the debuffs that follow).
+            return 3.0 if op == "strip_block" else 2.0
         if op == "apply_status_custom":
             # Phase J: a forged modifier status (Strength/Dexterity-shaped). Weight per stack like a generic
             # buff; a conservative score (the real value depends on the class's status spec, unseen here).

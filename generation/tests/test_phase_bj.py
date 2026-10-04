@@ -293,7 +293,8 @@ def _t_contract() -> None:
           "schema: payload scale enum += exhaust_pile_size / total_enemy_poison")
     check(set(NEW_CONDS) <= set(schema["$defs"]["condition"]["properties"]["kind"]["enum"]), "schema: condition kinds")
     rules = json.dumps(eff.get("allOf", []))
-    check('"scale": {"const": "target_status_stacks"}' in rules and '"status": {"enum": ["vulnerable", "weak", "poison"]}' in rules,
+    check('"scale": {"const": "target_status_stacks"}' in rules  # Phase BL (v64) appended doom to the set
+          and '"status": {"enum": ["vulnerable", "weak", "poison"' in rules,
           "schema: target_status_stacks requires its status")
     crules = json.dumps(schema["$defs"]["condition"].get("allOf", []))
     check('"kind": {"const": "played_cards_last_turn_ge"}' in crules, "schema: played_cards_last_turn_ge requires value 1..10")

@@ -7,6 +7,7 @@ using BaseLib.Utils;
 using BlankTheSpire.BlankTheSpireCode.Extensions;
 using MegaCrit.Sts2.Core.Combat; // Phase AN (v44): CombatSide for the expiry-log override
 using MegaCrit.Sts2.Core.Entities.Creatures;
+using MegaCrit.Sts2.Core.Entities.Powers; // Phase BL (v64): PowerType for the Strength Down shell
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Powers;
@@ -132,4 +133,48 @@ public sealed class ForgedTempFocusPower : ForgedTempStatPower
         (List<(string, string)>)new PowerLoc("Temporary Focus",
             "Gain Focus for this turn (removed at the end of your turn).",
             "Gain Focus for this turn (removed at the end of your turn).");
+}
+
+/// <summary>Phase BL (v64, gap #66) — Temporary Strength DOWN on an ENEMY (Piercing Wail / Dark Shackles): -N Strength now,
+/// restored at the end of the OWNER's side turn (the enemy's turn end — after it has attacked with less Strength).
+/// BaseLib's <see cref="CustomTemporaryPowerModel"/> carries the inverted form (<c>InvertInternalPowerAmount</c>: apply
+/// -amount, restore +Amount at expiry). <b>The Type override is MANDATORY:</b> the base shell reports
+/// <c>InternallyAppliedPower.Type</c> = Buff, so Artifact would ignore the SHELL, eat only the inner -N Strength, and the
+/// shell would still restore +N at turn end — an Artifact enemy would GAIN Strength. As a Debuff the whole shell is
+/// what Artifact blocks (PowerCmd.Apply: modified amount 0 → BeforeApplied applies -0 = nothing, ApplyInternal skips a
+/// 0-amount power), exactly like the base game's PiercingWailPower (a TemporaryStrengthPower with IsPositive=false).</summary>
+public sealed class ForgedTempStrengthDownPower : ForgedTempStatPower
+{
+    public override PowerModel InternallyAppliedPower => ModelDb.Power<StrengthPower>();
+
+    protected override bool InvertInternalPowerAmount => true;
+
+    // MANDATORY (see the summary): the shell is a DEBUFF so Artifact negates all of it (never just the inner -N).
+    public override PowerType Type => PowerType.Debuff;
+
+    protected override Task ApplyInternal(PlayerChoiceContext ctx, Creature target, decimal amount,
+        Creature? applier, CardModel? cardSource, bool silent)
+        => BetaMainCompatibility.PowerCmd_.Apply.InvokeGeneric<Task<StrengthPower?>, StrengthPower>(
+               null, ctx, target, amount, applier ?? target, cardSource, silent)!;
+
+    /// <summary>Phase BL smoke tag: the restore ran at the end of the OWNER's (the enemy's) turn — log the Strength
+    /// it left behind (the base removes the shell and re-applies +Amount; see CustomTemporaryPowerModel).</summary>
+    public override async Task AfterSideTurnEnd(PlayerChoiceContext choiceContext, CombatSide side, IEnumerable<Creature> participants)
+    {
+        var people = participants as ICollection<Creature> ?? participants.ToList();
+        var owner = Owner;
+        bool mine = owner != null && people.Contains(owner);
+        var had = Amount;
+        await base.AfterSideTurnEnd(choiceContext, side, people);
+        if (mine)
+            MainFile.Logger.Info($"[BL] temp_strength_down expired (Str now {owner!.GetPowerAmount<StrengthPower>()}) on " +
+                                 $"'{owner.Monster?.GetType().Name ?? "creature"}' (had {had}).");
+    }
+
+    public override string CustomPackedIconPath => "strength_down.png".PowerImagePath();
+    public override string CustomBigIconPath => "strength_down.png".BigPowerImagePath();
+    public override List<(string, string)>? Localization =>
+        (List<(string, string)>)new PowerLoc("Strength Down",
+            "Loses Strength until the end of its turn.",
+            "Loses {Amount} Strength until the end of its turn."); // smartDescription: PowerModel adds "Amount"
 }

@@ -44,6 +44,8 @@ STATUS_NAME = {
     "focus": "Focus",
     "temp_thorns": "Thorns", "temp_focus": "Focus",  # Phase AN (v44): worded like the temp stats (ForgedCards.StatusName)
     "vigor": "Vigor", "double_damage": "Double Damage",  # Phase BF (v60, gap #54): the base-game next-attack amplifiers
+    # Phase BL (v64, gaps #66/#67): enemy Strength loss + Doom (mirrors ForgedCards.StatusDisplay / StatusName).
+    "temp_strength_down": "Strength Down", "strength_down": "Strength Down", "doom": "Doom",
 }
 # Self-buffs are worded "Gain" and always land on the player; debuffs are "Apply"-ed to the target.
 # Keep in lockstep with EffectRunner.SelfBuffStatuses (the C# single source of truth for buff-vs-debuff side).
@@ -188,6 +190,8 @@ def effect_literal(e: dict) -> str:
     op = e["op"]
     if op == "apply_status":
         lit = f'new EffectSpec("apply_status", {e["amount"]}, "{e["status"]}")'
+        if str(e.get("scale", "")).strip():  # Phase BL (v64): Blight Strike — doom scaled by damage_dealt_unblocked
+            lit = f'new EffectSpec("apply_status", {e["amount"]}, "{e["status"]}", 1, "{str(e["scale"]).strip().lower()}")'
     elif op == "channel_orb":
         # positional shape (Op, Amount, Status, Hits, Scale, Orb) — Scale is null here (F5: was ScaleX bool).
         lit = f'new EffectSpec("channel_orb", {e.get("amount", 0)}, null, 1, null, "{e["orb"]}")'
@@ -720,6 +724,12 @@ def describe(effects: list[dict], target: str) -> str:
         elif op == "spread_debuffs":
             # Phase AX (v53, gaps #45-#47): the contagion sentence (flag-op, no var). Lockstep with ForgedCards.Describe.
             parts.append("Copy the target's debuffs to all other enemies.")
+        elif op == "strip_block":
+            # Phase BL (v64, gap #66): Expose, half one (flag-op, no var). Lockstep with ForgedCards.Describe.
+            parts.append("Remove all of the enemy's Block.")
+        elif op == "strip_artifact":
+            # Phase BL (v64, gap #66): Expose, half two (flag-op, no var). Lockstep with ForgedCards.Describe.
+            parts.append("Remove the enemy's Artifact.")
         elif op == "corruption":
             # Phase AB (gap #20): two sentences (joined by the "\n" that separates parts). Lockstep with ForgedCards.Describe.
             parts.append("Your Skills cost 0.")
@@ -795,6 +805,15 @@ def describe(effects: list[dict], target: str) -> str:
         elif op == "upgrade_card":
             # Phase V (gap #18): combat-scoped hand upgrade. Lockstep with ForgedCards.Describe.
             parts.append(_upgrade_sentence(e, capitalize=True))
+        elif op == "apply_status" and e["status"] == "strength_down":
+            # Phase BL (v64, gap #66): the permanent Strength loss reads like Malaise / Piercing Wail's own text (the
+            # "StrengthLoss" var). Lockstep with ForgedCards.Describe.
+            parts.append("ALL enemies lose {StrengthLoss} Strength." if aoe
+                         else "A random enemy loses {StrengthLoss} Strength." if target == "random_enemy"
+                         else "The enemy loses {StrengthLoss} Strength.")
+        elif op == "apply_status" and e["status"] == "doom" and str(e.get("scale", "")).lower() == "damage_dealt_unblocked":
+            # Phase BL (v64, gap #67): Blight Strike. Lockstep with ForgedCards.Describe.
+            parts.append("Apply Doom equal to the unblocked damage dealt.")
         elif op == "apply_status":
             name = STATUS_NAME.get(e["status"], e["status"])
             buff = e["status"] in _BUFFS

@@ -1,0 +1,6 @@
+{
+  "id": "strength_down",
+  "name": "Strength Down",
+  "kind": "debuff",
+  "decay": "none"
+}

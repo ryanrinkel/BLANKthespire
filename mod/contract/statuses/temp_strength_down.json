@@ -1,0 +1,6 @@
+{
+  "id": "temp_strength_down",
+  "name": "Strength Down",
+  "kind": "debuff",
+  "decay": "turn"
+}

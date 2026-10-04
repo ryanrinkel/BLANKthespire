@@ -77,7 +77,7 @@ def _t_engine() -> None:
         s = _cs("Engine", f)
         check("Apply<VigorPower>" in s and '"double_damage" => "Double Damage"' in s, f"{f} apply + name maps")
     fc = _cs("Engine", "ForgedCards.cs")
-    check('"vigor", "double_damage"]' in fc.split("SupportedStatuses =", 1)[1].split("];", 1)[0] + "]", "ForgedCards.SupportedStatuses")
+    check('"vigor", "double_damage"' in fc.split("SupportedStatuses =", 1)[1].split("];", 1)[0], "ForgedCards.SupportedStatuses")
     check(fc.count('"vigor" => "Vigor", "double_damage" => "Double Damage"') == 2, "both ForgedCards name maps")
     check(not list(MOD_CODE.glob("Powers/*NextAttack*")), "no new power class was written (the base game's are used)")
     for sid in ("vigor", "double_damage"):

@@ -42,7 +42,18 @@ public static class ForgedCards
     /// v10 (forged statuses, Phase J): + CharacterSpec.StatusPool (a class's ≤4 custom modifier-family statuses
     /// read from `status_pool`; see ForgedCharacters / ForgedStatusPower). Class cards may apply a custom status
     /// by pool name via the `apply_status_custom` op (class-only, like custom-orb channels).</summary>
-    public const int VocabVersion = 63; // 63: Phase BK (VOCAB_EXPANSION_6, gap #65) — HIT-COUNT SCALING: a new damage
+    public const int VocabVersion = 64; // 64: Phase BL (VOCAB_EXPANSION_6, gaps #66/#67) — ENEMY STRENGTH LOSS, STRIP, DOOM:
+                                        //     statuses `temp_strength_down` (Piercing Wail — our Debuff-typed
+                                        //     ForgedTempStrengthDownPower, restored at the ENEMY's turn end; Artifact eats the
+                                        //     whole shell), `strength_down` (Malaise — permanent, applied as a NEGATIVE
+                                        //     StrengthPower via the literal path, var "StrengthLoss") and `doom` (the base
+                                        //     DoomPower: dies at the end of its turn when HP <= Doom; never decays; Blight Strike
+                                        //     = scale damage_dealt_unblocked; Time's Up = target_status_stacks status doom;
+                                        //     target_has_status doom). Flag-ops `strip_block` / `strip_artifact` (Expose:
+                                        //     single-enemy, card-only, BEFORE the debuff). Strength Down + Doom count as debuffs
+                                        //     (target_debuff_count / spread_debuffs). Caps: temp 9, permanent 3, Doom 12 (5 in a
+                                        //     payload). No codec change.
+                                        // 63: Phase BK (VOCAB_EXPANSION_6, gap #65) — HIT-COUNT SCALING: a new damage (VOCAB_EXPANSION_6, gap #65) — HIT-COUNT SCALING: a new damage
                                         //     FIELD `hits_scale` sets the HIT COUNT from a live read (the base CalculatedHits
                                         //     recipe — Finisher / Flechettes; `x` = ResolveEnergyXValue, Whirlwind / Skewer,
                                         //     joins the X-cost coupling). Sources: `x`, `attacks_played_this_turn`,
@@ -489,11 +500,13 @@ public static class ForgedCards
          "transform_card", // Phase AH (gaps #35/#38): played card PERMANENTLY becomes the named same-class card for the rest of the run (self-rewrite / mode-swap). Card-only.
          "spend_forge", // Phase AX (v53, gap #44): SPEND Forge as a card's price (the cash-out half of the ramp). Forge-class, card-only.
          "spread_debuffs", // Phase AX (v53, gaps #45-#47): copy the struck target's debuffs to every OTHER living enemy. Card-only.
+         "strip_block", "strip_artifact", // Phase BL (v64, gap #66): Expose — the target loses all Block / its Artifact. Card-only, single-enemy.
          "graft_card", // Phase AI (gap #7): CHOOSE form of transform_card — pick a card in hand, IT permanently becomes the named same-class card for the rest of the run. Card-only.
          "exhaust_card", // Phase BC (v57, gap #52): exhaust OTHER cards in your hand (choose / random / up_to / all, optional card_type filter). Card-only.
          "draw_until", // Phase BC (v57, gap #53): draw until you draw a card of `card_type` (Pillage = non_attack). Card-only.
          "held_discount", // Phase BD (v58, gap #58): flag-op — costs N less for the combat per turn it is retained (Sands of Time). Card-only, needs retain.
          "apply_custom", // EXPLORE SPIKE: apply a hardcoded modifier-family custom status (not in LLM contract)
+         "gaptest_enemy_artifact", // PHASE BL GAPTEST (not in the LLM contract): N Artifact on the card's target(s) — the sign-flip smoke
          "summon_spike"]; // PHASE K SPIKE: summon a hardcoded player pet (not in LLM contract)
     // Phase H3/H4: the trigger kinds. turn_start/turn_end fire every turn; ripen is a one-shot countdown; the rest
     // are REACTIVE (H4) — they mirror the ForgedRelic hooks and can fire many times a turn (see ForgedTriggerPower).
@@ -540,13 +553,20 @@ public static class ForgedCards
     // resolved enemies; no target = the first living enemy) and apply_status_custom (a custom DEBUFF lands on the
     // resolved enemies; an untargeted apply_status_custom is the self-buff form).
     private static readonly HashSet<string> TriggerTargetedOps = ["damage", "apply_status", "summon_attack", "apply_status_custom"];
-    private static readonly HashSet<string> EnemyDebuffStatuses = ["vulnerable", "weak", "frail", "poison"];
+    private static readonly HashSet<string> EnemyDebuffStatuses = ["vulnerable", "weak", "frail", "poison",
+        "temp_strength_down", "doom"]; // Phase BL (v64): payload-legal enemy debuffs (the permanent strength_down is card-only)
     private static readonly HashSet<string> SupportedStatuses =
         ["vulnerable", "weak", "frail", "poison",
          "strength", "dexterity", "thorns", "regen", "metallicize", "artifact", "buffer",
          "intangible", "ritual", "blur", "temp_strength", "temp_dexterity", "barricade", "focus",
          "temp_thorns", "temp_focus", // Phase AN (v44): one-turn Thorns / Focus (removed at the end of your turn)
-         "vigor", "double_damage"]; // Phase BF (v60, gap #54): the base game's VigorPower / DoubleDamagePower
+         "vigor", "double_damage", // Phase BF (v60, gap #54): the base game's VigorPower / DoubleDamagePower
+         "temp_strength_down", "strength_down", "doom"]; // Phase BL (v64, gaps #66/#67): enemy Strength loss + Doom
+    // Phase BL (v64): the per-effect caps (plan §7 decision 6: Doom 12 per card; strength_down 3 permanent / 9 temporary).
+    // A payload Doom fires every turn and never decays, so it caps at 5 per fire. Lockstep with validator._BL_STATUS_CAPS.
+    private static readonly Dictionary<string, int> BlStatusCaps =
+        new() { ["temp_strength_down"] = 9, ["strength_down"] = 3, ["doom"] = 12 };
+    private const int PayloadDoomMax = 5;
     // Phase AN (v44): the gain_max_hp cap (Feed is +3/+4; a run-permanent stat, so the band is tight). Lockstep with
     // validator._GAIN_MAX_HP_MAX and the schema clause.
     private const int GainMaxHpMaxAmount = 5;
@@ -673,7 +693,8 @@ public static class ForgedCards
         ["x", "attacks_played_this_turn", "cards_in_hand", "skills_in_hand", "plays_this_combat",
          "exhaust_pile_size", "hp_loss_events_this_combat", "energy_spent_this_turn", "orb_count"];
     // Phase BJ (v62): the statuses target_status_stacks may read (Bully = Vulnerable; Weak; Poison).
-    internal static readonly HashSet<string> StatusStackStatuses = ["vulnerable", "weak", "poison"];
+    internal static readonly HashSet<string> StatusStackStatuses = ["vulnerable", "weak", "poison",
+        "doom"]; // Phase BL (v64, gap #67): Time's Up — damage equal to the enemy's Doom
     // Phase BJ (v62): to_hand_size's amount is the target hand size (the hand holds at most 10).
     private const int MinHandSizeTarget = 2, MaxHandSizeTarget = 10;
     // The scalars a trigger payload may use — PLAYER-level reads only (a trigger fires with no card, so `x` and the
@@ -1117,6 +1138,11 @@ public static class ForgedCards
                 return $"'once_per_combat' only applies to add_trigger (op '{e.Op}').";
             if (e.Op == "apply_status" && (e.Status == null || !SupportedStatuses.Contains(e.Status)))
                 return $"unsupported status '{e.Status}'.";
+            // Phase BL (v64): the enemy Strength-loss / Doom bands (a scaled Blight-Strike Doom reads the damage dealt).
+            if (e.Op == "apply_status" && !e.IsScaled && BlStatusCaps.TryGetValue(e.Status!, out int blCap) && e.Amount > blCap)
+                return $"apply_status '{e.Status}' amount may be at most {blCap}; got {e.Amount}.";
+            if (e.Op == "apply_status" && BlStatusCaps.ContainsKey(e.Status!) && target == TargetType.Self)
+                return $"apply_status '{e.Status}' is an enemy debuff — the card needs an enemy target (enemy / all_enemies / random_enemy).";
             if (AmountOps.Contains(e.Op) && !e.IsScaled && e.Amount < 1)
                 return $"op '{e.Op}' needs amount >= 1.";
             if (e.Hits < 1)
@@ -1198,8 +1224,11 @@ public static class ForgedCards
                 // (F5 hand/energy reads + M's additive "forged") stays damage/block/draw.
                 if (e.Scale == "damage_dealt_unblocked")
                 {
-                    if (e.Op != "heal")
-                        return "'scale:damage_dealt_unblocked' only applies to heal (lifesteal — heal the unblocked damage this card dealt).";
+                    // Phase BL (v64, gap #67): + apply_status doom (Blight Strike — Doom equal to the unblocked damage dealt).
+                    if (e.Op != "heal" && !(e.Op == "apply_status" && e.Status == "doom"))
+                        return "'scale:damage_dealt_unblocked' only applies to heal (lifesteal) or apply_status doom (Blight Strike).";
+                    if (e.Op == "apply_status" && target != null && target != TargetType.AnyEnemy)
+                        return "a 'scale:damage_dealt_unblocked' Doom needs a single-enemy card (target \"enemy\") — it dooms the enemy it struck.";
                 }
                 else if (e.Scale == "target_debuff_count")
                 {
@@ -1519,6 +1548,15 @@ public static class ForgedCards
                 if (target != null && target != TargetType.AnyEnemy)
                     return "spread_debuffs needs a single-enemy card (target \"enemy\") — it copies the CHOSEN target's debuffs to the others.";
             }
+            // Phase BL (v64, gap #66): the Expose flag-ops act on the CHOSEN enemy (single-enemy cards only, like
+            // spread_debuffs) and carry nothing of their own. Card-only: not in TriggerOps.
+            if (e.Op is "strip_block" or "strip_artifact")
+            {
+                if (e.Amount != 0 || e.Status != null || e.IsScaled || e.Hits > 1)
+                    return $"{e.Op} is a flag-op (no amount / status / scale / hits).";
+                if (target != null && target != TargetType.AnyEnemy)
+                    return $"{e.Op} needs a single-enemy card (target \"enemy\") — it strips the CHOSEN enemy.";
+            }
             if (e.When != null)
             {
                 var cerr = Conditions.Validate(e.When);
@@ -1586,6 +1624,22 @@ public static class ForgedCards
             return "at most one 'spend_forge' effect per card (one cash-out per play).";
         if (effects.Count(e => e.Op == "spread_debuffs") > 1 || (upgrade ?? []).Count(e => e.Op == "spread_debuffs") > 1)
             return "at most one 'spread_debuffs' effect per card (the debuffs only need copying once).";
+        // Phase BL (v64, gaps #66/#67): one strip_block / strip_artifact / permanent strength_down per effect list (its
+        // "StrengthLoss" var is one key), and the strips come BEFORE every enemy debuff on the card (the Expose order —
+        // a debuff placed first would be eaten by the Artifact the strip is there to remove).
+        foreach (var list in new[] { effects, upgrade })
+        {
+            if (list == null) continue;
+            foreach (var one in new[] { "strip_block", "strip_artifact" })
+                if (list.Count(e => e.Op == one) > 1)
+                    return $"at most one '{one}' effect per card.";
+            if (list.Count(e => e.Op == "apply_status" && e.Status == "strength_down") > 1)
+                return "at most one 'strength_down' effect per card (raise the amount instead).";
+            for (int i = 0; i < list.Length; i++)
+                if (list[i].Op is "strip_block" or "strip_artifact"
+                    && list.Take(i).Any(q => q.Op == "apply_status" && q.Status != null && !EffectRunner.SelfBuffStatuses.Contains(q.Status)))
+                    return $"'{list[i].Op}' must come BEFORE the card's debuffs (the Expose order: strip, then debuff).";
+        }
         // Phase AX (v53): spend_forge is the PRICE half of a card, so it may never be the whole card — the rest of
         // the effect list is what the Forge buys (mirrors the sacrifice_summon rule).
         foreach (var list in new[] { effects, upgrade })
@@ -1653,9 +1707,9 @@ public static class ForgedCards
         {
             if (list == null) continue;
             for (int i = 0; i < list.Length; i++)
-                if (list[i].Op == "heal" && list[i].Scale == "damage_dealt_unblocked"
+                if (list[i].Op is "heal" or "apply_status" && list[i].Scale == "damage_dealt_unblocked" // Phase BL: + Blight Strike Doom
                     && !list.Take(i).Any(p => p.Op == "damage"))
-                    return "a 'scale:damage_dealt_unblocked' heal needs a 'damage' op earlier in the same card (you heal the damage you dealt).";
+                    return "a 'scale:damage_dealt_unblocked' heal / Doom needs a 'damage' op earlier in the same card (it reads the damage you dealt).";
         }
         // Phase AX (v53, gap #44): a `when:forged_ge` gate reads the LIVE Forge counter at execution time, and
         // effects resolve top-to-bottom — so a gated payoff placed AFTER the spend_forge that empties the counter
@@ -1854,6 +1908,11 @@ public static class ForgedCards
                 if (t.Op == "apply_status" && (t.Status == null || !EnemyDebuffStatuses.Contains(t.Status)))
                     return $"a targeted trigger apply_status must be an enemy debuff " +
                            $"({string.Join("/", EnemyDebuffStatuses)}); got '{t.Status}'.";
+                // Phase BL (v64): the payload bands — a per-fire Doom never decays, so it caps at PayloadDoomMax.
+                if (t.Op == "apply_status" && t.Status == "doom" && t.Amount > PayloadDoomMax)
+                    return $"a trigger apply_status 'doom' may apply at most {PayloadDoomMax} per fire; got {t.Amount}.";
+                if (t.Op == "apply_status" && t.Status == "temp_strength_down" && t.Amount > BlStatusCaps["temp_strength_down"])
+                    return $"a trigger apply_status 'temp_strength_down' may be at most {BlStatusCaps["temp_strength_down"]}; got {t.Amount}.";
                 // Phase AL (v42): a targeted payload DAMAGE may be scaled ("deal damage equal to the cards in your hand
                 // to ALL enemies"); a targeted debuff / summon strike / custom status stays literal.
                 if (t.IsScaled && t.Op != "damage")
@@ -2065,6 +2124,7 @@ public static class ForgedCards
         "focus" => "Focus",
         "temp_thorns" => "Thorns", "temp_focus" => "Focus", // Phase AN (v44): worded like the temp stats
         "vigor" => "Vigor", "double_damage" => "Double Damage", // Phase BF (v60)
+        "temp_strength_down" => "Strength Down", "strength_down" => "Strength Down", "doom" => "Doom", // Phase BL (v64)
         _ => status ?? "",
     };
 
@@ -2196,6 +2256,9 @@ public static class ForgedCards
                 case "sacrifice_summon": parts.Add("Sacrifice your summon."); break; // Phase AV (v52): flag-op sentence (byte-lockstep with cardgen.py)
                 case "spend_forge": parts.Add($"Spend {Math.Max(1, e.Amount)} Forge."); break; // Phase AX (v53, gap #44): literal (no var), byte-lockstep with cardgen.py
                 case "spread_debuffs": parts.Add("Copy the target's debuffs to all other enemies."); break; // Phase AX (v53, gaps #45-#47)
+                case "strip_block":    parts.Add("Remove all of the enemy's Block."); break; // Phase BL (v64, gap #66): byte-lockstep with cardgen.py
+                case "strip_artifact": parts.Add("Remove the enemy's Artifact."); break;     // Phase BL (v64, gap #66)
+                case "gaptest_enemy_artifact": parts.Add($"Enemies gain {Math.Max(1, e.Amount)} Artifact (gap test)."); break; // PHASE BL GAPTEST only
                 case "corruption":  parts.Add("Your Skills cost 0."); parts.Add("Your Skills Exhaust when played."); break; // Phase AB (gap #20)
                 case "cost_shift":  parts.Add(CostShiftSentence(e)); break; // Phase AO (v45): the discount sentence (literal, no var)
                 case "blade_empower": parts.Add($"Your blade deals {Math.Max(2, e.Amount)}x damage this turn."); break; // Phase AF (gap #41)
@@ -2268,7 +2331,19 @@ public static class ForgedCards
                     // Self-buffs are worded "Gain"; debuffs are "Apply"-ed to the target. SelfBuffStatuses is the
                     // single source of truth (shared with EffectRunner) so wording matches actual targeting.
                     bool buff = EffectRunner.SelfBuffStatuses.Contains(e.Status ?? "");
-                    parts.Add($"{(buff ? "Gain" : "Apply")} {name}{(buff ? "" : dmgSuffix)}."); // AJ: random_enemy suffix too
+                    // Phase BL (v64): the permanent Strength loss reads like Malaise / Piercing Wail's text ("The enemy loses
+                    // {StrengthLoss} Strength."), and Blight Strike's Doom reads the damage dealt. Lockstep with cardgen.describe.
+                    if (e.Status == "strength_down")
+                        parts.Add(target switch
+                        {
+                            TargetType.AllEnemies => "ALL enemies lose {StrengthLoss} Strength.",
+                            TargetType.RandomEnemy => "A random enemy loses {StrengthLoss} Strength.",
+                            _ => "The enemy loses {StrengthLoss} Strength.",
+                        });
+                    else if (e.Status == "doom" && e.Scale == "damage_dealt_unblocked")
+                        parts.Add("Apply Doom equal to the unblocked damage dealt.");
+                    else
+                        parts.Add($"{(buff ? "Gain" : "Apply")} {name}{(buff ? "" : dmgSuffix)}."); // AJ: random_enemy suffix too
                     break;
             }
             // Phase H: weave the condition into the gated effect's sentence ("… if your orbs match.").
@@ -2561,6 +2636,7 @@ public static class ForgedCards
         "focus" => "Focus",
         "temp_thorns" => "Thorns", "temp_focus" => "Focus", // Phase AN (v44)
         "vigor" => "Vigor", "double_damage" => "Double Damage", // Phase BF (v60)
+        "temp_strength_down" => "Strength Down", "strength_down" => "Strength Down", "doom" => "Doom", // Phase BL (v64)
         _ => status ?? "",
     };
 

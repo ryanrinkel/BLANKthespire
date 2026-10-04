@@ -695,7 +695,7 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Mechanic sketch:** `apply_status temp_strength_down` (until the end of the enemy's turn; the wrapper power MUST be a Debuff so Artifact blocks the whole thing) → "Apply Strength Down."; `strength_down` (permanent, a literal negative Strength apply under its own `StrengthLoss` var) → "The enemy loses {StrengthLoss} Strength." / "ALL enemies lose …"; flag-ops `strip_block` ("Remove all of the enemy's Block.") and `strip_artifact` ("Remove the enemy's Artifact."), single-enemy, card-only, ordered before the debuff. Caps ≤ 3 permanent / ≤ 9 temporary. Default (plan §7): Strength Down counts as a debuff for `spread_debuffs` / `target_debuff_count` (base Misery copies it).
 - **Buildable today?** No — `strength` is self-only and the custom-status path is buff-only.
 - **Priority:** High — the Artifact sign-flip is the wave's biggest correctness risk, so the tester must face an Artifact enemy.
-- **Status:** **planned (Wave 6, Phase BL, vocab v64)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BL.
+- **Status:** **done (2026-10-04, vocab v64, Phase BL)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BL.
 
 ### 67. Doom (execute debuff)
 - **Surfaced by:** base-game audit (2026-10-01), "Doom" row: `Scourge`, `Deathbringer`, `BlightStrike`, `NoEscape`, `TimesUp`, `EndOfDays`, `CountdownPower`, `ReaperFormPower` (13 cards, Necrobinder).
@@ -703,7 +703,7 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Mechanic sketch:** enemy debuff `doom` (base `DoomPower`: kills at the end of ITS turn if HP ≤ Doom, never decays, respects bosses), wired everywhere `poison` is (card, trigger payload, relic, `target_has_status`, `target_debuff_count`); `apply_status status:doom` with `scale:"damage_dealt_unblocked"` (BlightStrike); `target_status_stacks status:doom` comes from #63. Describe: "Apply Doom." / "Apply Doom equal to the unblocked damage dealt."; condition "the enemy has doom". Default (plan §7): cap 12 per card, ≤ 4 Doom cards per class, rare for ≥ 10.
 - **Buildable today?** No.
 - **Priority:** High — gives any class Necrobinder's execute axis.
-- **Status:** **planned (Wave 6, Phase BL, vocab v64)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BL.
+- **Status:** **done (2026-10-04, vocab v64, Phase BL)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BL.
 
 ### 68. Self-drawback statuses (price-for-power debuffs on yourself)
 - **Surfaced by:** base-game audit (2026-10-01), "Self-drawback debuffs" row: `BattleTrance`, `BulletTime`, `ExpectAFight`, `PanicButton`, `WraithForm`, `BiasedCognition`, `Hyperbeam`, `Friendship`, `SharedFate` (15 cards).
