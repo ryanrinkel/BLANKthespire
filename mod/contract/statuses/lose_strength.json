@@ -1,0 +1,6 @@
+{
+  "id": "lose_strength",
+  "name": "Strength Loss",
+  "kind": "debuff",
+  "decay": "none"
+}

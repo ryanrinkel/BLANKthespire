@@ -1,0 +1,6 @@
+{
+  "id": "no_energy_gain",
+  "name": "No Energy Gain",
+  "kind": "debuff",
+  "decay": "turn"
+}

@@ -1,0 +1,6 @@
+{
+  "id": "lose_dexterity",
+  "name": "Dexterity Loss",
+  "kind": "debuff",
+  "decay": "none"
+}

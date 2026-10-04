@@ -481,6 +481,22 @@ const STATUS_NAMES = {
   temp_thorns: "Thorns (this turn)", temp_focus: "Focus (this turn)", // Phase AN (v44)
   vigor: "Vigor", double_damage: "Double Damage", // Phase BF (v60, gap #54)
   temp_strength_down: "Strength Down (this turn)", strength_down: "Strength (permanent loss)", doom: "Doom", // Phase BL (v64)
+  // Phase BM (v65, gaps #68/#69): the self statuses (their phrases are BM_PHRASES below)
+  no_draw: "No Draw", no_energy_gain: "No Energy Gain", no_block_gain: "No Block", dex_decay: "Wraith Form",
+  focus_decay: "Biased Cognition", lose_strength: "Strength", lose_dexterity: "Dexterity", lose_focus: "Focus",
+  echo_form: "Echo Form",
+};
+// Phase BM (v65, gaps #68/#69): the self-drawbacks + Echo Form read like the card text (lockstep with cardgen._BM_SENTENCES).
+const BM_PHRASES = {
+  no_draw: () => "You cannot draw additional cards this turn",
+  no_energy_gain: () => "You cannot gain energy this turn",
+  no_block_gain: (a) => `You cannot gain Block from cards for ${a ?? ""} turns`,
+  dex_decay: (a) => `At the start of your turn, lose ${a ?? ""} Dexterity`,
+  focus_decay: (a) => `At the start of your turn, lose ${a ?? ""} Focus`,
+  lose_strength: (a) => `Lose ${a ?? ""} Strength`,
+  lose_dexterity: (a) => `Lose ${a ?? ""} Dexterity`,
+  lose_focus: (a) => `Lose ${a ?? ""} Focus`,
+  echo_form: () => "The first card you play each turn is played twice",
 };
 const TRIGGER_PREFIX = {
   turn_start: "At the start of each turn", turn_end: "At the end of each turn",
@@ -633,6 +649,16 @@ function effPhrase(e, target) {
     case "spread_debuffs": return "Copy the target's debuffs to all other enemies"; // Phase AX (v53, gaps #45-#47)
     case "strip_block": return "Remove all of the enemy's Block"; // Phase BL (v64, gap #66): Expose, lockstep with cardgen.describe
     case "strip_artifact": return "Remove the enemy's Artifact"; // Phase BL (v64, gap #66)
+    case "replay_next": { // Phase BM (v65, gap #69): lockstep with cardgen._replay_next_sentence
+      const kind = e.card_type || "skill";
+      const single = { attack: "Attack", power: "Power", all: "card" }[kind] || "Skill";
+      const n = Math.max(1, e.count || 1);
+      const what = n > 1 ? `your next ${n} ${single}s are` : `your next ${single} is`;
+      return kind === "power" ? `${what[0].toUpperCase()}${what.slice(1)} played twice` : `This turn, ${what} played twice`;
+    }
+    case "block_next_turn": // Phase BM (v65, gap #70): Prolong
+      return e.scale === "block" ? "Next turn, gain Block equal to your current Block" : `Next turn, gain ${a ?? ""} Block`;
+    case "retain_hand": return "Retain your hand this turn"; // Phase BM (v65, gap #70): Equilibrium
     case "exhaust": return "Exhaust";
     case "innate": return "Innate";
     case "retain": return "Retain";
@@ -646,6 +672,7 @@ function effPhrase(e, target) {
         return target === "all_enemies" ? `ALL enemies lose ${a ?? ""} Strength`
              : target === "random_enemy" ? `A random enemy loses ${a ?? ""} Strength` : `The enemy loses ${a ?? ""} Strength`;
       if (e.status === "doom" && e.scale === "damage_dealt_unblocked") return "Apply Doom equal to the unblocked damage dealt";
+      if (BM_PHRASES[e.status]) return BM_PHRASES[e.status](a); // Phase BM (v65)
       return target === "self" ? `Gain ${a ?? ""} ${statusName(e.status)}`
                                : `Apply ${a ?? ""} ${statusName(e.status)}${toAll}`;
     case "apply_status_custom": return `Apply ${a ?? ""} ${e.status_name || "status"}`;

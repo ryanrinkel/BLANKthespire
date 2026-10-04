@@ -404,11 +404,12 @@ BP_TRIADS = (
 )
 BP_READING = 108_282          # the untrimmed v2 path (= the `full` rollback with no selection) — 2026-09-30, Wave 5
 BP_READING_V1 = 108_179       # flag-off (informational)
-BP_READING_SCAFFOLD = 46_385  # BP_READING minus VOCABULARY.md: the `full` path's scaffold half, snapshotted by (e)
+BP_READING_SCAFFOLD = 46_686  # BP_READING minus VOCABULARY.md: the `full` path's scaffold half, snapshotted by (e)
                               # (45,537 at BH-3; +136 Phase BI v61: the TRIGGERS pitch's one-line filter sentence;
                               # +227 Phase BJ v62: the SCALED AMOUNTS history-reads sentence + the two new `when` names
                               # in the conditions pitch; +145 Phase BK v63: the SCALED AMOUNTS hit-count sentence; +340 Phase BL
-                              # v64: the PRECISION READS enemy-Strength / Expose / Doom sentence)
+                              # v64: the PRECISION READS enemy-Strength / Expose / Doom sentence; +301 Phase BM v65: the
+                              # PRECISION READS prices / replays sentence)
 BP_TREE_READING_SCAFFOLD = 46_323  # INFORMATIONAL reading, not asserted: the scaffold on the all-ops tree path
                                    # (45,789 at BH-3 = 45,537 + the index/detail pointer; 45,951 after BI v61;
                                    # 46,178 after BJ v62; 46,323 after BK v63)

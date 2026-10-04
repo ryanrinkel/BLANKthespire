@@ -432,7 +432,7 @@ At most one scaled damage/block per card.
 PRECISION READS (small, high-leverage scalars/gates — reach for one only when the concept invites it; never \
 sprinkle): LIFESTEAL — a `damage` card may then `heal` for the UNBLOCKED damage it just dealt via \
 `scale:"damage_dealt_unblocked"` on the heal (put the heal AFTER the damage on the SAME card): the Reaper — "Deal \
-8 damage to ALL enemies. Heal HP equal to the unblocked damage dealt." ENEMY STRENGTH / EXPOSE / DOOM (v64) — `temp_strength_down` (Piercing Wail) and `strength_down` (Malaise) blunt enemy attacks; `strip_block` / `strip_artifact` go BEFORE the debuff (Expose); `doom` kills at the end of the enemy's turn once its HP <= Doom (Blight Strike: scale damage_dealt_unblocked; Time's Up: target_status_stacks doom). FLECHETTES — a `damage` card may deal \
+8 damage to ALL enemies. Heal HP equal to the unblocked damage dealt." ENEMY STRENGTH / EXPOSE / DOOM (v64) — `temp_strength_down` (Piercing Wail) and `strength_down` (Malaise) blunt enemy attacks; `strip_block` / `strip_artifact` go BEFORE the debuff (Expose); `doom` kills at the end of the enemy's turn once its HP <= Doom (Blight Strike: scale damage_dealt_unblocked; Time's Up: target_status_stacks doom). PRICES / REPLAYS (v65) — self-drawbacks pay for a strong card (`no_draw` after a big draw, `no_energy_gain`, `no_block_gain`, `dex_decay`, `lose_strength`); `replay_next` / a rare `echo_form` Power play cards twice; `block_next_turn` banks Block (Prolong); `retain_hand` keeps the hand (Equilibrium). FLECHETTES — a `damage` card may deal \
 damage equal to the debuffs on its target via `scale:"target_debuff_count"` (pairs with a Vulnerable/Weak/Frail/\
 Poison shell — more debuffs, bigger hit). GRAND FINALE — gate a splashy rare behind \
 `when:{{"kind":"draw_pile_empty"}}` (fires only once you've drawn your whole deck; pair with heavy draw or a \
@@ -2848,7 +2848,8 @@ def _card_uses_orbs(card: dict) -> bool:
     for e in effs:
         if e.get("op") in _ORB_OPS:
             return True
-        if e.get("op") == "apply_status" and e.get("status") in ("focus", "temp_focus"):  # Phase AN (v44): temp_focus too
+        if e.get("op") == "apply_status" and e.get("status") in ("focus", "temp_focus",  # Phase AN (v44): temp_focus too
+                                                                 "focus_decay", "lose_focus"):  # Phase BM (v65)
             return True
         when = e.get("when")
         if isinstance(when, dict) and when.get("kind") in _ORB_CONDITIONS:

@@ -67,8 +67,9 @@ def test_buildability_flips_with_gap_status() -> None:
     cat = load_catalog()
     live = C.live_vocab_tokens()
     e = cat.by_id["retain_hold"]
-    ok_done, _ = C.resolve_buildability(e.ops, e.gap_refs, live, {5: "done"})
-    ok_cap, reasons = C.resolve_buildability(e.ops, e.gap_refs, live, {5: "captured"})
+    # Phase BM (v65): retain_hold also refs gap #70 (retain_hand), done alongside #5 here
+    ok_done, _ = C.resolve_buildability(e.ops, e.gap_refs, live, {5: "done", 70: "done"})
+    ok_cap, reasons = C.resolve_buildability(e.ops, e.gap_refs, live, {5: "captured", 70: "done"})
     check(ok_done, "retain_hold buildable when gap #5 is done")
     check(not ok_cap, "retain_hold NOT buildable when gap #5 is captured")
     check(any("gap #5" in r for r in reasons), f"reason must name the blocking gap: {reasons}")

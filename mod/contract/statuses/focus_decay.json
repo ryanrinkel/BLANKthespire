@@ -1,0 +1,6 @@
+{
+  "id": "focus_decay",
+  "name": "Biased Cognition",
+  "kind": "debuff",
+  "decay": "none"
+}

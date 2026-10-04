@@ -200,7 +200,7 @@ def _t_contract() -> None:
     check("status" in eff["properties"]["card_type"]["enum"], "schema: card_type admits status")
     check("random_enemy" in schema["$defs"]["triggerEffect"]["properties"]["target"]["enum"], "schema: payload target random_enemy")
     rules = json.dumps(eff.get("allOf", []))
-    check('"enum": ["cost_shift", "exhaust_card", "draw_until", "add_trigger"]' in rules, "schema: card_type admits add_trigger")
+    check('"enum": ["cost_shift", "exhaust_card", "draw_until", "add_trigger"' in rules, "schema: card_type admits add_trigger")  # BM appends replay_next
     check('"required": ["every_n"]' in rules and '"scope": {"const": "this_turn"}' in rules, "schema: every_n + this_turn clauses")
     vocab = paths.VOCABULARY.read_text(encoding="utf-8")
     check('optional filters `card_type` / `every_n` / `scope:"this_turn"` (v61' in vocab, "VOCABULARY add_trigger row names the filters")

@@ -571,6 +571,42 @@ this turn."
 2-Skill hand, Echo Form power, Prolong, Equilibrium. **Tags:** `[BM] self-debuff <status> +N on player (Artifact <a>)`,
 `[BM] replay_next <kind> x<n>` (in `ApplyPowerLogged` :1266) + `[BM] replay play #2 of '<card>'` (from
 `DataCard.BeforeCardPlayed` when `play.PlayIndex > 0`), `[BM] block_next_turn +<n>`, `[BM] retain_hand`.
+**Findings (BM, built 2026-10-04 on `wave6`, smoke pending):** (1) Verify-first held: all twelve base powers (NoDraw,
+NoEnergyGain, NoBlock, WraithForm, BiasedCognition, Burst, OneTwoPunch, SignalBoost, Duplication, EchoForm,
+BlockNextTurn, RetainHand) are sealed, concrete and keyed only off `Owner` — generic on a forged class; `NoBlockPower`
+zeroes CARD Block only (payload / relic Block still lands); DECOMP `ArtifactPower` eats ANY debuff on its owner, so your
+own Artifact negates a self-drawback (DESIGN_HEURISTICS says so). (2) **Rename (rule 0.6): the status is
+`no_block_gain`, not `no_block`** — `no_block` is already a `when` condition kind (VOCABULARY Conditions row,
+`threshold_duelist` ops + base_synergies); a status of the same name took the token's HOME section in the vocabulary
+tree (two BH tree tests failed) and would read ambiguously in archetype ops. `no_block_gain` parallels `no_energy_gain`.
+(3) The nine self statuses are CARD-ONLY: `EffectRunner.SelfDebuffStatuses` (eight) + `BmSelfStatuses` (+ `echo_form`)
+are deliberately NOT in `SelfBuffStatuses`, which every relic / potion / orb / summon / payload validator keys off — so
+none of those paths accepts them (the schema's payload status enum omits them too). Routing = `IsSelfStatus` (self =
+SelfBuff ∪ BmSelf). Cards apply them through ONE literal path, `EffectRunner.ApplyBmSelfStatus` (the lose_* trio as the
+NEGATIVE apply under named vars `SelfStrengthLoss` / `SelfDexterityLoss` / `SelfFocusLoss`, so a `strength_down` on the
+same card keeps its own `StrengthLoss`), logging the player's Artifact before/after. Bands: no_draw / no_energy_gain /
+echo_form amount 1, no_block_gain 2..3 turns, dex_decay / focus_decay 1..2, lose_* 1..5; one of each per card; no_draw
+needs a draw or gain_energy on the same list; echo_form rare Power only. (4) The ops are card-only, one per card:
+`replay_next` reuses cost_shift's `card_type` / `count` fields (count printed literally, so an upgrade may not change
+kind/count; `all` rare-only; never on a Basic); `block_next_turn` fixed 1..20 (var `NextTurnBlock`) or `scale:"block"`
+(your Block when it resolves — put a Block op first, Prolong); `retain_hand` a flag-op (RetainHandPower 1).
+(5) **ForgedCostShiftPower decision: SKIP replays** — `AfterCardPlayed` returns early when `!cardPlay.IsFirstInSeries`
+(PlayIndex > 0): a replay costs nothing, so it must not burn a "next N cards" use (logged `[BM] cost_shift: replay #k
+of '<card>' burns no discount use`). (6) Tags: `[BM] self-debuff <status> +N on player (Artifact <a>[->b, blocked])`,
+`[BM] echo_form applied`, `[BM] replay_next <kind> x<n>` (logged by the op itself, not ApplyPowerLogged — it applies
+literally), `[BM] replay play #<k> of '<card>'` (DataCard.BeforeCardPlayed), `[BM] block_next_turn +<n>
+(scale=<block|fixed>)`, `[BM] retain_hand`, `[BM] decay tick <dex|focus>_decay -N` (the base powers own the tick on
+AfterSideTurnStart; DataCard.AfterSideTurnStart logs once per round — creature powers precede cards in the hook list,
+so the read is post-tick). (7) Not shipped: `end_turn` (§6), `str_decay` (no base power). Smoke limits: AutoSlay never
+pays energy, so `no_energy_gain` is proven APPLIED, never as a denied gain; the Focus drawbacks are orb-class tokens and
+the tester is a normal class (same literal path as the other six). (8) Harness: featured += `replay_window`; coverage
+menus unchanged (a forced self-drawback / Echo Form injection is not a sensible exotic ask); `orb_channel` also claims
+`focus_decay` / `lose_focus`; 13 token claims across seven archetypes (gap_refs #68/#69/#70); exemplars 156 -> 168
+(the Equilibrium exemplar is "Even Keel" — 'equilibrium' is a catalog metaphor); one PRECISION READS sentence (`full`
+scaffold snapshot 46,385 -> 46,686, +301); stale pins updated in test_phase_bi (card_type enum), test_frontend
+(retain_hold also refs #70), test_exemplars (orb class-only map), test_featured (sample). (9) Readings: index 8,483
+(clause cap 72 -> **56**) · per-archetype max 71,633 (`exhaust_pyre`) · per-archetype scaffold max 26,357 · triads
+64,882 / 74,642 / 81,077 · all-ops 122,395 · `full` 114,675.
 
 ### Phase BN — On-kill, random generation, auto-play (v66; gaps #71–#73; ~1½ days) — 38 base cards
 
@@ -862,3 +898,9 @@ raised first for the rest of the wave (0774055: per-archetype 80,000, triads 90,
 web **293**, `test_phase_bl` 215/215. Readings: index 8,065 · per-archetype max 70,043
 (`exhaust_pyre`) · per-archetype scaffold max 26,056 · triads 63,021 / 72,817 / 79,252 · all-ops 120,084 · `full`
 112,782 (scaffold snapshot 46,385, +340). Tester: `generation/tests/gaptest-bl/` (`--validate-only` green).
+
+**Phase BM built 2026-10-04, smoke pending** (on `wave6`, vocab v65; gaps #68–#70; the self status is `no_block_gain` —
+`no_block` is a condition, see Findings (BM)). Merged suite: generation **598**, web **293**, `test_phase_bm` 279/279
+(smoke records pending). Readings: index 8,483 (clause cap 56) · per-archetype max 71,633 (`exhaust_pyre`) ·
+per-archetype scaffold max 26,357 · triads 64,882 / 74,642 / 81,077 · all-ops 122,395 · `full` 114,675 (scaffold
+snapshot 46,686, +301). Tester: `generation/tests/gaptest-bm/` (`--validate-only` green); smoke waits for Ryan.

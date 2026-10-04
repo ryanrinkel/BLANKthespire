@@ -161,6 +161,8 @@ def test_detectors_round_trip() -> None:
         "contagion": _card([{"op": "apply_status", "status": "vulnerable", "amount": 2}, {"op": "spread_debuffs"}]),
         # Phase BL (v64): Expose — strip, then debuff
         "expose_strip": _card([{"op": "strip_block"}, {"op": "strip_artifact"}, {"op": "apply_status", "status": "vulnerable", "amount": 2}]),
+        # Phase BM (v65): the replay window (Burst)
+        "replay_window": _card([{"op": "replay_next", "card_type": "skill", "count": 1}, {"op": "draw", "amount": 1}]),
         # Phase BF (v60): the next-attack spike
         "setup_spike": _card([{"op": "apply_status", "status": "vigor", "amount": 4}, {"op": "draw", "amount": 1}]),
         # Phase BE (v59): the Venom engine

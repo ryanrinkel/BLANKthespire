@@ -1,0 +1,6 @@
+{
+  "id": "dex_decay",
+  "name": "Wraith Form",
+  "kind": "debuff",
+  "decay": "none"
+}

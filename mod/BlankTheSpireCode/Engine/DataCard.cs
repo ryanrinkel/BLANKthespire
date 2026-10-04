@@ -7,6 +7,7 @@ using BlankTheSpire.BlankTheSpireCode.Character;
 using BlankTheSpire.BlankTheSpireCode.Extensions;
 using BlankTheSpire.BlankTheSpireCode.Powers;
 using Godot; // Texture2D (CustomPortrait)
+using MegaCrit.Sts2.Core.Combat; // Phase BM (v65): CombatSide / ICombatState (the decay-tick tag)
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Entities.Players; // Phase BD (v58): Player
@@ -223,6 +224,21 @@ public abstract class DataCard : ConstructedCardModel
                 case "strip_block":           // Phase BL (v64, gap #66): Expose — the target loses all Block in OnPlay (flag-op, no var)
                 case "strip_artifact":        // Phase BL (v64, gap #66): Expose — the target's Artifact is removed in OnPlay (flag-op, no var)
                 case "gaptest_enemy_artifact": // PHASE BL GAPTEST (not in the LLM contract): Artifact on the target(s) in OnPlay
+                // Phase BM (v65, gaps #69/#70): sugar over sealed base powers, applied literally in OnPlay. The PowerVars give the
+                // hover tips only (replay_next's count is printed literally; Prolong's scaled form has no fixed number).
+                case "replay_next":
+                    switch (e.CardKind)
+                    {
+                        case "attack": WithPower<OneTwoPunchPower>(Math.Max(1, e.Count)); break;
+                        case "power":  WithPower<SignalBoostPower>(Math.Max(1, e.Count)); break;
+                        case "all":    WithPower<DuplicationPower>(Math.Max(1, e.Count)); break;
+                        default:       WithPower<BurstPower>(Math.Max(1, e.Count)); break;
+                    }
+                    break;
+                case "block_next_turn":       // "Next turn, gain {NextTurnBlock} Block." (fixed) / scale "block" = your current Block
+                    if (!e.IsScaled) WithPower<BlockNextTurnPower>("NextTurnBlock", e.Amount, up);
+                    break;
+                case "retain_hand":   WithPower<RetainHandPower>(1); break; // "Retain your hand this turn." (hover tip)
                 case "add_card":              // Phase Q (gap #16): generates card copies in OnPlay (no card var)
                 case "retrieve_card":         // Phase AP (v46): returns pile card(s) to hand in OnPlay (literal, no var); text via Describe
                 case "exhaust_card":          // Phase BC (v57, gap #52): exhausts hand cards in OnPlay (literal, no var); text via Describe
@@ -285,6 +301,19 @@ public abstract class DataCard : ConstructedCardModel
                         // (unlike the abstract TemporaryStrengthPower that crashed temp_strength), with shipped loc/icons.
                         case "vigor":          Power<VigorPower>(vname, e.Amount, up); break;         // +N to your next Attack, then consumed
                         case "double_damage":  Power<DoubleDamagePower>(vname, e.Amount, up); break;  // your Attacks deal double this turn (N turns)
+                        // Phase BM (v65, gaps #68/#69): the self-drawbacks + Echo Form (EffectRunner applies them LITERALLY to the
+                        // player). The real powers declare a PowerVar for the hover tip (+ the {NoBlockTurns} / {DexDecay} /
+                        // {FocusDecay} text vars); the permanent stat losses declare a NAMED var only — a Power<StrengthPower> var
+                        // would read positive and collide with a `strength` gain on the same card (the BL strength_down rule).
+                        case "no_draw":        Power<NoDrawPower>(vname, e.Amount, up); break;
+                        case "no_energy_gain": Power<NoEnergyGainPower>(vname, e.Amount, up); break;
+                        case "no_block_gain":       Power<NoBlockPower>(vname ?? "NoBlockTurns", e.Amount, up); break;
+                        case "dex_decay":      Power<WraithFormPower>(vname ?? "DexDecay", e.Amount, up); break;
+                        case "focus_decay":    Power<BiasedCognitionPower>(vname ?? "FocusDecay", e.Amount, up); break;
+                        case "lose_strength":  WithVar("SelfStrengthLoss", e.Amount, up); break;
+                        case "lose_dexterity": WithVar("SelfDexterityLoss", e.Amount, up); break;
+                        case "lose_focus":     WithVar("SelfFocusLoss", e.Amount, up); break;
+                        case "echo_form":      Power<EchoFormPower>(vname, e.Amount, up); break;
                         default:
                             throw new NotSupportedException($"DataCard: unsupported status '{e.Status}'");
                     }
@@ -375,6 +404,47 @@ public abstract class DataCard : ConstructedCardModel
             MainFile.Logger.Info($"[BB] sly: '{Spec.Title ?? Spec.Id}' discarded from hand -> played for free" +
                                  $"{(target != null ? $" at '{target.Monster?.GetType().Name ?? "target"}'" : "")}.");
         return base.BeforeCardAutoPlayed(card, target, type);
+    }
+
+    /// <summary>Phase BM (v65, gap #69): the smoke proof of a REPLAY. The game's play loop (CardModel.OnPlayWrapper) raises
+    /// BeforeCardPlayed once per play of the series; PlayIndex > 0 is a replay granted by Burst / One-Two Punch / Signal
+    /// Boost / Duplication / Echo Form (our replay_next / echo_form). The hook reaches every card in the piles, so only the
+    /// card being played logs.</summary>
+    public override Task BeforeCardPlayed(CardPlay cardPlay)
+    {
+        if (cardPlay.Card == this && cardPlay.PlayIndex > 0)
+            MainFile.Logger.Info($"[BM] replay play #{cardPlay.PlayIndex + 1} of '{Spec.Title ?? Spec.Id}' ({Spec.Type}, " +
+                                 $"{cardPlay.PlayCount} plays in the series).");
+        return base.BeforeCardPlayed(cardPlay);
+    }
+
+    // Phase BM (v65, gap #68): the decay-tick tag fires once per player turn start, from whichever forged card the hook
+    // reaches first (every card in the piles is a listener) — keyed on the combat + round so the deck logs it once.
+    private static object? _bmDecayCombat;
+    private static int _bmDecayRound = -1;
+
+    /// <summary>Phase BM (v65, gap #68): log the base WraithFormPower / BiasedCognitionPower tick (dex_decay / focus_decay).
+    /// The base powers own the tick (AfterSideTurnStart, ThrowingPlayerChoiceContext); the combat lists creature powers
+    /// before cards as hook listeners, so this runs after the tick and reads the post-tick stat.</summary>
+    public override Task AfterSideTurnStart(CombatSide side, IReadOnlyList<Creature> participants, ICombatState combatState)
+    {
+        var me = Owner?.Creature;
+        if (me != null && participants.Contains(me) && (me.HasPower<WraithFormPower>() || me.HasPower<BiasedCognitionPower>()))
+        {
+            int round = me.CombatState?.RoundNumber ?? -1;
+            if (!ReferenceEquals(_bmDecayCombat, combatState) || _bmDecayRound != round)
+            {
+                _bmDecayCombat = combatState;
+                _bmDecayRound = round;
+                if (me.HasPower<WraithFormPower>())
+                    MainFile.Logger.Info($"[BM] decay tick dex_decay -{me.GetPowerAmount<WraithFormPower>()} " +
+                                         $"(round {round}, Dex now {me.GetPowerAmount<DexterityPower>()}).");
+                if (me.HasPower<BiasedCognitionPower>())
+                    MainFile.Logger.Info($"[BM] decay tick focus_decay -{me.GetPowerAmount<BiasedCognitionPower>()} " +
+                                         $"(round {round}, Focus now {me.GetPowerAmount<FocusPower>()}).");
+            }
+        }
+        return base.AfterSideTurnStart(side, participants, combatState);
     }
 
     protected override async Task OnPlay(PlayerChoiceContext choiceContext, CardPlay play)

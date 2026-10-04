@@ -25,7 +25,12 @@ import sys
 import zlib
 from pathlib import Path
 
-VOCAB_VERSION = 64  # must be <= ForgedCards.VocabVersion (64: Phase BL — ENEMY STRENGTH LOSS, STRIP, DOOM: statuses
+VOCAB_VERSION = 65  # must be <= ForgedCards.VocabVersion (65: Phase BM — BASE-POWER STATUSES: card-only self-drawback
+                    # statuses no_draw / no_energy_gain / no_block_gain / dex_decay / focus_decay / lose_strength / lose_dexterity /
+                    # lose_focus (they land on the player), echo_form (rare Power), card-only ops replay_next {card_type,
+                    # count} (Burst / One-Two Punch / Signal Boost / Duplication), block_next_turn {amount | scale block}
+                    # (Prolong) and retain_hand (Equilibrium). No codec change.)
+                    # 64: Phase BL — ENEMY STRENGTH LOSS, STRIP, DOOM: statuses
                     # temp_strength_down (Piercing Wail), strength_down (Malaise, permanent) and doom (dies at the end of
                     # its turn when HP <= Doom; Blight Strike = scale damage_dealt_unblocked, Time's Up =
                     # target_status_stacks doom, target_has_status doom), flag-ops strip_block / strip_artifact

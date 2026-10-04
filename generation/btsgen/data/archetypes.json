@@ -5,7 +5,7 @@
       "id": "retain_hold",
       "name": "Retain / hold & build",
       "description": "Hold cards turn after turn, curate the perfect hand, then unleash it once the payoff is ready.",
-      "build_notes": "What players love here (the Watcher's Windmill Strike, Sands of Time and Establishment; Well-Laid Plans): patience that visibly pays off, and a hand that works as a curated toolkit. Give cards `retain`, bonuses for having been held (`retained_last_turn`), payoffs that read how many cards were held (`cards_retained`), and payoffs ON the held card itself (v58: a damage/Block `grow_held` that climbs each turn it stays in hand - Windmill Strike; a `held_discount` bomb that gets cheaper each held turn - Sands of Time), and enough defense to survive the build-up turns.",
+      "build_notes": "What players love here (the Watcher's Windmill Strike, Sands of Time and Establishment; Well-Laid Plans): patience that visibly pays off, and a hand that works as a curated toolkit. Give cards `retain`, bonuses for having been held (`retained_last_turn`), payoffs that read how many cards were held (`cards_retained`), and payoffs ON the held card itself (v58: a damage/Block `grow_held` that climbs each turn it stays in hand - Windmill Strike; a `held_discount` bomb that gets cheaper each held turn - Sands of Time), and enough defense to survive the build-up turns. `retain_hand` (v65, Equilibrium) keeps the whole hand this turn.",
       "metaphors": [
         "the held breath",
         "coiling",
@@ -40,14 +40,16 @@
           "scale",
           "add_trigger",
           "grow_held",
-          "held_discount"
+          "held_discount",
+          "retain_hand"
         ],
         "class_kind": "normal"
       },
       "mechanic_kind": "retain",
       "buildable": true,
       "gap_refs": [
-        "VOCABULARY_GAPS#5"
+        "VOCABULARY_GAPS#5",
+        "VOCABULARY_GAPS#70"
       ],
       "base_synergies": {
         "hooks": [
@@ -831,13 +833,15 @@
           "add_trigger",
           "scale",
           "temp_strength_down",
-          "strength_down"
+          "strength_down",
+          "block_next_turn"
         ],
         "class_kind": "normal"
       },
       "buildable": true,
       "gap_refs": [
-        "VOCABULARY_GAPS#66"
+        "VOCABULARY_GAPS#66",
+        "VOCABULARY_GAPS#70"
       ],
       "base_synergies": {
         "hooks": [
@@ -941,7 +945,7 @@
           "Weak to enemy scaling"
         ]
       },
-      "build_notes": "Enemy Strength loss (v64) is Block's twin: `temp_strength_down` (Piercing Wail) blunts the hit you are about to take, `strength_down` (Malaise) every hit after."
+      "build_notes": "Enemy Strength loss (v64) is Block's twin: `temp_strength_down` (Piercing Wail) blunts the hit you are about to take, `strength_down` (Malaise) every hit after. Next-turn Block (v65): `block_next_turn` banks Block for next turn (Prolong: scale block)."
     },
     {
       "id": "strength_berserk",
@@ -1248,12 +1252,16 @@
           "evoke",
           "gain_orb_slot",
           "focus",
-          "temp_focus"
+          "temp_focus",
+          "focus_decay",
+          "lose_focus"
         ],
         "class_kind": "orb"
       },
       "buildable": true,
-      "gap_refs": [],
+      "gap_refs": [
+        "VOCABULARY_GAPS#68"
+      ],
       "base_synergies": {
         "hooks": [
           "powers_played",
@@ -1313,7 +1321,8 @@
           "Few shared-pool orb payoffs",
           "Slot-limited"
         ]
-      }
+      },
+      "build_notes": "Focus drawbacks (v65): `focus_decay` (Biased Cognition: big Focus now, less every turn) and `lose_focus` (Hyperbeam) price a burst."
     },
     {
       "id": "slot_machine",
@@ -1759,12 +1768,17 @@
           "lose_hp",
           "heal",
           "apply_status",
-          "scale"
+          "scale",
+          "lose_strength",
+          "no_block_gain",
+          "dex_decay"
         ],
         "class_kind": "normal"
       },
       "buildable": true,
-      "gap_refs": [],
+      "gap_refs": [
+        "VOCABULARY_GAPS#68"
+      ],
       "base_synergies": {
         "hooks": [
           "hp_loss",
@@ -1838,7 +1852,8 @@
           "Risky in long acts",
           "Needs reliable healing"
         ]
-      }
+      },
+      "build_notes": "Self-drawbacks (v65) are prices like `lose_hp`: `lose_strength` (Friendship), `no_block_gain` (Panic Button), `dex_decay` (Wraith Form)."
     },
     {
       "id": "debuff_expose",
@@ -2122,13 +2137,16 @@
           "apply_status",
           "scale",
           "card_type",
-          "every_n"
+          "every_n",
+          "echo_form",
+          "replay_next"
         ],
         "class_kind": "normal"
       },
       "buildable": true,
       "gap_refs": [
-        "VOCABULARY_GAPS#62"
+        "VOCABULARY_GAPS#62",
+        "VOCABULARY_GAPS#69"
       ],
       "base_synergies": {
         "hooks": [
@@ -2216,7 +2234,8 @@
           "Slow setup",
           "Dead draws late in a fight"
         ]
-      }
+      },
+      "build_notes": "Replays (v65): a rare `echo_form` Power (first card each turn plays twice) and `replay_next` power (your next Power plays twice)."
     },
     {
       "id": "countdown_ripen",
@@ -2995,7 +3014,7 @@
       "id": "big_energy",
       "name": "Overload / mana ramp",
       "description": "Ramp your energy, then spend it on big, expensive cards and X-cost spells.",
-      "build_notes": "The mana-ramp class: energy generation and cost reduction first, then 2-3 cost cards and X-cost spells (`\"cost\": \"X\"` with `scale:\"x\"`) as the payoffs, with card draw to keep the big cards coming. X-cost cards are the signature: give the class a few that scale well with a big energy turn. Energy payoffs (v62): `energy_spent_this_turn` (Helix Drill) and `gain_energy` with scale `energy` (Double Energy). Whirlwind (v63): an X-cost attack with `hits_scale:\"x\"` hits X times.",
+      "build_notes": "The mana-ramp class: energy generation and cost reduction first, then 2-3 cost cards and X-cost spells (`\"cost\": \"X\"` with `scale:\"x\"`) as the payoffs, with card draw to keep the big cards coming. X-cost cards are the signature: give the class a few that scale well with a big energy turn. Energy payoffs (v62): `energy_spent_this_turn` (Helix Drill) and `gain_energy` with scale `energy` (Double Energy). Whirlwind (v63): an X-cost attack with `hits_scale:\"x\"` hits X times. Drawbacks (v65): `no_draw` after a big draw (Battle Trance), `no_energy_gain` after an energy burst (Expect a Fight).",
       "metaphors": [
         "the surge",
         "overload",
@@ -3032,14 +3051,17 @@
           "energy_ge",
           "energy_spent_this_turn",
           "energy",
-          "hits_scale"
+          "hits_scale",
+          "no_draw",
+          "no_energy_gain"
         ],
         "class_kind": "normal"
       },
       "buildable": true,
       "gap_refs": [
         "VOCABULARY_GAPS#63",
-        "VOCABULARY_GAPS#65"
+        "VOCABULARY_GAPS#65",
+        "VOCABULARY_GAPS#68"
       ],
       "base_synergies": {
         "hooks": [
@@ -3798,7 +3820,7 @@
       "id": "burst_window",
       "name": "Glass tempest / temp-stat burst",
       "description": "Sculpt the perfect hand over a few turns, then cash it in on one huge, stat-spiked turn.",
-      "build_notes": "Touchstone: Slay the Spire 1 Flex builds, where temporary Strength meets a hand full of attacks. The identity is SETUP: draw, retain and energy tools that let the player assemble the right hand, then temporary stat spikes (`temp_strength`, `temp_dexterity`, `temp_thorns`, `vigor` for one big attack; a rare `double_damage` turn) and cheap or multi-hit attacks that cash them in on the same turn. The player builds this moment; it isn't handed to them.",
+      "build_notes": "Touchstone: Slay the Spire 1 Flex builds, where temporary Strength meets a hand full of attacks. The identity is SETUP: draw, retain and energy tools that let the player assemble the right hand, then temporary stat spikes (`temp_strength`, `temp_dexterity`, `temp_thorns`, `vigor` for one big attack; a rare `double_damage` turn) and cheap or multi-hit attacks that cash them in on the same turn. The player builds this moment; it isn't handed to them. Replays (v65): `replay_next` makes the next Skills / Attacks play twice (Burst); `no_draw` prices a big setup draw.",
       "metaphors": [
         "the adrenaline spike",
         "the sugar rush",
@@ -3832,12 +3854,17 @@
           "temp_thorns",
           "damage",
           "vigor",
-          "double_damage"
+          "double_damage",
+          "no_draw",
+          "replay_next"
         ],
         "class_kind": "normal"
       },
       "buildable": true,
-      "gap_refs": [],
+      "gap_refs": [
+        "VOCABULARY_GAPS#68",
+        "VOCABULARY_GAPS#69"
+      ],
       "base_synergies": {
         "hooks": [
           "temp_stats",

@@ -28,6 +28,9 @@ validator. (The vocabulary grows as the interpreter grows — more ops/statuses 
 | `spread_debuffs`| *(none)* | **Contagion** (v53) — copy EVERY debuff on the struck target (Vulnerable / Weak / Frail / Poison / Doom / Strength Down, at their current stack counts) onto **all other living enemies**. Needs a chosen target, so **single-enemy cards only** (`target: "enemy"`). The payoff of a debuff deck against a crowd: stack the debuffs on one enemy, then spread them. Pair it with a debuff EARLIER on the same card so it is never dead; an undebuffed target / a lone enemy is a harmless no-op. Never on a BASIC, one per card, card-only; uncommon/rare. |
 | `strip_block`  | *(none)* | (v64, Expose) The chosen enemy loses ALL its Block. Single-enemy cards; BEFORE the debuffs; card-only, one per card. |
 | `strip_artifact`| *(none)* | (v64, Expose) Remove ALL the chosen enemy's Artifact so the debuffs after it land. Single-enemy cards; BEFORE the debuffs; card-only, one per card. |
+| `replay_next`  | `card_type` (skill/attack/power/all), `count` 1–2 | (v65, Burst) This turn your next `count` cards of that type are played twice (a Power: until used). `all` rare-only. Card-only, one per card. |
+| `block_next_turn`| `amount` 1–20, or `scale` block | (v65, Prolong) Next turn, gain that much Block (`scale` block = your current Block). Card-only, one per card. |
+| `retain_hand`  | *(none)* | (v65, Equilibrium) Retain your hand this turn. Card-only, one per card. |
 | `channel_orb`  | `orb` (lightning/frost/dark/**random**), optional `amount` (count) | Channel an orb into your next open slot. `orb:"random"` rolls one of lightning/frost/dark — **independently per orb** when `amount > 1`, so a multi-channel "pull" can come up all-matching (the slot-machine jackpot). **ORB-CLASS ONLY** — see Orbs below. |
 | `evoke`        | optional `amount` (count) | Evoke (trigger + consume) your oldest orb(s) now. **ORB-CLASS ONLY.** |
 | `gain_orb_slot`| `amount` (int ≥1) | Gain `amount` orb slots this combat. **ORB-CLASS ONLY.** |
@@ -68,7 +71,8 @@ order) read the way it actually plays.
 ## Statuses (for `apply_status`)
 Every status takes an `amount` (the number of stacks). DEBUFFS go on the card's target(s) — use them on
 `enemy`/`all_enemies` cards. BUFFS always land on **YOU** regardless of the card's `target`, so a buff can
-ride any card (e.g. an attack that also grants you Block-over-time).
+ride any card (e.g. an attack that also grants you Block-over-time). SELF-DEBUFFS (v65) also land on you: the price
+of a strong card, card-only, one each per card; your own Artifact negates them.
 
 | status          | kind   | meaning |
 |-----------------|--------|---------|
@@ -79,6 +83,15 @@ ride any card (e.g. an attack that also grants you Block-over-time).
 | `temp_strength_down` | debuff | Target loses `amount` Strength until the end of ITS turn (v64, Piercing Wail; 3-9). Artifact negates it. |
 | `strength_down` | debuff | Target loses `amount` Strength for the combat (v64, Malaise; 1-3). Artifact negates it. |
 | `doom`          | debuff | If the target's HP is at or below its Doom at the end of ITS turn, it dies. Doom never decays. (v64; ≤12, 10+ rare, ≤4 Doom cards per class.) |
+| `no_draw`       | self-debuff | You cannot draw more cards this turn (v65, Battle Trance; amount 1). Needs a draw/energy payoff on the card. |
+| `no_energy_gain`| self-debuff | You cannot gain energy this turn (v65, Expect a Fight; amount 1). |
+| `no_block_gain`      | self-debuff | Your cards give no Block for `amount` turns (v65, Panic Button; 2–3). |
+| `dex_decay`     | self-debuff | Lose `amount` Dexterity at the start of each turn (v65, Wraith Form; 1–2). |
+| `focus_decay`   | self-debuff | Lose `amount` Focus at the start of each turn (v65, Biased Cognition; 1–2). **ORB-CLASS ONLY.** |
+| `lose_strength` | self-debuff | Lose `amount` Strength now (v65, Friendship; 1–5). |
+| `lose_dexterity`| self-debuff | Lose `amount` Dexterity now (v65; 1–5). |
+| `lose_focus`    | self-debuff | Lose `amount` Focus now (v65, Hyperbeam; 1–5). **ORB-CLASS ONLY.** |
+| `echo_form`     | buff   | The first card you play each turn is played twice (v65; a RARE Power, amount 1). |
 | `strength`      | buff   | +`amount` damage per attack hit. Permanent. |
 | `dexterity`     | buff   | +`amount` Block gained per Block effect. Permanent. |
 | `temp_strength` | buff   | Like `strength` but only for this turn (a safe burst with no lasting power). |

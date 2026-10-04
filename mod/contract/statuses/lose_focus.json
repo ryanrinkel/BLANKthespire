@@ -1,0 +1,6 @@
+{
+  "id": "lose_focus",
+  "name": "Focus Loss",
+  "kind": "debuff",
+  "decay": "none"
+}

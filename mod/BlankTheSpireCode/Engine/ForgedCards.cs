@@ -42,7 +42,17 @@ public static class ForgedCards
     /// v10 (forged statuses, Phase J): + CharacterSpec.StatusPool (a class's ≤4 custom modifier-family statuses
     /// read from `status_pool`; see ForgedCharacters / ForgedStatusPower). Class cards may apply a custom status
     /// by pool name via the `apply_status_custom` op (class-only, like custom-orb channels).</summary>
-    public const int VocabVersion = 64; // 64: Phase BL (VOCAB_EXPANSION_6, gaps #66/#67) — ENEMY STRENGTH LOSS, STRIP, DOOM:
+    public const int VocabVersion = 65; // 65: Phase BM (VOCAB_EXPANSION_6, gaps #68-#70) — BASE-POWER STATUSES: self-drawback
+                                        //     statuses (card-only, routed to the PLAYER — EffectRunner.SelfDebuffStatuses):
+                                        //     `no_draw` (NoDrawPower), `no_energy_gain` (NoEnergyGainPower), `no_block_gain`
+                                        //     (NoBlockPower, amount = turns), `dex_decay` (WraithFormPower), `focus_decay`
+                                        //     (BiasedCognitionPower) and the literal NEGATIVE stat losses `lose_strength` /
+                                        //     `lose_dexterity` / `lose_focus`; `echo_form` (EchoFormPower; Power, rare, amount 1).
+                                        //     Card-only ops `replay_next {card_type skill|attack|power|all, count 1..2}` (Burst /
+                                        //     One-Two Punch / Signal Boost / Duplication; `all` rare-only), `block_next_turn
+                                        //     {amount | scale:"block"}` (BlockNextTurnPower — Prolong) and `retain_hand`
+                                        //     (RetainHandPower — Equilibrium). `end_turn` deferred (§6). No codec change.
+                                        // 64: Phase BL (VOCAB_EXPANSION_6, gaps #66/#67) — ENEMY STRENGTH LOSS, STRIP, DOOM:
                                         //     statuses `temp_strength_down` (Piercing Wail — our Debuff-typed
                                         //     ForgedTempStrengthDownPower, restored at the ENEMY's turn end; Artifact eats the
                                         //     whole shell), `strength_down` (Malaise — permanent, applied as a NEGATIVE
@@ -501,6 +511,7 @@ public static class ForgedCards
          "spend_forge", // Phase AX (v53, gap #44): SPEND Forge as a card's price (the cash-out half of the ramp). Forge-class, card-only.
          "spread_debuffs", // Phase AX (v53, gaps #45-#47): copy the struck target's debuffs to every OTHER living enemy. Card-only.
          "strip_block", "strip_artifact", // Phase BL (v64, gap #66): Expose — the target loses all Block / its Artifact. Card-only, single-enemy.
+         "replay_next", "block_next_turn", "retain_hand", // Phase BM (v65, gaps #69/#70): Burst-family replays, Prolong, Equilibrium. Card-only.
          "graft_card", // Phase AI (gap #7): CHOOSE form of transform_card — pick a card in hand, IT permanently becomes the named same-class card for the rest of the run. Card-only.
          "exhaust_card", // Phase BC (v57, gap #52): exhaust OTHER cards in your hand (choose / random / up_to / all, optional card_type filter). Card-only.
          "draw_until", // Phase BC (v57, gap #53): draw until you draw a card of `card_type` (Pillage = non_attack). Card-only.
@@ -561,7 +572,35 @@ public static class ForgedCards
          "intangible", "ritual", "blur", "temp_strength", "temp_dexterity", "barricade", "focus",
          "temp_thorns", "temp_focus", // Phase AN (v44): one-turn Thorns / Focus (removed at the end of your turn)
          "vigor", "double_damage", // Phase BF (v60, gap #54): the base game's VigorPower / DoubleDamagePower
-         "temp_strength_down", "strength_down", "doom"]; // Phase BL (v64, gaps #66/#67): enemy Strength loss + Doom
+         "temp_strength_down", "strength_down", "doom", // Phase BL (v64, gaps #66/#67): enemy Strength loss + Doom
+         // Phase BM (v65, gaps #68/#69): the card-only self-drawbacks (EffectRunner.SelfDebuffStatuses) + Echo Form.
+         "no_draw", "no_energy_gain", "no_block_gain", "dex_decay", "focus_decay", "lose_strength", "lose_dexterity", "lose_focus",
+         "echo_form"];
+    // Phase BM (v65, gaps #68/#69): the per-card bands of the self statuses. no_draw / no_energy_gain / echo_form are
+    // Single-shaped (amount 1); no_block_gain is TURNS (2..3, Panic Button = 2); the decays tick every turn (1..2); the literal
+    // stat losses 1..5 (Friendship 2, Hyperbeam 3). Lockstep with validator._BM_STATUS_CAPS / _BM_STATUS_MIN.
+    private static readonly Dictionary<string, int> BmStatusCaps = new()
+    {
+        ["no_draw"] = 1, ["no_energy_gain"] = 1, ["no_block_gain"] = 3, ["dex_decay"] = 2, ["focus_decay"] = 2,
+        ["lose_strength"] = 5, ["lose_dexterity"] = 5, ["lose_focus"] = 5, ["echo_form"] = 1,
+    };
+    private static readonly Dictionary<string, int> BmStatusMin = new() { ["no_block_gain"] = 2 };
+    // Phase BM (v65, gaps #69/#70): replay_next's card filter (BurstPower = skill, OneTwoPunchPower = attack,
+    // SignalBoostPower = power, DuplicationPower = all) and the fixed block_next_turn band. Lockstep with validator.
+    private static readonly HashSet<string> ReplayKinds = ["skill", "attack", "power", "all"];
+    private const int BlockNextTurnMaxAmount = 20;
+
+    /// <summary>Phase BM (v65, gap #69): the replay_next shape (card_type + count 1..2, nothing else).</summary>
+    private static string? ValidateReplayNext(EffectSpec e)
+    {
+        if (e.CardKind == null || !ReplayKinds.Contains(e.CardKind))
+            return $"replay_next needs a 'card_type' (one of {string.Join("/", ReplayKinds)}); got '{e.CardKind}'.";
+        if (e.Count < 1 || e.Count > EffectRunner.ReplayNextMaxCount)
+            return $"replay_next 'count' (the plays that repeat) must be 1..{EffectRunner.ReplayNextMaxCount}; got {e.Count}.";
+        if (e.Amount != 0 || e.Status != null || e.IsScaled || e.Hits > 1 || e.Scope != null)
+            return "replay_next carries only 'card_type' + 'count' (no amount / status / scale / hits / scope).";
+        return null;
+    }
     // Phase BL (v64): the per-effect caps (plan §7 decision 6: Doom 12 per card; strength_down 3 permanent / 9 temporary).
     // A payload Doom fires every turn and never decays, so it caps at 5 per fire. Lockstep with validator._BL_STATUS_CAPS.
     private static readonly Dictionary<string, int> BlStatusCaps =
@@ -724,6 +763,7 @@ public static class ForgedCards
          "shield_summon", // Phase AC (gap #2): Block to grant the summon (needs amount>=1; capped 1..12 in Validate)
          "blade_empower", // Phase AF (gap #41): the blade multiplier (needs amount>=2; capped 2..3 in Validate)
          "spend_forge", // Phase AX (v53, gap #44): the Forge consumed (needs amount>=1; capped 1..10 in Validate)
+         "block_next_turn", // Phase BM (v65, gap #70): next turn's Block (amount>=1, capped 20; the scale:"block" form is exempt)
          // NOTE: `summon` is intentionally NOT here. Its `amount` is the HP to grant and is OPTIONAL — a missing/0
          // amount means "use the summon's spec MaxHp" (EffectRunner falls back), matching the generator validator
          // (which never enforces summon amount>=1) and the relic path (ForgedCharacters special-cases summon before
@@ -896,6 +936,17 @@ public static class ForgedCards
         // card is one). A Power auto-played off a discard is a free permanent buff, which is not the fantasy.
         if (type == CardType.Power && effects.Concat(upgrade ?? []).Any(e => e.Op == "sly"))
         { error = "'sly' is not allowed on a Power (Sly is for Attacks/Skills you discard for a free play)."; return false; }
+        // Phase BM (v65, gap #69): Echo Form is the base rare Power (every first card each turn plays twice — a whole-combat
+        // engine), and the any-card replay (DuplicationPower) is rare-only; no replay on a Basic.
+        {
+            var all = effects.Concat(upgrade ?? []).ToList();
+            if (all.Any(e => e.Op == "apply_status" && e.Status == "echo_form") && (type != CardType.Power || rarity != CardRarity.Rare))
+            { error = "'echo_form' belongs on a RARE POWER card (the base Echo Form)."; return false; }
+            if (all.Any(e => e.Op == "replay_next" && e.CardKind == "all") && rarity != CardRarity.Rare)
+            { error = "replay_next card_type 'all' (your next card of ANY type plays twice) is RARE-only."; return false; }
+            if (all.Any(e => e.Op == "replay_next") && rarity == CardRarity.Basic)
+            { error = "replay_next is not allowed on a BASIC card."; return false; }
+        }
 
         // Cost is an int (0–4, Phase AX) OR the string "X" (an X-cost card: X = all energy, resolved at play time).
         bool costsX = card.ContainsKey("cost")
@@ -1143,6 +1194,17 @@ public static class ForgedCards
                 return $"apply_status '{e.Status}' amount may be at most {blCap}; got {e.Amount}.";
             if (e.Op == "apply_status" && BlStatusCaps.ContainsKey(e.Status!) && target == TargetType.Self)
                 return $"apply_status '{e.Status}' is an enemy debuff — the card needs an enemy target (enemy / all_enemies / random_enemy).";
+            // Phase BM (v65, gaps #68/#69): the self-status bands (they land on YOU whatever the card's target).
+            if (e.Op == "apply_status" && BmStatusCaps.TryGetValue(e.Status!, out int bmCap))
+            {
+                if (e.IsScaled)
+                    return $"apply_status '{e.Status}' can't be scaled (a fixed self-drawback / Echo Form).";
+                int bmMin = BmStatusMin.TryGetValue(e.Status!, out int mn) ? mn : 1;
+                if (e.Amount < bmMin || e.Amount > bmCap)
+                    return bmMin == bmCap
+                        ? $"apply_status '{e.Status}' must use amount {bmCap}; got {e.Amount}."
+                        : $"apply_status '{e.Status}' amount must be {bmMin}..{bmCap}; got {e.Amount}.";
+            }
             if (AmountOps.Contains(e.Op) && !e.IsScaled && e.Amount < 1)
                 return $"op '{e.Op}' needs amount >= 1.";
             if (e.Hits < 1)
@@ -1163,14 +1225,33 @@ public static class ForgedCards
                 var cserr = ValidateCostShift(e);
                 if (cserr != null) return cserr;
             }
+            // Phase BM (v65, gap #69): replay_next takes `card_type` (its own skill/attack/power/all band) + `count`.
+            else if (e.Op == "replay_next")
+            {
+                var rerr = ValidateReplayNext(e);
+                if (rerr != null) return rerr;
+            }
             // Phase BI (v61): add_trigger also takes `scope` ("this_turn") and `card_type` (the trigger filter) — both are
-            // checked in ValidateTrigger; `count` stays cost_shift-only.
+            // checked in ValidateTrigger; `count` stays cost_shift-only (Phase BM: + replay_next, above).
             else if (e.Count != 0 || (e.Scope != null && e.Op != "add_trigger"))
-                return $"'scope'/'count' only apply to cost_shift ('scope':'this_turn' also to add_trigger) (op '{e.Op}').";
+                return $"'scope'/'count' only apply to cost_shift / replay_next ('scope':'this_turn' also to add_trigger) (op '{e.Op}').";
             // Phase BC (v57): `card_type` is shared by cost_shift (its own attack/skill/power/all band, above) and the two
             // hand ops (attack/skill/power/non_attack, below); anywhere else it is a stray field.
             else if (e.CardKind != null && e.Op is not ("exhaust_card" or "draw_until" or "add_trigger"))
-                return $"'card_type' only applies to cost_shift/exhaust_card/draw_until/add_trigger (op '{e.Op}').";
+                return $"'card_type' only applies to cost_shift/replay_next/exhaust_card/draw_until/add_trigger (op '{e.Op}').";
+            // Phase BM (v65, gap #70): block_next_turn — a fixed amount (1..20) or scale "block" (Prolong); retain_hand is a
+            // flag-op. Both card-only (not in TriggerOps).
+            if (e.Op == "block_next_turn")
+            {
+                if (e.Status != null || e.Hits > 1)
+                    return "block_next_turn takes an 'amount' or scale 'block' only.";
+                if (e.IsScaled && e.Scale != "block")
+                    return $"block_next_turn may only scale by 'block' (your current Block — Prolong); got '{e.Scale}'.";
+                if (!e.IsScaled && e.Amount > BlockNextTurnMaxAmount)
+                    return $"block_next_turn 'amount' may be at most {BlockNextTurnMaxAmount}; got {e.Amount}.";
+            }
+            if (e.Op == "retain_hand" && (e.Amount != 0 || e.Status != null || e.IsScaled || e.Hits > 1))
+                return "retain_hand is a flag-op (no amount / status / scale / hits).";
             // Phase BI (v61): `every_n` belongs to add_trigger alone.
             if (e.EveryN != 0 && e.Op != "add_trigger")
                 return $"'every_n' only applies to add_trigger (op '{e.Op}').";
@@ -1215,7 +1296,7 @@ public static class ForgedCards
                 if (e.Amount != 0)
                     return "draw_until carries no amount (it draws until it finds a card of that type).";
             }
-            if (e.IsScaled)
+            if (e.IsScaled && e.Op != "block_next_turn") // Phase BM (v65): block_next_turn's one scale is checked above
             {
                 if (!SupportedScales.Contains(e.Scale!))
                     return $"unsupported scale '{e.Scale}' (one of {string.Join("/", SupportedScales)}).";
@@ -1637,9 +1718,31 @@ public static class ForgedCards
                 return "at most one 'strength_down' effect per card (raise the amount instead).";
             for (int i = 0; i < list.Length; i++)
                 if (list[i].Op is "strip_block" or "strip_artifact"
-                    && list.Take(i).Any(q => q.Op == "apply_status" && q.Status != null && !EffectRunner.SelfBuffStatuses.Contains(q.Status)))
+                    && list.Take(i).Any(q => q.Op == "apply_status" && q.Status != null && !EffectRunner.IsSelfStatus(q.Status)))
                     return $"'{list[i].Op}' must come BEFORE the card's debuffs (the Expose order: strip, then debuff).";
         }
+        // Phase BM (v65, gaps #68-#70): one of each self status / new op per effect list (a second is the same sentence
+        // twice — and the PowerVar keys would collide), and `no_draw` is a PRICE: the same list must carry the draw or
+        // energy it taxes (Battle Trance = draw 3, Expect a Fight = energy). Base + upgrade checked independently.
+        foreach (var list in new[] { effects, upgrade })
+        {
+            if (list == null) continue;
+            foreach (var st in BmStatusCaps.Keys)
+                if (list.Count(e => e.Op == "apply_status" && e.Status == st) > 1)
+                    return $"at most one '{st}' effect per card.";
+            foreach (var one in new[] { "replay_next", "block_next_turn", "retain_hand" })
+                if (list.Count(e => e.Op == one) > 1)
+                    return $"at most one '{one}' effect per card.";
+            if (list.Any(e => e.Op == "apply_status" && e.Status == "no_draw") && !list.Any(e => e.Op is "draw" or "gain_energy"))
+                return "'no_draw' is a price: the same card needs a 'draw' or 'gain_energy' payoff (Battle Trance: draw 3, then no more draws).";
+        }
+        // Phase BM (v65, gap #69): the upgrade overlay is positional and carries amounts only — a replay_next keeps its
+        // card_type and count (the count is printed literally).
+        if (upgrade != null)
+            for (int i = 0; i < Math.Min(effects.Length, upgrade.Length); i++)
+                if (effects[i].Op == "replay_next" && upgrade[i].Op == "replay_next"
+                    && (effects[i].CardKind != upgrade[i].CardKind || effects[i].Count != upgrade[i].Count))
+                    return "an upgrade can't change replay_next's 'card_type' / 'count' (upgrade the rest of the card instead).";
         // Phase AX (v53): spend_forge is the PRICE half of a card, so it may never be the whole card — the rest of
         // the effect list is what the Forge buys (mirrors the sacrifice_summon rule).
         foreach (var list in new[] { effects, upgrade })
@@ -2086,6 +2189,35 @@ public static class ForgedCards
         return $"Your {plural} cost {amt} less {life}.";
     }
 
+    /// <summary>Phase BM (v65, gaps #68/#69): the card sentence of a self status (null = not one). The {vars} are the
+    /// names DataCard declares. Byte-lockstep with cardgen._BM_SENTENCES.</summary>
+    internal static string? BmStatusSentence(string? status) => status switch
+    {
+        "no_draw"        => "You cannot draw additional cards this turn.",
+        "no_energy_gain" => "You cannot gain energy this turn.",
+        "no_block_gain"       => "You cannot gain Block from cards for {NoBlockTurns} turns.",
+        "dex_decay"      => "At the start of your turn, lose {DexDecay} Dexterity.",
+        "focus_decay"    => "At the start of your turn, lose {FocusDecay} Focus.",
+        "lose_strength"  => "Lose {SelfStrengthLoss} Strength.",
+        "lose_dexterity" => "Lose {SelfDexterityLoss} Dexterity.",
+        "lose_focus"     => "Lose {SelfFocusLoss} Focus.",
+        "echo_form"      => "The first card you play each turn is played twice.",
+        _ => null,
+    };
+
+    /// <summary>Phase BM (v65, gap #69): "This turn, your next Skill is played twice." / "This turn, your next 2 Attacks
+    /// are played twice." / "Your next Power is played twice." (Signal Boost persists until used) / "This turn, your next
+    /// card is played twice." Literal count (no var). Byte-lockstep with cardgen._replay_next_sentence.</summary>
+    private static string ReplayNextSentence(EffectSpec e)
+    {
+        string single = e.CardKind switch { "attack" => "Attack", "power" => "Power", "all" => "card", _ => "Skill" };
+        int n = Math.Max(1, e.Count);
+        string what = n > 1 ? $"your next {n} {single}s are" : $"your next {single} is";
+        return e.CardKind == "power"
+            ? $"{char.ToUpperInvariant(what[0])}{what[1..]} played twice."
+            : $"This turn, {what} played twice.";
+    }
+
     /// <summary>Phase AX (v53): the var key of the i-th effect. apply_status is occurrence-numbered, so a card's
     /// SECOND (gated) Weak declares 'status:weak:2' instead of colliding with the first.</summary>
     private static string? VarKey(EffectSpec[] effects, int i)
@@ -2125,6 +2257,10 @@ public static class ForgedCards
         "temp_thorns" => "Thorns", "temp_focus" => "Focus", // Phase AN (v44): worded like the temp stats
         "vigor" => "Vigor", "double_damage" => "Double Damage", // Phase BF (v60)
         "temp_strength_down" => "Strength Down", "strength_down" => "Strength Down", "doom" => "Doom", // Phase BL (v64)
+        // Phase BM (v65, gaps #68/#69): the self statuses (their card text is BmStatusSentence; these name them elsewhere).
+        "no_draw" => "No Draw", "no_energy_gain" => "No Energy Gain", "no_block_gain" => "No Block",
+        "dex_decay" => "Wraith Form", "focus_decay" => "Biased Cognition", "lose_strength" => "Strength",
+        "lose_dexterity" => "Dexterity", "lose_focus" => "Focus", "echo_form" => "Echo Form",
         _ => status ?? "",
     };
 
@@ -2258,6 +2394,11 @@ public static class ForgedCards
                 case "spread_debuffs": parts.Add("Copy the target's debuffs to all other enemies."); break; // Phase AX (v53, gaps #45-#47)
                 case "strip_block":    parts.Add("Remove all of the enemy's Block."); break; // Phase BL (v64, gap #66): byte-lockstep with cardgen.py
                 case "strip_artifact": parts.Add("Remove the enemy's Artifact."); break;     // Phase BL (v64, gap #66)
+                case "replay_next":    parts.Add(ReplayNextSentence(e)); break; // Phase BM (v65, gap #69): byte-lockstep with cardgen._replay_next_sentence
+                case "block_next_turn": // Phase BM (v65, gap #70): Prolong. Byte-lockstep with cardgen.describe.
+                    parts.Add(e.Scale == "block" ? "Next turn, gain Block equal to your current Block." : "Next turn, gain {NextTurnBlock} Block.");
+                    break;
+                case "retain_hand":    parts.Add("Retain your hand this turn."); break; // Phase BM (v65, gap #70): Equilibrium
                 case "gaptest_enemy_artifact": parts.Add($"Enemies gain {Math.Max(1, e.Amount)} Artifact (gap test)."); break; // PHASE BL GAPTEST only
                 case "corruption":  parts.Add("Your Skills cost 0."); parts.Add("Your Skills Exhaust when played."); break; // Phase AB (gap #20)
                 case "cost_shift":  parts.Add(CostShiftSentence(e)); break; // Phase AO (v45): the discount sentence (literal, no var)
@@ -2342,6 +2483,10 @@ public static class ForgedCards
                         });
                     else if (e.Status == "doom" && e.Scale == "damage_dealt_unblocked")
                         parts.Add("Apply Doom equal to the unblocked damage dealt.");
+                    // Phase BM (v65, gaps #68/#69): the self statuses read as their own sentences (the "Gain X." idiom would
+                    // misread a drawback). Lockstep with cardgen._BM_SENTENCES.
+                    else if (BmStatusSentence(e.Status) is { } bmLine)
+                        parts.Add(bmLine);
                     else
                         parts.Add($"{(buff ? "Gain" : "Apply")} {name}{(buff ? "" : dmgSuffix)}."); // AJ: random_enemy suffix too
                     break;
@@ -2637,6 +2782,10 @@ public static class ForgedCards
         "temp_thorns" => "Thorns", "temp_focus" => "Focus", // Phase AN (v44)
         "vigor" => "Vigor", "double_damage" => "Double Damage", // Phase BF (v60)
         "temp_strength_down" => "Strength Down", "strength_down" => "Strength Down", "doom" => "Doom", // Phase BL (v64)
+        // Phase BM (v65, gaps #68/#69): the self statuses (their card text is BmStatusSentence; these name them elsewhere).
+        "no_draw" => "No Draw", "no_energy_gain" => "No Energy Gain", "no_block_gain" => "No Block",
+        "dex_decay" => "Wraith Form", "focus_decay" => "Biased Cognition", "lose_strength" => "Strength",
+        "lose_dexterity" => "Dexterity", "lose_focus" => "Focus", "echo_form" => "Echo Form",
         _ => status ?? "",
     };
 

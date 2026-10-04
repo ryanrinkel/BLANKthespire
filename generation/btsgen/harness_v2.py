@@ -76,6 +76,7 @@ _PREFERRED_TRIGGERS = ["on_exhaust", "on_card_played", "on_hp_lost", "on_block_g
                        "on_damage_dealt", "attacked", "on_discard", "ripen",
                        "on_poison_damage"]  # Phase BE (v59)
 _CLASS_ONLY_TOKENS = {"channel_orb", "evoke", "gain_orb_slot", "focus", "orbs_match", "orb_count_ge", "summon",
+                      "focus_decay", "lose_focus",  # Phase BM (v65): the Focus drawbacks are orb-class only
                       "summon_attack", "buff_summon", "heal_summon", "shield_summon",
                       "sacrifice_summon",  # Phase AV (v52)
                       "apply_status_custom",

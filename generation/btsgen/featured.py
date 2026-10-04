@@ -197,6 +197,12 @@ FEATURED_MENU: list[Featured] = [
              '"strip_artifact" (flag-ops, no amount) and THEN applies a debuff (vulnerable / weak / temp_strength_down) - '
              'Expose. The strips must come before the debuff; one of each per card.',
              lambda cc: bool(cc.ops.keys() & {"strip_block", "strip_artifact"})),
+    # Phase BM (v65, gap #69): Burst / One-Two Punch / Echo Form — the replay window.
+    Featured("replay_window", 'a card that makes your NEXT cards of a type play TWICE (op "replay_next") or a rare Echo Form power',
+             'REQUIRED: add a skill with op "replay_next" (card_type skill / attack / power, count 1-2: this turn your next '
+             'N cards of that type are played twice - Burst) plus a draw or energy so the replayed cards arrive - OR, at '
+             'rare only, a POWER with apply_status echo_form amount 1 (the first card you play each turn is played twice).',
+             lambda cc: "replay_next" in cc.ops or "echo_form" in cc.statuses),
     # Phase BF (v60, gap #54): the setup-then-release beat on the base game's own amplifiers.
     Featured("setup_spike", 'a SETUP card that spikes your next Attack (apply_status vigor) or a rare that doubles your Attacks for a turn (apply_status double_damage)',
              'REQUIRED: add a skill with apply_status vigor (amount 3-6: your NEXT Attack deals that much more, then it '

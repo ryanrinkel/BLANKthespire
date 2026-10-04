@@ -39,6 +39,12 @@ _STATUS_WEIGHT = {
     # a permanent loss blunts every attack all fight (priced like your own Strength, a touch under); Doom never decays,
     # but it only pays off once the stack reaches the enemy's HP (an execute line, priced per stack below a hit).
     "temp_strength_down": 0.6, "strength_down": 3.0, "doom": 0.8,
+    # Phase BM (v65, gaps #68/#69): the SELF-drawbacks are priced NEGATIVE (like lose_hp — they pay for the card's payoff):
+    # No Draw ~ the next card you'd have drawn; No Energy Gain ~ most of an energy; No Block per turn of no card Block; the
+    # decays cost a stat point every turn; the literal losses mirror the stat they take. Echo Form replays the first card
+    # of every turn — a rare Power's whole-combat engine.
+    "no_draw": -7.0, "no_energy_gain": -4.0, "no_block_gain": -5.0, "dex_decay": -4.0, "focus_decay": -4.0,
+    "lose_strength": -4.0, "lose_dexterity": -3.0, "lose_focus": -3.0, "echo_form": 26.0,
     "thorns": 2.0,          # pays out per enemy hit taken
     "regen": 2.0,           # heal per turn, decaying
     "metallicize": 3.0,     # STS2 Plating: N + (N-1) + ... + 1 Block over N turns
@@ -80,7 +86,8 @@ _BUILD_AROUND_OPS = {"add_trigger", "apply_status_custom",
                      "spend_forge",  # Phase AX (v53, gap #44): cashing out the Forge ramp is a build-around, not a stat line
                      "spread_debuffs",  # Phase AX (v53, gaps #45-#47): contagion is a build-around payoff, not a stat line
                      "exhaust_card",  # Phase BC (v57, gap #52): exhaust-fuel is the engine half of a card, not a stat line
-                     "held_discount"}  # Phase BD (v58, gap #58): a held-turn discount is a build-around, not a stat line
+                     "held_discount",  # Phase BD (v58, gap #58): a held-turn discount is a build-around, not a stat line
+                     "replay_next", "retain_hand"}  # Phase BM (v65, gaps #69/#70): replays / a held hand are tempo utilities
 # Phase BD (v58, gap #58): the held_discount band (mirrors ForgedCards.HeldDiscountMaxAmount + the schema clause).
 _HELD_DISCOUNT_MAX = 2
 # F5: the live state scalars an effect's amount may scale to (mirrors ForgedCards.SupportedScales). "x" stays
@@ -159,6 +166,20 @@ _BL_STATUS_CAPS = {"temp_strength_down": 9, "strength_down": 3, "doom": 12}
 _PAYLOAD_DOOM_MAX = 5
 _DOOM_RARE_MIN = 10
 _STRIP_OPS = ("strip_block", "strip_artifact")
+# Phase BM (v65, gaps #68-#70): the card-only SELF statuses (mirror EffectRunner.SelfDebuffStatuses + echo_form), their
+# per-card bands (mirror ForgedCards.BmStatusCaps / BmStatusMin), replay_next's kinds + count band, block_next_turn's cap
+# and the replay pricing (per replayed card: a Skill ~ a cheap Skill, a Power more, `all` the most).
+_SELF_DEBUFF_STATUSES = {"no_draw", "no_energy_gain", "no_block_gain", "dex_decay", "focus_decay",
+                         "lose_strength", "lose_dexterity", "lose_focus"}
+_BM_SELF_STATUSES = _SELF_DEBUFF_STATUSES | {"echo_form"}
+_BM_STATUS_CAPS = {"no_draw": 1, "no_energy_gain": 1, "no_block_gain": 3, "dex_decay": 2, "focus_decay": 2,
+                   "lose_strength": 5, "lose_dexterity": 5, "lose_focus": 5, "echo_form": 1}
+_BM_STATUS_MIN = {"no_block_gain": 2}
+_REPLAY_KINDS = {"skill", "attack", "power", "all"}
+_REPLAY_MAX_COUNT = 2
+_REPLAY_VALUE = {"skill": 6.0, "attack": 7.0, "power": 8.0, "all": 10.0}
+_BLOCK_NEXT_TURN_MAX = 20
+_BM_ONE_PER_CARD_OPS = ("replay_next", "block_next_turn", "retain_hand")
 # Phase AK (v41): the POWER-HOSTED reactive kinds eligible for 'once_per_combat' (mirror ForgedCards.OncePerCombatTriggers)
 # — every multi-fire kind except the card-latent on_discard (no power instance to carry the fired flag).
 _ONCE_PER_COMBAT_TRIGGERS = _MULTI_FIRE_TRIGGERS - {"on_discard"}
@@ -718,11 +739,45 @@ class CardValidator:
                     out.append(f"cost_shift 'count' (the plays it applies to) must be 1..{_COST_SHIFT_MAX_COUNT}; got {cn!r}.")
                 if sc == "combat" and ca != 1:
                     out.append("cost_shift with scope 'combat' must use amount 1 (a whole-combat -2 is degenerate).")
+            # Phase BM (v65, gap #69): replay_next takes `card_type` (skill/attack/power/all) + `count` 1..2, nothing else.
+            # Mirrors ForgedCards.ValidateReplayNext.
+            elif op == "replay_next":
+                rk = str(e.get("card_type", "")).strip().lower()
+                rn = e.get("count")
+                if rk not in _REPLAY_KINDS:
+                    out.append(f"replay_next needs a 'card_type' (one of {'/'.join(sorted(_REPLAY_KINDS))}); got '{e.get('card_type')}'.")
+                if not (isinstance(rn, int) and not isinstance(rn, bool) and 1 <= rn <= _REPLAY_MAX_COUNT):
+                    out.append(f"replay_next 'count' (the plays that repeat) must be 1..{_REPLAY_MAX_COUNT}; got {rn!r}.")
+                if any(e.get(k) is not None for k in ("amount", "status", "scope")) or scale or (isinstance(hits, int) and hits > 1):
+                    out.append("replay_next carries only 'card_type' + 'count' (no amount / status / scale / hits / scope).")
             # Phase BI (v61): add_trigger also takes `scope` ("this_turn") + `card_type` (checked with the trigger rules).
             elif e.get("count") is not None or (e.get("scope") is not None and op != "add_trigger"):
-                out.append(f"'scope'/'count' only apply to cost_shift ('scope':'this_turn' also to add_trigger) (op '{op}').")
+                out.append(f"'scope'/'count' only apply to cost_shift / replay_next ('scope':'this_turn' also to add_trigger) (op '{op}').")
             elif e.get("card_type") is not None and op not in ("exhaust_card", "draw_until", "add_trigger"):  # Phase BC (v57)
-                out.append(f"'card_type' only applies to cost_shift/exhaust_card/draw_until/add_trigger (op '{op}').")
+                out.append(f"'card_type' only applies to cost_shift/replay_next/exhaust_card/draw_until/add_trigger (op '{op}').")
+            # Phase BM (v65, gap #70): block_next_turn — an amount 1..20 or scale "block" (Prolong); retain_hand is a flag-op.
+            if op == "block_next_turn":
+                if e.get("status") is not None or (isinstance(hits, int) and hits > 1):
+                    out.append("block_next_turn takes an 'amount' or scale 'block' only.")
+                if scale and scale != "block":
+                    out.append(f"block_next_turn may only scale by 'block' (your current Block — Prolong); got '{scale}'.")
+                bn = e.get("amount")
+                if not scale and not (isinstance(bn, int) and not isinstance(bn, bool) and 1 <= bn <= _BLOCK_NEXT_TURN_MAX):
+                    out.append(f"block_next_turn 'amount' must be 1..{_BLOCK_NEXT_TURN_MAX}; got {bn!r}.")
+            if op == "retain_hand" and (any(e.get(k) is not None for k in ("amount", "status")) or scale
+                                        or (isinstance(hits, int) and hits > 1)):
+                out.append("retain_hand is a flag-op (no amount / status / scale / hits).")
+            # Phase BM (v65, gaps #68/#69): the self-status bands (they land on YOU whatever the card's target). Mirrors
+            # ForgedCards.Validate; Echo Form's rare-Power rule is below (card level).
+            if op == "apply_status" and str(e.get("status", "")).strip().lower() in _BM_STATUS_CAPS:
+                bms = str(e.get("status", "")).strip().lower()
+                bma = e.get("amount")
+                lo, hi = _BM_STATUS_MIN.get(bms, 1), _BM_STATUS_CAPS[bms]
+                if scale:
+                    out.append(f"apply_status '{bms}' can't be scaled (a fixed self-drawback / Echo Form).")
+                elif not (isinstance(bma, int) and not isinstance(bma, bool) and lo <= bma <= hi):
+                    out.append(f"apply_status '{bms}' must use amount {hi}; got {bma!r}." if lo == hi
+                               else f"apply_status '{bms}' amount must be {lo}..{hi}; got {bma!r}.")
             if e.get("every_n") is not None and op != "add_trigger":  # Phase BI (v61)
                 out.append(f"'every_n' only applies to add_trigger (op '{op}').")
             # Phase BL (v64, gaps #66/#67): the enemy Strength-loss / Doom bands; all three are enemy debuffs (never on a
@@ -762,7 +817,7 @@ class CardValidator:
                     out.append("'hits_scale' can't combine with 'grow' / 'grow_held' (one calculated idea per effect).")
                 if op == "damage" and int(e.get("amount", 0) or 0) < 1:
                     out.append("a 'hits_scale' damage needs amount >= 1 (the damage of EACH hit).")
-            if scale:
+            if scale and op != "block_next_turn":  # Phase BM (v65): block_next_turn's one scale is checked above
                 if scale not in _SUPPORTED_SCALES:
                     out.append(f"unsupported scale '{scale}' (one of {'/'.join(sorted(_SUPPORTED_SCALES))}).")
                 # Phase P (gaps #21/#22): lifesteal is heal-ONLY (replace-semantics; the preceding-damage rule
@@ -900,9 +955,39 @@ class CardValidator:
                 out.append("at most one 'strength_down' effect per card (raise the amount instead).")
             for i, ef in enumerate(lst):
                 if ef.get("op") in _STRIP_OPS and any(
-                        q.get("op") == "apply_status" and str(q.get("status", "")).strip().lower() not in _SELF_BUFF_STATUSES
+                        q.get("op") == "apply_status"
+                        and str(q.get("status", "")).strip().lower() not in _SELF_BUFF_STATUSES | _BM_SELF_STATUSES
                         for q in lst[:i]):
                     out.append(f"'{ef.get('op')}' must come BEFORE the card's debuffs (the Expose order: strip, then debuff).")
+        # Phase BM (v65, gaps #68-#70): one of each self status / new op per effect list; `no_draw` is a PRICE — the same
+        # list carries the draw or energy it taxes (Battle Trance / Expect a Fight). Mirrors ForgedCards.Validate.
+        for lst in (effects, up_effects):
+            for st in _BM_STATUS_CAPS:
+                if sum(1 for ef in lst if ef.get("op") == "apply_status"
+                       and str(ef.get("status", "")).strip().lower() == st) > 1:
+                    out.append(f"at most one '{st}' effect per card.")
+            for one in _BM_ONE_PER_CARD_OPS:
+                if sum(1 for ef in lst if ef.get("op") == one) > 1:
+                    out.append(f"at most one '{one}' effect per card.")
+            if (any(ef.get("op") == "apply_status" and str(ef.get("status", "")).strip().lower() == "no_draw" for ef in lst)
+                    and not any(ef.get("op") in ("draw", "gain_energy") for ef in lst)):
+                out.append("'no_draw' is a price: the same card needs a 'draw' or 'gain_energy' payoff "
+                           "(Battle Trance: draw 3, then no more draws).")
+        for i in range(min(len(effects), len(up_effects))):
+            b, u = effects[i], up_effects[i]
+            if b.get("op") == "replay_next" and u.get("op") == "replay_next" and (
+                    b.get("card_type") != u.get("card_type") or b.get("count") != u.get("count")):
+                out.append("an upgrade can't change replay_next's 'card_type' / 'count' (upgrade the rest of the card instead).")
+        bm_all = effects + up_effects
+        bm_rarity = str(card.get("rarity", "")).strip().lower()
+        if any(ef.get("op") == "apply_status" and str(ef.get("status", "")).strip().lower() == "echo_form" for ef in bm_all) \
+                and (str(card.get("type", "")).strip().lower() != "power" or bm_rarity != "rare"):
+            out.append("'echo_form' belongs on a RARE POWER card (the base Echo Form).")
+        if any(ef.get("op") == "replay_next" and str(ef.get("card_type", "")).strip().lower() == "all" for ef in bm_all) \
+                and bm_rarity != "rare":
+            out.append("replay_next card_type 'all' (your next card of ANY type plays twice) is RARE-only.")
+        if any(ef.get("op") == "replay_next" for ef in bm_all) and bm_rarity == "basic":
+            out.append("replay_next is not allowed on a BASIC card.")
         # Phase W (gap #19): self-purge. purge ⊥ exhaust (both mean "the card leaves after this play"; a card can't
         # do both). Never on a BASIC card — a purgeable basic could thin a class's floors (and reads as a trap). The
         # >3-per-class / merchant-floor concerns are class-level (character_validator). Mirrors ForgedCards.Validate.
@@ -1525,6 +1610,19 @@ class CardValidator:
                     and str(eff.get("scale", "")).strip().lower() == "damage_dealt_unblocked"):
                 return 6.0 * float(_STATUS_WEIGHT["doom"])
             return self._amt(eff.get("amount", 0)) * float(_STATUS_WEIGHT.get(eff.get("status", ""), 2.0))
+        if op == "replay_next":
+            # Phase BM (v65, gap #69): each replayed card is a free copy of a typical card of that type.
+            n = max(1.0, self._amt(eff.get("count", 1)))
+            return n * _REPLAY_VALUE.get(str(eff.get("card_type", "skill")).strip().lower(), 6.0)
+        if op == "block_next_turn":
+            # Phase BM (v65, gap #70): Block that arrives next turn is a touch under Block now; Prolong (your current
+            # Block) is priced at a typical 8.
+            if str(eff.get("scale", "")).strip().lower() == "block":
+                return 8.0 * 0.7
+            return amt * 0.7
+        if op == "retain_hand":
+            # Phase BM (v65, gap #70): Equilibrium's hand retention — card quality, not a stat line (~a scry 2-3).
+            return 4.0
         if op in _STRIP_OPS:
             # Phase BL (v64, gap #66): Expose's halves — wiping Block is a burst of free damage (~a 4-damage hit); stripping
             # Artifact only matters against an Artifact enemy (it un-eats the debuffs that follow).

@@ -1,0 +1,6 @@
+{
+  "id": "echo_form",
+  "name": "Echo Form",
+  "kind": "buff",
+  "decay": "none"
+}

@@ -153,6 +153,15 @@ public sealed class ForgedCostShiftPower : BlankTheSpirePower
     {
         var card = cardPlay?.Card;
         if (card == null || card.Owner?.Creature != Owner) return;
+        // Phase BM (v65, gap #69): a REPLAY (PlayIndex > 0 — Burst / One-Two Punch / Duplication / Echo Form, our
+        // replay_next / echo_form) costs nothing, so it must not burn a budgeted "next N cards" use: only the first play
+        // of a series consumes one (and arms a granter's entry).
+        if (!cardPlay!.IsFirstInSeries)
+        {
+            if (_entries.Count > 0)
+                MainFile.Logger.Info($"[BM] cost_shift: replay #{cardPlay.PlayIndex + 1} of '{card.Id}' burns no discount use.");
+            return;
+        }
         bool changed = false;
         for (int i = _entries.Count - 1; i >= 0; i--)
         {

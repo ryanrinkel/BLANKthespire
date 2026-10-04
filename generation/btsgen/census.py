@@ -54,6 +54,9 @@ EXOTIC_STATUSES = frozenset({
     "temp_thorns",  # Phase AN (v44): the one-turn bristle (temp_focus joins focus in the specialty bucket)
     "vigor", "double_damage",  # Phase BF (v60): the base-game next-attack amplifiers
     "temp_strength_down", "strength_down", "doom",  # Phase BL (v64): enemy Strength loss + Doom
+    # Phase BM (v65, gaps #68/#69): the self-drawbacks + Echo Form
+    "no_draw", "no_energy_gain", "no_block_gain", "dex_decay", "focus_decay", "lose_strength", "lose_dexterity", "lose_focus",
+    "echo_form",
 })
 # W2.1: the SPECIALTY statuses — neither the over-used generic debuffs nor "exotic" mitigation/buff exotica.
 # Poison is the DoT debuff, Frail the block-side debuff, Focus the orb-class buff. Their own bucket so a

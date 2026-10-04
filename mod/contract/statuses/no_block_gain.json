@@ -1,0 +1,6 @@
+{
+  "id": "no_block_gain",
+  "name": "No Block",
+  "kind": "debuff",
+  "decay": "turn"
+}

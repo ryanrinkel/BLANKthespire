@@ -1,0 +1,6 @@
+{
+  "id": "no_draw",
+  "name": "No Draw",
+  "kind": "debuff",
+  "decay": "turn"
+}

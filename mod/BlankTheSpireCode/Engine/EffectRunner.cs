@@ -196,10 +196,18 @@ public static class EffectRunner
                     else await CommonActions.Draw(card, ctx);
                     break;
                 case "apply_status":
-                    if (card.TargetType == TargetType.RandomEnemy && !SelfBuffStatuses.Contains(e.Status ?? "")) // Phase AJ smoke
+                    if (card.TargetType == TargetType.RandomEnemy && !IsSelfStatus(e.Status)) // Phase AJ smoke (BM: + the self statuses)
                         MainFile.Logger.Info($"[AJ] random_enemy debuff '{e.Status}' from '{card.Id}' (BaseLib GetTargets rolls one enemy).");
                     if (e.Status is "temp_thorns" or "temp_focus") // Phase AN (v44) smoke: the one-turn shells apply (expiry logs from the power)
                         MainFile.Logger.Info($"[AN] {e.Status} +{amt} (this turn only) from '{card.Id}'.");
+                    // Phase BM (v65, gaps #68/#69): the self-drawbacks + Echo Form land on YOU whatever the card's target, through
+                    // ONE literal path (the lose_* trio is a NEGATIVE apply under a named var — no PowerVar to read — and every
+                    // apply logs the player's Artifact before/after: your own Artifact eats these like any debuff).
+                    if (BmSelfStatuses.Contains(e.Status ?? ""))
+                    {
+                        await ApplyBmSelfStatus(e.Status!, ctx, card.Owner.Creature, Math.Max(1, amt), spec.Title ?? spec.Id);
+                        break;
+                    }
                     // Phase BL (v64, gaps #66/#67): the enemy Strength-loss pair + Doom apply LITERALLY per target (so each
                     // target's Artifact / Strength / Doom can be read before + after — the smoke's sign-flip proof). The
                     // permanent `strength_down` MUST take this path: the card's "StrengthLoss" var is not a PowerVar, so
@@ -315,6 +323,54 @@ public static class EffectRunner
                         MainFile.Logger.Info($"[BL] strip_artifact (had {had}) on '{MonsterName(t)}' ('{spec.Title ?? spec.Id}').");
                     }
                     break;
+                case "replay_next":
+                {
+                    // Phase BM (v65, gap #69): sugar over the base game's play-count powers (Burst / One-Two Punch / Signal
+                    // Boost / Duplication — sealed, generic, shipped loc + icon), amount = count. The game replays the card
+                    // through CardModel.OnPlayWrapper (BeforeCardPlayed / OnPlay / AfterCardPlayed per replay), so a replayed
+                    // forged card re-runs this whole Execute; DataCard.BeforeCardPlayed logs each replay.
+                    int n = Math.Clamp(e.Count, 1, ReplayNextMaxCount);
+                    string kind = e.CardKind ?? "skill";
+                    var me = card.Owner.Creature;
+                    await (kind switch
+                    {
+                        "attack" => RelicApplyT<OneTwoPunchPower>(ctx, me, me, n),
+                        "power"  => RelicApplyT<SignalBoostPower>(ctx, me, me, n),
+                        "all"    => RelicApplyT<DuplicationPower>(ctx, me, me, n),
+                        _        => RelicApplyT<BurstPower>(ctx, me, me, n),
+                    });
+                    int now = kind switch
+                    {
+                        "attack" => me.GetPowerAmount<OneTwoPunchPower>(),
+                        "power"  => me.GetPowerAmount<SignalBoostPower>(),
+                        "all"    => me.GetPowerAmount<DuplicationPower>(),
+                        _        => me.GetPowerAmount<BurstPower>(),
+                    };
+                    MainFile.Logger.Info($"[BM] replay_next {kind} x{n} ('{spec.Title ?? spec.Id}'): stacks now {now}.");
+                    break;
+                }
+                case "block_next_turn":
+                {
+                    // Phase BM (v65, gap #70): the base BlockNextTurnPower (AfterBlockCleared -> GainBlock(Amount, Unpowered) ->
+                    // Remove). Fixed amount = the card's upgrade-aware "NextTurnBlock" var; scale "block" = your CURRENT Block
+                    // (Prolong reads creature.Block the same way).
+                    var me = card.Owner.Creature;
+                    bool scaled = e.Scale == "block";
+                    int n = scaled ? (int)me.Block : Math.Max(1, amt);
+                    if (n > 0) await RelicApplyT<BlockNextTurnPower>(ctx, me, me, n);
+                    MainFile.Logger.Info($"[BM] block_next_turn +{n} (scale={(scaled ? "block" : "fixed")}) ('{spec.Title ?? spec.Id}'): " +
+                                         $"next turn {me.GetPowerAmount<BlockNextTurnPower>()}.");
+                    break;
+                }
+                case "retain_hand":
+                {
+                    // Phase BM (v65, gap #70): Equilibrium — the base RetainHandPower (ShouldFlush -> false for its owner,
+                    // Decrement at the owner's turn end), amount 1.
+                    var me = card.Owner.Creature;
+                    await RelicApplyT<RetainHandPower>(ctx, me, me, 1);
+                    MainFile.Logger.Info($"[BM] retain_hand ('{spec.Title ?? spec.Id}'): Retain Hand now {me.GetPowerAmount<RetainHandPower>()}.");
+                    break;
+                }
                 case "gaptest_enemy_artifact":
                     // PHASE BL GAPTEST (not in the LLM contract — like apply_custom / summon_spike): give the card's
                     // target(s) N Artifact, so the smoke can prove an Artifact enemy does NOT gain Strength from a
@@ -1101,6 +1157,31 @@ public static class EffectRunner
         "vigor", "double_damage", // Phase BF (v60, gap #54): the base game's VigorPower / DoubleDamagePower
     ];
 
+    /// <summary>
+    /// Phase BM (v65, gap #68): the SELF-DRAWBACK statuses — debuffs a card puts on its OWN player as the price of a
+    /// strong effect (Battle Trance, Expect a Fight, Panic Button, Wraith Form, Biased Cognition, Friendship / Shared Fate /
+    /// Hyperbeam). They route to the player like a self-buff (self = SelfBuffStatuses ∪ SelfDebuffStatuses) but are worded
+    /// with their own sentences. Card-only: they are deliberately NOT in SelfBuffStatuses, so trigger payloads, relics,
+    /// potions, orbs and summons (which all key off SelfBuffStatuses) never accept them.
+    /// </summary>
+    public static readonly HashSet<string> SelfDebuffStatuses =
+    [
+        "no_draw", "no_energy_gain", "no_block_gain", "dex_decay", "focus_decay",
+        "lose_strength", "lose_dexterity", "lose_focus",
+    ];
+
+    /// <summary>Phase BM (v65, gaps #68/#69): every card-only status that lands on the player through
+    /// <see cref="ApplyBmSelfStatus"/> — the self-drawbacks plus Echo Form (a card-only self-buff, likewise kept out of
+    /// SelfBuffStatuses).</summary>
+    internal static readonly HashSet<string> BmSelfStatuses = new(SelfDebuffStatuses) { "echo_form" };
+
+    /// <summary>Phase BM (v65): does this status land on the PLAYER (a self-buff, a self-drawback or Echo Form)?</summary>
+    public static bool IsSelfStatus(string? status) =>
+        status != null && (SelfBuffStatuses.Contains(status) || BmSelfStatuses.Contains(status));
+
+    /// <summary>Phase BM (v65, gap #69): replay_next's count band (Burst / Burst+ = 1 / 2).</summary>
+    internal const int ReplayNextMaxCount = 2;
+
     /// <summary>Orb type for the <c>channel_orb</c> op (Phase G; lightning/frost/dark for the MVP).
     /// Internal so the trigger path (<see cref="TriggerRunner"/>) channels via the same mapping.</summary>
     internal static Type OrbTypeFor(string? orb) => orb switch
@@ -1815,8 +1896,47 @@ public static class EffectRunner
             "temp_focus"     => RelicApplyT<ForgedTempFocusPower>(ctx, target, source, amount),  // Phase AN (v44)
             "vigor"          => RelicApplyT<VigorPower>(ctx, target, source, amount),            // Phase BF (v60)
             "double_damage"  => RelicApplyT<DoubleDamagePower>(ctx, target, source, amount),     // Phase BF (v60)
+            // Phase BM (v65, gaps #68/#69): the self-drawbacks (sealed base powers, shipped loc + icons) and Echo Form. The
+            // lose_* trio is the base Friendship / Shared Fate / Hyperbeam recipe — a NEGATIVE stat apply (AllowNegative).
+            "no_draw"        => RelicApplyT<NoDrawPower>(ctx, target, source, amount),
+            "no_energy_gain" => RelicApplyT<NoEnergyGainPower>(ctx, target, source, amount),
+            "no_block_gain"       => RelicApplyT<NoBlockPower>(ctx, target, source, amount),
+            "dex_decay"      => RelicApplyT<WraithFormPower>(ctx, target, source, amount),
+            "focus_decay"    => RelicApplyT<BiasedCognitionPower>(ctx, target, source, amount),
+            "lose_strength"  => RelicApplyT<StrengthPower>(ctx, target, source, -amount),
+            "lose_dexterity" => RelicApplyT<DexterityPower>(ctx, target, source, -amount),
+            "lose_focus"     => RelicApplyT<FocusPower>(ctx, target, source, -amount),
+            "echo_form"      => RelicApplyT<EchoFormPower>(ctx, target, source, amount),
             _ => Task.CompletedTask,
         };
+
+    /// <summary>Phase BM (v65, gaps #68/#69): apply one of <see cref="BmSelfStatuses"/> to the player with a literal amount
+    /// and log the smoke tag with the player's Artifact before (and after, when it ate the apply — your own Artifact
+    /// negates a self-drawback like any debuff; base behaviour).</summary>
+    internal static async Task ApplyBmSelfStatus(string status, PlayerChoiceContext ctx, Creature me, int n, string? src)
+    {
+        int art0 = me.GetPowerAmount<ArtifactPower>();
+        await RelicApply(status, ctx, me, me, n);
+        int art1 = me.GetPowerAmount<ArtifactPower>();
+        if (status == "echo_form")
+        {
+            MainFile.Logger.Info($"[BM] echo_form applied by '{src}': Echo Form now {me.GetPowerAmount<EchoFormPower>()}.");
+            return;
+        }
+        string read = status switch
+        {
+            "no_draw"        => $"No Draw {me.GetPowerAmount<NoDrawPower>()}",
+            "no_energy_gain" => $"No Energy Gain {me.GetPowerAmount<NoEnergyGainPower>()}",
+            "no_block_gain"       => $"No Block {me.GetPowerAmount<NoBlockPower>()}",
+            "dex_decay"      => $"Wraith Form {me.GetPowerAmount<WraithFormPower>()}",
+            "focus_decay"    => $"Biased Cognition {me.GetPowerAmount<BiasedCognitionPower>()}",
+            "lose_strength"  => $"Str now {me.GetPowerAmount<StrengthPower>()}",
+            "lose_dexterity" => $"Dex now {me.GetPowerAmount<DexterityPower>()}",
+            _                => $"Focus now {me.GetPowerAmount<FocusPower>()}",
+        };
+        MainFile.Logger.Info($"[BM] self-debuff {status} +{n} on player (Artifact {art0}" +
+                             (art1 < art0 ? $"->{art1}, blocked" : "") + $") from '{src}': {read}.");
+    }
 
     /// <summary>Phase BL (v64, gaps #66/#67): the three enemy statuses that apply through the literal per-target path.</summary>
     internal static readonly HashSet<string> BlStatuses = ["temp_strength_down", "strength_down", "doom"];

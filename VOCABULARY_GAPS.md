@@ -711,7 +711,7 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Mechanic sketch:** a self-debuff route for `apply_status` (cards have none today) onto sealed base powers: `no_draw` ("You cannot draw additional cards this turn."), `no_energy_gain`, `no_block` ("You cannot gain Block from cards for {N} turns."), `dex_decay` / `focus_decay` ("At the start of your turn, lose {N} Dexterity."), and literal `lose_strength` / `lose_dexterity` / `lose_focus` ("Lose {N} Strength."). Priced negative like `lose_hp`; `no_draw` needs a draw or energy payoff on the same card; your own Artifact eats them. `end_turn` (VoidForm) is NOT here (#81).
 - **Buildable today?** No — `apply_status` requires amount ≥ 1 and routes debuffs to enemies.
 - **Priority:** Medium-High — 15 base cards, and the relic self-debuff path is the precedent.
-- **Status:** **planned (Wave 6, Phase BM, vocab v65)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BM.
+- **Status:** **done (2026-10-04, vocab v65, Phase BM)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BM.
 
 ### 69. Replay: play the next card(s) twice
 - **Surfaced by:** base-game audit (2026-10-01), "Replay / play-twice" row: `Burst`, `OneTwoPunch`, `SignalBoost`, `EchoForm`, `Transfigure`, `HiddenGem`, `SwordSagePower` (8 cards).
@@ -719,7 +719,7 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Mechanic sketch:** op `replay_next {card_type: skill|attack|power|all, count: 1..2}` as sugar over the base powers (`BurstPower` / `OneTwoPunchPower` / `SignalBoostPower` / `DuplicationPower`, the last rare-only), and `echo_form` via `apply_status` (`EchoFormPower`, rare Power, amount 1). Describe: "This turn, your next 2 Skills are played twice." / "Your next Power is played twice." / "The first card you play each turn is played twice." Not a payload. A replay re-runs the whole card, so `spend_forge` spends twice by design.
 - **Buildable today?** No.
 - **Priority:** Medium.
-- **Status:** **planned (Wave 6, Phase BM, vocab v65)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BM.
+- **Status:** **done (2026-10-04, vocab v65, Phase BM)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BM.
 
 ### 70. Next-turn Block and retain your hand
 - **Surfaced by:** base-game audit (2026-10-01), "Block carry and reflect variants" and "Retain variants" rows: `Prolong`, `ToricToughness`, `Equilibrium`.
@@ -727,7 +727,7 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Mechanic sketch:** `block_next_turn {amount | scale:"block"}` (base `BlockNextTurnPower`; the scaled form is an op because `apply_status` doesn't scale) → "Next turn, gain 8 Block." / "Next turn, gain Block equal to your current Block."; self-buff `retain_hand` (base `RetainHandPower`) → "Retain your hand this turn." Reflect stays out.
 - **Buildable today?** Partly — `ripen` can delay a fixed Block, but cannot carry `scale:"block"`, and there is no whole-hand retain.
 - **Priority:** Medium — small, ships with #68/#69.
-- **Status:** **planned (Wave 6, Phase BM, vocab v65)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BM.
+- **Status:** **done (2026-10-04, vocab v65, Phase BM)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BM.
 
 ### 71. On-kill payoff (`when target_killed`)
 - **Surfaced by:** base-game audit (2026-10-01), "On-kill payoff" row: `Feed`, `Sunder`, `KnockoutBlow`, `HandOfGreed`, `TheHunt`, `EchoingSlash` (6 cards).

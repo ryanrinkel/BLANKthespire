@@ -46,6 +46,23 @@ STATUS_NAME = {
     "vigor": "Vigor", "double_damage": "Double Damage",  # Phase BF (v60, gap #54): the base-game next-attack amplifiers
     # Phase BL (v64, gaps #66/#67): enemy Strength loss + Doom (mirrors ForgedCards.StatusDisplay / StatusName).
     "temp_strength_down": "Strength Down", "strength_down": "Strength Down", "doom": "Doom",
+    # Phase BM (v65, gaps #68/#69): the self statuses (their card text is _BM_SENTENCES; mirrors ForgedCards.StatusDisplay).
+    "no_draw": "No Draw", "no_energy_gain": "No Energy Gain", "no_block_gain": "No Block", "dex_decay": "Wraith Form",
+    "focus_decay": "Biased Cognition", "lose_strength": "Strength", "lose_dexterity": "Dexterity", "lose_focus": "Focus",
+    "echo_form": "Echo Form",
+}
+# Phase BM (v65, gaps #68/#69): the self-drawbacks + Echo Form read as their own sentences (the "Gain X." idiom would
+# misread a drawback). The {vars} are the names DataCard declares. Byte-lockstep with ForgedCards.BmStatusSentence.
+_BM_SENTENCES = {
+    "no_draw": "You cannot draw additional cards this turn.",
+    "no_energy_gain": "You cannot gain energy this turn.",
+    "no_block_gain": "You cannot gain Block from cards for {NoBlockTurns} turns.",
+    "dex_decay": "At the start of your turn, lose {DexDecay} Dexterity.",
+    "focus_decay": "At the start of your turn, lose {FocusDecay} Focus.",
+    "lose_strength": "Lose {SelfStrengthLoss} Strength.",
+    "lose_dexterity": "Lose {SelfDexterityLoss} Dexterity.",
+    "lose_focus": "Lose {SelfFocusLoss} Focus.",
+    "echo_form": "The first card you play each turn is played twice.",
 }
 # Self-buffs are worded "Gain" and always land on the player; debuffs are "Apply"-ed to the target.
 # Keep in lockstep with EffectRunner.SelfBuffStatuses (the C# single source of truth for buff-vs-debuff side).
@@ -261,6 +278,10 @@ def effect_literal(e: dict) -> str:
         if e.get("card_type"):
             ck = str(e["card_type"]).replace("\\", "\\\\").replace('"', '\\"')
             lit = f'{lit[:-1]}, CardKind: "{ck}")'
+    elif op == "replay_next":
+        # Phase BM (v65, gap #69): named CardKind / Count args (the cost_shift idiom). No amount.
+        ck = str(e.get("card_type", "skill")).replace("\\", "\\\\").replace('"', '\\"')
+        lit = f'new EffectSpec("replay_next", 0, CardKind: "{ck}", Count: {int(e.get("count", 1) or 1)})'
     elif op == "draw_until":
         # Phase BC (v57, gap #53): named CardKind arg (the type that stops the draw). No amount.
         ck = str(e.get("card_type", "non_attack")).replace("\\", "\\\\").replace('"', '\\"')
@@ -613,6 +634,17 @@ def _cost_shift_sentence(e: dict) -> str:
     return f"Your {plural} cost {amt} less {life}."
 
 
+def _replay_next_sentence(e: dict) -> str:
+    """Phase BM (v65, gap #69): "This turn, your next Skill is played twice." / "This turn, your next 2 Attacks are played
+    twice." / "Your next Power is played twice." (Signal Boost persists until used) / "This turn, your next card is played
+    twice." Literal count (no var). Byte-lockstep with ForgedCards.ReplayNextSentence."""
+    kind = str(e.get("card_type", "skill")).lower()
+    single = {"attack": "Attack", "power": "Power", "all": "card"}.get(kind, "Skill")
+    n = max(1, int(e.get("count", 1) or 1))
+    what = f"your next {n} {single}s are" if n > 1 else f"your next {single} is"
+    return f"{what[0].upper()}{what[1:]} played twice." if kind == "power" else f"This turn, {what} played twice."
+
+
 def describe(effects: list[dict], target: str) -> str:
     # STS2 AoE cards spell out "to ALL enemies" in their text (the game does not auto-append it), so the
     # target informs the wording. Keep in lockstep with ForgedCards.Describe() (the C# slot-runtime mirror).
@@ -730,6 +762,16 @@ def describe(effects: list[dict], target: str) -> str:
         elif op == "strip_artifact":
             # Phase BL (v64, gap #66): Expose, half two (flag-op, no var). Lockstep with ForgedCards.Describe.
             parts.append("Remove the enemy's Artifact.")
+        elif op == "replay_next":
+            # Phase BM (v65, gap #69): Burst / One-Two Punch / Signal Boost / Duplication. Lockstep with ForgedCards.Describe.
+            parts.append(_replay_next_sentence(e))
+        elif op == "block_next_turn":
+            # Phase BM (v65, gap #70): Prolong's two forms. Lockstep with ForgedCards.Describe.
+            parts.append("Next turn, gain Block equal to your current Block." if str(e.get("scale", "")).lower() == "block"
+                         else "Next turn, gain {NextTurnBlock} Block.")
+        elif op == "retain_hand":
+            # Phase BM (v65, gap #70): Equilibrium. Lockstep with ForgedCards.Describe.
+            parts.append("Retain your hand this turn.")
         elif op == "corruption":
             # Phase AB (gap #20): two sentences (joined by the "\n" that separates parts). Lockstep with ForgedCards.Describe.
             parts.append("Your Skills cost 0.")
@@ -814,6 +856,9 @@ def describe(effects: list[dict], target: str) -> str:
         elif op == "apply_status" and e["status"] == "doom" and str(e.get("scale", "")).lower() == "damage_dealt_unblocked":
             # Phase BL (v64, gap #67): Blight Strike. Lockstep with ForgedCards.Describe.
             parts.append("Apply Doom equal to the unblocked damage dealt.")
+        elif op == "apply_status" and e["status"] in _BM_SENTENCES:
+            # Phase BM (v65, gaps #68/#69): the self statuses' own sentences. Lockstep with ForgedCards.BmStatusSentence.
+            parts.append(_BM_SENTENCES[e["status"]])
         elif op == "apply_status":
             name = STATUS_NAME.get(e["status"], e["status"])
             buff = e["status"] in _BUFFS
