@@ -64,6 +64,7 @@ _PREFERRED_OPS = ["add_trigger", "transform_card", "graft_card", "spread_debuffs
                   "ethereal", "innate", "sly",  # Phase BB (v56): the base-game Sly keyword
                   "exhaust_card", "draw_until",  # Phase BC (v57): the hand ops
                   "held_discount",  # Phase BD (v58): the Sands of Time retain payoff
+                  "put_back", "grant_keyword",  # Phase BO (v66): Headbutt / Snap card-flow utilities
                   "lose_hp"]
 _PREFERRED_SCALES = ["cards_in_hand", "cards_retained", "unspent_energy_last_turn", "forged",
                      "damage_dealt_unblocked", "target_debuff_count", "tag_cards_owned",

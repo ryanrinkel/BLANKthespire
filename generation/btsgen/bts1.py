@@ -25,7 +25,13 @@ import sys
 import zlib
 from pathlib import Path
 
-VOCAB_VERSION = 65  # must be <= ForgedCards.VocabVersion (65: Phase BM — BASE-POWER STATUSES: card-only self-drawback
+VOCAB_VERSION = 66  # must be <= ForgedCards.VocabVersion (66: Phase BO — RECURSION, PUT-BACK, DRAW TUTOR, ON_SHUFFLE,
+                    # GRANT_KEYWORD: card-only flag-ops return_to_hand (Particle Wall), to_draw_top (Rebound),
+                    # return_next_turn (Bolas), shuffle_hand (Reboot); ops put_back {from hand|discard, cards choose}
+                    # (Thinking Ahead / Headbutt) and grant_keyword {keyword retain|ethereal|sly, cards choose, card_type?}
+                    # (Snap / Hand Trick); retrieve_card pile "draw" + card_type (Secret Weapon); exhaust_card pile "draw";
+                    # trigger on_shuffle. No codec change.)
+                    # 65: Phase BM — BASE-POWER STATUSES: card-only self-drawback
                     # statuses no_draw / no_energy_gain / no_block_gain / dex_decay / focus_decay / lose_strength / lose_dexterity /
                     # lose_focus (they land on the player), echo_form (rare Power), card-only ops replay_next {card_type,
                     # count} (Burst / One-Two Punch / Signal Boost / Duplication), block_next_turn {amount | scale block}

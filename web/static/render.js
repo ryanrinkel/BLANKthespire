@@ -502,6 +502,7 @@ const TRIGGER_PREFIX = {
   turn_start: "At the start of each turn", turn_end: "At the end of each turn",
   ripen: "After it ripens in hand", on_hp_lost: "Whenever you lose HP",
   on_poison_damage: "Whenever an enemy takes Poison damage", // Phase BE (v59, gap #56)
+  on_shuffle: "Whenever you shuffle your draw pile", // Phase BO (v66, gap #74)
 };
 // Phase BI (v61, gap #62): the card-trigger filters read exactly like the card text (cardgen._trigger_head /
 // ForgedCards.TriggerSentence): "Whenever you play an Attack", "Every 3rd time you play an Attack",
@@ -512,6 +513,7 @@ const REACTIVE_HEAD = {
   on_damage_dealt: "Whenever you deal damage", on_block_gained: "Whenever you gain Block",
   attacked: "Whenever you are attacked", on_blade_played: "Whenever you play your blade",
   on_poison_damage: "Whenever an enemy takes Poison damage",
+  on_shuffle: "Whenever you shuffle your draw pile", // Phase BO (v66, gap #74)
 };
 const TRIGGER_KIND_WORDS = { attack: "an Attack", skill: "a Skill", power: "a Power", non_attack: "a non-Attack card", status: "a Status" };
 function trigHead(e) {
@@ -623,18 +625,22 @@ function effPhrase(e, target) {
     }
     case "heal": return `Heal ${a ?? ""}`;
     case "discard": return `Discard ${a ?? 1} ${e.cards === "choose" ? "chosen" : "random"} card${(a ?? 1) == 1 ? "" : "s"}`; // Phase AP (v46)
-    case "retrieve_card": { // Phase AP (v46)
+    case "retrieve_card": { // Phase AP (v46); Phase BO (v66): + the draw-pile tutor and the card_type filter
       const n = a ?? 1;
+      const what = { attack: "Attack", skill: "Skill", power: "Power", non_attack: "non-Attack card" }[e.card_type] || "card";
+      if (e.pile === "draw")
+        return `Put ${n} ${e.cards === "choose" ? "" : "random "}${what}${n == 1 ? "" : "s"} from your draw pile into your hand`;
       const pile = e.pile === "exhaust" ? "exhaust" : "discard";
-      return e.cards === "choose" ? `Return ${n} chosen card${n == 1 ? "" : "s"} from your ${pile} pile to hand`
-                                  : `Return ${n} random card${n == 1 ? "" : "s"} from your ${pile} pile to hand`;
+      return e.cards === "choose" ? `Return ${n} chosen ${what}${n == 1 ? "" : "s"} from your ${pile} pile to hand`
+                                  : `Return ${n} random ${what}${n == 1 ? "" : "s"} from your ${pile} pile to hand`;
     }
     case "exhaust_card": { // Phase BC (v57, gap #52)
       const what = { attack: "Attack", skill: "Skill", power: "Power", non_attack: "non-Attack card" }[e.card_type] || "card";
       const n = a ?? 1;
-      if (e.cards === "all") return `Exhaust all ${what}s in your hand`;
-      if (e.cards === "up_to") return `Exhaust up to ${n} ${what}${n == 1 ? "" : "s"} in your hand`;
-      return `Exhaust ${n} ${e.cards === "random" ? "random " : ""}${what}${n == 1 ? "" : "s"} in your hand`;
+      const where = e.pile === "draw" ? "draw pile" : "hand"; // Phase BO (v66): + the draw pile
+      if (e.cards === "all") return `Exhaust all ${what}s in your ${where}`;
+      if (e.cards === "up_to") return `Exhaust up to ${n} ${what}${n == 1 ? "" : "s"} in your ${where}`;
+      return `Exhaust ${n} ${e.cards === "random" ? "random " : ""}${what}${n == 1 ? "" : "s"} in your ${where}`;
     }
     case "draw_until": return `Draw cards until you draw ${{ attack: "an Attack", skill: "a Skill", power: "a Power" }[e.card_type] || "a non-Attack card"}`; // Phase BC (v57, gap #53)
     case "add_status_card": { // Phase AP (v46)
@@ -659,6 +665,18 @@ function effPhrase(e, target) {
     case "block_next_turn": // Phase BM (v65, gap #70): Prolong
       return e.scale === "block" ? "Next turn, gain Block equal to your current Block" : `Next turn, gain ${a ?? ""} Block`;
     case "retain_hand": return "Retain your hand this turn"; // Phase BM (v65, gap #70): Equilibrium
+    // Phase BO (v66, gaps #74/#75): lockstep with cardgen.describe.
+    case "return_to_hand": return "Returns to your hand after you play it";
+    case "to_draw_top": return "Goes on top of your draw pile after you play it";
+    case "return_next_turn": return "At the start of your next turn, return this to your hand";
+    case "put_back": return e.from === "discard" ? "Put a card from your discard pile on top of your draw pile"
+                                                 : "Put a card from your hand on top of your draw pile";
+    case "shuffle_hand": return "Shuffle your hand and discard pile into your draw pile";
+    case "grant_keyword": {
+      const one = { attack: "an Attack", skill: "a Skill", power: "a Power", non_attack: "a non-Attack card" }[e.card_type] || "a card";
+      const gains = { sly: "is Sly this turn", ethereal: "gains Ethereal" }[e.keyword] || "gains Retain";
+      return `Choose ${one} in your hand. It ${gains}`;
+    }
     case "exhaust": return "Exhaust";
     case "innate": return "Innate";
     case "retain": return "Retain";

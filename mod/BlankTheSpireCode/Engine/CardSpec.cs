@@ -94,7 +94,9 @@ public sealed record EffectSpec(string Op, int Amount = 0, string? Status = null
     string? StatusCard = null, // Phase AP (v46): the add_status_card kind (dazed/wound/burn)
     int GrowHeld = 0, // Phase BD (v58, gap #57): +GrowHeld damage/Block per turn THIS card was retained (Windmill Strike)
     int EveryN = 0, // Phase BI (v61, gap #62): on add_trigger, fire only on every Nth event (2..9, counted per combat)
-    string? HitsScale = null) // Phase BK (v63, gap #65): a damage op's HIT COUNT comes from a live read (Finisher / Whirlwind)
+    string? HitsScale = null, // Phase BK (v63, gap #65): a damage op's HIT COUNT comes from a live read (Finisher / Whirlwind)
+    string? From = null, // Phase BO (v66, gap #74): put_back's source pile (hand / discard) — Thinking Ahead / Headbutt
+    string? Keyword = null) // Phase BO (v66, gap #75): grant_keyword's keyword (retain / ethereal / sly) — Snap / Hand Trick
 {
     /// <summary>Phase BK (v63, gap #65): this <c>damage</c> op hits once per unit of a live read (<see cref="HitsScale"/> =
     /// <c>x</c> / <c>attacks_played_this_turn</c> / <c>cards_in_hand</c> / <c>skills_in_hand</c> / <c>plays_this_combat</c> /
@@ -174,6 +176,13 @@ public sealed record CardSpec(
     /// run deck for the rest of the run when played (see <see cref="DataCard.GetResultPileTypeForCardPlay"/> +
     /// EffectRunner's purge case). Read by the DataCard pile-type override, which is why it lives on the spec.</summary>
     public bool HasPurge => Effects.Any(e => e.Op == "purge");
+
+    /// <summary>Phase BO (v66, gap #74): the self-routing flag-ops (one per card, validator-exclusive). Read by DataCard's pile
+    /// overrides: <c>return_to_hand</c> (GetResultPileTypeForCardPlay, Particle Wall), <c>to_draw_top</c>
+    /// (ModifyCardPlayResultPileTypeAndPosition, the ReboundPower pattern) and <c>return_next_turn</c> (BeforeHandDraw, Bolas).</summary>
+    public bool HasReturnToHand => Effects.Any(e => e.Op == "return_to_hand");
+    public bool HasToDrawTop => Effects.Any(e => e.Op == "to_draw_top");
+    public bool HasReturnNextTurn => Effects.Any(e => e.Op == "return_next_turn");
 
     /// <summary>The CardSpec for an unfilled forged slot: harmless valid enums, no effects, hidden.</summary>
     public static CardSpec EmptySlot(string id) => new(

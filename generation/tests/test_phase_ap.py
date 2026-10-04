@@ -127,7 +127,7 @@ def _t_retrieve(v: CardValidator) -> None:
     check(v.validate(headbutt).ok, f"Headbutt (damage + retrieve discard) validates: {v.validate(headbutt).errors}")
     bad = [
         (_card([{"op": "retrieve_card", "cards": "choose"}]), "pile", "missing pile"),
-        (_card([_rc("draw", "choose")]), "pile", "pile draw"),
+        # Phase BO (v66, plan §7 decision 10): pile "draw" is now LEGAL (the Secret Weapon tutor) — see test_phase_bo.
         (_card([_rc("hand", "choose")]), "pile", "pile hand"),
         (_card([{"op": "retrieve_card", "pile": "discard"}]), "cards", "missing cards"),
         (_card([_rc("discard", "all")]), "cards", "cards all"),

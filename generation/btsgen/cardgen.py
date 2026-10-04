@@ -98,13 +98,29 @@ def _retrieve_sentence(e: dict) -> str:
     # Phase AP (v46): the retrieve_card sentence — "Return a random card from your discard pile to your hand." /
     # "Return 2 cards of your choice from your exhaust pile to your hand." Literal numbers (no var, like add_card); an
     # absent/unknown pile reads as the discard pile, an absent mode as random. Mirrors ForgedCards.RetrieveSentence.
+    # Phase BO (v66, gap #74): the optional card_type filter, and the DRAW-pile tutor — "Put an Attack from your draw
+    # pile into your hand." (choose) / "Put a random Skill from your draw pile into your hand." (random).
     n = max(1, int(e.get("amount", 1) or 1))
+    one, many = _hand_kind_words(e.get("card_type"))
+    noun = one.split(" ", 1)[1]
+    choose = str(e.get("cards", "")).lower() == "choose"
+    if str(e.get("pile", "")).lower() == "draw":
+        pick = (f"{n} {many}" if n > 1 else one) if choose else (f"{n} random {many}" if n > 1 else f"a random {noun}")
+        return f"Put {pick} from your draw pile into your hand."
     pile = "exhaust pile" if str(e.get("pile", "")).lower() == "exhaust" else "discard pile"
-    if str(e.get("cards", "")).lower() == "choose":
-        what = f"{n} cards of your choice" if n > 1 else "a card of your choice"
+    if choose:
+        what = f"{n} {many} of your choice" if n > 1 else f"{one} of your choice"
     else:
-        what = f"{n} random cards" if n > 1 else "a random card"
+        what = f"{n} random {many}" if n > 1 else f"a random {noun}"
     return f"Return {what} from your {pile} to your hand."
+
+
+def _grant_keyword_sentence(e: dict) -> str:
+    # Phase BO (v66, gap #75): "Choose a card in your hand. It gains Retain." / "Choose a Skill in your hand. It is Sly this
+    # turn." / "... It gains Ethereal." Mirrors ForgedCards.GrantKeywordSentence.
+    kw = str(e.get("keyword", "")).lower()
+    gains = {"sly": "is Sly this turn", "ethereal": "gains Ethereal"}.get(kw, "gains Retain")
+    return f"Choose {_hand_kind_words(e.get('card_type'))[0]} in your hand. It {gains}."
 
 
 def _status_card_sentence(e: dict) -> str:
@@ -142,7 +158,8 @@ def _exhaust_card_sentence(e: dict) -> str:
         what = f"up to {n} {many}"
     else:
         what = f"{n} {many}" if n > 1 else one
-    return f"Exhaust {what} in your hand."
+    # Phase BO (v66, gap #74): + the draw pile ("Exhaust a card in your draw pile.").
+    return f"Exhaust {what} in your {'draw pile' if str(e.get('pile', '')).lower() == 'draw' else 'hand'}."
 
 
 def _draw_until_sentence(e: dict) -> str:
@@ -278,6 +295,19 @@ def effect_literal(e: dict) -> str:
         if e.get("card_type"):
             ck = str(e["card_type"]).replace("\\", "\\\\").replace('"', '\\"')
             lit = f'{lit[:-1]}, CardKind: "{ck}")'
+        if str(e.get("pile", "")).lower() == "draw":  # Phase BO (v66, gap #74): exhaust from the draw pile
+            lit = f'{lit[:-1]}, Pile: "draw")'
+    elif op == "put_back":
+        # Phase BO (v66, gap #74): named From / Cards args (Thinking Ahead / Headbutt). No amount (one card).
+        frm = str(e.get("from", "hand")).replace("\\", "\\\\").replace('"', '\\"')
+        lit = f'new EffectSpec("put_back", 0, Cards: "choose", From: "{frm}")'
+    elif op == "grant_keyword":
+        # Phase BO (v66, gap #75): named Cards / Keyword (+ CardKind) args (Snap / Hand Trick). No amount.
+        kw = str(e.get("keyword", "retain")).replace("\\", "\\\\").replace('"', '\\"')
+        lit = f'new EffectSpec("grant_keyword", 0, Cards: "choose", Keyword: "{kw}")'
+        if e.get("card_type"):
+            ck = str(e["card_type"]).replace("\\", "\\\\").replace('"', '\\"')
+            lit = f'{lit[:-1]}, CardKind: "{ck}")'
     elif op == "replay_next":
         # Phase BM (v65, gap #69): named CardKind / Count args (the cost_shift idiom). No amount.
         ck = str(e.get("card_type", "skill")).replace("\\", "\\\\").replace('"', '\\"')
@@ -291,6 +321,9 @@ def effect_literal(e: dict) -> str:
         pile = str(e.get("pile", "discard")).replace("\\", "\\\\").replace('"', '\\"')
         cards = str(e.get("cards", "random")).replace("\\", "\\\\").replace('"', '\\"')
         lit = f'new EffectSpec("retrieve_card", {e.get("amount", 1)}, Pile: "{pile}", Cards: "{cards}")'
+        if e.get("card_type"):  # Phase BO (v66, gap #74): the tutor's type filter (Secret Weapon = attack)
+            ck = str(e["card_type"]).replace("\\", "\\\\").replace('"', '\\"')
+            lit = f'{lit[:-1]}, CardKind: "{ck}")'
     elif op == "add_status_card":
         # Phase AP (v46): named StatusCard / Pile args. Amount = Status cards added (default 1).
         kind = str(e.get("card", "wound")).replace("\\", "\\\\").replace('"', '\\"')
@@ -609,6 +642,8 @@ def trigger_sentence(t: dict) -> str:
         when = "Whenever you play your blade"
     elif trig == "on_poison_damage":  # Phase BE (v59, gap #56): the Venom engine. Mirrors ForgedCards.TriggerSentence.
         when = "Whenever an enemy takes Poison damage"
+    elif trig == "on_shuffle":  # Phase BO (v66, gap #74). Mirrors ForgedCards.TriggerSentence.
+        when = "Whenever you shuffle your draw pile"
     else:
         when = "At the end of your turn"
     when = _trigger_head(t, when)
@@ -772,6 +807,22 @@ def describe(effects: list[dict], target: str) -> str:
         elif op == "retain_hand":
             # Phase BM (v65, gap #70): Equilibrium. Lockstep with ForgedCards.Describe.
             parts.append("Retain your hand this turn.")
+        # Phase BO (v66, gaps #74/#75): the recursion flag-ops, put-back, shuffle and grant_keyword. Byte-lockstep with
+        # ForgedCards.Describe (the C# literals are written by hand; test_phase_bo greps them).
+        elif op == "return_to_hand":
+            parts.append("Returns to your hand after you play it.")
+        elif op == "to_draw_top":
+            parts.append("Goes on top of your draw pile after you play it.")
+        elif op == "return_next_turn":
+            parts.append("At the start of your next turn, return this to your hand.")
+        elif op == "put_back":
+            parts.append("Put a card from your discard pile on top of your draw pile."
+                         if str(e.get("from", "")).lower() == "discard"
+                         else "Put a card from your hand on top of your draw pile.")
+        elif op == "shuffle_hand":
+            parts.append("Shuffle your hand and discard pile into your draw pile.")
+        elif op == "grant_keyword":
+            parts.append(_grant_keyword_sentence(e))
         elif op == "corruption":
             # Phase AB (gap #20): two sentences (joined by the "\n" that separates parts). Lockstep with ForgedCards.Describe.
             parts.append("Your Skills cost 0.")

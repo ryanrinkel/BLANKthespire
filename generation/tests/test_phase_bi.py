@@ -127,7 +127,7 @@ def _t_engine() -> None:
     check("MinEveryN = 2, MaxEveryN = 9" in fc, "the every_n band")
     check("'every_n' can't be combined with 'once_per_combat'" in fc, "every_n + once_per_combat is rejected")
     check('t.Target != "random_enemy"' in fc, "ValidateTrigger allows random_enemy")
-    check("e.Op is not (\"exhaust_card\" or \"draw_until\" or \"add_trigger\")" in fc, "the stray card_type rule admits add_trigger")
+    check("e.Op is not (\"exhaust_card\" or \"draw_until\" or \"add_trigger\"" in fc, "the stray card_type rule admits add_trigger")  # Phase BO (v66) widened it
 
 
 def _t_rules_and_describe() -> None:

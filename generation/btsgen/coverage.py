@@ -79,6 +79,8 @@ EXOTIC_MENU_V2 = [
 REACTIVE_MENU_V2 = REACTIVE_MENU + [
     ("on_card_drawn", 'REQUIRED: add an ongoing power (op "add_trigger", trigger "on_card_drawn", once_per_turn) that rewards drawing a card.'),
     ("on_damage_dealt", 'REQUIRED: add an ongoing power (op "add_trigger", trigger "on_damage_dealt", once_per_turn) that rewards dealing damage.'),
+    # Phase BO (v66, gap #74): the reshuffle payoff (a thin deck shuffles often; shuffle_hand does it on demand).
+    ("on_shuffle", 'REQUIRED: add an ongoing power (op "add_trigger", trigger "on_shuffle") that pays off each time you shuffle your draw pile (1-3 Block or a draw).'),
 ]
 WHEN_MENU_V2 = WHEN_MENU + [
     ("hand_size_ge", 'REQUIRED: gate a bonus with `when` hand_size_ge value:4 (a full-hand payoff).'),

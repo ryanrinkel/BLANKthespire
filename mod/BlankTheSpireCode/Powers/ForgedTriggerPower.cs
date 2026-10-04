@@ -235,6 +235,18 @@ public abstract class ForgedTriggerPower : BlankTheSpirePower
         await FireReactive("on_damage_dealt", ctx);
     }
 
+    // Phase BO (v66, gap #74): on_shuffle — whenever the owner shuffles the discard pile into the draw pile (the game's
+    // CardPileCmd.Shuffle raises Hook.AfterShuffle once per shuffle: an empty-draw-pile refill or a shuffle_hand / Reboot).
+    // The ctx may come from a hand draw (turn start), so like on_poison_damage it is NOT stored in _combatCtx. A payload that
+    // draws into another shuffle is stopped by FireReactive's _firing guard; once_per_* / every_n / this_turn apply as usual.
+    public override async Task AfterShuffle(PlayerChoiceContext ctx, Player shuffler)
+    {
+        if (Trigger?.Trigger != "on_shuffle" || shuffler != Owner.Player) return;
+        MainFile.Logger.Info($"[BO] on_shuffle fired ('{SourceSpec?.Title ?? SourceSpec?.Id}', draw pile " +
+                             $"{shuffler.PlayerCombatState?.DrawPile.Cards.Count ?? 0}).");
+        await FireReactive("on_shuffle", ctx);
+    }
+
     // on_block_gained: when the owner gains Block (Juggernaut). AfterBlockGained hands no ctx → use the captured one.
     public override async Task AfterBlockGained(Creature creature, decimal amount, ValueProp props, CardModel cardSource)
     {
@@ -314,6 +326,7 @@ public abstract class ForgedTriggerPower : BlankTheSpirePower
                 "on_block_gained" => "On Block Gained", "attacked" => "When Attacked",
                 "on_blade_played" => "On Blade Played", // Phase T
                 "on_poison_damage" => "On Poison Damage", // Phase BE (v59)
+                "on_shuffle" => "On Shuffle", // Phase BO (v66)
                 _ => "Turn End",
             };
             string desc = t != null ? ForgedCards.DescribeTrigger(t) : "A forged trigger.";

@@ -5,7 +5,7 @@
       "id": "retain_hold",
       "name": "Retain / hold & build",
       "description": "Hold cards turn after turn, curate the perfect hand, then unleash it once the payoff is ready.",
-      "build_notes": "What players love here (the Watcher's Windmill Strike, Sands of Time and Establishment; Well-Laid Plans): patience that visibly pays off, and a hand that works as a curated toolkit. Give cards `retain`, bonuses for having been held (`retained_last_turn`), payoffs that read how many cards were held (`cards_retained`), and payoffs ON the held card itself (v58: a damage/Block `grow_held` that climbs each turn it stays in hand - Windmill Strike; a `held_discount` bomb that gets cheaper each held turn - Sands of Time), and enough defense to survive the build-up turns. `retain_hand` (v65, Equilibrium) keeps the whole hand this turn.",
+      "build_notes": "What players love here (the Watcher's Windmill Strike, Sands of Time and Establishment; Well-Laid Plans): patience that visibly pays off, and a hand that works as a curated toolkit. Give cards `retain`, bonuses for having been held (`retained_last_turn`), payoffs that read how many cards were held (`cards_retained`), and payoffs ON the held card itself (v58: a damage/Block `grow_held` that climbs each turn it stays in hand - Windmill Strike; a `held_discount` bomb that gets cheaper each held turn - Sands of Time), and enough defense to survive the build-up turns. `retain_hand` (v65, Equilibrium) keeps the whole hand this turn. (v66) `grant_keyword` gives a hand card Retain (Snap), `put_back` sets up next turn's draw (Thinking Ahead), `return_to_hand` keeps a key skill coming back (Particle Wall).",
       "metaphors": [
         "the held breath",
         "coiling",
@@ -41,7 +41,10 @@
           "add_trigger",
           "grow_held",
           "held_discount",
-          "retain_hand"
+          "retain_hand",
+          "grant_keyword",
+          "put_back",
+          "return_to_hand"
         ],
         "class_kind": "normal"
       },
@@ -49,7 +52,9 @@
       "buildable": true,
       "gap_refs": [
         "VOCABULARY_GAPS#5",
-        "VOCABULARY_GAPS#70"
+        "VOCABULARY_GAPS#70",
+        "VOCABULARY_GAPS#74",
+        "VOCABULARY_GAPS#75"
       ],
       "base_synergies": {
         "hooks": [
@@ -537,7 +542,7 @@
       "id": "ascetic_purge",
       "name": "Ascetic / small deck",
       "description": "Run a lean deck that cycles fast and assembles all the pieces for a win.",
-      "build_notes": "The identity is a SMALL deck. Heavy draw and cycling make a thin deck empty its draw pile every turn or two. Exhaust (`exhaust_card`: burn chosen hand cards), ethereal and purge effects let the player manipulate their deck size, and `draw_until` cycles the thin deck; example payoffs might include Grand-Finale-style finishers gated on `when:{\"kind\":\"draw_pile_empty\"}` or a few-card combo engine that wins the game if those are the only cards left. (Purge is a supporting tool the player has to EARN: gate `purge_card` behind a condition they must engineer (`draw_pile_empty`, `cards_played_this_turn_ge`), or put self-`purge` only on a costly one-shot whose play takes setup. Never a free, repeatable purge skill.",
+      "build_notes": "The identity is a SMALL deck. Heavy draw and cycling make a thin deck empty its draw pile every turn or two. Exhaust (`exhaust_card`: burn chosen hand cards), ethereal and purge effects let the player manipulate their deck size, and `draw_until` cycles the thin deck; example payoffs might include Grand-Finale-style finishers gated on `when:{\"kind\":\"draw_pile_empty\"}` or a few-card combo engine that wins the game if those are the only cards left. (Purge is a supporting tool the player has to EARN: gate `purge_card` behind a condition they must engineer (`draw_pile_empty`, `cards_played_this_turn_ge`), or put self-`purge` only on a costly one-shot whose play takes setup. Never a free, repeatable purge skill. A thin deck digs (v66): `retrieve_card` `pile:\"draw\"` tutors the card you need (Secret Weapon), `to_draw_top` replays a key card next draw, and a thin deck reshuffles often, so an `on_shuffle` power or `shuffle_hand` (Reboot) pays off.",
       "metaphors": [
         "burning the chaff",
         "the ascetic's discipline",
@@ -571,14 +576,19 @@
           "damage",
           "draw_pile_empty",
           "exhaust_card",
-          "draw_until"
+          "draw_until",
+          "retrieve_card",
+          "to_draw_top",
+          "shuffle_hand",
+          "on_shuffle"
         ],
         "class_kind": "normal"
       },
       "mechanic_kind": "purge",
       "buildable": true,
       "gap_refs": [
-        "VOCABULARY_GAPS#19"
+        "VOCABULARY_GAPS#19",
+        "VOCABULARY_GAPS#74"
       ],
       "base_synergies": {
         "hooks": [
@@ -2438,7 +2448,7 @@
       "id": "madness_discard",
       "name": "Madness / discard-matters",
       "description": "Churn your hand: discard is fuel, and some cards pay out when you throw them away.",
-      "build_notes": "Touchstone: the base-game Reflex and Sly cards. Discard is a resource: pair discard outlets (random or the player's choice, `scry`, discard-then-draw) with cards that are fine to play but even better when an effect discards them (an `on_discard` trigger that adds value on top of a normal play, or the `sly` keyword: discarded by an effect, the card plays itself for free). Add payoffs that react to discards, and `retrieve_card` to bring a key card back. Every card should be playable on its own; avoid cards that do nothing unless discarded. Payoffs (v62): `discards_this_turn` (Memento Mori) and `discard_pile_size` (Stack) scale to the churn.",
+      "build_notes": "Touchstone: the base-game Reflex and Sly cards. Discard is a resource: pair discard outlets (random or the player's choice, `scry`, discard-then-draw) with cards that are fine to play but even better when an effect discards them (an `on_discard` trigger that adds value on top of a normal play, or the `sly` keyword: discarded by an effect, the card plays itself for free). Add payoffs that react to discards, and `retrieve_card` to bring a key card back. Every card should be playable on its own; avoid cards that do nothing unless discarded. Payoffs (v62): `discards_this_turn` (Memento Mori) and `discard_pile_size` (Stack) scale to the churn. Recursion (v66): `put_back` stacks a discarded card on top of your draw pile (Headbutt), `grant_keyword` makes a hand card Sly this turn (Hand Trick), `return_next_turn` brings an attack back next turn (Bolas).",
       "metaphors": [
         "the gambler",
         "sifting the ashes",
@@ -2481,7 +2491,10 @@
           "retrieve_card",
           "sly",
           "discards_this_turn",
-          "discard_pile_size"
+          "discard_pile_size",
+          "put_back",
+          "grant_keyword",
+          "return_next_turn"
         ],
         "class_kind": "normal"
       },
@@ -2489,7 +2502,9 @@
       "buildable": true,
       "gap_refs": [
         "VOCABULARY_GAPS#17",
-        "VOCABULARY_GAPS#63"
+        "VOCABULARY_GAPS#63",
+        "VOCABULARY_GAPS#74",
+        "VOCABULARY_GAPS#75"
       ],
       "base_synergies": {
         "hooks": [
@@ -2695,7 +2710,7 @@
       "id": "exhaust_pyre",
       "name": "Pyre / exhaust-matters",
       "description": "Burn cards away for power: every Exhaust feeds the engine.",
-      "build_notes": "This deck wants to exhaust the cards in its hand and gets bonuses for doing so. Look for triggered effects that happen on exhaust, cards that have effects when exhausted or return something from the exhausted pool to hand or discard. `exhaust_card` (v57) is the fuel op: burn other hand cards on purpose (choose / random / up to N / all non-Attacks) so every on_exhaust payoff fires. Payoffs read the pile (v62): `exhaust_pile_size` scales damage/Block to the ashes, `exhausted_this_turn` gates an Evil Eye bonus.",
+      "build_notes": "This deck wants to exhaust the cards in its hand and gets bonuses for doing so. Look for triggered effects that happen on exhaust, cards that have effects when exhausted or return something from the exhausted pool to hand or discard. `exhaust_card` (v57) is the fuel op: burn other hand cards on purpose (choose / random / up to N / all non-Attacks) so every on_exhaust payoff fires. Payoffs read the pile (v62): `exhaust_pile_size` scales damage/Block to the ashes, `exhausted_this_turn` gates an Evil Eye bonus. `exhaust_card` `pile:\"draw\"` (v66) burns a card in your draw pile.",
       "metaphors": [
         "the pyre",
         "ashes",
@@ -2739,7 +2754,8 @@
       "gap_refs": [
         "VOCABULARY_GAPS#20",
         "VOCABULARY_GAPS#63",
-        "VOCABULARY_GAPS#64"
+        "VOCABULARY_GAPS#64",
+        "VOCABULARY_GAPS#74"
       ],
       "base_synergies": {
         "hooks": [
@@ -3612,7 +3628,7 @@
       "id": "fleeting_flux",
       "name": "Fleeting / ethereal",
       "description": "Over-powered cards that vanish at end of turn: play them now or lose them.",
-      "build_notes": "Every card here asks a question the moment it's drawn: play it now or lose it. Ethereal cards are over-statted for their cost, but a deck can't hold many before the waste adds up, so pair them with draw, energy and cheap enablers. Crosses well with small-deck (Ascetic) and combo plans, where the same ethereal cards come around every turn.",
+      "build_notes": "Every card here asks a question the moment it's drawn: play it now or lose it. Ethereal cards are over-statted for their cost, but a deck can't hold many before the waste adds up, so pair them with draw, energy and cheap enablers. Crosses well with small-deck (Ascetic) and combo plans, where the same ethereal cards come around every turn. `grant_keyword` (v66) can make another hand card Ethereal for a fast exhaust.",
       "metaphors": [
         "the fading spark",
         "the melting snow",
@@ -3643,12 +3659,15 @@
         "ops": [
           "ethereal",
           "draw",
-          "damage"
+          "damage",
+          "grant_keyword"
         ],
         "class_kind": "normal"
       },
       "buildable": true,
-      "gap_refs": [],
+      "gap_refs": [
+        "VOCABULARY_GAPS#75"
+      ],
       "base_synergies": {
         "hooks": [
           "ethereal",

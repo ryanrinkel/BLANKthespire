@@ -759,7 +759,7 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Mechanic sketch:** flag-ops (one per card, exclusive with each other and with `exhaust` / `purge` / Power) `return_to_hand` ("Returns to your hand after you play it."; cost ≥ 1, no `gain_energy` / `draw` on the card), `to_draw_top` ("Goes on top of your draw pile after you play it."), `return_next_turn` ("At the start of your next turn, return this to your hand."; never from exhaust/purge). `put_back {from: hand|discard, cards: choose, amount: 1}` ("Put a card from your hand on top of your draw pile."), optional `shuffle_hand`. `retrieve_card pile:"draw"` + `card_type` ("Put an Attack from your draw pile into your hand.") and `exhaust_card pile:"draw"`. Trigger `on_shuffle` ("Whenever you shuffle your draw pile, …"). Default (plan §7): accept reversing the "never the draw pile" `retrieve_card` rule, said in the row.
 - **Buildable today?** No — `retrieve_card` reads discard/exhaust only and no card routes itself.
 - **Priority:** Medium.
-- **Status:** **planned (Wave 6, Phase BO, vocab v67)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BO.
+- **Status:** **done (2026-10-04, vocab v66, Phase BO)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BO.
 
 ### 75. `grant_keyword` (give another card Retain / Ethereal / Sly)
 - **Surfaced by:** base-game audit (2026-10-01), "Grant a keyword to another card" row: `HandTrick`, `SculptingStrike`, `Snap`, `MasterPlannerPower` (6 cards).
@@ -767,7 +767,7 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Mechanic sketch:** op `grant_keyword {keyword: retain|ethereal|sly, cards: choose, card_type?}` through the existing hand picker (the `graft_card` path), skipping cards that already have it. Describe: "Choose a card in your hand. It gains Retain." / "Choose a Skill in your hand. It is Sly this turn." Card-only.
 - **Buildable today?** No.
 - **Priority:** Low-Medium.
-- **Status:** **planned (Wave 6, Phase BO, vocab v67)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BO.
+- **Status:** **done (2026-10-04, vocab v66, Phase BO)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BO.
 
 ### 76. Self cost modification (`cost_delta`)
 - **Surfaced by:** base-game audit (2026-10-01), "Self cost modification" row: `Stomp`, `Pinpoint`, `MomentumStrike`, `UpMySleeve`, `Modded`, `KinglyKick`, `Transfigure` (13 cards).

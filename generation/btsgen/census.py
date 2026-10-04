@@ -65,7 +65,9 @@ SPECIALTY_STATUSES = frozenset({"poison", "frail", "focus", "temp_focus"})  # Ph
 # W2.1: the four card-property keywords (nullary ops). `multi_hit` joins them as a keyword KIND (see
 # CardCensus.keyword_kinds) because "Deal 4 damage 3 times" is a card shape, not an op.
 KEYWORD_OPS = frozenset({"exhaust", "retain", "innate", "ethereal",
-                         "sly"})  # Phase BB (v56, gap #55): the base-game Sly keyword is a card shape too
+                         "sly",  # Phase BB (v56, gap #55): the base-game Sly keyword is a card shape too
+                         # Phase BO (v66, gap #74): the self-routing flag-ops say where the card goes after play — a shape too
+                         "return_to_hand", "to_draw_top", "return_next_turn"})
 MULTI_HIT_KIND = "multi_hit"
 
 

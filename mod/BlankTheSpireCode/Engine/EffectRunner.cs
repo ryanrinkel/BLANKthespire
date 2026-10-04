@@ -10,6 +10,7 @@ using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
+using MegaCrit.Sts2.Core.Localization; // Phase BO (v66): LocString (the custom picker prompts)
 using MegaCrit.Sts2.Core.Localization.DynamicVars; // Phase BK (v63): CalculatedVar (the CalculatedHits count)
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Orbs;
@@ -371,6 +372,26 @@ public static class EffectRunner
                     MainFile.Logger.Info($"[BM] retain_hand ('{spec.Title ?? spec.Id}'): Retain Hand now {me.GetPowerAmount<RetainHandPower>()}.");
                     break;
                 }
+                // Phase BO (v66, gap #74): the self-routing flag-ops act from DataCard's pile overrides (after the play), not here.
+                case "return_to_hand":
+                case "to_draw_top":
+                case "return_next_turn":
+                    break;
+                case "put_back":
+                    // Phase BO (v66, gap #74): Thinking Ahead (from hand) / Headbutt (from discard) — pick a card, put it on TOP
+                    // of the draw pile.
+                    await PutBack(e, ctx, card.Owner, card);
+                    break;
+                case "shuffle_hand":
+                    // Phase BO (v66, gap #74): Reboot's first half — the whole hand into the draw pile, then the game's own
+                    // Shuffle (which also shuffles the discard pile in and raises AfterShuffle -> on_shuffle).
+                    await ShuffleHand(ctx, card.Owner);
+                    break;
+                case "grant_keyword":
+                    // Phase BO (v66, gap #75): Snap / Hand Trick — pick a hand card without the keyword, give it Retain /
+                    // Ethereal / single-turn Sly.
+                    await GrantKeyword(e, ctx, card.Owner, card);
+                    break;
                 case "gaptest_enemy_artifact":
                     // PHASE BL GAPTEST (not in the LLM contract — like apply_custom / summon_spike): give the card's
                     // target(s) N Artifact, so the smoke can prove an Artifact enemy does NOT gain Strength from a
@@ -516,7 +537,7 @@ public static class EffectRunner
                     // Phase AP (v46): return `amt` card(s) from the discard/exhaust pile to hand — random (the Exhume-
                     // roulette) or the player's pick (CardSelectCmd.FromCombatPile, the Headbutt surface). Status/Curse
                     // cards are never offered (a random recursion pulling Wounds is anti-fun). Empty pile → no-op.
-                    await RetrieveCards(e, amt, ctx, card.Owner);
+                    await RetrieveCards(e, amt, ctx, card.Owner, card);
                     break;
                 case "exhaust_card":
                     // Phase BC (v57, gap #52): exhaust OTHER cards in your hand — the player's pick (Burning Pact / Purity),
@@ -771,18 +792,21 @@ public static class EffectRunner
     /// picks are random (the run's card-selection RNG stream, seed-correct). The move is <c>CardPileCmd.Add(card, Hand,
     /// Random)</c> — the exact call Phase T's blade retrieval uses from any pile, exhaust included. Empty / all-Status
     /// pile is a logged no-op. Under AutoSlay the <c>AutoSlayCardSelector</c> auto-picks (no hang).</summary>
-    internal static async Task RetrieveCards(EffectSpec e, int n, PlayerChoiceContext ctx, Player owner)
+    internal static async Task RetrieveCards(EffectSpec e, int n, PlayerChoiceContext ctx, Player owner, CardModel? source = null)
     {
-        PileType pileType = e.Pile == "exhaust" ? PileType.Exhaust : PileType.Discard;
+        // Phase BO (v66, gap #74): + the DRAW pile (Secret Weapon — the tutor; reverses the AP "never the draw pile" rule on
+        // purpose) and an optional card_type filter, ANDed with Retrievable (Status/Curse never come back) on every pile.
+        PileType pileType = e.Pile switch { "exhaust" => PileType.Exhaust, "draw" => PileType.Draw, _ => PileType.Discard };
         var pile = pileType.GetPile(owner);
-        var pool = pile.Cards.Where(Retrievable).ToList();
+        Func<CardModel, bool> ok = c => Retrievable(c) && HandKindMatches(c, e.CardKind);
+        var pool = pile.Cards.Where(ok).ToList();
         if (n < 1 || pool.Count == 0) { MainFile.Logger.Info($"[AP] retrieve_card: nothing retrievable in the {pileType} pile (no-op)."); return; }
         int take = Math.Min(n, pool.Count);
         List<CardModel> chosen;
         if (e.Cards == "choose")
         {
             chosen = (await CardSelectCmd.FromCombatPile(ctx, pile, owner,
-                new CardSelectorPrefs(CardSelectorPrefs.DiscardSelectionPrompt, take), Retrievable)).ToList();
+                new CardSelectorPrefs(BoPrompt(source, PromptRetrieve, CardSelectorPrefs.DiscardSelectionPrompt), take), ok)).ToList();
             if (chosen.Count == 0) { MainFile.Logger.Info("[AP] retrieve_card choose: no selection (no-op)."); return; }
         }
         else
@@ -797,9 +821,94 @@ public static class EffectRunner
             }
         }
         foreach (var c in chosen)
+        {
             await CardPileCmd.Add(c, PileType.Hand, CardPilePosition.Random);
+            if (pileType == PileType.Draw)
+                MainFile.Logger.Info($"[BO] retrieve draw [{e.CardKind ?? "any"}] '{c.Title}' ({e.Cards ?? "random"}).");
+        }
         MainFile.Logger.Info($"[AP] retrieve_card {e.Cards ?? "random"} x{chosen.Count} from {pileType} -> hand " +
                              $"({string.Join(", ", chosen.Select(c => $"'{c.Title}'"))}).");
+    }
+
+    // Phase BO (v66, rule 0.4): the ExtraLoc keys DataCard.PickPrompts writes for the BO pickers (cards.<id>.<key>).
+    internal const string PromptPutBack = "boPutBackPrompt";
+    internal const string PromptGrant = "boGrantKeywordPrompt";
+    internal const string PromptRetrieve = "boRetrievePrompt";
+
+    /// <summary>Phase BO (v66, rule 0.4): the card's own picker prompt (a <c>CardLoc</c> ExtraLoc key, see
+    /// <see cref="DataCard"/>.PickPrompts) when it exists, else the stock <paramref name="fallback"/> — never a throw (the base
+    /// <c>SelectionScreenPrompt</c> getter throws on a missing key).</summary>
+    internal static LocString BoPrompt(CardModel? card, string key, LocString fallback)
+    {
+        if (card == null) return fallback;
+        var ls = new LocString("cards", card.Id.Entry + "." + key);
+        return ls.Exists() ? ls : fallback;
+    }
+
+    /// <summary>Phase BO (v66, gap #74): PUT BACK — pick one card from your hand (Thinking Ahead) or discard pile (Headbutt)
+    /// and put it on TOP of your draw pile (<c>CardPileCmd.Add(card, Draw, Top)</c>, the base recipe). The playing card is in
+    /// the Play pile, so it is never a candidate. Empty pile / no selection is a logged no-op; under AutoSlay the selector
+    /// auto-picks.</summary>
+    internal static async Task PutBack(EffectSpec e, PlayerChoiceContext ctx, Player owner, CardModel source)
+    {
+        string from = e.From == "discard" ? "discard" : "hand";
+        var prefs = new CardSelectorPrefs(BoPrompt(source, PromptPutBack, CardSelectorPrefs.DiscardSelectionPrompt), 1);
+        CardModel? chosen;
+        if (from == "discard")
+        {
+            var pile = PileType.Discard.GetPile(owner);
+            if (pile.Cards.Count == 0) { MainFile.Logger.Info("[BO] put_back discard: empty discard pile (no-op)."); return; }
+            chosen = (await CardSelectCmd.FromCombatPile(ctx, pile, owner, prefs)).FirstOrDefault();
+        }
+        else
+        {
+            if (owner.PlayerCombatState.Hand.Cards.Count == 0) { MainFile.Logger.Info("[BO] put_back hand: empty hand (no-op)."); return; }
+            chosen = (await CardSelectCmd.FromHand(ctx, owner, prefs, filter: null, source)).FirstOrDefault();
+        }
+        if (chosen == null) { MainFile.Logger.Info($"[BO] put_back {from}: no selection (no-op)."); return; }
+        await CardPileCmd.Add(chosen, PileType.Draw, CardPilePosition.Top);
+        MainFile.Logger.Info($"[BO] put_back {from} '{chosen.Title}' -> draw top.");
+    }
+
+    /// <summary>Phase BO (v66, gap #74): Reboot's first half — every card in your hand goes into the draw pile, then the game's
+    /// own <c>CardPileCmd.Shuffle</c> shuffles the discard pile in too and raises <c>Hook.AfterShuffle</c> (on_shuffle). The
+    /// draw that Reboot adds is a separate <c>draw</c> op on the card.</summary>
+    internal static async Task ShuffleHand(PlayerChoiceContext ctx, Player owner)
+    {
+        var hand = owner.PlayerCombatState.Hand.Cards.ToList();
+        foreach (var c in hand)
+            await CardPileCmd.Add(c, PileType.Draw);
+        await CardPileCmd.Shuffle(ctx, owner);
+        MainFile.Logger.Info($"[BO] shuffle_hand {hand.Count} cards (draw pile now {owner.PlayerCombatState.DrawPile.Cards.Count}).");
+    }
+
+    /// <summary>Phase BO (v66, gap #75): GRANT KEYWORD — pick one hand card (optionally of <c>e.CardKind</c>) that does not
+    /// already have the keyword (base Snap / Hand Trick filters) and give it Retain / Ethereal (<c>CardCmd.ApplyKeyword</c>)
+    /// or Sly for this turn (<c>CardCmd.ApplySingleTurnSly</c>). Under AutoSlay the selector auto-picks.</summary>
+    internal static async Task GrantKeyword(EffectSpec e, PlayerChoiceContext ctx, Player owner, CardModel source)
+    {
+        string kw = e.Keyword ?? "retain";
+        Func<CardModel, bool> filter = c => HandKindMatches(c, e.CardKind) && kw switch
+        {
+            "sly"      => !c.IsSlyThisTurn && !c.Keywords.Contains(CardKeyword.Sly),
+            "ethereal" => !c.Keywords.Contains(CardKeyword.Ethereal),
+            _          => !c.Keywords.Contains(CardKeyword.Retain),
+        };
+        if (!owner.PlayerCombatState.Hand.Cards.Any(filter))
+        {
+            MainFile.Logger.Info($"[BO] grant_keyword {kw}: no eligible card in hand (no-op).");
+            return;
+        }
+        var chosen = (await CardSelectCmd.FromHand(ctx, owner,
+            new CardSelectorPrefs(BoPrompt(source, PromptGrant, CardSelectorPrefs.EnchantSelectionPrompt), 1), filter, source)).FirstOrDefault();
+        if (chosen == null) { MainFile.Logger.Info($"[BO] grant_keyword {kw}: no selection (no-op)."); return; }
+        switch (kw)
+        {
+            case "sly":      CardCmd.ApplySingleTurnSly(chosen); break;
+            case "ethereal": CardCmd.ApplyKeyword(chosen, CardKeyword.Ethereal); break;
+            default:         CardCmd.ApplyKeyword(chosen, CardKeyword.Retain); break;
+        }
+        MainFile.Logger.Info($"[BO] grant_keyword {kw} -> '{chosen.Title}'.");
     }
 
     /// <summary>Phase BC (v57): does a hand card match a hand filter? <c>attack</c> / <c>skill</c> / <c>power</c> by
@@ -826,6 +935,7 @@ public static class EffectRunner
     /// the run-scoped <c>AutoSlayCardSelector</c> auto-picks, so the picker never blocks the bot.</summary>
     internal static async Task ExhaustCards(EffectSpec e, int n, PlayerChoiceContext ctx, Player owner, AbstractModel source)
     {
+        if (e.Pile == "draw") { await ExhaustFromDraw(e, n, ctx, owner); return; } // Phase BO (v66, gap #74)
         var pool = owner.PlayerCombatState.Hand.Cards.Where(c => HandKindMatches(c, e.CardKind)).ToList();
         if (pool.Count == 0) { MainFile.Logger.Info($"[BC] exhaust_card {e.Cards}: no matching card in hand (no-op)."); return; }
         List<CardModel> chosen;
@@ -868,6 +978,40 @@ public static class EffectRunner
             await CardCmd.Exhaust(ctx, c);   // one at a time (the game's own rule) → Hook.AfterCardExhausted per card
         MainFile.Logger.Info($"[BC] exhaust_card {e.Cards}{(e.CardKind != null ? $" [{e.CardKind}]" : "")} x{chosen.Count} " +
                              $"({string.Join(", ", chosen.Select(c => $"'{c.Title}'"))}).");
+    }
+
+    /// <summary>Phase BO (v66, gap #74): EXHAUST FROM THE DRAW PILE — the player's pick (<c>CardSelectCmd.FromCombatPile</c> over
+    /// the draw pile, the stock exhaust prompt fits) or a random one (CombatCardSelection), optionally filtered by
+    /// <c>e.CardKind</c>. <c>CardCmd.Exhaust</c> moves a card from ANY pile and raises AfterCardExhausted, so every on_exhaust
+    /// payoff fires per card. Empty (filtered) pile is a logged no-op.</summary>
+    private static async Task ExhaustFromDraw(EffectSpec e, int n, PlayerChoiceContext ctx, Player owner)
+    {
+        var pile = PileType.Draw.GetPile(owner);
+        Func<CardModel, bool> ok = c => HandKindMatches(c, e.CardKind);
+        var pool = pile.Cards.Where(ok).ToList();
+        if (pool.Count == 0) { MainFile.Logger.Info($"[BO] exhaust_card draw {e.Cards}: no matching card in the draw pile (no-op)."); return; }
+        int take = Math.Min(Math.Max(1, n), pool.Count);
+        List<CardModel> chosen;
+        if (e.Cards == "random")
+        {
+            var rng = owner.RunState.Rng.CombatCardSelection;
+            chosen = new List<CardModel>(take);
+            for (int i = 0; i < take; i++)
+            {
+                int idx = rng.NextInt(pool.Count);
+                chosen.Add(pool[idx]);
+                pool.RemoveAt(idx);
+            }
+        }
+        else
+            chosen = (await CardSelectCmd.FromCombatPile(ctx, pile, owner,
+                new CardSelectorPrefs(CardSelectorPrefs.ExhaustSelectionPrompt, take), ok)).ToList();
+        if (chosen.Count == 0) { MainFile.Logger.Info($"[BO] exhaust_card draw {e.Cards}: no selection (no-op)."); return; }
+        foreach (var c in chosen)
+        {
+            await CardCmd.Exhaust(ctx, c);   // one at a time (the game's own rule) -> Hook.AfterCardExhausted per card
+            MainFile.Logger.Info($"[BO] exhaust_card draw '{c.Title}' ({e.Cards}{(e.CardKind != null ? $", {e.CardKind}" : "")}).");
+        }
     }
 
     /// <summary>Phase BC (v57, gap #53): the draw_until loop cap — a safety net, not a design number. A deck with NO

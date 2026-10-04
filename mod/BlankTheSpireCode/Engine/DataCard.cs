@@ -8,6 +8,8 @@ using BlankTheSpire.BlankTheSpireCode.Extensions;
 using BlankTheSpire.BlankTheSpireCode.Powers;
 using Godot; // Texture2D (CustomPortrait)
 using MegaCrit.Sts2.Core.Combat; // Phase BM (v65): CombatSide / ICombatState (the decay-tick tag)
+using MegaCrit.Sts2.Core.Combat.History.Entries; // Phase BO (v66): CardPlayFinishedEntry (the Bolas return_next_turn read)
+using MegaCrit.Sts2.Core.Commands; // Phase BO (v66): CardPileCmd.Add (return_next_turn)
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Entities.Players; // Phase BD (v58): Player
@@ -141,7 +143,36 @@ public abstract class DataCard : ConstructedCardModel
     /// leave Title null and fall back to the shipped .pck cards.json table.
     /// </summary>
     public override List<(string, string)>? Localization =>
-        Spec.Title != null ? (List<(string, string)>)new CardLoc(Spec.Title, Spec.Description ?? "") : null;
+        Spec.Title != null ? (List<(string, string)>)new CardLoc(Spec.Title, Spec.Description ?? "", PickPrompts()) : null;
+
+    /// <summary>Phase BO (v66, rule 0.4): honest picker prompts for this card's BO pickers, injected through BaseLib's
+    /// <c>CardLoc</c> ExtraLoc pairs (written as <c>cards.&lt;id&gt;.&lt;key&gt;</c>), so no ill-fitting
+    /// <c>CardSelectorPrefs.*</c> key is reused. One key per picker op (<see cref="EffectRunner.BoPrompt"/> reads them, and
+    /// falls back to a stock prompt when the key is missing); the first one also fills the base
+    /// <c>selectionScreenPrompt</c> key.</summary>
+    private (string, string)[] PickPrompts()
+    {
+        var list = new List<(string, string)>();
+        foreach (var e in Spec.Effects.Concat(Spec.Upgrade ?? []))
+        {
+            string? key = null, text = null;
+            switch (e.Op)
+            {
+                case "put_back":
+                    key = EffectRunner.PromptPutBack; text = "Choose a card to put on top of your draw pile."; break;
+                case "grant_keyword":
+                    key = EffectRunner.PromptGrant;
+                    text = e.Keyword switch { "sly" => "Choose a card to make Sly this turn.", "ethereal" => "Choose a card to make Ethereal.",
+                                              _ => "Choose a card to Retain." };
+                    break;
+                case "retrieve_card" when e.Cards == "choose":
+                    key = EffectRunner.PromptRetrieve; text = "Choose a card to put into your hand."; break;
+            }
+            if (key != null && list.All(p => p.Item1 != key)) list.Add((key, text!));
+        }
+        if (list.Count > 0) list.Insert(0, ("selectionScreenPrompt", list[0].Item2));
+        return list.ToArray();
+    }
 
     private void DeclareEffects()
     {
@@ -239,6 +270,16 @@ public abstract class DataCard : ConstructedCardModel
                     if (!e.IsScaled) WithPower<BlockNextTurnPower>("NextTurnBlock", e.Amount, up);
                     break;
                 case "retain_hand":   WithPower<RetainHandPower>(1); break; // "Retain your hand this turn." (hover tip)
+                // Phase BO (v66, gaps #74/#75): literal ops, no var. The three self-routing flags act through this class's pile
+                // overrides (GetResultPileTypeForCardPlay / ModifyCardPlayResultPileTypeAndPosition / BeforeHandDraw); put_back /
+                // shuffle_hand / grant_keyword run in OnPlay (EffectRunner). Text via Describe.
+                case "return_to_hand":
+                case "to_draw_top":
+                case "return_next_turn":
+                case "put_back":
+                case "shuffle_hand":
+                case "grant_keyword":
+                    break;
                 case "add_card":              // Phase Q (gap #16): generates card copies in OnPlay (no card var)
                 case "retrieve_card":         // Phase AP (v46): returns pile card(s) to hand in OnPlay (literal, no var); text via Describe
                 case "exhaust_card":          // Phase BC (v57, gap #52): exhausts hand cards in OnPlay (literal, no var); text via Describe
@@ -490,9 +531,56 @@ public abstract class DataCard : ConstructedCardModel
     /// the run-deck removal that makes it run-permanent happens in EffectRunner's purge case (on the card's
     /// <c>DeckVersion</c>). We OWN this CardModel subclass, so an override is cleaner + safer than BaseLib's
     /// generic Harmony <c>PurgePatch</c> (which we don't rely on being active — §0.5). Power cards already
-    /// return None; this covers Attack/Skill purge cards. base() preserves exhaust/discard behaviour for the rest.</summary>
+    /// return None; this covers Attack/Skill purge cards. base() preserves exhaust/discard behaviour for the rest.
+    /// Phase BO (v66, gap #74): a <c>return_to_hand</c> card (Particle Wall) turns the game's Discard into Hand — only the
+    /// Discard result, exactly as the base card does, so an Exhaust (Corruption, ExhaustOnNextPlay) or a Power's None wins.
+    /// Purge's None keeps precedence (the validator also keeps the two apart).</summary>
     protected override PileType GetResultPileTypeForCardPlay()
-        => Spec.HasPurge ? PileType.None : base.GetResultPileTypeForCardPlay();
+    {
+        if (Spec.HasPurge) return PileType.None;
+        var pile = base.GetResultPileTypeForCardPlay();
+        if (Spec.HasReturnToHand && pile == PileType.Discard)
+        {
+            MainFile.Logger.Info($"[BO] return_to_hand '{Spec.Title ?? Spec.Id}' (Discard -> Hand).");
+            return PileType.Hand;
+        }
+        return pile;
+    }
+
+    /// <summary>Phase BO (v66, gap #74): a <c>to_draw_top</c> card goes on TOP of the draw pile after it is played — the
+    /// ReboundPower pattern on the card itself (the card sits in the Play pile when OnPlayWrapper asks, and every card in
+    /// the piles is a hook listener). Only a Discard result is redirected: creature powers precede cards in the listener
+    /// order, so a Corruption-exhausted Skill stays exhausted (the validator also keeps to_draw_top off corruption cards).</summary>
+    public override (PileType, CardPilePosition) ModifyCardPlayResultPileTypeAndPosition(CardModel card, bool isAutoPlay,
+        ResourceInfo resources, PileType pileType, CardPilePosition position)
+    {
+        if (card == this && Spec.HasToDrawTop && pileType == PileType.Discard)
+        {
+            MainFile.Logger.Info($"[BO] to_draw_top '{Spec.Title ?? Spec.Id}' (Discard -> Draw top{(isAutoPlay ? ", auto-play" : "")}).");
+            return (PileType.Draw, CardPilePosition.Top);
+        }
+        return base.ModifyCardPlayResultPileTypeAndPosition(card, isAutoPlay, resources, pileType, position);
+    }
+
+    /// <summary>Phase BO (v66, gap #74): Bolas — at the start of the owner's next turn (before the hand draw), a
+    /// <c>return_next_turn</c> card that was played LAST player turn comes back to the hand. Copied from the base
+    /// <c>Bolas.BeforeHandDraw</c> (History.CardPlaysFinished + HappenedLastPlayerTurn + card == this), with one extra
+    /// guard: only from the Discard or Draw pile — an exhausted / purged / removed copy never comes back.</summary>
+    public override async Task BeforeHandDraw(Player player, PlayerChoiceContext choiceContext, ICombatState combatState)
+    {
+        await base.BeforeHandDraw(player, choiceContext, combatState);
+        if (!Spec.HasReturnNextTurn || player != Owner) return;
+        if (!CombatManager.Instance.History.CardPlaysFinished.Any(e => e.HappenedLastPlayerTurn(Owner) && e.CardPlay.Card == this))
+            return;
+        var from = Pile?.Type;
+        if (from is not (PileType.Discard or PileType.Draw))
+        {
+            MainFile.Logger.Info($"[BO] return_next_turn '{Spec.Title ?? Spec.Id}' skipped (in {from?.ToString() ?? "no pile"}).");
+            return;
+        }
+        await CardPileCmd.Add(this, PileType.Hand);
+        MainFile.Logger.Info($"[BO] return_next_turn '{Spec.Title ?? Spec.Id}' <- {from}.");
+    }
 
     // Phase R (gap #17): the combat round this card last fired its on_discard payload — for the once_per_turn
     // gate. Per-instance state (the CardModel persists across pile moves within a combat); -1 = never fired.

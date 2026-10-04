@@ -160,7 +160,7 @@ def _t_describe() -> None:
         got = cardgen.describe(fx, "self")
         check(got == want, f"{fx[0]} -> {got!r} (want {want!r})")
     fc = _cs("Engine", "ForgedCards.cs")
-    for frag in ('"all"    => $"all {many}"', '"up_to"  => $"up to {n} {many}"', 'return $"Exhaust {what} in your hand.";',
+    for frag in ('"all"    => $"all {many}"', '"up_to"  => $"up to {n} {many}"', 'return $"Exhaust {what} in your {(e.Pile == "draw" ? "draw pile" : "hand")}.";',
                  '$"Draw cards until you draw {HandKindWords(e.CardKind).One}."', '"non_attack" => ("a non-Attack card", "non-Attack cards")'):
         check(frag in fc, f"C# Describe carries {frag!r}")
     lit = cardgen.effect_literal({"op": "exhaust_card", "cards": "up_to", "amount": 2, "card_type": "skill"})

@@ -87,7 +87,10 @@ _BUILD_AROUND_OPS = {"add_trigger", "apply_status_custom",
                      "spread_debuffs",  # Phase AX (v53, gaps #45-#47): contagion is a build-around payoff, not a stat line
                      "exhaust_card",  # Phase BC (v57, gap #52): exhaust-fuel is the engine half of a card, not a stat line
                      "held_discount",  # Phase BD (v58, gap #58): a held-turn discount is a build-around, not a stat line
-                     "replay_next", "retain_hand"}  # Phase BM (v65, gaps #69/#70): replays / a held hand are tempo utilities
+                     "replay_next", "retain_hand",  # Phase BM (v65, gaps #69/#70): replays / a held hand are tempo utilities
+                     # Phase BO (v66, gaps #74/#75): recursion, put-back, the reshuffle and keyword grants are card-flow
+                     # utilities, not stat lines
+                     "return_to_hand", "to_draw_top", "return_next_turn", "put_back", "shuffle_hand", "grant_keyword"}
 # Phase BD (v58, gap #58): the held_discount band (mirrors ForgedCards.HeldDiscountMaxAmount + the schema clause).
 _HELD_DISCOUNT_MAX = 2
 # F5: the live state scalars an effect's amount may scale to (mirrors ForgedCards.SupportedScales). "x" stays
@@ -156,7 +159,8 @@ _MULTI_FIRE_TRIGGERS = {"on_hp_lost", "on_exhaust", "on_card_played", "on_card_d
                         "on_block_gained", "attacked",
                         "on_discard",  # Phase R (gap #17): a card can be discarded, redrawn, discarded again
                         "on_blade_played",  # Phase AJ (v40): the blade can be played several times a turn (C# parity)
-                        "on_poison_damage"}  # Phase BE (v59, gap #56): each poisoned enemy ticks separately
+                        "on_poison_damage",  # Phase BE (v59, gap #56): each poisoned enemy ticks separately
+                        "on_shuffle"}  # Phase BO (v66, gap #74): a thin deck can reshuffle more than once a turn
 _ENEMY_DEBUFF_STATUSES = {"vulnerable", "weak", "frail", "poison",
                           "temp_strength_down", "doom"}  # Phase BL (v64): payload-legal (strength_down is card-only)
 # Phase BL (v64, gaps #66/#67): the enemy Strength-loss / Doom bands (plan §7 decision 6: Doom 12 per card, rare for 10+,
@@ -191,7 +195,21 @@ _ADD_CARD_MAX = 3
 # discard / retrieve_card (random / choose), the base-game Status cards add_status_card may generate, and the per-play
 # caps. Mirrors ForgedCards.RetrievePiles / PickModes / StatusCards / RetrieveMaxAmount / StatusCardMaxAmount + the
 # schema clauses. Both new ops are card-only (the triggerEffect op enum omits them); a payload discard stays random.
-_RETRIEVE_PILES = {"discard", "exhaust"}
+_RETRIEVE_PILES = {"discard", "exhaust",
+                   "draw"}  # Phase BO (v66, gap #74): the Secret Weapon tutor — reverses the old "never draw" rule on purpose
+# Phase BO (v66, gaps #74/#75): put_back's source piles, grant_keyword's keywords, exhaust_card's piles, the three
+# self-routing flag-ops (ONE per card) and the per-op prices. Mirrors ForgedCards.PutBackFrom / GrantKeywords /
+# ExhaustPiles / PileFlagOps + the schema clauses. All six new ops are card-only (the triggerEffect op enum omits them).
+_PUT_BACK_FROM = {"hand", "discard"}
+_GRANT_KEYWORDS = {"retain", "ethereal", "sly"}
+_EXHAUST_PILES = {"hand", "draw"}
+_PILE_FLAG_OPS = ("return_to_hand", "to_draw_top", "return_next_turn")
+_BO_FLAG_OPS = _PILE_FLAG_OPS + ("shuffle_hand",)
+_BO_ONE_PER_CARD_OPS = _BO_FLAG_OPS + ("put_back", "grant_keyword")
+# A card that comes back is worth part of a replay; put-back stacks the next draw (~ a scry 1); grant_keyword ~ a cheap
+# keyword enabler (Sly this turn is a free play when discarded; Ethereal is a drawback unless the deck wants exhausts).
+_BO_VALUE = {"return_to_hand": 5.0, "to_draw_top": 2.0, "return_next_turn": 3.0, "put_back": 2.0, "shuffle_hand": 2.0}
+_GRANT_VALUE = {"retain": 3.0, "sly": 3.0, "ethereal": 1.0}
 _PICK_MODES = {"random", "choose"}
 # Phase BC (v57, gaps #52/#53): the exhaust_card pick modes + per-play cap, and the hand filter the two hand ops share
 # (`non_attack` = the Pillage / Second Wind filter; cost_shift keeps its own attack/skill/power/all). Mirrors
@@ -642,6 +660,9 @@ class CardValidator:
                 amt = e.get("amount")
                 if isinstance(amt, int) and not isinstance(amt, bool) and amt > _RETRIEVE_MAX:
                     out.append(f"retrieve_card 'amount' (cards returned) may be at most {_RETRIEVE_MAX}; got {amt}.")
+                ck = e.get("card_type")  # Phase BO (v66, gap #74): the tutor's optional hand filter
+                if ck is not None and str(ck).strip().lower() not in _HAND_KIND_FILTERS:
+                    out.append(f"retrieve_card 'card_type':'{ck}' must be one of {'/'.join(sorted(_HAND_KIND_FILTERS))}.")
             # Phase AP (v46): add_status_card generates base-game Status cards (dazed/wound/burn) into a pile — the
             # self-drawback of an over-statted card. A kind (`card`), a destination pile (the add_card piles), an
             # optional amount 1..3, no card_id. Not class-only. Mirrors ForgedCards.Validate.
@@ -656,8 +677,8 @@ class CardValidator:
                 amt = e.get("amount")
                 if isinstance(amt, int) and not isinstance(amt, bool) and amt > _STATUS_CARD_MAX:
                     out.append(f"add_status_card 'amount' (cards added) may be at most {_STATUS_CARD_MAX}; got {amt}.")
-            elif e.get("card_id") is not None or e.get("pile") is not None:
-                out.append(f"'card_id'/'pile' only apply to add_card/transform_card/graft_card/retrieve_card/add_status_card (op '{e.get('op')}').")
+            elif e.get("card_id") is not None or (e.get("pile") is not None and e.get("op") != "exhaust_card"):
+                out.append(f"'card_id'/'pile' only apply to add_card/transform_card/graft_card/retrieve_card/add_status_card/exhaust_card (op '{e.get('op')}').")
             if e.get("card") is not None and e.get("op") != "add_status_card":
                 out.append(f"'card' only applies to add_status_card (op '{e.get('op')}').")
             # Phase S (gap #1): balance_step shape rules. Mirrors ForgedCards.Validate — a valid pole + the step
@@ -698,8 +719,44 @@ class CardValidator:
                 ck = e.get("card_type")
                 if ck is not None and str(ck).strip().lower() not in _HAND_KIND_FILTERS:
                     out.append(f"exhaust_card 'card_type':'{ck}' must be one of {'/'.join(sorted(_HAND_KIND_FILTERS))}.")
-            elif e.get("cards") is not None and e.get("op") != "retrieve_card":
-                out.append(f"'cards' only applies to upgrade_card/discard/retrieve_card/exhaust_card (op '{e.get('op')}').")
+                # Phase BO (v66, gap #74): `pile` hand (default) / draw; from the draw pile only choose / random.
+                xp = e.get("pile")
+                if xp is not None and str(xp).strip().lower() not in _EXHAUST_PILES:
+                    out.append(f"exhaust_card 'pile':'{xp}' must be one of {'/'.join(sorted(_EXHAUST_PILES))}.")
+                if str(xp or "").strip().lower() == "draw" and mode not in ("choose", "random"):
+                    out.append(f"exhaust_card from the draw pile takes 'cards' choose or random only; got '{e.get('cards')}'.")
+            elif e.get("cards") is not None and e.get("op") not in ("retrieve_card", "put_back", "grant_keyword"):
+                out.append(f"'cards' only applies to upgrade_card/discard/retrieve_card/exhaust_card/put_back/grant_keyword (op '{e.get('op')}').")
+            # Phase BO (v66, gaps #74/#75): put_back / grant_keyword shapes; `from` / `keyword` belong to them alone; the
+            # self-routing flag-ops + shuffle_hand carry nothing. Mirrors ForgedCards.Validate.
+            bop = e.get("op")
+            if bop == "put_back":
+                if str(e.get("from", "")).strip().lower() not in _PUT_BACK_FROM:
+                    out.append(f"put_back needs a 'from' pile (one of {'/'.join(sorted(_PUT_BACK_FROM))}); got '{e.get('from')}'.")
+                if str(e.get("cards", "")).strip().lower() != "choose":
+                    out.append(f"put_back needs 'cards':'choose' (you pick the card to put on top); got '{e.get('cards')}'.")
+                pa = e.get("amount")
+                if (pa is not None and pa != 1) or e.get("status") is not None or str(e.get("scale", "")).strip() \
+                        or (isinstance(e.get("hits"), int) and e.get("hits") > 1):
+                    out.append("put_back moves ONE card (amount 1 at most; no status / scale / hits).")
+            elif e.get("from") is not None:
+                out.append(f"'from' only applies to put_back (op '{bop}').")
+            if bop == "grant_keyword":
+                if str(e.get("keyword", "")).strip().lower() not in _GRANT_KEYWORDS:
+                    out.append(f"grant_keyword needs a 'keyword' (one of {'/'.join(sorted(_GRANT_KEYWORDS))}); got '{e.get('keyword')}'.")
+                if str(e.get("cards", "")).strip().lower() != "choose":
+                    out.append(f"grant_keyword needs 'cards':'choose' (you pick the hand card); got '{e.get('cards')}'.")
+                gk = e.get("card_type")
+                if gk is not None and str(gk).strip().lower() not in _HAND_KIND_FILTERS:
+                    out.append(f"grant_keyword 'card_type' must be one of {'/'.join(sorted(_HAND_KIND_FILTERS))}; got '{gk}'.")
+                if any(e.get(k) is not None for k in ("amount", "status")) or str(e.get("scale", "")).strip() \
+                        or (isinstance(e.get("hits"), int) and e.get("hits") > 1):
+                    out.append("grant_keyword carries only 'keyword' + 'cards' (+ an optional 'card_type').")
+            elif e.get("keyword") is not None:
+                out.append(f"'keyword' only applies to grant_keyword (op '{bop}').")
+            if bop in _BO_FLAG_OPS and (any(e.get(k) is not None for k in ("amount", "status")) or str(e.get("scale", "")).strip()
+                                        or (isinstance(e.get("hits"), int) and e.get("hits") > 1)):
+                out.append(f"{bop} is a flag-op (no amount / status / scale / hits).")
             # Phase BC (v57, gap #53): draw_until — the hand filter that STOPS the draw, no amount. Mirrors ForgedCards.Validate.
             if e.get("op") == "draw_until":
                 ck = str(e.get("card_type", "")).strip().lower()
@@ -753,8 +810,9 @@ class CardValidator:
             # Phase BI (v61): add_trigger also takes `scope` ("this_turn") + `card_type` (checked with the trigger rules).
             elif e.get("count") is not None or (e.get("scope") is not None and op != "add_trigger"):
                 out.append(f"'scope'/'count' only apply to cost_shift / replay_next ('scope':'this_turn' also to add_trigger) (op '{op}').")
-            elif e.get("card_type") is not None and op not in ("exhaust_card", "draw_until", "add_trigger"):  # Phase BC (v57)
-                out.append(f"'card_type' only applies to cost_shift/replay_next/exhaust_card/draw_until/add_trigger (op '{op}').")
+            elif e.get("card_type") is not None and op not in ("exhaust_card", "draw_until", "add_trigger",  # Phase BC (v57)
+                                                               "retrieve_card", "grant_keyword"):  # Phase BO (v66)
+                out.append(f"'card_type' only applies to cost_shift/replay_next/exhaust_card/draw_until/add_trigger/retrieve_card/grant_keyword (op '{op}').")
             # Phase BM (v65, gap #70): block_next_turn — an amount 1..20 or scale "block" (Prolong); retain_hand is a flag-op.
             if op == "block_next_turn":
                 if e.get("status") is not None or (isinstance(hits, int) and hits > 1):
@@ -988,6 +1046,31 @@ class CardValidator:
             out.append("replay_next card_type 'all' (your next card of ANY type plays twice) is RARE-only.")
         if any(ef.get("op") == "replay_next" for ef in bm_all) and bm_rarity == "basic":
             out.append("replay_next is not allowed on a BASIC card.")
+        # Phase BO (v66, gaps #74/#75): one of each new op per effect list; ONE self-routing flag-op per card (base +
+        # upgrade together), never with exhaust / purge, never on a Power; return_to_hand costs 1+ (base and upgrade) and
+        # carries no draw / gain_energy (it comes straight back: an infinite loop for a human player); to_draw_top never
+        # shares a card with corruption (the hook order would decide whether the Skill exhausts). Mirrors ForgedCards.
+        for lst in (effects, up_effects):
+            for one in _BO_ONE_PER_CARD_OPS:
+                if sum(1 for ef in lst if ef.get("op") == one) > 1:
+                    out.append(f"at most one '{one}' effect per card.")
+        bo_all = effects + up_effects
+        bo_flags = sorted({ef.get("op") for ef in bo_all if ef.get("op") in _PILE_FLAG_OPS})
+        if len(bo_flags) > 1:
+            out.append(f"a card routes itself ONE way: '{bo_flags[0]}' and '{bo_flags[1]}' can't share a card.")
+        if bo_flags and any(ef.get("op") in ("exhaust", "purge") for ef in bo_all):
+            out.append(f"'{bo_flags[0]}' can't share a card with 'exhaust' / 'purge' (both say where the card goes after play).")
+        if bo_flags and str(card.get("type", "")).strip().lower() == "power":
+            out.append("the self-routing flag-ops (return_to_hand / to_draw_top / return_next_turn) are not allowed on a "
+                       "Power (it never reaches a pile).")
+        if "return_to_hand" in bo_flags:
+            if any(ef.get("op") in ("draw", "gain_energy") for ef in bo_all):
+                out.append("'return_to_hand' can't share a card with 'draw' / 'gain_energy' (it comes straight back: an infinite loop).")
+            rc, ruc = card.get("cost"), (card.get("upgrade") or {}).get("cost")
+            if not (isinstance(rc, int) and not isinstance(rc, bool) and rc >= 1) or (isinstance(ruc, int) and ruc < 1):
+                out.append("'return_to_hand' needs a card that costs 1+ energy (base and upgrade; a 0-cost one comes back forever).")
+        if "to_draw_top" in bo_flags and any(ef.get("op") == "corruption" for ef in bo_all):
+            out.append("'to_draw_top' can't share a card with 'corruption' (Corruption exhausts the Skill; the hook order would decide).")
         # Phase W (gap #19): self-purge. purge ⊥ exhaust (both mean "the card leaves after this play"; a card can't
         # do both). Never on a BASIC card — a purgeable basic could thin a class's floors (and reads as a trap). The
         # >3-per-class / merchant-floor concerns are class-level (character_validator). Mirrors ForgedCards.Validate.
@@ -1623,6 +1706,13 @@ class CardValidator:
         if op == "retain_hand":
             # Phase BM (v65, gap #70): Equilibrium's hand retention — card quality, not a stat line (~a scry 2-3).
             return 4.0
+        if op in _BO_VALUE:
+            # Phase BO (v66, gap #74): recursion / put-back / the reshuffle are card-flow value (Particle Wall's return is
+            # most of a replay; to_draw_top ~ a scry 1; Bolas's next-turn return a little more).
+            return _BO_VALUE[op]
+        if op == "grant_keyword":
+            # Phase BO (v66, gap #75): Snap / Hand Trick — a keyword on another card (Ethereal is mostly a price).
+            return _GRANT_VALUE.get(str(eff.get("keyword", "retain")).strip().lower(), 2.0)
         if op in _STRIP_OPS:
             # Phase BL (v64, gap #66): Expose's halves — wiping Block is a burst of free damage (~a 4-damage hit); stripping
             # Artifact only matters against an Artifact enemy (it un-eats the debuffs that follow).

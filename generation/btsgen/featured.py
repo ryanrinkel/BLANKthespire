@@ -203,6 +203,12 @@ FEATURED_MENU: list[Featured] = [
              'N cards of that type are played twice - Burst) plus a draw or energy so the replayed cards arrive - OR, at '
              'rare only, a POWER with apply_status echo_form amount 1 (the first card you play each turn is played twice).',
              lambda cc: "replay_next" in cc.ops or "echo_form" in cc.statuses),
+    # Phase BO (v66, gaps #74/#75): the card that comes back / stacks your next draw.
+    Featured("recursion", 'a card that COMES BACK after you play it (flag-op "return_to_hand" / "to_draw_top" / "return_next_turn") or puts a card on top of your draw pile (op "put_back")',
+             'REQUIRED: add an attack or skill with ONE of the flag-ops "return_to_hand" (cost 1+, no draw / gain_energy on '
+             'the card - Particle Wall), "to_draw_top" (Rebound) or "return_next_turn" (Bolas), never with exhaust - OR a card '
+             'with op "put_back" (from "hand" or "discard", cards "choose": put a card on top of your draw pile - Headbutt).',
+             lambda cc: bool(cc.ops.keys() & {"return_to_hand", "to_draw_top", "return_next_turn", "put_back"})),
     # Phase BF (v60, gap #54): the setup-then-release beat on the base game's own amplifiers.
     Featured("setup_spike", 'a SETUP card that spikes your next Attack (apply_status vigor) or a rare that doubles your Attacks for a turn (apply_status double_damage)',
              'REQUIRED: add a skill with apply_status vigor (amount 3-6: your NEXT Attack deals that much more, then it '

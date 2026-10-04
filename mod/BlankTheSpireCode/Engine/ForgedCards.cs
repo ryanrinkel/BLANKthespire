@@ -42,7 +42,18 @@ public static class ForgedCards
     /// v10 (forged statuses, Phase J): + CharacterSpec.StatusPool (a class's ≤4 custom modifier-family statuses
     /// read from `status_pool`; see ForgedCharacters / ForgedStatusPower). Class cards may apply a custom status
     /// by pool name via the `apply_status_custom` op (class-only, like custom-orb channels).</summary>
-    public const int VocabVersion = 65; // 65: Phase BM (VOCAB_EXPANSION_6, gaps #68-#70) — BASE-POWER STATUSES: self-drawback
+    public const int VocabVersion = 66; // 66: Phase BO (VOCAB_EXPANSION_6, gaps #74/#75) — RECURSION, PUT-BACK, DRAW TUTOR,
+                                        //     ON_SHUFFLE, GRANT_KEYWORD: card-only flag-ops `return_to_hand` (Particle Wall —
+                                        //     DataCard.GetResultPileTypeForCardPlay Discard -> Hand), `to_draw_top` (DataCard.
+                                        //     ModifyCardPlayResultPileTypeAndPosition -> (Draw, Top), the ReboundPower pattern),
+                                        //     `return_next_turn` (Bolas — DataCard.BeforeHandDraw, from the discard / draw pile only)
+                                        //     and `shuffle_hand` (Reboot); ops `put_back {from hand|discard, cards choose}`
+                                        //     (Thinking Ahead / Headbutt) and `grant_keyword {keyword retain|ethereal|sly, cards
+                                        //     choose, card_type?}` (Snap / Hand Trick); `retrieve_card pile:"draw"` + `card_type`
+                                        //     (Secret Weapon — reverses the old never-the-draw-pile rule on purpose);
+                                        //     `exhaust_card pile:"draw"`; trigger `on_shuffle` (ForgedTriggerPower.AfterShuffle).
+                                        //     No codec change.
+                                        // 65: Phase BM (VOCAB_EXPANSION_6, gaps #68-#70) — BASE-POWER STATUSES: self-drawback
                                         //     statuses (card-only, routed to the PLAYER — EffectRunner.SelfDebuffStatuses):
                                         //     `no_draw` (NoDrawPower), `no_energy_gain` (NoEnergyGainPower), `no_block_gain`
                                         //     (NoBlockPower, amount = turns), `dex_decay` (WraithFormPower), `focus_decay`
@@ -512,6 +523,8 @@ public static class ForgedCards
          "spread_debuffs", // Phase AX (v53, gaps #45-#47): copy the struck target's debuffs to every OTHER living enemy. Card-only.
          "strip_block", "strip_artifact", // Phase BL (v64, gap #66): Expose — the target loses all Block / its Artifact. Card-only, single-enemy.
          "replay_next", "block_next_turn", "retain_hand", // Phase BM (v65, gaps #69/#70): Burst-family replays, Prolong, Equilibrium. Card-only.
+         "return_to_hand", "to_draw_top", "return_next_turn", // Phase BO (v66, gap #74): self-routing flag-ops (Particle Wall / Rebound / Bolas). Card-only.
+         "put_back", "shuffle_hand", "grant_keyword", // Phase BO (v66, gaps #74/#75): Thinking Ahead / Headbutt, Reboot, Snap / Hand Trick. Card-only.
          "graft_card", // Phase AI (gap #7): CHOOSE form of transform_card — pick a card in hand, IT permanently becomes the named same-class card for the rest of the run. Card-only.
          "exhaust_card", // Phase BC (v57, gap #52): exhaust OTHER cards in your hand (choose / random / up_to / all, optional card_type filter). Card-only.
          "draw_until", // Phase BC (v57, gap #53): draw until you draw a card of `card_type` (Pillage = non_attack). Card-only.
@@ -526,21 +539,24 @@ public static class ForgedCards
          "on_exhaust", "on_card_played", "on_card_drawn", "on_damage_dealt", "on_block_gained", "attacked",
          "on_discard", // Phase R (gap #17): CARD-LATENT Reflex — fires THIS card's payload when ANY effect discards it (v51)
          "on_blade_played", // Phase T: Parry analogue — fires whenever you play your signature blade (a token card)
-         "on_poison_damage"]; // Phase BE (v59, gap #56): fires whenever an ENEMY takes Poison damage (the base-game tick)
+         "on_poison_damage", // Phase BE (v59, gap #56): fires whenever an ENEMY takes Poison damage (the base-game tick)
+         "on_shuffle"]; // Phase BO (v66, gap #74): fires whenever you shuffle your discard pile into your draw pile (AfterShuffle)
     // H4: the reactive kinds that can fire MULTIPLE times per turn → eligible for the `once_per_turn` gate.
     // (turn_start/turn_end/ripen already fire at most once per turn, so once_per_turn is rejected on them.)
     private static readonly HashSet<string> MultiFireTriggers =
         ["on_hp_lost", "on_exhaust", "on_card_played", "on_card_drawn", "on_damage_dealt", "on_block_gained", "attacked",
          "on_discard", // Phase R: a card can be discarded → redrawn → discarded again within a turn
          "on_blade_played", // Phase T: you can play the blade more than once a turn (retrieve + replay)
-         "on_poison_damage"]; // Phase BE (v59): several poisoned enemies (or Accelerant) tick in one enemy turn
+         "on_poison_damage", // Phase BE (v59): several poisoned enemies (or Accelerant) tick in one enemy turn
+         "on_shuffle"]; // Phase BO (v66): a thin deck can reshuffle more than once a turn (draw + shuffle_hand)
     // Phase AK (v41): the POWER-HOSTED reactive kinds eligible for `once_per_combat` — the fired flag lives on the
     // granted ForgedTriggerPower, a fresh instance per combat. on_discard is card-latent (no power; DataCard tracks
     // it by round), so it is excluded.
     private static readonly HashSet<string> OncePerCombatTriggers =
         ["on_hp_lost", "on_exhaust", "on_card_played", "on_card_drawn", "on_damage_dealt", "on_block_gained", "attacked",
          "on_blade_played",
-         "on_poison_damage"]; // Phase BE (v59)
+         "on_poison_damage", // Phase BE (v59)
+         "on_shuffle"]; // Phase BO (v66): power-hosted, so every_n / scope this_turn / once_per_combat are legal too
     // Phase H3: the self/orb-only sub-vocabulary a trigger's payload may use when it has NO target. (H4 lifts this
     // for effects that carry a `target`: damage + enemy-debuff apply_status may then hit enemies — see TriggerRunner.)
     private static readonly HashSet<string> TriggerOps =
@@ -644,7 +660,16 @@ public static class ForgedCards
     // draw pile: that is what draw/scry are for), the pick modes shared by discard / retrieve_card (random / choose),
     // the base-game Status cards add_status_card may generate, and the per-play caps. Lockstep with validator.py
     // (_RETRIEVE_PILES / _PICK_MODES / _STATUS_CARDS / _RETRIEVE_MAX / _STATUS_CARD_MAX) + card.schema.json.
-    private static readonly HashSet<string> RetrievePiles = ["discard", "exhaust"];
+    // Phase BO (v66, gap #74): + "draw" — the Secret Weapon tutor. This REVERSES the rule above on purpose (plan §7
+    // decision 10): a draw-pile pick is a tutor (choose / random, optional card_type filter), not a draw.
+    private static readonly HashSet<string> RetrievePiles = ["discard", "exhaust", "draw"];
+    // Phase BO (v66, gaps #74/#75): put_back's source piles, the keywords grant_keyword may give, exhaust_card's piles
+    // (hand default; the draw pile takes choose / random only) and the three self-routing flag-ops (one per card).
+    // Lockstep with validator._PUT_BACK_FROM / _GRANT_KEYWORDS / _EXHAUST_PILES / _PILE_FLAG_OPS + the schema clauses.
+    private static readonly HashSet<string> PutBackFrom = ["hand", "discard"];
+    private static readonly HashSet<string> GrantKeywords = ["retain", "ethereal", "sly"];
+    private static readonly HashSet<string> ExhaustPiles = ["hand", "draw"];
+    internal static readonly HashSet<string> PileFlagOps = ["return_to_hand", "to_draw_top", "return_next_turn"];
     private static readonly HashSet<string> PickModes = ["random", "choose"];
     // Phase BC (v57, gap #52): the exhaust_card pick modes (the base-game shapes: Burning Pact chooses, True Grit
     // rolls, Purity is "up to N", Second Wind / Fiend Fire take all) and its per-play cap; the hand filter the two
@@ -948,6 +973,10 @@ public static class ForgedCards
             { error = "replay_next is not allowed on a BASIC card."; return false; }
         }
 
+        // Phase BO (v66, gap #74): a Power is never in a pile after play, so the self-routing flag-ops are Attack/Skill only.
+        if (type == CardType.Power && effects.Concat(upgrade ?? []).Any(e => PileFlagOps.Contains(e.Op)))
+        { error = "the self-routing flag-ops (return_to_hand / to_draw_top / return_next_turn) are not allowed on a Power (it never reaches a pile)."; return false; }
+
         // Cost is an int (0–4, Phase AX) OR the string "X" (an X-cost card: X = all energy, resolved at play time).
         bool costsX = card.ContainsKey("cost")
                       && card["cost"].VariantType == Godot.Variant.Type.String
@@ -978,6 +1007,9 @@ public static class ForgedCards
         // Phase BJ (v62): only the damage/block/draw form — a Double Energy gain_energy reads post-pay energy on any cost.
         if (effects.Concat(upgrade ?? []).Any(e => e.Scale == "energy" && e.Op is "damage" or "block" or "draw") && (costsX || cost != 0))
         { error = "'scale:energy' requires a cost-0 card (the cost is paid before the card resolves, so a paid card would preview one number and deal another)."; return false; }
+        // Phase BO (v66, gap #74): a return_to_hand card costs 1+ (a 0-cost one replays forever; X-cost re-spends nothing).
+        if (effects.Any(e => e.Op == "return_to_hand") && (costsX || cost < 1 || (upgradedCost is { } rc && rc < 1)))
+        { error = "'return_to_hand' needs a card that costs 1+ energy (base and upgrade; a 0-cost one comes back forever)."; return false; }
         // Phase BD (v58, gap #58): a held_discount needs a cost to lower — never on a 0-cost or X-cost card.
         if (effects.Concat(upgrade ?? []).Any(e => e.Op == "held_discount") && (costsX || cost < 1))
         { error = "'held_discount' needs a card that costs 1+ energy (not 0-cost, not X-cost) — there is nothing to discount."; return false; }
@@ -1160,11 +1192,14 @@ public static class ForgedCards
             // Phase BK (v63, gap #65): `hits_scale` — the live read that sets a damage op's hit count (legality in Validate).
             string? hitsScale = e.ContainsKey("hits_scale") && Str(e, "hits_scale").Trim().Length > 0
                               ? Str(e, "hits_scale").Trim().ToLowerInvariant() : null;
+            // Phase BO (v66, gaps #74/#75): put_back's `from` pile and grant_keyword's `keyword` (legality in Validate).
+            string? from = e.ContainsKey("from") ? Str(e, "from").Trim().ToLowerInvariant() : null;
+            string? keyword = e.ContainsKey("keyword") ? Str(e, "keyword").Trim().ToLowerInvariant() : null;
             list.Add(new EffectSpec(op, amount, status, hits, scale, orb, when, trigger, triggered, statusName,
                                     summonName, oncePerTurn, target, cardId, pile, pole, grow, cards, tag,
                                     OncePerCombat: oncePerCombat, Unblockable: unblockable,
                                     CardKind: cardKind, Scope: scope, Count: count, StatusCard: statusCard,
-                                    GrowHeld: growHeld, EveryN: everyN, HitsScale: hitsScale));
+                                    GrowHeld: growHeld, EveryN: everyN, HitsScale: hitsScale, From: from, Keyword: keyword));
         }
         return list.ToArray();
     }
@@ -1237,8 +1272,36 @@ public static class ForgedCards
                 return $"'scope'/'count' only apply to cost_shift / replay_next ('scope':'this_turn' also to add_trigger) (op '{e.Op}').";
             // Phase BC (v57): `card_type` is shared by cost_shift (its own attack/skill/power/all band, above) and the two
             // hand ops (attack/skill/power/non_attack, below); anywhere else it is a stray field.
-            else if (e.CardKind != null && e.Op is not ("exhaust_card" or "draw_until" or "add_trigger"))
-                return $"'card_type' only applies to cost_shift/replay_next/exhaust_card/draw_until/add_trigger (op '{e.Op}').";
+            else if (e.CardKind != null && e.Op is not ("exhaust_card" or "draw_until" or "add_trigger" or "retrieve_card" or "grant_keyword"))
+                return $"'card_type' only applies to cost_shift/replay_next/exhaust_card/draw_until/add_trigger/retrieve_card/grant_keyword (op '{e.Op}').";
+            // Phase BO (v66, gaps #74/#75): the self-routing flag-ops + shuffle_hand carry nothing; `from` belongs to put_back,
+            // `keyword` to grant_keyword. All card-only (not in TriggerOps).
+            if ((PileFlagOps.Contains(e.Op) || e.Op == "shuffle_hand") && (e.Amount != 0 || e.Status != null || e.IsScaled || e.Hits > 1))
+                return $"{e.Op} is a flag-op (no amount / status / scale / hits).";
+            if (e.From != null && e.Op != "put_back")
+                return $"'from' only applies to put_back (op '{e.Op}').";
+            if (e.Keyword != null && e.Op != "grant_keyword")
+                return $"'keyword' only applies to grant_keyword (op '{e.Op}').";
+            if (e.Op == "put_back")
+            {
+                if (e.From == null || !PutBackFrom.Contains(e.From))
+                    return $"put_back needs a 'from' pile (one of {string.Join("/", PutBackFrom)}); got '{e.From}'.";
+                if (e.Cards != "choose")
+                    return $"put_back needs 'cards':'choose' (you pick the card to put on top); got '{e.Cards}'.";
+                if (e.Amount > 1 || e.Status != null || e.IsScaled || e.Hits > 1)
+                    return "put_back moves ONE card (amount 1 at most; no status / scale / hits).";
+            }
+            if (e.Op == "grant_keyword")
+            {
+                if (e.Keyword == null || !GrantKeywords.Contains(e.Keyword))
+                    return $"grant_keyword needs a 'keyword' (one of {string.Join("/", GrantKeywords)}); got '{e.Keyword}'.";
+                if (e.Cards != "choose")
+                    return $"grant_keyword needs 'cards':'choose' (you pick the hand card); got '{e.Cards}'.";
+                if (e.CardKind != null && !HandKindFilters.Contains(e.CardKind))
+                    return $"grant_keyword 'card_type' must be one of {string.Join("/", HandKindFilters)}; got '{e.CardKind}'.";
+                if (e.Amount != 0 || e.Status != null || e.IsScaled || e.Hits > 1)
+                    return "grant_keyword carries only 'keyword' + 'cards' (+ an optional 'card_type').";
+            }
             // Phase BM (v65, gap #70): block_next_turn — a fixed amount (1..20) or scale "block" (Prolong); retain_hand is a
             // flag-op. Both card-only (not in TriggerOps).
             if (e.Op == "block_next_turn")
@@ -1287,6 +1350,11 @@ public static class ForgedCards
                     return $"exhaust_card 'amount' (cards exhausted) must be 1..{ExhaustCardMaxAmount}; got {e.Amount}.";
                 if (e.CardKind != null && !HandKindFilters.Contains(e.CardKind))
                     return $"exhaust_card 'card_type' must be one of {string.Join("/", HandKindFilters)}; got '{e.CardKind}'.";
+                // Phase BO (v66, gap #74): `pile` hand (default) / draw; from the draw pile only choose / random.
+                if (e.Pile != null && !ExhaustPiles.Contains(e.Pile))
+                    return $"exhaust_card 'pile' must be one of {string.Join("/", ExhaustPiles)}; got '{e.Pile}'.";
+                if (e.Pile == "draw" && e.Cards is not ("choose" or "random"))
+                    return $"exhaust_card from the draw pile takes 'cards' choose or random only; got '{e.Cards}'.";
             }
             // Phase BC (v57, gap #53): draw_until — a required hand filter (the type that STOPS the draw), no amount.
             if (e.Op == "draw_until")
@@ -1536,6 +1604,9 @@ public static class ForgedCards
                     return "'card_id' does not apply to retrieve_card (it returns whatever is in the pile, not a named card).";
                 if (e.Amount > RetrieveMaxAmount)
                     return $"retrieve_card 'amount' (cards returned) may be at most {RetrieveMaxAmount}; got {e.Amount}.";
+                // Phase BO (v66, gap #74): an optional hand filter on the card it fetches (Secret Weapon = attack).
+                if (e.CardKind != null && !HandKindFilters.Contains(e.CardKind))
+                    return $"retrieve_card 'card_type' must be one of {string.Join("/", HandKindFilters)}; got '{e.CardKind}'.";
             }
             // Phase AP (v46): add_status_card generates base-game STATUS cards (dazed/wound/burn) into a combat pile — the
             // self-drawback of an over-statted card. Not class-only (the cards are the game's own). Carries the kind
@@ -1551,8 +1622,8 @@ public static class ForgedCards
                 if (e.Amount > StatusCardMaxAmount)
                     return $"add_status_card 'amount' (cards added) may be at most {StatusCardMaxAmount}; got {e.Amount}.";
             }
-            else if (e.CardId != null || e.Pile != null)
-                return $"'card_id'/'pile' only apply to add_card/transform_card/graft_card/retrieve_card/add_status_card (op '{e.Op}').";
+            else if (e.CardId != null || (e.Pile != null && e.Op != "exhaust_card")) // Phase BO (v66): exhaust_card's pile is checked above
+                return $"'card_id'/'pile' only apply to add_card/transform_card/graft_card/retrieve_card/add_status_card/exhaust_card (op '{e.Op}').";
             if (e.StatusCard != null && e.Op != "add_status_card")
                 return $"'card' only applies to add_status_card (op '{e.Op}').";
             // Phase T: summon_blade retrieves THIS class's signature blade — class-only, like add_card/summon.
@@ -1585,8 +1656,8 @@ public static class ForgedCards
                 if (e.Cards != null && !PickModes.Contains(e.Cards))
                     return $"discard 'cards' must be one of {string.Join("/", PickModes)}; got '{e.Cards}'.";
             }
-            else if (e.Cards != null && e.Op is not ("retrieve_card" or "exhaust_card")) // both validated above
-                return $"'cards' only applies to upgrade_card/discard/retrieve_card/exhaust_card (op '{e.Op}').";
+            else if (e.Cards != null && e.Op is not ("retrieve_card" or "exhaust_card" or "put_back" or "grant_keyword")) // validated above
+                return $"'cards' only applies to upgrade_card/discard/retrieve_card/exhaust_card/put_back/grant_keyword (op '{e.Op}').";
             // Phase AV (v52): sacrifice_summon is a flag-op that consumes the class's living minion so its on_death
             // rattle fires. Class-only (like `summon` — it needs a summon_pool to have anything to kill), carries no
             // amount/target/status, and card-only (it is not in TriggerOps, so ValidateTrigger rejects a payload one).
@@ -1735,6 +1806,29 @@ public static class ForgedCards
                     return $"at most one '{one}' effect per card.";
             if (list.Any(e => e.Op == "apply_status" && e.Status == "no_draw") && !list.Any(e => e.Op is "draw" or "gain_energy"))
                 return "'no_draw' is a price: the same card needs a 'draw' or 'gain_energy' payoff (Battle Trance: draw 3, then no more draws).";
+        }
+        // Phase BO (v66, gaps #74/#75): one of each new op per effect list; ONE self-routing flag-op per card (base + upgrade
+        // together — a card goes to one place after play), never with exhaust / purge (they route the card too); a
+        // return_to_hand card carries no draw / gain_energy (it comes straight back: an infinite loop for a human player);
+        // a to_draw_top card never also grants corruption (the hook order would decide whether the Skill exhausts).
+        foreach (var list in new[] { effects, upgrade })
+        {
+            if (list == null) continue;
+            foreach (var one in new[] { "return_to_hand", "to_draw_top", "return_next_turn", "put_back", "shuffle_hand", "grant_keyword" })
+                if (list.Count(e => e.Op == one) > 1)
+                    return $"at most one '{one}' effect per card.";
+        }
+        {
+            var boAll = effects.Concat(upgrade ?? []).ToList();
+            var flags = boAll.Where(e => PileFlagOps.Contains(e.Op)).Select(e => e.Op).Distinct().ToList();
+            if (flags.Count > 1)
+                return $"a card routes itself ONE way: '{flags[0]}' and '{flags[1]}' can't share a card.";
+            if (flags.Count == 1 && boAll.Any(e => e.Op is "exhaust" or "purge"))
+                return $"'{flags[0]}' can't share a card with 'exhaust' / 'purge' (both say where the card goes after play).";
+            if (flags.Contains("return_to_hand") && boAll.Any(e => e.Op is "draw" or "gain_energy"))
+                return "'return_to_hand' can't share a card with 'draw' / 'gain_energy' (it comes straight back: an infinite loop).";
+            if (flags.Contains("to_draw_top") && boAll.Any(e => e.Op == "corruption"))
+                return "'to_draw_top' can't share a card with 'corruption' (Corruption exhausts the Skill; the hook order would decide).";
         }
         // Phase BM (v65, gap #69): the upgrade overlay is positional and carries amounts only — a replay_next keeps its
         // card_type and count (the count is printed literally).
@@ -2399,6 +2493,14 @@ public static class ForgedCards
                     parts.Add(e.Scale == "block" ? "Next turn, gain Block equal to your current Block." : "Next turn, gain {NextTurnBlock} Block.");
                     break;
                 case "retain_hand":    parts.Add("Retain your hand this turn."); break; // Phase BM (v65, gap #70): Equilibrium
+                // Phase BO (v66, gaps #74/#75): byte-lockstep with cardgen.describe.
+                case "return_to_hand":   parts.Add("Returns to your hand after you play it."); break;
+                case "to_draw_top":      parts.Add("Goes on top of your draw pile after you play it."); break;
+                case "return_next_turn": parts.Add("At the start of your next turn, return this to your hand."); break;
+                case "put_back":         parts.Add(e.From == "discard" ? "Put a card from your discard pile on top of your draw pile."
+                                                                       : "Put a card from your hand on top of your draw pile."); break;
+                case "shuffle_hand":     parts.Add("Shuffle your hand and discard pile into your draw pile."); break;
+                case "grant_keyword":    parts.Add(GrantKeywordSentence(e)); break;
                 case "gaptest_enemy_artifact": parts.Add($"Enemies gain {Math.Max(1, e.Amount)} Artifact (gap test)."); break; // PHASE BL GAPTEST only
                 case "corruption":  parts.Add("Your Skills cost 0."); parts.Add("Your Skills Exhaust when played."); break; // Phase AB (gap #20)
                 case "cost_shift":  parts.Add(CostShiftSentence(e)); break; // Phase AO (v45): the discount sentence (literal, no var)
@@ -2536,6 +2638,7 @@ public static class ForgedCards
             "on_discard"      => "Whenever this card is discarded", // Phase R (gap #17): Reflex — card-latent
             "on_blade_played" => "Whenever you play your blade", // Phase T: Parry analogue (fires on the token blade)
             "on_poison_damage" => "Whenever an enemy takes Poison damage", // Phase BE (v59, gap #56)
+            "on_shuffle"      => "Whenever you shuffle your draw pile", // Phase BO (v66, gap #74)
             _                 => "At the end of your turn",
         };
         // Phase BI (v61, gap #62): the filters reword the head. Lockstep with cardgen._trigger_head.
@@ -2684,11 +2787,28 @@ public static class ForgedCards
     private static string RetrieveSentence(EffectSpec e)
     {
         int n = Math.Max(1, e.Amount);
+        var (one, many) = HandKindWords(e.CardKind);   // Phase BO (v66): the optional card_type filter
+        string noun = one[(one.IndexOf(' ') + 1)..];
+        // Phase BO (v66, gap #74): the draw-pile tutor — "Put an Attack from your draw pile into your hand." (choose) /
+        // "Put a random Skill from your draw pile into your hand." Lockstep with cardgen._retrieve_sentence.
+        if (e.Pile == "draw")
+        {
+            string pick = e.Cards == "choose" ? (n > 1 ? $"{n} {many}" : one) : (n > 1 ? $"{n} random {many}" : $"a random {noun}");
+            return $"Put {pick} from your draw pile into your hand.";
+        }
         string pile = e.Pile == "exhaust" ? "exhaust pile" : "discard pile";
         string what = e.Cards == "choose"
-            ? (n > 1 ? $"{n} cards of your choice" : "a card of your choice")
-            : (n > 1 ? $"{n} random cards" : "a random card");
+            ? (n > 1 ? $"{n} {many} of your choice" : $"{one} of your choice")
+            : (n > 1 ? $"{n} random {many}" : $"a random {noun}");
         return $"Return {what} from your {pile} to your hand.";
+    }
+
+    /// <summary>Phase BO (v66, gap #75): "Choose a card in your hand. It gains Retain." / "Choose a Skill in your hand. It is Sly
+    /// this turn." / "… It gains Ethereal." Lockstep with cardgen._grant_keyword_sentence.</summary>
+    private static string GrantKeywordSentence(EffectSpec e)
+    {
+        string gains = e.Keyword switch { "sly" => "is Sly this turn", "ethereal" => "gains Ethereal", _ => "gains Retain" };
+        return $"Choose {HandKindWords(e.CardKind).One} in your hand. It {gains}.";
     }
 
     /// <summary>Phase AP (v46): the add_status_card sentence — "Add a Wound to your discard pile." / "Add 2 Wounds to your
@@ -2728,7 +2848,7 @@ public static class ForgedCards
             "up_to"  => $"up to {n} {many}",
             _        => n > 1 ? $"{n} {many}" : one,
         };
-        return $"Exhaust {what} in your hand.";
+        return $"Exhaust {what} in your {(e.Pile == "draw" ? "draw pile" : "hand")}."; // Phase BO (v66): + the draw pile
     }
 
     /// <summary>Phase BC (v57, gap #53): the draw_until sentence — "Draw cards until you draw a non-Attack card." /

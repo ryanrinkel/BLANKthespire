@@ -659,7 +659,7 @@ a Creative-AI power. **Tags:** `[BN] target_killed gate OPEN|closed (killed=<b>,
 <type> x<n> -> <pile> ('<titles>'; free=<b>; choose_of=<n>)` + grep `Auto-selected 1 card(s)`, `[BN] autoplay <from>
 '<card>' -> <target|none> (depth <d>)`.
 
-### Phase BO — Recursion, put-back, draw-pile tutor, `on_shuffle`, `grant_keyword` (v67; gaps #74, #75; ~1½ days) — 29 base cards
+### Phase BO — Recursion, put-back, draw-pile tutor, `on_shuffle`, `grant_keyword` (v66 — built first of the stretch phases, Ryan's order BO → BP → BQ → BN, rule 0.8; gaps #74, #75; ~1½ days) — 29 base cards
 
 Every card in all five piles (Play included) is a hook listener (DECOMP `CombatState.cs:150-168`), so `DataCard` can
 own these. **Each new override gets its own tag on day one (rule 0.3).**
@@ -694,6 +694,51 @@ loops cross-check.
 Weapon, Snap, a shuffle-payoff power with a thin deck. **Tags:** `[BO] return_to_hand '<card>'`, `[BO] to_draw_top
 '<card>'`, `[BO] return_next_turn '<card>' <- <pile>`, `[BO] put_back <from> '<card>' -> draw top`, `[BO] retrieve
 draw [<type>] '<card>'`, `[BO] on_shuffle fired`, `[BO] grant_keyword <kw> -> '<card>'`.
+**Findings (BO, built 2026-10-04 on `wave6`, vocab v66, smoke pending — batched with BP's):** (1) Verify-first held: the
+three hook signatures match DECOMP `AbstractModel` (`ModifyCardPlayResultPileTypeAndPosition(card, isAutoPlay, resources,
+pileType, position)`, `BeforeHandDraw(player, ctx, combatState)`, `AfterShuffle(ctx, shuffler)`); OnPlayWrapper runs
+`GetResultPileTypeForCardPlay()` through the listener hook once per play SERIES (before the replay loop), so a BM-replayed
+`return_to_hand` card returns once — fine, no rule needed; `CardSelectCmd.FromCombatPile` takes the DRAW pile with a filter
+(the AutoSlay selector orders it by rarity + id); `CardCmd.Exhaust` moves from any pile; `CardPileCmd.Shuffle` raises
+`AfterShuffle` once per shuffle. (2) **The base Make It So is not a to-draw-top card** (it returns to HAND every 3rd Skill
+played); the real precedent is `ReboundPower`. The tester keeps the plan's name for the Rebound shape. (3) `return_to_hand`
+(GetResultPileTypeForCardPlay) and `to_draw_top` (ModifyCardPlayResultPileTypeAndPosition, `card == this`) redirect ONLY a
+Discard result, exactly as Particle Wall / Rebound do: creature powers precede cards in the listener order, so a
+Corruption-exhausted Skill stays exhausted, an ExhaustOnNextPlay card still exhausts, and purge's None keeps precedence.
+The validator forbids `to_draw_top` + `corruption` on ANY card (not just Skills — corruption is power/skill-only anyway).
+`return_next_turn` copies Bolas verbatim plus the `Pile.Type is Discard or Draw` guard (a skip is logged). (4) **Wording
+(rule 0.6): `shuffle_hand` reads "Shuffle your hand and discard pile into your draw pile."** — `CardPileCmd.Shuffle` always
+shuffles the discard pile in too (Reboot is the same), so the scout's "Shuffle your hand into your draw pile" would be untrue.
+(5) `retrieve_card` takes `card_type` on all three piles (an untyped sentence is byte-identical to v46; typed: "Return an
+Attack of your choice from your discard pile to your hand."); the draw form reads "Put an Attack from your draw pile into
+your hand." / "Put a random Skill from your draw pile into your hand." — the VOCABULARY row says the never-the-draw-pile rule
+is reversed on purpose (§7 decision 10). (6) Pickers (rule 0.4): `DataCard.PickPrompts` adds CardLoc ExtraLoc keys
+`boPutBackPrompt` / `boGrantKeywordPrompt` / `boRetrievePrompt` (and the first one as `selectionScreenPrompt`);
+`EffectRunner.BoPrompt` reads the key and falls back to a stock prompt if it is missing (never the throwing base getter).
+The retrieve_card CHOOSE picker on the discard / exhaust piles now shows the honest prompt too; exhaust from the draw pile
+keeps the stock exhaust prompt (it fits). (7) `on_shuffle` is power-hosted, so it joined `MultiFireTriggers` AND
+`OncePerCombatTriggers` — **decision: BI's `every_n` and `scope:"this_turn"` are legal on it** (the counter and the
+self-removal live on the per-combat power instance like every other reactive kind). AfterShuffle's ctx can come from a
+turn-start hand draw, so it is never stored in `_combatCtx` (the BE rule); a payload draw that reshuffles is stopped by the
+`_firing` guard. (8) Flag-op rules (both validators): ONE of `return_to_hand` / `to_draw_top` / `return_next_turn` per card
+across base + upgrade; never with `exhaust` / `purge`; never on a Power (C# TryBuildSpec + Python); `return_to_hand` costs 1+
+on the base AND the upgrade, with no `draw` / `gain_energy` on the card; `put_back` (from hand|discard, cards choose, one
+card), `grant_keyword` (retain|ethereal|sly, cards choose, optional hand `card_type`; skips cards that already have it),
+`shuffle_hand` (flag) and the flags are card-only, one each per card; `exhaust_card pile:"draw"` takes choose / random only.
+**Note for BR (stun × recursion):** BR's stun requires `exhaust`, which the BO rule already keeps off the three flag-ops; BR
+must still reject a stun card on a class whose `retrieve_card pile:"exhaust"` (Exhume) or `put_back` could re-buy it, or cap
+stun cards so a recursion loop can't lock an enemy. (9) Harness: census `KEYWORD_OPS` += the three flags (they count toward
+`keyword_kinds`); `KEYWORD_MENU` unchanged (not good injection targets; the C# `KeywordOps` is unchanged too — they are not
+CardKeywords); coverage `REACTIVE_MENU_V2` += `on_shuffle`; featured += `recursion`; `_PREFERRED_OPS` += `put_back`,
+`grant_keyword`; `gate.FIELD_UNITS` += `from` / `keyword` (+ exhaust_card's `pile`); 12 exemplars (168 -> 180; the
+test_harness_v2 sanity ceiling 175 -> 200); token claims across five archetypes (gap_refs #74/#75) — `exhaust_pyre` gained
+NO new token (exhaust-from-draw is a field on `exhaust_card`, which it already claims: build_notes + #74 only); one pitch
+sentence each in the DISCARD, DECK-THINNING and SCALED AMOUNTS / RETAIN sections (`full` scaffold snapshot 46,686 -> 47,178,
++492). Stale pins updated: test_phase_ap (pile draw is now legal), test_phase_bc (the exhaust sentence names the pile),
+test_phase_bk / test_phase_bi (EffectSpec field order, the widened card_type rule), test_frontend (retain_hold refs
+#74/#75), test_featured (recursion sample). (10) Rule 0.9 — index budget raised to 11,000 first (b0cae05: 8,692 chars at the
+full 72-char cap). Readings: index 9,115 (cap 72) · per-archetype max 73,278 (`exhaust_pyre`) · per-archetype scaffold max
+26,849 · triads 66,328 / 75,576 / 82,011 · all-ops 124,942 · `full` 116,590.
 
 ### Phase BP — `cost_delta` + small reactive triggers (v68; gaps #76, #77; ~1 day) — 24 base cards
 
@@ -813,7 +858,7 @@ as every merged phase passed its smoke.
 | BM | #68–#70 | v65 | 1 day | 30 | Battle Trance, Panic Button, Wraith Form prices; Burst / Double Tap / Echo Form; Prolong; Equilibrium |
 | **cut line** | | | **~7½ days of scout estimate (Wave 5 ran ~5 estimated days in one real day)** | **~114** | |
 | BN | #71–#73 | v66 | 1½ days | 38 | Feed / Sunder on-kill; Discovery / Infernal Blade; Havoc / Uproar / Mayhem |
-| BO | #74, #75 | v67 | 1½ days | 29 | Particle Wall, Bolas, Headbutt, Secret Weapon, Reboot; Snap / Hand Trick |
+| BO | #74, #75 | v66 | 1½ days | 29 | Particle Wall, Bolas, Headbutt, Secret Weapon, Reboot; Snap / Hand Trick |
 | BP | #76, #77 | v68 | 1 day | 24 | Stomp / Momentum Strike / Kingly Kick; Arsenal, Vicious, Sleight of Flesh |
 | BQ | #78 | v69 | 1 day | 17 | Dualcast, Darkness, Loop, Compile Driver, Chill — the orb class catches up |
 | BR | #11, #79 | v70 | 1 day | 5 | Whistle; Fiend Fire / Calculated Gamble; Rolling Boulder |
@@ -917,3 +962,9 @@ on `wave6`, vocab v65; gaps #68–#70; the self status is `no_block_gain` —
 Readings: index 8,483 (clause cap 56) · per-archetype max 71,633 (`exhaust_pyre`) ·
 per-archetype scaffold max 26,357 · triads 64,882 / 74,642 / 81,077 · all-ops 122,395 · `full` 114,675 (scaffold
 snapshot 46,686, +301). Tester + tags: `generation/tests/gaptest-bm/`.
+
+**Phase BO BUILT 2026-10-04** (on `wave6`, vocab v66; gaps #74/#75 done; smoke pending — batched with BP's after Ryan's
+go-ahead; tester `generation/tests/gaptest-bo/`, `--validate-only` green). Index budget 8,500 -> 11,000 first (b0cae05).
+Merged suite: generation **600**, web **293**, `test_phase_bo` 266/266 (smoke record pending). Readings: index 9,115 (cap 72) ·
+per-archetype max 73,278 (`exhaust_pyre`) · per-archetype scaffold max 26,849 · triads 66,328 / 75,576 / 82,011 · all-ops
+124,942 · `full` 116,590 (scaffold snapshot 47,178, +492). See Findings (BO).

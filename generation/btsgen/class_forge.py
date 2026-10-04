@@ -427,7 +427,8 @@ instead of a fixed number by adding `"scale": "<source>"` (keep a nominal "amoun
 back for a big release. Hit counts (v63): "hits_scale" on a damage = one hit per unit ("x" Whirlwind, \
 "attacks_played_this_turn" Finisher, "skills_in_hand" Flechettes). A signature Retain archetype = cheap/zero-cost cards with `retain`, payoffs that `scale` to \
 cards_retained or are gated `when:{{"kind":"retained_last_turn"}}` / `when:{{"kind":"hand_size_ge","value":N}}`. \
-At most one scaled damage/block per card.
+At most one scaled damage/block per card. v66: `grant_keyword` gives a hand card Retain (Snap) or Ethereal; \
+`return_to_hand` / `put_back` recycle a key card.
 
 PRECISION READS (small, high-leverage scalars/gates — reach for one only when the concept invites it; never \
 sprinkle): LIFESTEAL — a `damage` card may then `heal` for the UNBLOCKED damage it just dealt via \
@@ -486,7 +487,8 @@ deck-thinning: cut a Basic, a Curse, or a dead draw); the purge_card card itself
 skill, and it pairs naturally with a normal cost/stat line. Reach for either on combo / lean-engine concepts where \
 the fantasy is sharpening the deck toward a few key cards; keep it to 1-3 per class total. Rules: `purge` and \
 `exhaust` are MUTUALLY EXCLUSIVE on one card; NEVER put `purge`/`purge_card` on a basic (Strike/Defend). No \
-amount/target on either.
+amount/target on either. A thin deck digs (v66): `retrieve_card` `pile:"draw"` tutors a card (Secret Weapon), \
+`exhaust_card` `pile:"draw"` burns one unseen, and an `on_shuffle` power pays off the frequent reshuffles.
 
 DISCARD / HAND-CHURN (`discard` + `on_discard` — throw cards away for value): reach for this when the fantasy is \
 recklessness / gambling / sifting / a hand you deliberately churn. TWO parts: (1) `discard` INCOME — `{{"op": \
@@ -504,7 +506,9 @@ FUEL (choose exactly which fuel card to pitch) — put a `scry` skill in any dis
 fits sifting/foresight concepts on its own. Card-only (no repeating-trigger scry). (4) v46: `discard` takes \
 `"cards":"choose"` (the player picks which cards to pitch — card-only, a payload discard stays random), and \
 `{{"op":"retrieve_card","pile":"discard"|"exhaust","cards":"choose"|"random","amount":1}}` returns a spent card to \
-your hand (Headbutt / Exhume; Status/Curse cards never come back) — the recursion half of a churn or exhaust class.
+your hand (Headbutt / Exhume; Status/Curse cards never come back) — the recursion half of a churn or exhaust class. \
+(5) v66: `put_back` (from discard) re-stacks a card on your draw pile, `grant_keyword` sly makes a hand card Sly this \
+turn, `return_next_turn` brings an attack back next turn (Bolas).
 
 CORRUPTION (`corruption` — your Skills cost 0 but Exhaust when played): reach for this when the fantasy is \
 RECKLESS TEMPO / spending yourself / a Faustian bargain — a burst of free skills at the cost of burning them. ONE \
