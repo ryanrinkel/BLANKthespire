@@ -1,0 +1,1011 @@
+# Phase BM AutoSlay smoke — seed GAPTESTBM1 (godot.log grep, 11757 lines)
+# [BM] lines: 979
+# mod exceptions: 0
+# BlankTheSpire stack frames: 0
+# BlankTheSpire frames in non-exception [ERROR] traces (logged, non-fatal): 0
+# Localization formatting errors: 0
+# exception lines (any source): 7
+# run end: [INFO] [AutoSlay] Action: Run completed (max floor reached). Abandoning
+# attempt 1 (same seed, earlier launch): HANG at the wall-clock timeout. Act 3 boss (Queen + Torch Head Amalgam),
+#   turn 13, AutoSlay 'Playing' a Defend at Dex -44: godot.log AND the AutoSlay log both stop dead (no watchdog line,
+#   no exception, no BlankTheSpire frame) - a whole-process freeze. 1477 [BM] lines up to then, every tag fired.
+#   Re-run alone (this record) drew a different Act 3 boss and completed. Not reproduced; recorded, not explained.
+# --- per-tag counts ---
+  block_next_turn scale=block             26
+  block_next_turn scale=fixed             60
+  cost_shift: replay                      63
+  decay tick dex_decay                    48
+  echo_form applied                       41
+  replay play                            265
+  replay_next all                         61
+  replay_next attack                      19
+  replay_next power                       20
+  replay_next skill                       47
+  retain_hand                             53
+  self-debuff dex_decay                   15
+  self-debuff lose_dexterity             144
+  self-debuff lose_strength               20
+  self-debuff no_block_gain               29
+  self-debuff no_draw                     29
+  self-debuff no_energy_gain              39
+# self-debuffs eaten by the player's Artifact: 0
+# --- every [BM] line ---
+[INFO] [BlankTheSpire] [BM] block_next_turn +17 (scale=block) ('Prolong'): next turn 17.
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 1.
+[INFO] [BlankTheSpire] [BM] self-debuff no_block_gain +2 on player (Artifact 0) from 'Panic Button': No Block 2.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_strength +2 on player (Artifact 0) from 'Shared Fate': Str now -2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Shared Fate' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_strength +2 on player (Artifact 0) from 'Shared Fate': Str now -4.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] self-debuff no_draw +1 on player (Artifact 0) from 'Battle Trance': No Draw 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Battle Trance' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_draw +1 on player (Artifact 0) from 'Battle Trance': No Draw 2.
+[INFO] [BlankTheSpire] [BM] replay_next attack x1 ('One-Two Punch'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Reckless Lunge' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -2.
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Expect a Fight' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 2.
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Burst' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 4.
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Equilibrium' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Strike' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next power x1 ('Signal Flare'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Equilibrium' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 2.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -3.
+[INFO] [BlankTheSpire] [BM] self-debuff dex_decay +1 on player (Artifact 0) from 'Wraith Form': Wraith Form 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Wraith Form' (Power, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff dex_decay +1 on player (Artifact 0) from 'Wraith Form': Wraith Form 2.
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -2 (round 6, Dex now -5).
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -2 (round 7, Dex now -7).
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Burst' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 4.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Defend' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Expect a Fight' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 2.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=block) ('Prolong'): next turn 6.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Prolong' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=block) ('Prolong'): next turn 12.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Quick Hands' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD17' burns no discount use.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Defend' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -2 (round 8, Dex now -9).
+[INFO] [BlankTheSpire] [BM] replay_next power x1 ('Signal Flare'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay_next attack x1 ('One-Two Punch'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Strike' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] block_next_turn +27 (scale=block) ('Prolong'): next turn 27.
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 1.
+[INFO] [BlankTheSpire] [BM] replay_next power x1 ('Signal Flare'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] self-debuff no_block_gain +2 on player (Artifact 0) from 'Panic Button': No Block 2.
+[INFO] [BlankTheSpire] [BM] replay_next attack x1 ('One-Two Punch'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Defend' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff dex_decay +1 on player (Artifact 0) from 'Wraith Form': Wraith Form 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Wraith Form' (Power, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff dex_decay +1 on player (Artifact 0) from 'Wraith Form': Wraith Form 2.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -2 (round 3, Dex now -2).
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Banked Wall' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 12.
+[INFO] [BlankTheSpire] [BM] self-debuff no_draw +1 on player (Artifact 0) from 'Battle Trance': No Draw 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Battle Trance' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_draw +1 on player (Artifact 0) from 'Battle Trance': No Draw 2.
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 1.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -2 (round 4, Dex now -4).
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 1.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] replay_next attack x1 ('One-Two Punch'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Strike' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -1.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -2.
+[INFO] [BlankTheSpire] [BM] block_next_turn +28 (scale=block) ('Prolong'): next turn 28.
+[INFO] [BlankTheSpire] [BM] replay_next power x1 ('Signal Flare'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Echo Form' (Power, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 2.
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Equilibrium' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 2.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] replay_next attack x1 ('One-Two Punch'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Strike' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Expect a Fight' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 2.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -1.
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Quick Hands' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD17' burns no discount use.
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Equilibrium' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 2.
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD16' burns no discount use.
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -2.
+[INFO] [BlankTheSpire] [BM] self-debuff dex_decay +1 on player (Artifact 0) from 'Wraith Form': Wraith Form 1.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_strength +2 on player (Artifact 0) from 'Shared Fate': Str now -2.
+[INFO] [BlankTheSpire] [BM] self-debuff no_draw +1 on player (Artifact 0) from 'Battle Trance': No Draw 1.
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 1.
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 1.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -1 (round 4, Dex now -3).
+[INFO] [BlankTheSpire] [BM] self-debuff no_block_gain +2 on player (Artifact 0) from 'Panic Button': No Block 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Panic Button' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_block_gain +2 on player (Artifact 0) from 'Panic Button': No Block 4.
+[INFO] [BlankTheSpire] [BM] block_next_turn +24 (scale=block) ('Prolong'): next turn 24.
+[INFO] [BlankTheSpire] [BM] replay_next power x1 ('Signal Flare'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Twin Jab' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -1 (round 5, Dex now -4).
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Defend' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] replay_next attack x1 ('One-Two Punch'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'One-Two Punch' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next attack x1 ('One-Two Punch'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Doubletake' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Equilibrium' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 2.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -1 (round 6, Dex now -5).
+[INFO] [BlankTheSpire] [BM] block_next_turn +0 (scale=block) ('Prolong'): next turn 0.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Prolong' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] block_next_turn +0 (scale=block) ('Prolong'): next turn 0.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -1 (round 7, Dex now -6).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -7.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Reckless Lunge' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -8.
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] replay_next power x1 ('Signal Flare'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Signal Flare' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next power x1 ('Signal Flare'): stacks now 3.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -1 (round 8, Dex now -9).
+[INFO] [BlankTheSpire] [BM] self-debuff no_draw +1 on player (Artifact 0) from 'Battle Trance': No Draw 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Battle Trance' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_draw +1 on player (Artifact 0) from 'Battle Trance': No Draw 2.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -1 (round 9, Dex now -10).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -11.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Reckless Lunge' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -12.
+[INFO] [BlankTheSpire] [BM] replay_next power x1 ('Signal Flare'): stacks now 4.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -1 (round 10, Dex now -13).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -1.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_strength +2 on player (Artifact 0) from 'Shared Fate': Str now -2.
+[INFO] [BlankTheSpire] [BM] self-debuff no_draw +1 on player (Artifact 0) from 'Battle Trance': No Draw 1.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -2.
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 1.
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Defend' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_block_gain +2 on player (Artifact 0) from 'Panic Button': No Block 2.
+[INFO] [BlankTheSpire] [BM] self-debuff no_block_gain +2 on player (Artifact 0) from 'Panic Button': No Block 2.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 1.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_strength +2 on player (Artifact 0) from 'Shared Fate': Str now -2.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -1.
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Burst' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 4.
+[INFO] [BlankTheSpire] [BM] block_next_turn +17 (scale=block) ('Prolong'): next turn 17.
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 1.
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 1.
+[INFO] [BlankTheSpire] [BM] replay_next attack x1 ('One-Two Punch'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_strength +2 on player (Artifact 0) from 'Shared Fate': Str now -2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Heavy Swing' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -1.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -1.
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Quick Hands' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD17' burns no discount use.
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Expect a Fight' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 2.
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD04' burns no discount use.
+[INFO] [BlankTheSpire] [BM] block_next_turn +29 (scale=block) ('Prolong'): next turn 29.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -1.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -2.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 35.
+[INFO] [BlankTheSpire] [BM] self-debuff no_draw +1 on player (Artifact 0) from 'Battle Trance': No Draw 1.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -3.
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 1.
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_strength +2 on player (Artifact 0) from 'Shared Fate': Str now -1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Shared Fate' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_strength +2 on player (Artifact 0) from 'Shared Fate': Str now -3.
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Defend' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Defend' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 1.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -1.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay_next power x1 ('Signal Flare'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] self-debuff dex_decay +1 on player (Artifact 0) from 'Wraith Form': Wraith Form 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Wraith Form' (Power, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff dex_decay +1 on player (Artifact 0) from 'Wraith Form': Wraith Form 2.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -2 (round 4, Dex now -2).
+[INFO] [BlankTheSpire] [BM] replay_next attack x1 ('One-Two Punch'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] self-debuff no_block_gain +2 on player (Artifact 0) from 'Panic Button': No Block 2.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -3.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Reckless Lunge' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -4.
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -2 (round 5, Dex now -6).
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -2 (round 6, Dex now -8).
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Heavy Swing' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 1.
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 2.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -2 (round 7, Dex now -10).
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 1.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_strength +2 on player (Artifact 0) from 'Shared Fate': Str now -1.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -11.
+[INFO] [BlankTheSpire] [BM] block_next_turn +0 (scale=block) ('Prolong'): next turn 6.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -2 (round 8, Dex now -13).
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Quick Hands' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD17' burns no discount use.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -2 (round 9, Dex now -15).
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Doubletake' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Quick Hands' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD17' burns no discount use.
+[INFO] [BlankTheSpire] [BM] self-debuff no_draw +1 on player (Artifact 0) from 'Battle Trance': No Draw 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Battle Trance' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_draw +1 on player (Artifact 0) from 'Battle Trance': No Draw 2.
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD03' burns no discount use.
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 1.
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 1.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -16.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -2 (round 10, Dex now -18).
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Defend' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -18.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Heavy Swing' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -1.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 1.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -2.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -1.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -1.
+[INFO] [BlankTheSpire] [BM] block_next_turn +19 (scale=block) ('Prolong'): next turn 19.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -2.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_strength +2 on player (Artifact 0) from 'Shared Fate': Str now -2.
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 1.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -2.
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 1.
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 2.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -1.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -2.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -3.
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 1.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -4.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -5.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Doubletake' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Equilibrium' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Strike' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Doubletake' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now 4.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now 3.
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_strength +2 on player (Artifact 0) from 'Shared Fate': Str now -2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Shared Fate' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_strength +2 on player (Artifact 0) from 'Shared Fate': Str now -4.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -3.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Defend' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] block_next_turn +10 (scale=block) ('Prolong'): next turn 10.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Prolong' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] block_next_turn +13 (scale=block) ('Prolong'): next turn 23.
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 1.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -3.
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 1.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -4.
+[INFO] [BlankTheSpire] [BM] replay_next attack x1 ('One-Two Punch'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'One-Two Punch' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next attack x1 ('One-Two Punch'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Twin Jab' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 2.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Equilibrium' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 2.
+[INFO] [BlankTheSpire] [BM] self-debuff no_draw +1 on player (Artifact 0) from 'Battle Trance': No Draw 1.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -5.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Reckless Lunge' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -6.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -7.
+[INFO] [BlankTheSpire] [BM] self-debuff no_block_gain +2 on player (Artifact 0) from 'Panic Button': No Block 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Heavy Swing' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Twin Jab' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff dex_decay +1 on player (Artifact 0) from 'Wraith Form': Wraith Form 1.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -1 (round 8, Dex now -8).
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Heavy Swing' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_draw +1 on player (Artifact 0) from 'Battle Trance': No Draw 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Battle Trance' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_draw +1 on player (Artifact 0) from 'Battle Trance': No Draw 2.
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 1.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -9.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Reckless Lunge' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -10.
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 2.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -1 (round 9, Dex now -11).
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Defend' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Burst' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 4.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Doubletake' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Defend' (Skill, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay play #3 of 'Defend' (Skill, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Equilibrium' (Skill, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 2.
+[INFO] [BlankTheSpire] [BM] replay play #3 of 'Equilibrium' (Skill, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 3.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -1 (round 10, Dex now -12).
+[INFO] [BlankTheSpire] [BM] block_next_turn +0 (scale=block) ('Prolong'): next turn 0.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Prolong' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] block_next_turn +0 (scale=block) ('Prolong'): next turn 0.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Strike' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -13.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -14.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -1 (round 11, Dex now -15).
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Doubletake' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Heavy Swing' (Attack, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay play #3 of 'Heavy Swing' (Attack, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -1.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -2.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Banked Wall' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 12.
+[INFO] [BlankTheSpire] [BM] self-debuff no_block_gain +2 on player (Artifact 0) from 'Panic Button': No Block 2.
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 1.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Quick Hands' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD17' burns no discount use.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -1.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Strike' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 1.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Defend' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Banked Wall' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 12.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -1.
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Quick Hands' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD17' burns no discount use.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Doubletake' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD12' burns no discount use.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Heavy Swing' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD19' burns no discount use.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Heavy Swing' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next attack x1 ('One-Two Punch'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Reckless Lunge' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -2.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -3.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Quick Hands' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD17' burns no discount use.
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 1.
+[INFO] [BlankTheSpire] [BM] block_next_turn +17 (scale=block) ('Prolong'): next turn 17.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 23.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Quick Hands' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD17' burns no discount use.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Reckless Lunge' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -2.
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD08' burns no discount use.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -3.
+[INFO] [BlankTheSpire] [BM] self-debuff no_block_gain +2 on player (Artifact 0) from 'Panic Button': No Block 2.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -4.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -5.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -6.
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 1.
+[INFO] [BlankTheSpire] [BM] self-debuff no_draw +1 on player (Artifact 0) from 'Battle Trance': No Draw 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Battle Trance' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_draw +1 on player (Artifact 0) from 'Battle Trance': No Draw 2.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -6.
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 1.
+[INFO] [BlankTheSpire] [BM] self-debuff dex_decay +1 on player (Artifact 0) from 'Wraith Form': Wraith Form 1.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -1 (round 5, Dex now -7).
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Quick Hands' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD17' burns no discount use.
+[INFO] [BlankTheSpire] [BM] self-debuff no_block_gain +2 on player (Artifact 0) from 'Panic Button': No Block 2.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_strength +2 on player (Artifact 0) from 'Shared Fate': Str now -1.
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 1.
+[INFO] [BlankTheSpire] [BM] replay_next attack x1 ('One-Two Punch'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 2.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -8.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Reckless Lunge' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -9.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -1 (round 6, Dex now -10).
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Burst' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 4.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Heavy Swing' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -1 (round 7, Dex now -11).
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Equilibrium' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Heavy Swing' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -1 (round 8, Dex now -12).
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Burst' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 4.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Quick Hands' (Skill, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD17' burns no discount use.
+[INFO] [BlankTheSpire] [BM] replay play #3 of 'Quick Hands' (Skill, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #3 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD17' burns no discount use.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -1 (round 9, Dex now -13).
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Strike' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Banked Wall' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 12.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -1 (round 10, Dex now -14).
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Defend' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Quick Hands' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD17' burns no discount use.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -1 (round 11, Dex now -15).
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Doubletake' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -16.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Reckless Lunge' (Attack, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -17.
+[INFO] [BlankTheSpire] [BM] replay play #3 of 'Reckless Lunge' (Attack, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -18.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -1 (round 12, Dex now -19).
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Doubletake' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Equilibrium' (Skill, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 2.
+[INFO] [BlankTheSpire] [BM] replay play #3 of 'Equilibrium' (Skill, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 3.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -1 (round 13, Dex now -20).
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Defend' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] block_next_turn +0 (scale=block) ('Prolong'): next turn 0.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Prolong' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] block_next_turn +0 (scale=block) ('Prolong'): next turn 0.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -1 (round 14, Dex now -21).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -22.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Reckless Lunge' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -23.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Banked Wall' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 12.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -1 (round 15, Dex now -24).
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Expect a Fight' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 2.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -25.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Reckless Lunge' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -26.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -1 (round 16, Dex now -27).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -28.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Reckless Lunge' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -29.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Quick Hands' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD17' burns no discount use.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -1 (round 17, Dex now -30).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -30.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -30.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Reckless Lunge' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -2.
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 1.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 12.
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 2.
+[INFO] [BlankTheSpire] [BM] self-debuff no_block_gain +2 on player (Artifact 0) from 'Panic Button': No Block 2.
+[INFO] [BlankTheSpire] [BM] replay_next attack x1 ('One-Two Punch'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 1.
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Expect a Fight' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 2.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -2.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_strength +2 on player (Artifact 0) from 'Shared Fate': Str now -1.
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Expect a Fight' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 2.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Quick Hands' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD17' burns no discount use.
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Banked Wall' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 12.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -3.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -3.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -3.
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 1.
+[INFO] [BlankTheSpire] [BM] replay_next power x1 ('Signal Flare'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -1.
+[INFO] [BlankTheSpire] [BM] self-debuff no_block_gain +2 on player (Artifact 0) from 'Panic Button': No Block 2.
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Echo Form' (Power, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 2.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 3.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Echo Form' (Power, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 4.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Banked Wall' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 12.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Quick Hands' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD17' burns no discount use.
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Burst' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 4.
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD09' burns no discount use.
+[INFO] [BlankTheSpire] [BM] self-debuff no_draw +1 on player (Artifact 0) from 'Battle Trance': No Draw 1.
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 1.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -1.
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 1.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] self-debuff no_draw +1 on player (Artifact 0) from 'Battle Trance': No Draw 2.
+[INFO] [BlankTheSpire] [BM] self-debuff dex_decay +1 on player (Artifact 0) from 'Wraith Form': Wraith Form 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Wraith Form' (Power, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff dex_decay +1 on player (Artifact 0) from 'Wraith Form': Wraith Form 2.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -2.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -3.
+[INFO] [BlankTheSpire] [BM] replay_next power x1 ('Signal Flare'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -2 (round 3, Dex now -4).
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Heavy Swing' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 1.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -2 (round 4, Dex now -6).
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Strike' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Echo Form' (Power, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 3.
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Equilibrium' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 2.
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -2 (round 5, Dex now -8).
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Twin Jab' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Quick Hands' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD17' burns no discount use.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -9.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Reckless Lunge' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -10.
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD08' burns no discount use.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -10.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -1.
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 1.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -2.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 12.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -5.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Reckless Lunge' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -6.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -7.
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 1.
+[INFO] [BlankTheSpire] [BM] block_next_turn +31 (scale=block) ('Prolong'): next turn 31.
+[INFO] [BlankTheSpire] [BM] replay_next power x1 ('Signal Flare'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Signal Flare' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next power x1 ('Signal Flare'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Burst' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 4.
+[INFO] [BlankTheSpire] [BM] self-debuff no_draw +1 on player (Artifact 0) from 'Battle Trance': No Draw 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Battle Trance' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_draw +1 on player (Artifact 0) from 'Battle Trance': No Draw 2.
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 4.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Burst' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 6.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -7.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Quick Hands' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD17' burns no discount use.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -8.
+[INFO] [BlankTheSpire] [BM] self-debuff no_block_gain +2 on player (Artifact 0) from 'Panic Button': No Block 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Panic Button' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_block_gain +2 on player (Artifact 0) from 'Panic Button': No Block 4.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Doubletake' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] self-debuff no_block_gain +2 on player (Artifact 0) from 'Panic Button': No Block 6.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Panic Button' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_block_gain +2 on player (Artifact 0) from 'Panic Button': No Block 8.
+[INFO] [BlankTheSpire] [BM] replay_next attack x1 ('One-Two Punch'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'One-Two Punch' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next attack x1 ('One-Two Punch'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -11.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Reckless Lunge' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -8.
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 1.
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 1.
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Heavy Swing' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -1.
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 1.
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 2.
+[INFO] [BlankTheSpire] [BM] block_next_turn +32 (scale=block) ('Prolong'): next turn 32.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 38.
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 3.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Echo Form' (Power, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 4.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Quick Hands' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD17' burns no discount use.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Heavy Swing' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD19' burns no discount use.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Quick Hands' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD17' burns no discount use.
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 1.
+[INFO] [BlankTheSpire] [BM] self-debuff no_block_gain +2 on player (Artifact 0) from 'Panic Button': No Block 2.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Reckless Lunge' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -3.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_strength +2 on player (Artifact 0) from 'Shared Fate': Str now -1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Shared Fate' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_strength +2 on player (Artifact 0) from 'Shared Fate': Str now -3.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Heavy Swing' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -3.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Reckless Lunge' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -4.
+[INFO] [BlankTheSpire] [BM] self-debuff no_draw +1 on player (Artifact 0) from 'Battle Trance': No Draw 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Battle Trance' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_draw +1 on player (Artifact 0) from 'Battle Trance': No Draw 2.
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Banked Wall' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 12.
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Expect a Fight' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 2.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -5.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Reckless Lunge' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -6.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Quick Hands' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD17' burns no discount use.
+[INFO] [BlankTheSpire] [BM] replay_next power x1 ('Signal Flare'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Signal Flare' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next power x1 ('Signal Flare'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD11' burns no discount use.
+[INFO] [BlankTheSpire] [BM] self-debuff no_block_gain +2 on player (Artifact 0) from 'Panic Button': No Block 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Panic Button' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_block_gain +2 on player (Artifact 0) from 'Panic Button': No Block 4.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -7.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Heavy Swing' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -8.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Heavy Swing' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Quick Hands' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD17' burns no discount use.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -9.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Reckless Lunge' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -9.
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD08' burns no discount use.
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 1.
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -1.
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Equilibrium' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 2.
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Expect a Fight' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 2.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] block_next_turn +17 (scale=block) ('Prolong'): next turn 23.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_strength +2 on player (Artifact 0) from 'Shared Fate': Str now -1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Shared Fate' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_strength +2 on player (Artifact 0) from 'Shared Fate': Str now -3.
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 1.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Defend' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Echo Form' (Power, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 3.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Reckless Lunge' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -2.
+[INFO] [BlankTheSpire] [BM] self-debuff dex_decay +1 on player (Artifact 0) from 'Wraith Form': Wraith Form 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Wraith Form' (Power, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff dex_decay +1 on player (Artifact 0) from 'Wraith Form': Wraith Form 2.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -2 (round 5, Dex now -4).
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Heavy Swing' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_draw +1 on player (Artifact 0) from 'Battle Trance': No Draw 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Battle Trance' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_draw +1 on player (Artifact 0) from 'Battle Trance': No Draw 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Quick Hands' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD17' burns no discount use.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -5.
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 4.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -6.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -2 (round 6, Dex now -8).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -9.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Reckless Lunge' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -10.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Quick Hands' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD17' burns no discount use.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Heavy Swing' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD19' burns no discount use.
+[INFO] [BlankTheSpire] [BM] self-debuff no_block_gain +2 on player (Artifact 0) from 'Panic Button': No Block 2.
+[INFO] [BlankTheSpire] [BM] replay_next attack x1 ('One-Two Punch'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -11.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Reckless Lunge' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -12.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -2 (round 7, Dex now -14).
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 5.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Echo Form' (Power, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 6.
+[INFO] [BlankTheSpire] [BM] replay_next power x1 ('Signal Flare'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Signal Flare' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next power x1 ('Signal Flare'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] self-debuff no_block_gain +2 on player (Artifact 0) from 'Panic Button': No Block 3.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Panic Button' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_block_gain +2 on player (Artifact 0) from 'Panic Button': No Block 5.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Doubletake' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Doubletake' (Skill, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 3.
+[INFO] [BlankTheSpire] [BM] replay play #3 of 'Doubletake' (Skill, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 4.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Defend' (Skill, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay play #3 of 'Defend' (Skill, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Expect a Fight' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 2.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -2 (round 8, Dex now -16).
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Strike' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_draw +1 on player (Artifact 0) from 'Battle Trance': No Draw 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Battle Trance' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_draw +1 on player (Artifact 0) from 'Battle Trance': No Draw 2.
+[INFO] [BlankTheSpire] [BM] self-debuff no_block_gain +2 on player (Artifact 0) from 'Panic Button': No Block 6.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Panic Button' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_block_gain +2 on player (Artifact 0) from 'Panic Button': No Block 8.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -17.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Reckless Lunge' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -17.
+[INFO] [BlankTheSpire] [BM] self-debuff no_draw +1 on player (Artifact 0) from 'Battle Trance': No Draw 1.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -1.
+[INFO] [BlankTheSpire] [BM] block_next_turn +43 (scale=block) ('Prolong'): next turn 43.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] self-debuff no_draw +1 on player (Artifact 0) from 'Battle Trance': No Draw 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Battle Trance' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_draw +1 on player (Artifact 0) from 'Battle Trance': No Draw 3.
+[INFO] [BlankTheSpire] [BM] replay_next power x1 ('Signal Flare'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -2.
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Echo Form' (Power, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Heavy Swing' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -3.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Quick Hands' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD17' burns no discount use.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Heavy Swing' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD19' burns no discount use.
+[INFO] [BlankTheSpire] [BM] self-debuff no_block_gain +2 on player (Artifact 0) from 'Panic Button': No Block 2.
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 1.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] self-debuff no_block_gain +2 on player (Artifact 0) from 'Panic Button': No Block 4.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -4.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 12.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -5.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Reckless Lunge' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -6.
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Equilibrium' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 2.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 3.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Echo Form' (Power, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 4.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Twin Jab' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_strength +2 on player (Artifact 0) from 'Shared Fate': Str now -2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Shared Fate' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_strength +2 on player (Artifact 0) from 'Shared Fate': Str now -4.
+[INFO] [BlankTheSpire] [BM] self-debuff no_block_gain +2 on player (Artifact 0) from 'Panic Button': No Block 4.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Panic Button' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_block_gain +2 on player (Artifact 0) from 'Panic Button': No Block 6.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -7.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Banked Wall' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 12.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Heavy Swing' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 5.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Echo Form' (Power, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 6.
+[INFO] [BlankTheSpire] [BM] self-debuff dex_decay +1 on player (Artifact 0) from 'Wraith Form': Wraith Form 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Wraith Form' (Power, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff dex_decay +1 on player (Artifact 0) from 'Wraith Form': Wraith Form 2.
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Burst' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 4.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Heavy Swing' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Heavy Swing' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -8.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Reckless Lunge' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -9.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -2 (round 8, Dex now -11).
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Twin Jab' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Burst' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 4.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Quick Hands' (Skill, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD17' burns no discount use.
+[INFO] [BlankTheSpire] [BM] replay play #3 of 'Quick Hands' (Skill, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #3 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD17' burns no discount use.
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 7.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Echo Form' (Power, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] echo_form applied by 'Echo Form': Echo Form now 8.
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD13' burns no discount use.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Quick Hands' (Skill, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD17' burns no discount use.
+[INFO] [BlankTheSpire] [BM] replay play #3 of 'Quick Hands' (Skill, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #3 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD17' burns no discount use.
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Expect a Fight' (Skill, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 2.
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD04' burns no discount use.
+[INFO] [BlankTheSpire] [BM] replay play #3 of 'Expect a Fight' (Skill, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 3.
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #3 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD04' burns no discount use.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Doubletake' (Skill, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] replay play #3 of 'Doubletake' (Skill, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 3.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -12.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Reckless Lunge' (Attack, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -13.
+[INFO] [BlankTheSpire] [BM] replay play #3 of 'Reckless Lunge' (Attack, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -14.
+[INFO] [BlankTheSpire] [BM] replay_next attack x1 ('One-Two Punch'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'One-Two Punch' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next attack x1 ('One-Two Punch'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Strike' (Attack, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay play #3 of 'Strike' (Attack, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -2 (round 9, Dex now -16).
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Quick Hands' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD17' burns no discount use.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -17.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Reckless Lunge' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -18.
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD08' burns no discount use.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Doubletake' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD12' burns no discount use.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -19.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Reckless Lunge' (Attack, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -20.
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD08' burns no discount use.
+[INFO] [BlankTheSpire] [BM] replay play #3 of 'Reckless Lunge' (Attack, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -21.
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #3 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD08' burns no discount use.
+[INFO] [BlankTheSpire] [BM] block_next_turn +7 (scale=block) ('Prolong'): next turn 7.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Prolong' (Skill, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] block_next_turn +14 (scale=block) ('Prolong'): next turn 21.
+[INFO] [BlankTheSpire] [BM] replay play #3 of 'Prolong' (Skill, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] block_next_turn +14 (scale=block) ('Prolong'): next turn 35.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Quick Hands' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD17' burns no discount use.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 41.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Banked Wall' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 47.
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD14' burns no discount use.
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Equilibrium' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] retain_hand ('Equilibrium'): Retain Hand now 2.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -2 (round 10, Dex now -23).
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Quick Hands' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD17' burns no discount use.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Twin Jab' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD18' burns no discount use.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -24.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Reckless Lunge' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -25.
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD08' burns no discount use.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Banked Wall' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 12.
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD14' burns no discount use.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Heavy Swing' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD19' burns no discount use.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -26.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Reckless Lunge' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -27.
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD08' burns no discount use.
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -2 (round 11, Dex now -29).
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Twin Jab' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -30.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Reckless Lunge' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -31.
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Expect a Fight' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff no_energy_gain +1 on player (Artifact 0) from 'Expect a Fight': No Energy Gain 2.
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Doubletake' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next all x1 ('Doubletake'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Heavy Swing' (Attack, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay play #3 of 'Heavy Swing' (Attack, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] decay tick dex_decay -2 (round 12, Dex now -33).
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Quick Hands' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD17' burns no discount use.
+[INFO] [BlankTheSpire] [BM] replay_next power x1 ('Signal Flare'): stacks now 1.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Signal Flare' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next power x1 ('Signal Flare'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD11' burns no discount use.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Strike' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD01' burns no discount use.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Quick Hands' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD17' burns no discount use.
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 2.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Burst' (Skill, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] replay_next skill x2 ('Burst'): stacks now 4.
+[INFO] [BlankTheSpire] [BM] cost_shift: replay #2 of 'CARD.BLANKTHESPIRE-FORGED_CLASS04_CARD09' burns no discount use.
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 6.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Banked Wall' (Skill, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 12.
+[INFO] [BlankTheSpire] [BM] replay play #3 of 'Banked Wall' (Skill, 3 plays in the series).
+[INFO] [BlankTheSpire] [BM] block_next_turn +6 (scale=fixed) ('Banked Wall'): next turn 18.
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -34.
+[INFO] [BlankTheSpire] [BM] replay play #2 of 'Reckless Lunge' (Attack, 2 plays in the series).
+[INFO] [BlankTheSpire] [BM] self-debuff lose_dexterity +1 on player (Artifact 0) from 'Reckless Lunge': Dex now -35.

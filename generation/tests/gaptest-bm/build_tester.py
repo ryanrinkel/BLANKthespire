@@ -7,7 +7,7 @@ gaps #68 / #69 / #70).
     uv run python tests/gaptest-bm/build_tester.py --remove          # restores whatever slot 04 held before
     uv run btsgen-autoslay-smoke --seeds GAPTESTBM1 GAPTESTBM2 --character class4 --relic auto --timeout 900
 
-The deck (slot 04, a normal class, 20 cards; Skill-heavy so Burst / Echo Form have something to replay):
+The deck (slot 04, a normal class, 22 cards; Skill-heavy so Burst / Echo Form have something to replay):
   * Battle Trance       — draw 3, then no_draw (NoDrawPower)                     [BM] self-debuff no_draw +1 on player
   * Expect a Fight      — gain 2 energy, then no_energy_gain (NoEnergyGainPower)  [BM] self-debuff no_energy_gain +1
   * Panic Button        — 16 Block, no_block_gain 2 (NoBlockPower), exhaust      [BM] self-debuff no_block_gain +2
@@ -122,7 +122,7 @@ CARDS = [
     card("bm_heavy_swing", "Heavy Swing", "attack", "common", 2, "enemy",
          [{"op": "damage", "amount": 13}], [{"op": "damage", "amount": 17}]),
 ]
-# slot -> count (1-based card order). 20 cards; every BM card at least once, Burst doubled (the Skill-heavy replay hand).
+# slot -> count (1-based card order). 22 cards; every BM card at least once, Burst doubled (the Skill-heavy replay hand).
 DECK = {"bm_strike": 2, "bm_defend": 2, "bm_burst": 2}
 
 CHARACTER = {

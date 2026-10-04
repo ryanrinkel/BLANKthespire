@@ -6,8 +6,8 @@ the lose_* trio as NEGATIVE applies under named vars — the base powers behind 
 decay-tick hooks on DataCard, the ForgedCostShiftPower replay skip, the [BM] tags); the validator rules on both sides;
 the describe byte-match (Python literals asserted, the C# fragments grepped); the contract surfaces (schema, VOCABULARY
 rows, statuses/*.json, gate order, census, featured, archetypes, exemplars, heuristics, gap log, render.js, the pitch
-sentence); the tester's validate-only path; the saved AutoSlay tag greps under tests/gaptest-bm/ when present
-(GAPTESTBM1 / BM2 — "smoke pending" until Ryan approves the run); and prints the rule-0.9 readings.
+sentence); the tester's validate-only path; the saved AutoSlay tag greps under tests/gaptest-bm/ (GAPTESTBM1 / BM2:
+both runs completed, every [BM] tag fired); and prints the rule-0.9 readings.
 """
 from __future__ import annotations
 
@@ -420,22 +420,23 @@ def _t_tester() -> None:
 
 def _t_smoke_record() -> None:
     print("the saved AutoSlay tag greps (TEST_AUDIT_2026-10 §7):")
-    recs = [TESTER_DIR / f"godot_BM_tags_{s}.txt" for s in SMOKE_SEEDS]
-    if not any(p.exists() for p in recs):
-        print("  smoke pending (no godot_BM_tags_*.txt yet — the smoke runs after Ryan's go-ahead)")
-        return
     seen = ""
-    for p in recs:
-        if not p.exists():
-            print(f"  smoke pending for {p.name}")
-            continue
+    for s in SMOKE_SEEDS:
+        p = TESTER_DIR / f"godot_BM_tags_{s}.txt"
+        assert p.exists(), f"missing smoke record {p}"
         txt = p.read_text(encoding="utf-8")
+        check("Run completed" in txt, f"{p.name}: the run completed")
         check("[BM]" in txt, f"{p.name} holds [BM] tags")
         check("mod exceptions: 0" in txt and "Localization formatting errors: 0" in txt
               and "BlankTheSpire stack frames: 0" in txt, f"{p.name} records a clean run")
         seen += txt
     for t in TAGS:
         check(t in seen, f"the smoke fired '{t}'")
+    check(re.search(r"\[BM\] replay play #[3-9] of '", seen) is not None,
+          "stacked replays fired (a play #3+: Echo Form on top of Burst / Duplication)")
+    check("burns no discount use" in seen, "a replayed card burned no cost_shift use (the PlayIndex decision)")
+    check(re.search(r"\[BM\] block_next_turn \+[1-9]\d* \(scale=block\)", seen) is not None,
+          "Prolong banked a real (non-zero) current Block")
 
 
 def _t_budget() -> None:

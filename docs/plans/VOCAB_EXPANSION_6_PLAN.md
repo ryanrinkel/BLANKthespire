@@ -607,6 +607,17 @@ scaffold snapshot 46,385 -> 46,686, +301); stale pins updated in test_phase_bi (
 (retain_hold also refs #70), test_exemplars (orb class-only map), test_featured (sample). (9) Readings: index 8,483
 (clause cap 72 -> **56**) · per-archetype max 71,633 (`exhaust_pyre`) · per-archetype scaffold max 26,357 · triads
 64,882 / 74,642 / 81,077 · all-ops 122,395 · `full` 114,675.
+(10) Smoke (tests/gaptest-bm, one build, no code iteration): the first GAPTESTBM1 launch HUNG at the wall-clock timeout —
+in the Act 3 boss (Queen + Torch Head Amalgam), turn 13, while AutoSlay played a Defend at Dex -44, godot.log AND the
+AutoSlay log stopped dead with no watchdog line, no exception and no BlankTheSpire frame (a whole-process freeze;
+1,477 [BM] lines up to then, every tag already fired). GAPTESTBM2 then completed the run (1,115 [BM] lines), and
+GAPTESTBM1 re-run alone drew a different Act 3 boss and completed (979 [BM] lines). Not reproduced; recorded in the
+BM1 tags file, not explained (the Queen fight is the lead if it recurs). Both completed seeds: every [BM] tag fired —
+self-debuff for all six non-orb statuses, replay_next skill / attack / power / all, replay play #2 (and #3/#4 when
+Echo Form stacks on Burst / Duplication), echo_form, both block_next_turn forms, retain_hand, the dex_decay tick, and
+the cost_shift replay skip; 0 mod exceptions, 0 BlankTheSpire frames, 0 localization errors; no self-debuff was ever
+eaten by an Artifact (the tester has no Artifact source). Both seeds logged AutoSlay's post-completion "Options NButton
+not found" in AbandonRunAsync (base AutoSlay, after the run already counted as completed — also in BL2).
 
 ### Phase BN — On-kill, random generation, auto-play (v66; gaps #71–#73; ~1½ days) — 38 base cards
 
@@ -899,8 +910,10 @@ web **293**, `test_phase_bl` 215/215. Readings: index 8,065 · per-archetype max
 (`exhaust_pyre`) · per-archetype scaffold max 26,056 · triads 63,021 / 72,817 / 79,252 · all-ops 120,084 · `full`
 112,782 (scaffold snapshot 46,385, +340). Tester: `generation/tests/gaptest-bl/` (`--validate-only` green).
 
-**Phase BM built 2026-10-04, smoke pending** (on `wave6`, vocab v65; gaps #68–#70; the self status is `no_block_gain` —
-`no_block` is a condition, see Findings (BM)). Merged suite: generation **598**, web **293**, `test_phase_bm` 279/279
-(smoke records pending). Readings: index 8,483 (clause cap 56) · per-archetype max 71,633 (`exhaust_pyre`) ·
+**Phase BM DONE 2026-10-04** (smokes GAPTESTBM1/BM2 completed the run, every `[BM]` tag fired, 0 mod exceptions,
+0 localization errors; one unexplained, unreproduced whole-process freeze on the first BM1 launch — Findings (BM) 10;
+on `wave6`, vocab v65; gaps #68–#70; the self status is `no_block_gain` —
+`no_block` is a condition, see Findings (BM)). Merged suite: generation **598**, web **293**, `test_phase_bm` 304/304
+Readings: index 8,483 (clause cap 56) · per-archetype max 71,633 (`exhaust_pyre`) ·
 per-archetype scaffold max 26,357 · triads 64,882 / 74,642 / 81,077 · all-ops 122,395 · `full` 114,675 (scaffold
-snapshot 46,686, +301). Tester: `generation/tests/gaptest-bm/` (`--validate-only` green); smoke waits for Ryan.
+snapshot 46,686, +301). Tester + tags: `generation/tests/gaptest-bm/`.
