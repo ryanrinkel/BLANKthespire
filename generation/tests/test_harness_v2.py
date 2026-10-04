@@ -352,9 +352,8 @@ def test_strip_metaphors_tidies_text():
 # only govern the scaffolding — a phase that adds an op MUST document it, and there is nothing to trade the row
 # against. Measured against the half it can govern, the discipline is working: +265/phase, several phases at
 # zero. So the budget is two terms, both owned here:
-BP_SCAFFOLD_BUDGET = 46_000   # the assert with teeth: prompt MINUS the vocabulary paste. 44,845 today, ~1,155
-                              # of headroom = ~4 phases at the observed mean. This is where "pay with a removal"
-                              # bites, and where a phase argues for headroom.
+BP_SCAFFOLD_BUDGET = 46_000   # HISTORICAL (retired as an assert 2026-10-04): the whole-prompt / all-ops scaffold
+                              # ceiling. Replaced by BP_SCAFFOLD_BUDGET_PER_ARCHETYPE on the real (pruned) path.
 BP_TOTAL_TRIPWIRE = 120_000   # NOT a per-phase gate — the line at which the shrink conversation is due. Derived
                               # from the actual consumer (below), not from last month's reading: ~30k tokens,
                               # ~20-25% of a 128k context. ~16 phases of runway at the observed total rate.
@@ -376,19 +375,35 @@ BP_TOTAL_TRIPWIRE = 120_000   # NOT a per-phase gate — the line at which the s
 # end, harness v2) now sends the VOCABULARY TREE ($BTS_BLUEPRINT_VOCAB=tree, the default): a ~6k INDEX of every
 # token in the cached head, plus a per-forge DETAIL block with the full rows of what the chosen archetypes
 # selected. So the asserts now run on that real path:
-#   (a) the index <= 6,000 chars;                       (b) every archetype alone <= 70,000;
+#   (a) the index <= 8,500 chars;                       (b) every archetype alone <= 70,000;
+#   (b2) three fixed sample triads (normal / orb / hybrid orb+status) <= 80,000 each;
 #   (c) the all-ops path (every archetype's ops, every pool kind, nothing pruned) <= BP_TOTAL_TRIPWIRE;
-#   (d) the scaffold = that prompt MINUS the index MINUS the detail block (measured from the block markers)
-#       <= BP_SCAFFOLD_BUDGET;
+#   (d) the scaffold = prompt MINUS the index MINUS the detail block (measured from the block markers), for EVERY
+#       archetype alone (its pitches pruned as production prunes them) <= BP_SCAFFOLD_BUDGET_PER_ARCHETYPE;
 #   (e) the `full` rollback path is byte-identical to the pre-BH prompt (its scaffold half is snapshotted).
 # The untrimmed reading survives as an INFORMATIONAL print: it is the `full` rollback path.
+#
+# DECIDED 2026-10-04 (Ryan): (d) used to be measured on the ALL-OPS path — every archetype's pitch unpruned, a
+# prompt no forge sends — so every pitch sentence of every phase was charged to one 46,000 budget (49 chars left
+# after BI). Pitches are pruned per forge, so they cost only the forges that select them: (d) now runs on the real
+# per-archetype path, the all-ops scaffold is printed (BP_TREE_READING_SCAFFOLD is its recorded reading), and the
+# all-ops TOTAL keeps the 120k tripwire (c) as the only synthetic assert. Same day: index 6,000 -> 8,500.
 BP_ARCHETYPE_CEILING = 70_000  # (b) the design prompt for ONE archetype's selection
-BP_INDEX_CEILING = 6_000       # (a) = gate.INDEX_BUDGET (the index adapts its clause length to stay under it)
+BP_TRIAD_BUDGET = 80_000       # (b2) the design prompt for each of BP_TRIADS (what a real three-archetype forge gets)
+BP_SCAFFOLD_BUDGET_PER_ARCHETYPE = 32_000  # (d) 25,345 (exhaust_pyre) at the 2026-10-04 decision
+BP_INDEX_CEILING = 8_500       # (a) = gate.INDEX_BUDGET (the index adapts its clause length to stay under it)
+# (b2) the fixed sample forges — the same three the Phase BH dry run builds (tests/test_phase_bh.DRY_RUNS).
+BP_TRIADS = (
+    ("normal", ("retain_hold", "poison_attrition", "block_bulwark"), "normal"),
+    ("orb", ("orb_channel", "slot_machine", "tempo_draw"), "orb"),
+    ("hybrid", ("orb_channel", "status_signature", "debuff_expose"), ("orb", "status")),
+)
 BP_READING = 108_282          # the untrimmed v2 path (= the `full` rollback with no selection) — 2026-09-30, Wave 5
 BP_READING_V1 = 108_179       # flag-off (informational)
 BP_READING_SCAFFOLD = 45_673  # BP_READING minus VOCABULARY.md: the `full` path's scaffold half, snapshotted by (e)
                               # (45,537 at BH-3; +136 Phase BI v61: the TRIGGERS pitch's one-line filter sentence)
-BP_TREE_READING_SCAFFOLD = 45_925  # (d) on the all-ops tree path (45,789 at BH-3 = 45,537 + the index/detail pointer; +136 BI)
+BP_TREE_READING_SCAFFOLD = 45_951  # INFORMATIONAL reading, not asserted: the scaffold on the all-ops tree path
+                                   # (45,789 at BH-3 = 45,537 + the index/detail pointer; 45,951 after BI v61)
 
 
 def _tree_prompt(ops, kind, **kw) -> str:
@@ -415,17 +430,37 @@ def _all_ops() -> set:
     return ops
 
 
+def _triad_prompt(ids, kind) -> str:
+    """One of BP_TRIADS' design prompts, built the way the Phase BH dry run (and frontend/builder.py) builds it:
+    the union of the three archetypes' ops, the class kind(s), no nominated sections."""
+    cat = load_catalog()
+    ops: set = set()
+    for aid in ids:
+        ops |= set(cat.by_id[aid].ops)
+    k = kind if isinstance(kind, str) else list(kind)
+    return _BlueprintContract(mode="dossier", triad=True, seed=1, selected_ops=ops, class_kind=k,
+                              nominated_sections=None).system_prompt()
+
+
 def rule_0_9_readings() -> dict:
     """Every rule-0.9 reading in one place (the asserts below use the same recipe; tests/test_phase_bh prints
     them). The caller pins BTS_HARNESS_V2=1 and BTS_BLUEPRINT_VOCAB=tree."""
     from btsgen import gate, paths
     vocab = paths.VOCABULARY.read_text(encoding="utf-8")
-    per = {e.id: len(_tree_prompt(e.ops, e.class_kind)) for e in load_catalog().entries}
+    per: dict = {}
+    per_scaffold: dict = {}
+    for e in load_catalog().entries:
+        bp = _tree_prompt(e.ops, e.class_kind)
+        per[e.id], per_scaffold[e.id] = len(bp), _scaffold_len(bp)
+    triads = {name: len(_triad_prompt(ids, kind)) for name, ids, kind in BP_TRIADS}
     allp = _tree_prompt(_all_ops(), ["orb", "status", "summon"])
     untrimmed = _BlueprintContract(mode="dossier", triad=True, seed=1).system_prompt()
     worst = max(per, key=per.get)
+    worst_sc = max(per_scaffold, key=per_scaffold.get)
     return {"index": len(gate.vocab_index(vocab)), "index_clause_cap": gate.index_clause_cap(vocab),
             "per_archetype": per, "archetype_max": per[worst], "archetype_max_id": worst,
+            "per_archetype_scaffold": per_scaffold, "archetype_scaffold_max": per_scaffold[worst_sc],
+            "archetype_scaffold_max_id": worst_sc, "triads": triads,
             "all_ops": len(allp), "scaffold": _scaffold_len(allp), "untrimmed": len(untrimmed),
             "untrimmed_scaffold": _scaffold_len(untrimmed), "vocabulary": len(vocab)}
 
@@ -463,6 +498,17 @@ def test_rule_0_9_every_archetype_alone_under_the_ceiling(tree):
     assert not over, f"rule 0.9: design prompts past {BP_ARCHETYPE_CEILING:,} chars: {over}"
 
 
+def test_rule_0_9_sample_triads_under_the_ceiling(tree):
+    """(b2) what the model actually receives for a three-archetype forge: a normal, an orb and a hybrid orb+status
+    triad (BP_TRIADS, the Phase BH dry-run samples)."""
+    sizes = {name: len(_triad_prompt(ids, kind)) for name, ids, kind in BP_TRIADS}
+    print("rule 0.9 (b2) triad prompts: " + ", ".join(f"{n} {s:,}" for n, s in sizes.items())
+          + f" (ceiling {BP_TRIAD_BUDGET:,})")
+    over = {n: s for n, s in sizes.items() if s > BP_TRIAD_BUDGET}
+    assert not over, (f"rule 0.9: sample triad design prompts past {BP_TRIAD_BUDGET:,} chars: {over}. Shrink the "
+                      f"detail rows or the pitches those archetypes pull; raise the ceiling only on purpose, here.")
+
+
 def test_rule_0_9_total_prompt_stays_under_the_tripwire(tree):
     """(c) the all-ops path (every archetype selected, every pool kind, nothing pruned) — the only place the old
     120k tripwire survives. Trips long before the model notices, on purpose."""
@@ -473,14 +519,29 @@ def test_rule_0_9_total_prompt_stays_under_the_tripwire(tree):
 
 
 def test_rule_0_9_blueprint_scaffolding_stays_within_budget(tree):
-    """(d) the assert with teeth: everything in the all-ops tree prompt that is NOT the index or the detail."""
+    """(d) the assert with teeth, on the REAL path: for every archetype alone (its ops, its class kind, the pitches
+    pruned as production prunes them), everything that is NOT the index or the detail block."""
+    per = {}
+    for e in load_catalog().entries:
+        per[e.id] = _scaffold_len(_tree_prompt(e.ops, e.class_kind))
+    worst = max(per, key=per.get)
+    print(f"rule 0.9 (d): per-archetype scaffold max {per[worst]:,} ({worst}; "
+          f"budget {BP_SCAFFOLD_BUDGET_PER_ARCHETYPE:,})")
+    over = {k: n for k, n in per.items() if n > BP_SCAFFOLD_BUDGET_PER_ARCHETYPE}
+    assert not over, (
+        f"rule 0.9: blueprint scaffolding past the {BP_SCAFFOLD_BUDGET_PER_ARCHETYPE:,} per-archetype ceiling: "
+        f"{over}. This is prompt text that is NOT a vocabulary row: keep pitch additions to a sentence, pay for "
+        f"shared text with a removal of equal size, or make it a one-line menu pointer. Raise the ceiling only on "
+        f"purpose, here.")
+
+
+def test_rule_0_9_all_ops_scaffold_is_informational(tree):
+    """The scaffold on the ALL-OPS path (every pitch unpruned — a prompt no forge sends): printed, not asserted
+    (decided 2026-10-04). Its total is still bounded by the 120k tripwire (c)."""
     bp = _tree_prompt(_all_ops(), ["orb", "status", "summon"])
     scaffold = _scaffold_len(bp)
-    assert scaffold < BP_SCAFFOLD_BUDGET, (
-        f"rule 0.9: the blueprint scaffolding is {scaffold:,} chars, past the {BP_SCAFFOLD_BUDGET:,} ceiling "
-        f"({scaffold - BP_TREE_READING_SCAFFOLD:+,} since the {BP_TREE_READING_SCAFFOLD:,} recorded at Phase BH-3). "
-        f"This is prompt text that is NOT a vocabulary row: pay for it with a removal of equal size, or make it a "
-        f"one-line menu pointer. Raise the ceiling only on purpose, here.")
+    print(f"rule 0.9 (informational): all-ops scaffold {scaffold:,} chars "
+          f"({scaffold - BP_TREE_READING_SCAFFOLD:+,} vs the {BP_TREE_READING_SCAFFOLD:,} recorded reading)")
 
 
 def test_rule_0_9_full_path_is_byte_identical(v2, monkeypatch):

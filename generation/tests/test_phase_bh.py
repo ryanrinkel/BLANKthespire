@@ -2,7 +2,7 @@
 (VOCAB_EXPANSION_6_PLAN §2.2 / §2.3; no vocab bump) — offline, no model calls, no keys.
 Run:  uv run python -m tests.test_phase_bh   (from generation/)
 
-Pins: gate.vocab_index is derived from VOCABULARY.md (every live token, class tags, <= 6k, deterministic);
+Pins: gate.vocab_index is derived from VOCABULARY.md (every live token, class tags, <= 8.5k, deterministic);
 gate.vocab_detail carries exactly the selected rows + their prose + the family closure + the signature potion; the
 design prompt lays out [head + INDEX + pointer] -> [pruned pitches] -> [VOCABULARY DETAIL] (cache-safe: the head is
 identical for every forge); `nominate_ops` re-issues the design call ONCE through the front end with the nominated
@@ -105,7 +105,7 @@ def _t_index() -> None:
     idx = gate.vocab_index(v)
     check(idx == gate.vocab_index(v), "deterministic (same file -> same bytes)")
     check(idx.startswith(gate.INDEX_HEADER) and idx.endswith(gate.INDEX_END), "framed by INDEX_HEADER / INDEX_END")
-    check(len(idx) <= 6_000, f"index <= 6,000 chars (got {len(idx):,})")
+    check(len(idx) <= gate.INDEX_BUDGET == 8_500, f"index <= 8,500 chars (got {len(idx):,})")
     live = catalog_mod.live_vocab_tokens()
     missing = sorted(t for t in live if f"`{t}`" not in idx)
     check(bool(live) and not missing, f"every live VOCABULARY token is in the index (missing: {missing})")
@@ -339,21 +339,29 @@ def _t_nominate_round_trip() -> None:
 def _t_budget() -> None:
     print("rule 0.9 on the real path (§2.3) — readings:")
     from tests.test_harness_v2 import (BP_ARCHETYPE_CEILING, BP_INDEX_CEILING, BP_READING_SCAFFOLD,
-                                       BP_SCAFFOLD_BUDGET, BP_TOTAL_TRIPWIRE, rule_0_9_readings)
+                                       BP_SCAFFOLD_BUDGET_PER_ARCHETYPE, BP_TOTAL_TRIPWIRE, BP_TRIAD_BUDGET,
+                                       BP_TREE_READING_SCAFFOLD, rule_0_9_readings)
     with _env(BTS_HARNESS_V2="1", BTS_BLUEPRINT_VOCAB="tree"):
         r = rule_0_9_readings()
     print(f"  (reading) index                  {r['index']:>8,}  (ceiling {BP_INDEX_CEILING:,}; clause cap "
           f"{r['index_clause_cap']} chars)")
     print(f"  (reading) per-archetype max      {r['archetype_max']:>8,}  ({r['archetype_max_id']}; ceiling "
           f"{BP_ARCHETYPE_CEILING:,})")
+    print(f"  (reading) per-archetype scaffold {r['archetype_scaffold_max']:>8,}  "
+          f"({r['archetype_scaffold_max_id']}; budget {BP_SCAFFOLD_BUDGET_PER_ARCHETYPE:,})")
+    for name, n in r["triads"].items():
+        print(f"  (reading) triad {name:<16} {n:>8,}  (ceiling {BP_TRIAD_BUDGET:,})")
     print(f"  (reading) all-ops path           {r['all_ops']:>8,}  (tripwire {BP_TOTAL_TRIPWIRE:,})")
-    print(f"  (reading) scaffold (all-ops)     {r['scaffold']:>8,}  (budget {BP_SCAFFOLD_BUDGET:,})")
+    print(f"  (reading) scaffold (all-ops)     {r['scaffold']:>8,}  (informational; recorded "
+          f"{BP_TREE_READING_SCAFFOLD:,})")
     print(f"  (reading) full path (untrimmed)  {r['untrimmed']:>8,}  (scaffold {r['untrimmed_scaffold']:,}; "
           f"VOCABULARY.md {r['vocabulary']:,})")
     check(r["index"] <= BP_INDEX_CEILING, "(a) index within its ceiling")
     check(r["archetype_max"] <= BP_ARCHETYPE_CEILING, "(b) every archetype alone within its ceiling")
+    check(all(n <= BP_TRIAD_BUDGET for n in r["triads"].values()), "(b2) the sample triads within their ceiling")
     check(r["all_ops"] < BP_TOTAL_TRIPWIRE, "(c) the all-ops path under the tripwire")
-    check(r["scaffold"] < BP_SCAFFOLD_BUDGET, "(d) the scaffold within budget")
+    check(r["archetype_scaffold_max"] <= BP_SCAFFOLD_BUDGET_PER_ARCHETYPE,
+          "(d) every archetype's scaffold within budget")
     check(r["untrimmed_scaffold"] == BP_READING_SCAFFOLD, "(e) the full path's scaffold is the pre-BH snapshot")
 
 

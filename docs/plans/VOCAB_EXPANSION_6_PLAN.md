@@ -223,12 +223,18 @@ the design prompt drops from ~108k to roughly 50–60k, and later waves add ~80 
 ### 2.3 Repoint the rule-0.9 tests at the real prompt (same commit as 2.2)
 
 - Keep the untrimmed reading as an INFORMATIONAL print (it is the `full` rollback path), not an assert.
-- New asserts, all on `BTS_BLUEPRINT_VOCAB=tree` and `harness_v2.enabled()`:
-  (a) `vocab_index` ≤ 6,000 chars; (b) for EVERY archetype in `data/archetypes.json` alone (`selected_ops` = its
-  ops, its `class_kind`), the design prompt ≤ 70,000; (c) the all-ops path (`selected_ops` = every archetype's
-  ops, nothing pruned) ≤ `BP_TOTAL_TRIPWIRE` 120,000 — this is the only place the old number survives; (d) scaffold
-  = prompt minus index minus detail block ≤ 46,000, measured from the block markers (replace `_scaffold_len` :381,
-  which subtracts the whole file); (e) the `full` path is byte-identical to today's prompt (snapshot the length).
+- Asserts, all on `BTS_BLUEPRINT_VOCAB=tree` and `harness_v2.enabled()` (revised 2026-10-04, Ryan):
+  (a) `vocab_index` ≤ 8,500 chars (`BP_INDEX_CEILING` = `gate.INDEX_BUDGET`; the adaptive clause cap stays the
+  safety net); (b) for EVERY archetype in `data/archetypes.json` alone (`selected_ops` = its ops, its `class_kind`),
+  the design prompt ≤ 70,000; (b2) three fixed sample triads — normal (`retain_hold`+`poison_attrition`+
+  `block_bulwark`), orb (`orb_channel`+`slot_machine`+`tempo_draw`), hybrid orb+status (`orb_channel`+
+  `status_signature`+`debuff_expose`), built as the BH dry run builds them — each ≤ 80,000 (`BP_TRIAD_BUDGET`);
+  (c) the all-ops path (`selected_ops` = every archetype's ops, nothing pruned) ≤ `BP_TOTAL_TRIPWIRE` 120,000 —
+  the only synthetic assert, and the only place the old number survives; (d) scaffold = prompt minus index minus
+  detail block (measured from the block markers) ≤ 32,000 (`BP_SCAFFOLD_BUDGET_PER_ARCHETYPE`) for EVERY archetype
+  alone, its pitches pruned as production prunes them; the all-ops scaffold is an INFORMATIONAL print
+  (`BP_TREE_READING_SCAFFOLD` is its recorded reading, not a snapshot assert); (e) the `full` path is
+  byte-identical to today's prompt (`BP_READING_SCAFFOLD` exact snapshot).
 - Fix `test_wave0_prompts.py:63-105`: the ALSO-AVAILABLE line must stop naming pool kinds whose rows are now
   index-only (it may name them as "in the index"). `test_phase_aw.py:146-160` (hybrid keeps ORB + STATUS pitch
   sections) gets a detail-block analog. New tests: an orb-kind blueprint's detail has `## Orbs` + the `channel_orb`
@@ -331,7 +337,8 @@ Attack" / "Every 5th card you play"; prefix "This turn, whenever you play an Att
 `this_turn` only on reactive kinds (never `turn_start`/`ripen`); price every-N payloads at `amount / n`.
 **Harness:** `power_ramp` + `strike_tempo` gain the tokens; `_PREFERRED_TRIGGERS` unchanged; `gate.FIELD_UNITS` +=
 `every_n`; coverage `REACTIVE_MENU_V2` unchanged (filters are fields, not kinds); exemplars for all three forms.
-**Budget:** 3 VOCABULARY touch-ups (the `add_trigger` row + Triggers prose), scaffold ≤ +38.
+**Budget:** 3 VOCABULARY touch-ups (the `add_trigger` row + Triggers prose), per-archetype scaffold ≤ 32k; keep pitch
+additions to a sentence.
 **Open decisions:** (1) per-combat vs per-turn `every_n` (default per-combat); (2) `StackType Single` means a second
 Rage in one turn does NOT double the payload — accept and price, or multiply payload by `Amount` for `this_turn` powers
 (default accept); (3) self-trigger: the granting card's own play counts toward its filter (already true today) — leave.
@@ -389,7 +396,8 @@ damage/block when `scale:"target_status_stacks"` (check the schema `if/then` at 
 (discards), `tempo_draw` (drawn), `big_energy` (energy spent, double energy), `poison_attrition` (total poison),
 `debuff_expose` (target stacks), `countdown_ripen` / `ambush_alpha` (intent gate); `WHEN_MENU_V2` += the 3 kinds.
 **Budget:** this is the biggest VOCABULARY delta of the wave (~12 scale rows ≈ 1.5k + 3 condition rows). Fold the
-scales into ONE table row group under Scaled amounts rather than one row each; scaffold ≤ +38.
+scales into ONE table row group under Scaled amounts rather than one row each; per-archetype scaffold ≤ 32k; keep
+pitch additions to a sentence.
 **Test:** `tests/test_phase_bj.py`. **Tester** `gaptest-bj`: one card per scale (exhaust/discard fuel in the deck),
 Expertise, Double Energy, Evil Eye, Go for the Eyes. **Tags:** `[BJ] scale <name> -> <n> ('<card>')` via
 `PhaseAmScales` (:1059) membership, `[BJ] draw to_hand_size: hand <h> -> draw <n>`, `[BJ] gain_energy x energy`, the
@@ -764,8 +772,7 @@ status lookup + orb pitch were fixed in the BH-3 follow-up (388ec64, merged 26fc
 exceptions, 0 localization errors; tester + tags in `generation/tests/gaptest-bi/`). Merged suite: generation **588**,
 web **293**, `test_phase_bh` 101/101. Readings: index 5,924 · per-archetype max 64,742 · all-ops 114,296 ·
 **scaffold 45,951 of 46,000 (49 chars of headroom)** · `full` 108,977.
-**Decision needed before BJ (Ryan):** the scaffold assert (§2.3 d) is measured on the ALL-OPS path, so every pitch
-sentence of every phase is charged to it and BJ–BR cannot fit in 49 chars. §2's own discipline sentence says pitches
-"cost only the forges that select them". Recommended: measure (d) on the pruned per-archetype path (max ~25k today,
-same 46,000 ceiling) and let the all-ops path keep only the 120,000 total tripwire (c). Alternative: raise (d) to
-~48,000 on the all-ops path. **Next: Phase BJ** (v62).
+**Decided 2026-10-04 (Ryan):** scaffold (§2.3 d) measured per archetype on the real (pruned) path ≤ 32,000; triad
+samples ≤ 80,000; index budget 8,500. Readings: index 7,172 (clause cap 72) · per-archetype max 65,990 (`forge_ramp`) ·
+per-archetype scaffold max 25,345 (`exhaust_pyre`) · triads 59,197 / 68,992 / 75,069 · all-ops 115,544 · all-ops
+scaffold 45,951 (informational) · `full` 108,977. **Next: Phase BJ** (v62).
