@@ -354,9 +354,10 @@ def test_strip_metaphors_tidies_text():
 # zero. So the budget is two terms, both owned here:
 BP_SCAFFOLD_BUDGET = 46_000   # HISTORICAL (retired as an assert 2026-10-04): the whole-prompt / all-ops scaffold
                               # ceiling. Replaced by BP_SCAFFOLD_BUDGET_PER_ARCHETYPE on the real (pruned) path.
-BP_TOTAL_TRIPWIRE = 120_000   # NOT a per-phase gate — the line at which the shrink conversation is due. Derived
-                              # from the actual consumer (below), not from last month's reading: ~30k tokens,
-                              # ~20-25% of a 128k context. ~16 phases of runway at the observed total rate.
+BP_TOTAL_TRIPWIRE = 140_000   # NOT a per-phase gate — the line at which the shrink conversation is due. Derived
+                              # from the actual consumer (below), not from last month's reading: ~35k tokens,
+                              # ~25-30% of a 128k context. Raised 120k -> 140k 2026-10-04 (Ryan; 117,639 after BJ):
+                              # the real guards are per-archetype <= 70k (b) and the three sample triads <= 80k (b2).
 #
 # Why the total is a tripwire and not a ceiling: rule 0.9 says the prompt "is tuned for 7B-class local models",
 # and that premise is STALE. The blueprint rides the `structure` role, which is glm-5.2 in every shipped mix
@@ -387,7 +388,8 @@ BP_TOTAL_TRIPWIRE = 120_000   # NOT a per-phase gate — the line at which the s
 # prompt no forge sends — so every pitch sentence of every phase was charged to one 46,000 budget (49 chars left
 # after BI). Pitches are pruned per forge, so they cost only the forges that select them: (d) now runs on the real
 # per-archetype path, the all-ops scaffold is printed (BP_TREE_READING_SCAFFOLD is its recorded reading), and the
-# all-ops TOTAL keeps the 120k tripwire (c) as the only synthetic assert. Same day: index 6,000 -> 8,500.
+# all-ops TOTAL keeps the tripwire (c) as the only synthetic assert. Same day: index 6,000 -> 8,500; tripwire
+# 120k -> 140k (the all-ops path is synthetic; (b) and (b2) are the real guards).
 BP_ARCHETYPE_CEILING = 70_000  # (b) the design prompt for ONE archetype's selection
 BP_TRIAD_BUDGET = 80_000       # (b2) the design prompt for each of BP_TRIADS (what a real three-archetype forge gets)
 BP_SCAFFOLD_BUDGET_PER_ARCHETYPE = 32_000  # (d) 25,345 (exhaust_pyre) at the 2026-10-04 decision
@@ -513,8 +515,8 @@ def test_rule_0_9_sample_triads_under_the_ceiling(tree):
 
 
 def test_rule_0_9_total_prompt_stays_under_the_tripwire(tree):
-    """(c) the all-ops path (every archetype selected, every pool kind, nothing pruned) — the only place the old
-    120k tripwire survives. Trips long before the model notices, on purpose."""
+    """(c) the all-ops path (every archetype selected, every pool kind, nothing pruned) — the only place the
+    tripwire (140k since 2026-10-04) survives. Trips long before the model notices, on purpose."""
     bp = _tree_prompt(_all_ops(), ["orb", "status", "summon"])
     assert len(bp) < BP_TOTAL_TRIPWIRE, (
         f"the all-ops blueprint prompt is {len(bp):,} chars, past the {BP_TOTAL_TRIPWIRE:,} tripwire. The answer "
@@ -540,7 +542,7 @@ def test_rule_0_9_blueprint_scaffolding_stays_within_budget(tree):
 
 def test_rule_0_9_all_ops_scaffold_is_informational(tree):
     """The scaffold on the ALL-OPS path (every pitch unpruned — a prompt no forge sends): printed, not asserted
-    (decided 2026-10-04). Its total is still bounded by the 120k tripwire (c)."""
+    (decided 2026-10-04). Its total is still bounded by the 140k tripwire (c)."""
     bp = _tree_prompt(_all_ops(), ["orb", "status", "summon"])
     scaffold = _scaffold_len(bp)
     print(f"rule 0.9 (informational): all-ops scaffold {scaffold:,} chars "
