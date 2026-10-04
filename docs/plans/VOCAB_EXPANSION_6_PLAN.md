@@ -226,9 +226,9 @@ the design prompt drops from ~108k to roughly 50–60k, and later waves add ~80 
 - Asserts, all on `BTS_BLUEPRINT_VOCAB=tree` and `harness_v2.enabled()` (revised 2026-10-04, Ryan):
   (a) `vocab_index` ≤ 8,500 chars (`BP_INDEX_CEILING` = `gate.INDEX_BUDGET`; the adaptive clause cap stays the
   safety net); (b) for EVERY archetype in `data/archetypes.json` alone (`selected_ops` = its ops, its `class_kind`),
-  the design prompt ≤ 70,000; (b2) three fixed sample triads — normal (`retain_hold`+`poison_attrition`+
+  the design prompt ≤ 80,000 (raised from 70,000 on 2026-10-04 before Phase BL); (b2) three fixed sample triads — normal (`retain_hold`+`poison_attrition`+
   `block_bulwark`), orb (`orb_channel`+`slot_machine`+`tempo_draw`), hybrid orb+status (`orb_channel`+
-  `status_signature`+`debuff_expose`), built as the BH dry run builds them — each ≤ 80,000 (`BP_TRIAD_BUDGET`);
+  `status_signature`+`debuff_expose`), built as the BH dry run builds them — each ≤ 90,000 (`BP_TRIAD_BUDGET`, raised from 80,000 the same day);
   (c) the all-ops path (`selected_ops` = every archetype's ops, nothing pruned) ≤ `BP_TOTAL_TRIPWIRE` 140,000 —
   the only synthetic assert (raised from 120,000 on 2026-10-04 at 117,639: the real guards are (b) and (b2));
   (d) scaffold = prompt minus index minus detail block (measured from the block markers) ≤ 32,000 (`BP_SCAFFOLD_BUDGET_PER_ARCHETYPE`) for EVERY archetype
@@ -806,7 +806,9 @@ web **293**, `test_phase_bh` 101/101. Readings: index 5,924 · per-archetype max
 **scaffold 45,951 of 46,000 (49 chars of headroom)** · `full` 108,977.
 **Decided 2026-10-04 (Ryan):** scaffold (§2.3 d) measured per archetype on the real (pruned) path ≤ 32,000; triad
 samples ≤ 80,000; index budget 8,500; all-ops tripwire (§2.3 c) 120,000 → 140,000 (decided before Phase BK at
-117,639 — the all-ops path is synthetic, the real guards are per-archetype ≤ 70k and the triads ≤ 80k).
+117,639 — the all-ops path is synthetic, the real guards are per-archetype ≤ 70k and the triads ≤ 80k). **Raised once more before Phase BL (Ryan,
+2026-10-04), for the rest of the wave:** per-archetype (b) 70,000 → **80,000** and triads (b2) 80,000 → **90,000**
+(readings at the time: `exhaust_pyre` 68,796 · hybrid triad 77,647). Later growth shortens; it does not raise.
 Readings: index 7,172 (clause cap 72) · per-archetype max 65,990 (`forge_ramp`) ·
 per-archetype scaffold max 25,345 (`exhaust_pyre`) · triads 59,197 / 68,992 / 75,069 · all-ops 115,544 · all-ops
 scaffold 45,951 (informational) · `full` 108,977. **Next: Phase BJ** (v62).

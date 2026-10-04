@@ -303,9 +303,9 @@ def _t_budget() -> None:
     with _env(BTS_HARNESS_V2="1", BTS_BLUEPRINT_VOCAB="tree"):
         r = rule_0_9_readings()
     print(f"  (reading) index                  {r['index']:>8,}  (clause cap {r['index_clause_cap']}; budget 8,500)")
-    print(f"  (reading) per-archetype max      {r['archetype_max']:>8,}  ({r['archetype_max_id']}; ceiling 70,000)")
+    print(f"  (reading) per-archetype max      {r['archetype_max']:>8,}  ({r['archetype_max_id']}; ceiling 80,000)")
     print(f"  (reading) per-archetype scaffold {r['archetype_scaffold_max']:>8,}  ({r['archetype_scaffold_max_id']}; budget 32,000)")
-    print(f"  (reading) triads                 {', '.join(f'{k} {v:,}' for k, v in r['triads'].items())}  (budget 80,000)")
+    print(f"  (reading) triads                 {', '.join(f'{k} {v:,}' for k, v in r['triads'].items())}  (budget 90,000)")
     print(f"  (reading) all-ops path           {r['all_ops']:>8,}  (tripwire 140,000)")
     print(f"  (reading) scaffold (all-ops)     {r['scaffold']:>8,}")
     print(f"  (reading) full path (untrimmed)  {r['untrimmed']:>8,}  (scaffold {r['untrimmed_scaffold']:,})")

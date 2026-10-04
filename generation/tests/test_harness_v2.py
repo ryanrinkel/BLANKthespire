@@ -357,7 +357,7 @@ BP_SCAFFOLD_BUDGET = 46_000   # HISTORICAL (retired as an assert 2026-10-04): th
 BP_TOTAL_TRIPWIRE = 140_000   # NOT a per-phase gate — the line at which the shrink conversation is due. Derived
                               # from the actual consumer (below), not from last month's reading: ~35k tokens,
                               # ~25-30% of a 128k context. Raised 120k -> 140k 2026-10-04 (Ryan; 117,639 after BJ):
-                              # the real guards are per-archetype <= 70k (b) and the three sample triads <= 80k (b2).
+                              # the real guards are per-archetype <= 80k (b) and the three sample triads <= 90k (b2).
 #
 # Why the total is a tripwire and not a ceiling: rule 0.9 says the prompt "is tuned for 7B-class local models",
 # and that premise is STALE. The blueprint rides the `structure` role, which is glm-5.2 in every shipped mix
@@ -376,8 +376,8 @@ BP_TOTAL_TRIPWIRE = 140_000   # NOT a per-phase gate — the line at which the s
 # end, harness v2) now sends the VOCABULARY TREE ($BTS_BLUEPRINT_VOCAB=tree, the default): a ~6k INDEX of every
 # token in the cached head, plus a per-forge DETAIL block with the full rows of what the chosen archetypes
 # selected. So the asserts now run on that real path:
-#   (a) the index <= 8,500 chars;                       (b) every archetype alone <= 70,000;
-#   (b2) three fixed sample triads (normal / orb / hybrid orb+status) <= 80,000 each;
+#   (a) the index <= 8,500 chars;                       (b) every archetype alone <= 80,000;
+#   (b2) three fixed sample triads (normal / orb / hybrid orb+status) <= 90,000 each;
 #   (c) the all-ops path (every archetype's ops, every pool kind, nothing pruned) <= BP_TOTAL_TRIPWIRE;
 #   (d) the scaffold = prompt MINUS the index MINUS the detail block (measured from the block markers), for EVERY
 #       archetype alone (its pitches pruned as production prunes them) <= BP_SCAFFOLD_BUDGET_PER_ARCHETYPE;
@@ -390,8 +390,10 @@ BP_TOTAL_TRIPWIRE = 140_000   # NOT a per-phase gate — the line at which the s
 # per-archetype path, the all-ops scaffold is printed (BP_TREE_READING_SCAFFOLD is its recorded reading), and the
 # all-ops TOTAL keeps the tripwire (c) as the only synthetic assert. Same day: index 6,000 -> 8,500; tripwire
 # 120k -> 140k (the all-ops path is synthetic; (b) and (b2) are the real guards).
-BP_ARCHETYPE_CEILING = 70_000  # (b) the design prompt for ONE archetype's selection
-BP_TRIAD_BUDGET = 80_000       # (b2) the design prompt for each of BP_TRIADS (what a real three-archetype forge gets)
+# RAISED ONCE for the rest of Wave 6 (Ryan, 2026-10-04, before Phase BL; exhaust_pyre 68,796, hybrid triad 77,647):
+# (b) 70,000 -> 80,000 and (b2) 80,000 -> 90,000. Further growth is paid for by shortening, not by raising.
+BP_ARCHETYPE_CEILING = 80_000  # (b) the design prompt for ONE archetype's selection
+BP_TRIAD_BUDGET = 90_000       # (b2) the design prompt for each of BP_TRIADS (what a real three-archetype forge gets)
 BP_SCAFFOLD_BUDGET_PER_ARCHETYPE = 32_000  # (d) 25,345 (exhaust_pyre) at the 2026-10-04 decision
 BP_INDEX_CEILING = 8_500       # (a) = gate.INDEX_BUDGET (the index adapts its clause length to stay under it)
 # (b2) the fixed sample forges — the same three the Phase BH dry run builds (tests/test_phase_bh.DRY_RUNS).
