@@ -25,7 +25,11 @@ import sys
 import zlib
 from pathlib import Path
 
-VOCAB_VERSION = 62  # must be <= ForgedCards.VocabVersion (62: Phase BJ — COMBAT-HISTORY SCALES + CONDITIONS: 12 scale
+VOCAB_VERSION = 63  # must be <= ForgedCards.VocabVersion (63: Phase BK — HIT-COUNT SCALING: the damage field
+                    # `hits_scale` sets the hit COUNT from a live read — x (X-cost, Whirlwind), attacks_played_this_turn
+                    # (Finisher), cards_in_hand, skills_in_hand (Flechettes), plays_this_combat, exhaust_pile_size,
+                    # hp_loss_events_this_combat, energy_spent_this_turn, orb_count; capped at 10. No codec change.)
+                    # 62: Phase BJ — COMBAT-HISTORY SCALES + CONDITIONS: 12 scale
                     # forms (exhaust/discard pile, discards/draws this turn, draws/HP-loss events/cards created this
                     # combat, energy spent this turn, total enemy Poison, target_status_stacks, gain_energy x energy,
                     # draw to_hand_size) and 3 `when` kinds (exhausted_this_turn, played_cards_last_turn_ge,

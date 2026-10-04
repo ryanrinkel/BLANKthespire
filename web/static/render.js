@@ -529,6 +529,18 @@ const SCALE_NOUN = {
   total_enemy_poison: "the total Poison on ALL enemies",
 };
 const scaleNoun = (e) => e.scale === "target_status_stacks" ? `the enemy's ${statusName(e.status)}` : SCALE_NOUN[e.scale];
+// Phase BK (v63, gap #65): the singular noun a `hits_scale` damage counts — lockstep with cardgen._HITS_PHRASE /
+// ForgedCards.HitsPhrase ("Deal 6 damage for each Attack you played this turn"; `x` reads "X times").
+const HITS_NOUN = {
+  attacks_played_this_turn: "Attack you played this turn",
+  cards_in_hand: "other card in your hand",
+  skills_in_hand: "Skill in your hand",
+  plays_this_combat: "card you have played this combat",
+  exhaust_pile_size: "card in your exhaust pile",
+  hp_loss_events_this_combat: "time you have lost HP this combat",
+  energy_spent_this_turn: "energy you have spent this turn",
+  orb_count: "orb you have channeled",
+};
 const titleCase = (s) => String(s || "").replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
 const statusName = (s) => STATUS_NAMES[s] || titleCase(s);
 
@@ -572,6 +584,10 @@ function effPhrase(e, target) {
   const hits = e.hits > 1 ? ` ×${e.hits}` : "";
   const toAll = target === "all_enemies" ? " to all enemies" : "";
   const noun = scaleNoun(e); // Phase BJ (v62)
+  if (e.op === "damage" && e.hits_scale) { // Phase BK (v63): the hit count is a live read
+    const per = e.hits_scale === "x" ? "X times" : `for each ${HITS_NOUN[e.hits_scale] || titleCase(e.hits_scale)}`;
+    return `Deal ${a ?? ""} damage ${per}${toAll}${e.unblockable === true ? " (ignores Block)" : ""}`;
+  }
   if (noun && e.op === "damage") return `Deal damage equal to ${noun}${toAll}${e.unblockable === true ? " (ignores Block)" : ""}`;
   if (noun && e.op === "block") return `Gain Block equal to ${noun}`;
   switch (e.op) {

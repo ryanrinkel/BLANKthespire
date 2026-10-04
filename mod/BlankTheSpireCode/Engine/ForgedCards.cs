@@ -42,7 +42,16 @@ public static class ForgedCards
     /// v10 (forged statuses, Phase J): + CharacterSpec.StatusPool (a class's ≤4 custom modifier-family statuses
     /// read from `status_pool`; see ForgedCharacters / ForgedStatusPower). Class cards may apply a custom status
     /// by pool name via the `apply_status_custom` op (class-only, like custom-orb channels).</summary>
-    public const int VocabVersion = 62; // 62: Phase BJ (VOCAB_EXPANSION_6, gaps #63/#64) — COMBAT-HISTORY SCALES +
+    public const int VocabVersion = 63; // 63: Phase BK (VOCAB_EXPANSION_6, gap #65) — HIT-COUNT SCALING: a new damage
+                                        //     FIELD `hits_scale` sets the HIT COUNT from a live read (the base CalculatedHits
+                                        //     recipe — Finisher / Flechettes; `x` = ResolveEnergyXValue, Whirlwind / Skewer,
+                                        //     joins the X-cost coupling). Sources: `x`, `attacks_played_this_turn`,
+                                        //     `cards_in_hand`, `skills_in_hand`, `plays_this_combat`, `exhaust_pile_size`,
+                                        //     `hp_loss_events_this_combat`, `energy_spent_this_turn`, `orb_count`. The count is
+                                        //     a BaseLib NAMED calc-var (coexists with CalculatedDamage), capped at 10 at runtime
+                                        //     (logged); 0 hits = no swing. THE card's one multi-hit (⊥ hits/scale/grow/
+                                        //     grow_held); card-level damage only; an upgrade changes the per-hit damage only.
+                                        // 62: Phase BJ (VOCAB_EXPANSION_6, gaps #63/#64) — COMBAT-HISTORY SCALES +
                                         //     CONDITIONS, verbatim base-game reads. Scales (replace-semantics, one
                                         //     EffectRunner.ScaleValue case each; DataCard.BonusFor picks them up):
                                         //     `exhaust_pile_size` (AshenStrike; damage/block/draw), `discard_pile_size`
@@ -657,6 +666,12 @@ public static class ForgedCards
     // payoff, priced so) and the board-wide Poison sum (Mirage's damage twin).
     internal static readonly HashSet<string> DamageOnlyScales =
         ["cards_drawn_this_combat", "hp_loss_events_this_combat", "total_enemy_poison"];
+    // Phase BK (v63, gap #65): the reads a damage op's `hits_scale` may take (the hit COUNT). `x` couples to an X cost;
+    // `orb_count` is orb-class only (generation-side: class_forge drops it off a slotless class; it reads 0 there).
+    // Lockstep with validator._HITS_SCALE_SOURCES + the schema enum + EffectRunner.ScaleValue.
+    internal static readonly HashSet<string> HitsScaleSources =
+        ["x", "attacks_played_this_turn", "cards_in_hand", "skills_in_hand", "plays_this_combat",
+         "exhaust_pile_size", "hp_loss_events_this_combat", "energy_spent_this_turn", "orb_count"];
     // Phase BJ (v62): the statuses target_status_stacks may read (Bully = Vulnerable; Weak; Poison).
     internal static readonly HashSet<string> StatusStackStatuses = ["vulnerable", "weak", "poison"];
     // Phase BJ (v62): to_hand_size's amount is the target hand size (the hand holds at most 10).
@@ -878,11 +893,12 @@ public static class ForgedCards
         }
 
         // X-cost coupling is specific to scale:"x" (the OTHER F5 scalars are not tied to the card cost).
-        bool anyX = effects.Any(e => e.ScaleX);
+        // Phase BK (v63, gap #65): a `hits_scale:"x"` damage (Whirlwind / Skewer) is the other X consumer.
+        bool anyX = effects.Any(e => e.ScaleX || e.HitsScale == "x");
         if (costsX && !anyX)
-        { error = "an X-cost card needs a 'scale:x' effect (otherwise X does nothing)."; return false; }
+        { error = "an X-cost card needs a 'scale:x' or 'hits_scale:x' effect (otherwise X does nothing)."; return false; }
         if (!costsX && anyX)
-        { error = "'scale:x' requires the card cost to be \"X\"."; return false; }
+        { error = "'scale:x' / 'hits_scale:x' requires the card cost to be \"X\"."; return false; }
         // Phase AM (v43): scale:"energy" reads your CURRENT energy. The game spends the card's cost BEFORE OnPlay
         // (PlayCardAction.SpendResources), so on a paid card the in-hand preview (pre-pay) and the resolved amount
         // (post-pay) would disagree by the cost — only a cost-0 card keeps them equal. X-cost is excluded too
@@ -1069,11 +1085,14 @@ public static class ForgedCards
             int growHeld = e.ContainsKey("grow_held") ? Int(e, "grow_held") : 0;
             // Phase BI (v61, gap #62): `every_n` on an add_trigger — fire on every Nth event (legality in ValidateTrigger).
             int everyN = e.ContainsKey("every_n") ? Int(e, "every_n") : 0;
+            // Phase BK (v63, gap #65): `hits_scale` — the live read that sets a damage op's hit count (legality in Validate).
+            string? hitsScale = e.ContainsKey("hits_scale") && Str(e, "hits_scale").Trim().Length > 0
+                              ? Str(e, "hits_scale").Trim().ToLowerInvariant() : null;
             list.Add(new EffectSpec(op, amount, status, hits, scale, orb, when, trigger, triggered, statusName,
                                     summonName, oncePerTurn, target, cardId, pile, pole, grow, cards, tag,
                                     OncePerCombat: oncePerCombat, Unblockable: unblockable,
                                     CardKind: cardKind, Scope: scope, Count: count, StatusCard: statusCard,
-                                    GrowHeld: growHeld, EveryN: everyN));
+                                    GrowHeld: growHeld, EveryN: everyN, HitsScale: hitsScale));
         }
         return list.ToArray();
     }
@@ -1129,6 +1148,23 @@ public static class ForgedCards
             // Phase BI (v61): `every_n` belongs to add_trigger alone.
             if (e.EveryN != 0 && e.Op != "add_trigger")
                 return $"'every_n' only applies to add_trigger (op '{e.Op}').";
+            // Phase BK (v63, gap #65): `hits_scale` — a damage op's hit COUNT from a live read. THE card's one multi-hit, so
+            // never with a fixed `hits`, a `scale` on the amount, or a growth rule (one calculated idea per effect).
+            if (e.HitsScale != null)
+            {
+                if (e.Op != "damage")
+                    return $"'hits_scale' only applies to damage (op '{e.Op}').";
+                if (!HitsScaleSources.Contains(e.HitsScale))
+                    return $"unsupported hits_scale '{e.HitsScale}' (one of {string.Join("/", HitsScaleSources)}).";
+                if (e.Hits > 1)
+                    return "'hits_scale' and 'hits' can't combine on one effect (hits_scale IS the hit count).";
+                if (e.IsScaled)
+                    return "'hits_scale' and 'scale' can't combine on one effect (the per-hit damage is the printed amount).";
+                if (e.HasGrow || e.HasGrowHeld)
+                    return "'hits_scale' can't combine with 'grow' / 'grow_held' (one calculated idea per effect).";
+                if (e.Amount < 1)
+                    return "a 'hits_scale' damage needs amount >= 1 (the damage of EACH hit).";
+            }
             // Phase BC (v57, gap #52): exhaust_card — a pick mode, an amount for the counted modes (1..3), an optional
             // hand filter. `all` takes every matching card (amount is meaningless there). Card-only: not in TriggerOps.
             if (e.Op == "exhaust_card")
@@ -1494,9 +1530,15 @@ public static class ForgedCards
                 if (terr != null) return terr;
             }
         }
-        // One "Hits" DynamicVar per card → at most one multi-hit damage effect (in the base effects).
-        if (effects.Count(e => e.Hits > 1) > 1)
-            return "at most one multi-hit damage effect per card.";
+        // One "Hits" DynamicVar per card → at most one multi-hit damage effect (in the base effects). Phase BK (v63): a
+        // `hits_scale` damage is THE multi-hit too (one "CalculatedHits" var — a second would be a duplicate key).
+        if (effects.Count(e => e.Hits > 1 || e.HitsScale != null) > 1)
+            return "at most one multi-hit damage effect per card (hits or hits_scale).";
+        // Phase BK (v63): the upgrade overlay is positional and changes the per-hit DAMAGE only — the hit-count read stays.
+        if (upgrade != null)
+            for (int i = 0; i < Math.Min(effects.Length, upgrade.Length); i++)
+                if (effects[i].HitsScale != upgrade[i].HitsScale)
+                    return "an upgrade can't change 'hits_scale' (upgrade the per-hit damage instead).";
         // One calculated var per card (BaseLib limit): damage/block scaling each declares a CalculatedVar, so at
         // most one scaled damage/block per card (a scaled draw uses no var and is exempt). Phase U (gap #23): a
         // `grow` damage ALSO declares a CalculatedDamage var, so it counts toward the same one-calc-var budget.
@@ -1784,6 +1826,8 @@ public static class ForgedCards
                 return "'grow' is not allowed in a trigger payload (it's a per-card-play attack mechanic).";
             if (t.HasGrowHeld) // Phase BD (v58)
                 return "'grow_held' is not allowed in a trigger payload (it's a per-card held-turn mechanic).";
+            if (t.HitsScale != null) // Phase BK (v63): the hit count rides a CARD calc-var; a payload loops literal hits
+                return "'hits_scale' is not allowed in a trigger payload (it's a card-level damage field; use 'hits').";
             // Phase AN (v44): `unblockable` rides a CARD's damage var; a payload damage is an intrinsic CreatureCmd hit
             // with no var to flag. Card-level only.
             if (t.Unblockable)
@@ -2058,6 +2102,21 @@ public static class ForgedCards
         _ => "X",
     };
 
+    /// <summary>Phase BK (v63, gap #65): the singular noun a <c>hits_scale</c> damage counts ("Deal {Damage} damage for each
+    /// Attack you played this turn."). Lockstep with cardgen._HITS_PHRASE + render.js HITS_NOUN.</summary>
+    private static string HitsPhrase(string? src) => src switch
+    {
+        "attacks_played_this_turn"   => "Attack you played this turn",
+        "cards_in_hand"              => "other card in your hand",
+        "skills_in_hand"             => "Skill in your hand",
+        "plays_this_combat"          => "card you have played this combat",
+        "exhaust_pile_size"          => "card in your exhaust pile",
+        "hp_loss_events_this_combat" => "time you have lost HP this combat",
+        "energy_spent_this_turn"     => "energy you have spent this turn",
+        "orb_count"                  => "orb you have channeled",
+        _ => "X",
+    };
+
     /// <summary>Phase BJ (v62): the effect-aware phrase — target_status_stacks names its status ("the enemy's
     /// Vulnerable"); everything else is <see cref="ScalePhrase(string?)"/>. Lockstep with cardgen._effect_scale_phrase.</summary>
     private static string ScalePhrase(EffectSpec e) =>
@@ -2096,6 +2155,10 @@ public static class ForgedCards
                         parts.Add($"Deal {{CalculatedDamage}} damage{dmgSuffix}{ub}. Grows by {e.Grow} each time it is played this combat.");
                     else if (e.HasGrowHeld) // Phase BD (v58, gap #57): Windmill Strike — the calc-var climbs per held turn
                         parts.Add($"Deal {{CalculatedDamage}} damage{dmgSuffix}{ub}. Grows by {e.GrowHeld} each turn it is retained.");
+                    else if (e.HitsScale != null) // Phase BK (v63, gap #65): Whirlwind / Finisher — lockstep with cardgen.describe
+                        parts.Add(e.HitsScale == "x"
+                            ? $"Deal {{Damage}} damage X times{dmgSuffix}{ub}."
+                            : $"Deal {{Damage}} damage for each {HitsPhrase(e.HitsScale)}{dmgSuffix}{ub}.");
                     else
                         parts.Add(e.Hits > 1
                             ? $"Deal {{Damage}} damage {{Hits}} times{dmgSuffix}{ub}."

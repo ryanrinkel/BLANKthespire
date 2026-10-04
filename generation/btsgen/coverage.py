@@ -168,6 +168,9 @@ SCALE_MENU = [
                              '"target_status_stacks" with status vulnerable/weak/poison (the enemy\'s stacks - Bully).'),
     ("to_hand_size", 'REQUIRED: a draw with scale "to_hand_size" and amount 5-7 (draw until you hold that many '
                      'cards - Expertise).'),
+    # Phase BK (v63, gap #65): the hit COUNT from a live read (a damage field, not a `scale` — its own detector below).
+    ("hits_scale", 'REQUIRED: give one attack a "hits_scale" (it hits once per unit of a live read - "x" on an X-cost '
+                   'card = Whirlwind, "attacks_played_this_turn" = Finisher, "skills_in_hand" = Flechettes).'),
 ]
 SCALE_MENU_KIND = [
     ("tag_cards_owned", 'REQUIRED: make one damage or block amount scale "tag_cards_owned" with a matching "tag" '
@@ -245,6 +248,7 @@ for _k, _d, _kind in SCALE_MENU_KIND:
 for _k, _d in KEYWORD_MENU:
     CENSUS_DETECTOR[_k] = _det_keyword(_k)
 CENSUS_DETECTOR["scale"] = lambda cc: cc.scaled_or_x  # the v1 fixed scale directive
+CENSUS_DETECTOR["hits_scale"] = lambda cc: bool(cc.hits_scale)  # Phase BK (v63): a damage field, not a `scale` source
 
 # The per-class nomination categories the blueprint may declare (Fix B): category -> the v2 menu it filters.
 # W0.5 adds "sections": blueprint-prompt section KEYS a CALLER (CLI / web / bench via ClassBrief.coverage_nominations)
@@ -488,7 +492,7 @@ def measure(made: list[dict]) -> PoolReport:
             rep.generic_debuff_cards += 1
         if cc.scaled_or_x:
             rep.scaled_or_x += 1
-        rep.scale_kinds |= set(cc.scales)
+        rep.scale_kinds |= set(cc.scales) | ({"hits_scale"} if cc.hits_scale else set())  # Phase BK (v63)
         rep.keyword_kinds |= cc.keyword_kinds
         if not _is_reprint(plan):
             rep.plain_denom += 1

@@ -130,6 +130,7 @@ FIELD_UNITS = {
     "pole": ("balance_step",), "card_type": ("cost_shift", "exhaust_card", "draw_until", "add_trigger"),  # Phase BC (v57) / BI (v61)
     "scope": ("cost_shift", "add_trigger"), "count": ("cost_shift",),
     "every_n": ("add_trigger",),  # Phase BI (v61, gap #62): the trigger filters
+    "hits_scale": ("fam:scaling",),  # Phase BK (v63, gap #65): the hit COUNT from a live read rides the scaling family
     "card": ("add_status_card",),
 }
 DEF_UNITS = {"triggerEffect": ("add_trigger",)}

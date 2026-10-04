@@ -275,7 +275,9 @@ def test_w2_menu_keys_wired() -> None:
                                                   "cards_drawn_this_turn", "cards_drawn_this_combat",
                                                   "energy_spent_this_turn", "hp_loss_events_this_combat",
                                                   "cards_generated_this_combat", "total_enemy_poison",
-                                                  "target_status_stacks", "to_hand_size"}, "the scale menu")
+                                                  "target_status_stacks", "to_hand_size",
+                                                  # Phase BK (v63)
+                                                  "hits_scale"}, "the scale menu")
     check({k for k, _d, _k in coverage.SCALE_MENU_KIND} == {"tag_cards_owned", "forged"}, "the gated scale keys")
     check({k for k, _ in coverage.EXOTIC_NOMINATE_ONLY} == {"ritual", "barricade", "intangible"}, "nominate-only exotics")
     check({k for k, _ in coverage.KEYWORD_MENU} == {"retain", "innate", "ethereal", "hits"}, "the keyword menu")
@@ -341,6 +343,8 @@ def test_w2_menu_keys_wired() -> None:
         "total_enemy_poison": {"op": "damage", "amount": 1, "scale": "total_enemy_poison"},
         "target_status_stacks": {"op": "damage", "amount": 1, "scale": "target_status_stacks", "status": "vulnerable"},
         "to_hand_size": {"op": "draw", "amount": 6, "scale": "to_hand_size"},
+        # Phase BK (v63): the scaled hit count
+        "hits_scale": {"op": "damage", "amount": 6, "hits_scale": "attacks_played_this_turn"},
     }
     check(set(samples) == set(_w2_keys()), "a sample exists for every W2.2 key")
     for key, eff in samples.items():

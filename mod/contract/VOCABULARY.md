@@ -132,6 +132,11 @@ An ungated pair is rejected (that should just be one bigger number), and a third
   is retained." — the base-game **Windmill Strike**; the card shows its CURRENT value in hand. Needs `retain` on the
   same card; `grow_held` ≤ `amount`; NOT a scale (⊥ `scale`, ⊥ `grow`); it counts as the card's one calculated value.
   Not legal inside an `add_trigger` payload. Its cost-side twin is the `held_discount` op (Sands of Time).
+- `hits_scale` (v63): a `damage` effect's HIT COUNT from a live read — `amount` is each hit; cap 10, 0 = no hit.
+  `"x"` (X-cost only) = "Deal 5 damage X times." (Whirlwind); `attacks_played_this_turn` (Finisher), `cards_in_hand`,
+  `skills_in_hand` (Flechettes), `plays_this_combat`, `exhaust_pile_size`, `hp_loss_events_this_combat`,
+  `energy_spent_this_turn`, `orb_count` (orb classes) = "Deal 6 damage for each Attack you played this turn." The
+  card's one multi-hit (never with `hits` / `scale` / `grow` / `grow_held`); upgrades raise the per-hit damage; card-level only.
 - **Scaled amounts (`scale`):** instead of a fixed number, a `damage`, `block`, or `draw` effect can scale its
   amount to a **live combat value**. Put `"scale": "<source>"` on the effect (still include a nominal `"amount"`,
   which is ignored). Sources:

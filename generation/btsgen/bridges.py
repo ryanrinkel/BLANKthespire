@@ -55,6 +55,8 @@ def card_tokens(card: dict) -> set[str]:
         toks.add("card_type")
     if cc.every_n:
         toks.add("every_n")
+    if cc.hits_scale:  # Phase BK (v63): the hit-count field is a token strike_tempo / big_energy / horde_breaker claim
+        toks.add("hits_scale")
     return toks
 
 

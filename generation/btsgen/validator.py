@@ -108,6 +108,17 @@ _DAMAGE_ONLY_SCALES = {"cards_drawn_this_combat", "hp_loss_events_this_combat", 
 _STATUS_STACK_STATUSES = {"vulnerable", "weak", "poison"}
 # Phase BJ (v62): to_hand_size's amount is the target hand size (ForgedCards.Min/MaxHandSizeTarget).
 _HAND_SIZE_TARGET_MIN, _HAND_SIZE_TARGET_MAX = 2, 10
+# Phase BK (v63, gap #65): the live reads a damage op's `hits_scale` may take (the hit COUNT; mirrors
+# ForgedCards.HitsScaleSources + the schema enum). `x` couples to an X cost; `orb_count` is orb-class only (class_forge
+# drops it off a slotless class, as it does every orb-reading card).
+_HITS_SCALE_SOURCES = {"x", "attacks_played_this_turn", "cards_in_hand", "skills_in_hand", "plays_this_combat",
+                       "exhaust_pile_size", "hp_loss_events_this_combat", "energy_spent_this_turn", "orb_count"}
+# Phase BK: a hits_scale damage is priced at amount × the EXPECTED hit count (the runtime cap is 10). The open-ended
+# combat counts (plays / exhaust pile / HP-loss events) are late-game payoffs; the turn reads sit near 2.
+_HITS_SCALE_CAP = 10
+_HITS_SCALE_EXPECTED = {"x": 2.5, "attacks_played_this_turn": 2.0, "cards_in_hand": 3.0, "skills_in_hand": 1.5,
+                        "plays_this_combat": 6.0, "exhaust_pile_size": 4.0, "hp_loss_events_this_combat": 3.0,
+                        "energy_spent_this_turn": 2.0, "orb_count": 2.5}
 # Phase BJ (v62): the unbounded combat counts are late-game payoffs — a scaled damage is priced at this expected value.
 _LATE_GAME_SCALE_VALUE = {"cards_drawn_this_combat": 18.0, "hp_loss_events_this_combat": 8.0}
 # Phase AM (v43): the `when` kinds that read the CHOSEN target — single-enemy cards only, never in a trigger
@@ -701,6 +712,23 @@ class CardValidator:
                 out.append(f"'card_type' only applies to cost_shift/exhaust_card/draw_until/add_trigger (op '{op}').")
             if e.get("every_n") is not None and op != "add_trigger":  # Phase BI (v61)
                 out.append(f"'every_n' only applies to add_trigger (op '{op}').")
+            # Phase BK (v63, gap #65): `hits_scale` — the hit COUNT from a live read; THE card's one multi-hit, so never with
+            # a fixed `hits`, a `scale` on the amount, or a growth rule. Mirrors ForgedCards.Validate.
+            hsc = e.get("hits_scale")
+            if hsc is not None:
+                hsc = str(hsc).strip().lower()
+                if op != "damage":
+                    out.append(f"'hits_scale' only applies to damage (op '{op}').")
+                if hsc not in _HITS_SCALE_SOURCES:
+                    out.append(f"unsupported hits_scale '{hsc}' (one of {'/'.join(sorted(_HITS_SCALE_SOURCES))}).")
+                if isinstance(hits, int) and hits > 1:
+                    out.append("'hits_scale' and 'hits' can't combine on one effect (hits_scale IS the hit count).")
+                if scale:
+                    out.append("'hits_scale' and 'scale' can't combine on one effect (the per-hit damage is the printed amount).")
+                if e.get("grow", 0) or e.get("grow_held", 0):
+                    out.append("'hits_scale' can't combine with 'grow' / 'grow_held' (one calculated idea per effect).")
+                if op == "damage" and int(e.get("amount", 0) or 0) < 1:
+                    out.append("a 'hits_scale' damage needs amount >= 1 (the damage of EACH hit).")
             if scale:
                 if scale not in _SUPPORTED_SCALES:
                     out.append(f"unsupported scale '{scale}' (one of {'/'.join(sorted(_SUPPORTED_SCALES))}).")
@@ -800,8 +828,14 @@ class CardValidator:
             _c = card.get("cost", 0)
             if isinstance(_c, str) or (isinstance(_c, int) and _c < 1):
                 out.append("'held_discount' needs a card that costs 1+ energy (not 0-cost, not X-cost) -- there is nothing to discount.")
-        if sum(1 for e in effects if isinstance(e.get("hits"), int) and e.get("hits", 1) > 1) > 1:
-            out.append("at most one multi-hit damage effect per card.")
+        if sum(1 for e in effects if (isinstance(e.get("hits"), int) and e.get("hits", 1) > 1)
+               or e.get("hits_scale") is not None) > 1:  # Phase BK (v63): hits_scale is THE multi-hit too
+            out.append("at most one multi-hit damage effect per card (hits or hits_scale).")
+        # Phase BK (v63): the upgrade overlay is positional and changes the per-hit DAMAGE only. Mirrors ForgedCards.Validate.
+        for be, ue in zip(effects, up_effects):
+            if str(be.get("hits_scale") or "").strip().lower() != str(ue.get("hits_scale") or "").strip().lower():
+                out.append("an upgrade can't change 'hits_scale' (upgrade the per-hit damage instead).")
+                break
         # one calculated var per card: at most one scaled damage/block (a scaled draw uses no var → exempt).
         # Phase U (gap #23): a `grow` damage also declares a CalculatedDamage var — counts toward the same budget.
         if sum(1 for e in effects if (str(e.get("scale", "")).strip() and e.get("op") in ("damage", "block"))
@@ -1008,11 +1042,13 @@ class CardValidator:
             out.append("at most one 'retrieve_card' effect per card (one retrieval per play — raise the amount instead).")
         cost = card.get("cost", 0)
         costs_x = isinstance(cost, str) and cost.strip().upper() == "X"
-        any_scale = any(str(e.get("scale", "")).lower() == "x" for e in effects)
+        # Phase BK (v63, gap #65): a `hits_scale:"x"` damage (Whirlwind / Skewer) is the other X consumer.
+        any_scale = any(str(e.get("scale", "")).lower() == "x" or str(e.get("hits_scale", "")).lower() == "x"
+                        for e in effects)
         if costs_x and not any_scale:
-            out.append("an X-cost card needs a 'scale:x' effect (otherwise X does nothing).")
+            out.append("an X-cost card needs a 'scale:x' or 'hits_scale:x' effect (otherwise X does nothing).")
         if not costs_x and any_scale:
-            out.append("'scale:x' requires the card cost to be \"X\".")
+            out.append("'scale:x' / 'hits_scale:x' requires the card cost to be \"X\".")
         # Phase AM (v43): scale:"energy" is cost-0 ONLY — the game pays the cost BEFORE the card resolves, so on a
         # paid card the in-hand preview (pre-pay) and the dealt amount (post-pay) would differ by the cost. X-cost is
         # excluded too (X spends everything -> always 0). Mirrors ForgedCards.TryParseCardJson.
@@ -1129,6 +1165,8 @@ class CardValidator:
                     out.append("'unblockable' is not allowed in a trigger payload (it flags a card-level damage).")
                 if t.get("grow_held"):  # Phase BD (v58)
                     out.append("'grow_held' is not allowed in a trigger payload (it's a per-card held-turn mechanic).")
+                if t.get("hits_scale") is not None:  # Phase BK (v63): mirrors ForgedCards.ValidateTrigger
+                    out.append("'hits_scale' is not allowed in a trigger payload (it's a card-level damage field; use 'hits').")
                 if tgt is not None:
                     # H4 (gap #14): a TARGETED payload effect hits enemies — damage / enemy-debuff apply_status only,
                     # and never scaled. (target enum + op-vs-target coupling are also enforced by the schema.)
@@ -1325,6 +1363,11 @@ class CardValidator:
             late = _LATE_GAME_SCALE_VALUE.get(str(eff.get("scale", "")).strip().lower())
             if late is not None:
                 amt = max(amt, late)
+            # Phase BK (v63, gap #65): a scaled hit count is priced at the per-hit damage × its EXPECTED count.
+            hsc = str(eff.get("hits_scale") or "").strip().lower()
+            if hsc:
+                n = _HITS_SCALE_EXPECTED.get(hsc, 2.0)
+                return amt * n + unblockable_premium * n
             return amt + (6.0 if forged else 0.0) + grow_premium + held_premium + unblockable_premium
         if op == "gain_max_hp":
             # Phase AN (v44): a run-permanent stat (+ an immediate heal of the same amount) — priced like a permanent

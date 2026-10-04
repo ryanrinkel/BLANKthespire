@@ -1100,13 +1100,15 @@
           "add_status_card",
           "draw_until",
           "card_type",
-          "every_n"
+          "every_n",
+          "hits_scale"
         ],
         "class_kind": "normal"
       },
       "buildable": true,
       "gap_refs": [
-        "VOCABULARY_GAPS#62"
+        "VOCABULARY_GAPS#62",
+        "VOCABULARY_GAPS#65"
       ],
       "base_synergies": {
         "hooks": [
@@ -1203,7 +1205,7 @@
           "Needs card flow"
         ]
       },
-      "build_notes": "Cheap swings in volume, and `draw_until` (v57, Pillage) as the attack that digs through the Attacks for the one Skill or Power the turn needs. A Juggling power (`every_n` Attacks: damage to a random enemy) pays off the volume (v61)."
+      "build_notes": "Cheap swings in volume, and `draw_until` (v57, Pillage) as the attack that digs through the Attacks for the one Skill or Power the turn needs. A Juggling power (`every_n` Attacks: damage to a random enemy) pays off the volume (v61). Finisher (v63): `hits_scale` attacks_played_this_turn hits once per Attack played before it."
     },
     {
       "id": "orb_channel",
@@ -2977,7 +2979,7 @@
       "id": "big_energy",
       "name": "Overload / mana ramp",
       "description": "Ramp your energy, then spend it on big, expensive cards and X-cost spells.",
-      "build_notes": "The mana-ramp class: energy generation and cost reduction first, then 2-3 cost cards and X-cost spells (`\"cost\": \"X\"` with `scale:\"x\"`) as the payoffs, with card draw to keep the big cards coming. X-cost cards are the signature: give the class a few that scale well with a big energy turn. Energy payoffs (v62): `energy_spent_this_turn` (Helix Drill) and `gain_energy` with scale `energy` (Double Energy).",
+      "build_notes": "The mana-ramp class: energy generation and cost reduction first, then 2-3 cost cards and X-cost spells (`\"cost\": \"X\"` with `scale:\"x\"`) as the payoffs, with card draw to keep the big cards coming. X-cost cards are the signature: give the class a few that scale well with a big energy turn. Energy payoffs (v62): `energy_spent_this_turn` (Helix Drill) and `gain_energy` with scale `energy` (Double Energy). Whirlwind (v63): an X-cost attack with `hits_scale:\"x\"` hits X times.",
       "metaphors": [
         "the surge",
         "overload",
@@ -3013,13 +3015,15 @@
           "scale",
           "energy_ge",
           "energy_spent_this_turn",
-          "energy"
+          "energy",
+          "hits_scale"
         ],
         "class_kind": "normal"
       },
       "buildable": true,
       "gap_refs": [
-        "VOCABULARY_GAPS#63"
+        "VOCABULARY_GAPS#63",
+        "VOCABULARY_GAPS#65"
       ],
       "base_synergies": {
         "hooks": [
@@ -3348,12 +3352,15 @@
         "ops": [
           "damage",
           "all_enemies",
-          "enemy_count_ge"
+          "enemy_count_ge",
+          "hits_scale"
         ],
         "class_kind": "normal"
       },
       "buildable": true,
-      "gap_refs": [],
+      "gap_refs": [
+        "VOCABULARY_GAPS#65"
+      ],
       "base_synergies": {
         "hooks": [
           "aoe",
@@ -3427,7 +3434,8 @@
           "Weak against lone bosses",
           "Low single-target damage"
         ]
-      }
+      },
+      "build_notes": "Whirlwind / Skewer (v63): an X-cost AoE attack with `hits_scale:\"x\"` sweeps the room X times."
     },
     {
       "id": "ambush_alpha",

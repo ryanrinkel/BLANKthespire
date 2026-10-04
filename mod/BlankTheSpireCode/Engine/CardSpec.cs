@@ -78,6 +78,8 @@ namespace BlankTheSpire.BlankTheSpireCode.Engine;
 /// Phase AP also reuses <see cref="Cards"/> on <c>discard</c> (<c>"random"</c> / <c>"choose"</c> — the player picks which
 /// cards to discard) and on <c>retrieve_card</c> (random / choose), and <see cref="Pile"/> on <c>retrieve_card</c>
 /// (<c>"discard"</c> / <c>"exhaust"</c> — the pile a card is returned to your hand from).</param>
+/// <param name="HitsScale">Phase BK (v63, gap #65): on a <c>damage</c> op, the live read that sets the HIT COUNT (Finisher /
+/// Flechettes / Whirlwind); null = the fixed <see cref="Hits"/>. See <see cref="HasHitsScale"/>.</param>
 /// <param name="EveryN">Phase BI (v61, gap #62): on an <c>add_trigger</c> op with a power-hosted multi-fire trigger, the
 /// payload fires only on the Nth, 2Nth… matching event (2..9; Panache / Juggling). Counted PER COMBAT on the granted power
 /// instance (relic <c>every_n</c> parity). 0 = every event. Phase BI also reuses <see cref="CardKind"/> on add_trigger (the
@@ -91,8 +93,16 @@ public sealed record EffectSpec(string Op, int Amount = 0, string? Status = null
     string? CardKind = null, string? Scope = null, int Count = 0, // Phase AO (v45): the cost_shift filter / lifetime / use budget
     string? StatusCard = null, // Phase AP (v46): the add_status_card kind (dazed/wound/burn)
     int GrowHeld = 0, // Phase BD (v58, gap #57): +GrowHeld damage/Block per turn THIS card was retained (Windmill Strike)
-    int EveryN = 0) // Phase BI (v61, gap #62): on add_trigger, fire only on every Nth event (2..9, counted per combat)
+    int EveryN = 0, // Phase BI (v61, gap #62): on add_trigger, fire only on every Nth event (2..9, counted per combat)
+    string? HitsScale = null) // Phase BK (v63, gap #65): a damage op's HIT COUNT comes from a live read (Finisher / Whirlwind)
 {
+    /// <summary>Phase BK (v63, gap #65): this <c>damage</c> op hits once per unit of a live read (<see cref="HitsScale"/> =
+    /// <c>x</c> / <c>attacks_played_this_turn</c> / <c>cards_in_hand</c> / <c>skills_in_hand</c> / <c>plays_this_combat</c> /
+    /// <c>exhaust_pile_size</c> / <c>hp_loss_events_this_combat</c> / <c>energy_spent_this_turn</c> / <c>orb_count</c>),
+    /// capped at <see cref="EffectRunner.HitsScaleCap"/>. The per-hit damage is the printed amount ({Damage}). It is THE
+    /// card's one multi-hit: mutually exclusive with <see cref="Hits"/> &gt; 1, <see cref="Scale"/>, <see cref="Grow"/> and
+    /// <see cref="GrowHeld"/>. The count rides a BaseLib named calc-var (<c>CalculatedHits</c>, see DataCard).</summary>
+    public bool HasHitsScale => HitsScale != null;
     /// <summary>Phase BD (v58, gap #57): this <c>damage</c>/<c>block</c> op's amount INCREASES by <see cref="GrowHeld"/>
     /// for each end-of-turn flush THIS card instance survived in hand (Retain) — <c>amount + GrowHeld × turns held</c>
     /// (Windmill Strike). Per-card-instance, per-combat (the counter lives on the combat clone, see DataCard.OnHeldIntoTurn).

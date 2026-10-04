@@ -687,7 +687,7 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Mechanic sketch:** effect field `hits_scale` on `damage`, sources `x`, `cards_in_hand`, `plays_this_combat`, `attacks_played_this_turn`, `skills_in_hand`, `orb_count` and #63's `exhaust_pile_size` / `hp_loss_events_this_combat` / `energy_spent_this_turn`. Exclusive with `hits`, `scale`, `grow`, `grow_held`; counts as the card's one multi-hit; upgrades touch per-hit damage only; 0 hits = logged skip. Describe: "Deal {Damage} damage X times." / "Deal {Damage} damage for each Attack you played this turn." Default (plan §7): runtime cap 10 hits, logged.
 - **Buildable today?** No — `scale` and `hits` exclude each other.
 - **Priority:** High — 24 base cards.
-- **Status:** **planned (Wave 6, Phase BK, vocab v63)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BK.
+- **Status:** **done (2026-10-04, vocab v63, Phase BK)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BK.
 
 ### 66. Enemy Strength loss + strip Block / Artifact
 - **Surfaced by:** base-game audit (2026-10-01), "Enemy Strength loss" and "Strip enemy Block / Artifact" rows: `PiercingWail`, `DarkShackles`, `Mangle`, `EnfeeblingTouch`, `Malaise`, `SharedFate`, `Expose` (12 cards).

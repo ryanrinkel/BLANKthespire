@@ -10,6 +10,7 @@ using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
+using MegaCrit.Sts2.Core.Localization.DynamicVars; // Phase BK (v63): CalculatedVar (the CalculatedHits count)
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Orbs;
 using MegaCrit.Sts2.Core.Models.Powers;
@@ -101,6 +102,20 @@ public static class EffectRunner
                     // Hit count rides a "Hits" DynamicVar (declared by DataCard only when >1), so it both
                     // shows in card text ({Hits}) and upgrades. CardAttack deals the card's Damage var per hit.
                     int hits = card.DynamicVars.TryGetValue("Hits", out var hv) ? (int)hv.BaseValue : 1;
+                    // Phase BK (v63, gap #65): a hits_scale damage reads its count off the CalculatedHits calc-var (the base
+                    // Finisher recipe: Calculate(target)), capped at HitsScaleCap (logged). 0 hits = no swing at all.
+                    if (e.HitsScale != null)
+                    {
+                        int raw = HitsScaleRead(card, e, play);
+                        hits = Math.Min(HitsScaleCap, raw);
+                        if (hits <= 0)
+                        {
+                            MainFile.Logger.Info($"[BK] hits_scale {e.HitsScale} -> 0 hits, skipped (raw {raw}) from '{spec.Title ?? spec.Id}'.");
+                            break;
+                        }
+                        MainFile.Logger.Info($"[BK] hits_scale {e.HitsScale} -> {hits} hits (raw {raw}, cap {HitsScaleCap}) x " +
+                                             $"{(int)card.DynamicVars.Damage.BaseValue} from '{spec.Title ?? spec.Id}'.");
+                    }
                     // Phase BF (v60, gap #54): the smoke's consume proof — an Attack resolving with Vigor / Double Damage up.
                     if (card.Owner?.Creature is { } bfOwner && (bfOwner.HasPower<VigorPower>() || bfOwner.HasPower<DoubleDamagePower>()))
                         MainFile.Logger.Info($"[BF] '{spec.Title ?? spec.Id}' hits {hits}x with Vigor {bfOwner.GetPower<VigorPower>()?.Amount ?? 0}, " +
@@ -1088,8 +1103,39 @@ public static class EffectRunner
         "hp_loss_events_this_combat" => HpLossEventsThisCombat(card.Owner),                // TearAsunder
         "cards_generated_this_combat" => CardsGeneratedThisCombat(card.Owner),             // Supermassive
         "total_enemy_poison"         => TotalEnemyPoison(card.Owner),                      // Mirage
+        // Phase BK (v63, gap #65): the hits_scale-only reads (never a `scale` source — SupportedScales omits them).
+        "attacks_played_this_turn"   => AttacksPlayedThisTurn(card.Owner),                 // Finisher
+        "skills_in_hand"             => SkillsInHand(card.Owner),                          // Flechettes
+        "orb_count"                  => card.Owner?.PlayerCombatState?.OrbQueue?.Orbs?.Count ?? 0, // orb classes
         _ => 0,
     };
+
+    /// <summary>Phase BK (v63, gap #65): the runtime ceiling on a hits_scale hit count (plan §7 decision 3). A replace-
+    /// semantics count like plays_this_combat reaches 20+ late in a fight — animation time and the AutoSlay timeout.</summary>
+    internal const int HitsScaleCap = 10;
+    /// <summary>Phase BK: the calc-var key the hit count rides (the base Finisher / Flechettes name).</summary>
+    internal const string CalculatedHitsKey = "CalculatedHits";
+
+    /// <summary>Phase BK: the UNCAPPED hit count — the card's CalculatedHits calc-var (preview == resolve), falling back to
+    /// the same ScaleValue read if the var is somehow missing.</summary>
+    private static int HitsScaleRead(ConstructedCardModel card, EffectSpec e, CardPlay play) =>
+        card.DynamicVars.TryGetValue(CalculatedHitsKey, out var hv) && hv is CalculatedVar cv
+            ? (int)cv.Calculate(play?.Target)
+            : ScaleValue(e.HitsScale, card);
+
+    /// <summary>Phase BK: Finisher — the Attacks you FINISHED playing this turn (the in-flight card is not finished yet).</summary>
+    internal static int AttacksPlayedThisTurn(Player? player)
+    {
+        var cm = CombatManager.Instance;
+        var cs = player?.Creature?.CombatState;
+        if (player == null || cs == null || cm?.History?.CardPlaysFinished == null) return 0;
+        return cm.History.CardPlaysFinished.Count(entry => entry.HappenedThisTurn(cs) && entry.CardPlay.Card.Type == CardType.Attack
+                                                           && entry.CardPlay.Card.Owner == player);
+    }
+
+    /// <summary>Phase BK: Flechettes — the Skills in your hand.</summary>
+    internal static int SkillsInHand(Player? player) =>
+        player?.PlayerCombatState?.Hand?.Cards?.Count(c => c.Type == CardType.Skill) ?? 0;
 
     /// <summary>Phase BJ (v62): the scales this phase added (the [BJ] play-time log). `to_hand_size` logs its own line.</summary>
     internal static readonly HashSet<string> PhaseBjScales =

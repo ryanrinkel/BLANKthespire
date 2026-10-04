@@ -438,6 +438,24 @@ at expected count (x: ~2.5; attacks_this_turn: ~2; cards_in_hand: ~3; exhaust pi
 `hits_scale`; `census` field counter; `bridges.card_tokens`; one `SCALE_MENU` line mentions it.
 **Test:** `tests/test_phase_bk.py`. **Tester** `gaptest-bk`: Whirlwind (X, all_enemies), Finisher, Flechettes, an
 exhaust-pile ripper. **Tags:** `[BK] hits_scale <src> -> <n> hits (cap <c>) x <dmg> from '<card>'`.
+**Findings (BK, done 2026-10-04 on `wave6`):** (1) Verify-first held: BaseLib `WithCalculatedVar(name, …)`
+(`ConstructedCardModel.cs:152`) never sets `_hasBasegameCalculatedVar`, so `CalculatedHits` coexists with a
+`CalculatedDamage`/`CalculatedBlock` (the phase test greps the BaseLib source). (2) The three new reads
+(`attacks_played_this_turn`, `skills_in_hand`, `orb_count`) are `ScaleValue` branches but hits_scale-ONLY (not in
+`SupportedScales`). The tag prints both counts: `-> <n> hits (raw <r>, cap 10) x <per-hit dmg>`; 0 hits logs
+`-> 0 hits, skipped (raw 0)` and plays no swing. (3) `orb_count` is orb-class only through
+`class_forge._card_uses_orbs` (dropped off a slotless class like every orb-reading card); its noun is "orb you have
+channeled". (4) Census counts a hits_scale damage as `multi_hit` AND `scaled_or_x` (coverage's scale quota sees it);
+`coverage.SCALE_MENU` gained a `hits_scale` key with its own detector. `featured.py` was NOT touched (the SCALE_MENU
+directive covers repair; a featured roll is optional). (5) Pricing: per-hit damage × expected hits (x 2.5, Finisher 2,
+cards_in_hand 3, Flechettes 1.5, plays_this_combat 6, exhaust pile 4, HP-loss 3, energy spent 2, orbs 2.5).
+(6) AutoPlay captures X = your CURRENT energy (`CardCmd.AutoPlay`, CardCmd.cs:102), so `x` read 2..9 in the smoke;
+`energy_spent_this_turn` read 0 on every play (AutoSlay spends nothing — the READ and the skip tag are proven).
+(7) Smoke (tests/gaptest-bk): the first GAPTESTBK1 pass stalled on the Act 2 merchant ("Buying item" → AutoSlay 120 s
+timeout, `[MerchantGuard]` thin pool: no Power; no mod frame) and HP-loss read 0 on all 7 plays → the tester gained a
+Power (Steady Rhythm) and a lose_hp Skill (Blood Toll ×2). Second pass: GAPTESTBK1 and GAPTESTBK2 both completed the
+run; every source fired, all but energy_spent non-zero; the cap fired 37× / 13× on plays_this_combat (raw up to 90)
+and once on exhaust_pile_size (raw 11); 0 mod exceptions, 0 BlankTheSpire frames, 0 localization errors.
 
 ### Phase BL — Enemy Strength loss, strip, Doom (v64; gaps #66, #67; ~1½ days) — 24 base cards
 
@@ -798,3 +816,10 @@ scaffold 45,951 (informational) · `full` 108,977. **Next: Phase BJ** (v62).
 **592**, web **293**, `test_phase_bj` 231/231. Readings: index 7,627 (cap 72) · per-archetype max 67,956
 (`exhaust_pyre`) · per-archetype scaffold max 25,571 · triads 60,934 / 70,730 / 76,807 · all-ops 117,639 · all-ops
 scaffold 46,178 (informational) · `full` 110,775 (scaffold snapshot 45,900, +227). **Next: Phase BK** (v63).
+
+**Phase BK DONE 2026-10-04** (on `wave6`, vocab v63; smokes GAPTESTBK1/BK2 both completed the run after one tester
+iteration, every `[BK] hits_scale` source fired, the 10-hit cap observed, 0 mod exceptions, 0 localization errors;
+tester + tags in `generation/tests/gaptest-bk/`). All-ops tripwire raised to 140,000 first (ac3a1b9). Merged suite:
+generation **594**, web **293**, `test_phase_bk` 151/151. Readings: index 7,743 (cap 72) · per-archetype max 68,796
+(`exhaust_pyre`) · per-archetype scaffold max 25,716 · triads 61,774 / 71,570 / 77,647 · all-ops 118,479 · all-ops
+scaffold 46,323 (informational) · `full` 111,499 (scaffold snapshot 46,045, +145). **Next: Phase BL** (v64).

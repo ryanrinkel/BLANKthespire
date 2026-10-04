@@ -424,7 +424,8 @@ instead of a fixed number by adding `"scale": "<source>"` (keep a nominal "amoun
 "energy" (cost-0 cards only), and "x" (X-cost only). History reads (v62): "exhaust_pile_size", "discards_this_turn", \
 "cards_drawn_this_turn", "energy_spent_this_turn", "total_enemy_poison", "target_status_stacks" + status (Bully). Reach for "cards_retained" plus the `retain` keyword and the \
 `retained_last_turn`/`hand_size_ge` conditions when the concept's fantasy is PATIENCE / coiling / holding cards \
-back for a big release. A signature Retain archetype = cheap/zero-cost cards with `retain`, payoffs that `scale` to \
+back for a big release. Hit counts (v63): "hits_scale" on a damage = one hit per unit ("x" Whirlwind, \
+"attacks_played_this_turn" Finisher, "skills_in_hand" Flechettes). A signature Retain archetype = cheap/zero-cost cards with `retain`, payoffs that `scale` to \
 cards_retained or are gated `when:{{"kind":"retained_last_turn"}}` / `when:{{"kind":"hand_size_ge","value":N}}`. \
 At most one scaled damage/block per card.
 
@@ -2851,6 +2852,8 @@ def _card_uses_orbs(card: dict) -> bool:
             return True
         when = e.get("when")
         if isinstance(when, dict) and when.get("kind") in _ORB_CONDITIONS:
+            return True
+        if e.get("hits_scale") == "orb_count":  # Phase BK (v63): a hit count read off your orbs is orb-class only
             return True
     return False
 

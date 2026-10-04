@@ -166,6 +166,12 @@ public abstract class DataCard : ConstructedCardModel
                     // Multi-hit: a "Hits" var carries the count (upgrade-aware, shown as {Hits} in text).
                     // Single-hit (Hits<=1) declares no var, so EffectRunner defaults to 1 — unchanged path.
                     if (e.Hits > 1) WithVar("Hits", e.Hits, EffectRunner.HitsUpgradeDelta(Spec, i));
+                    // Phase BK (v63, gap #65): a hits_scale damage carries its hit COUNT as a BaseLib NAMED calc-var
+                    // ("CalculatedHits" = 0 + 1 × the live read; the base Finisher / Flechettes var name). The named overload
+                    // never sets ConstructedCardModel._hasBasegameCalculatedVar, so it coexists with a CalculatedDamage
+                    // (validator-enforced ⊥ scale/grow anyway). EffectRunner reads + caps it at play time.
+                    if (e.HitsScale != null)
+                        WithCalculatedVar(EffectRunner.CalculatedHitsKey, 0, (c, _) => EffectRunner.ScaleValue(e.HitsScale, c));
                     break;
                 case "block":
                     if (e.IsScaled) WithCalculatedBlock(0, BonusFor(e, up)); // block = scalar; CardBlock auto-reads CalculatedBlock

@@ -119,7 +119,7 @@ def _t_engine() -> None:
           "ResolveEnemies rolls random_enemy on Rng.CombatTargets")
     check("[BI] random_enemy payload ->" in tr, "the [BI] random_enemy tag")
     check('"status"     => c.Type == CardType.Status' in _cs("Engine", "EffectRunner.cs"), "HandKindMatches knows `status`")
-    check("int EveryN = 0)" in _cs("Engine", "CardSpec.cs"), "EffectSpec.EveryN")
+    check("int EveryN = 0" in _cs("Engine", "CardSpec.cs"), "EffectSpec.EveryN")  # Phase BK (v63) appended HitsScale after it
     fc = _cs("Engine", "ForgedCards.cs")
     check('int everyN = e.ContainsKey("every_n") ? Int(e, "every_n") : 0;' in fc and "EveryN: everyN" in fc, "ParseEffects reads every_n")
     check('TriggerCardKinds = ["attack", "skill", "power", "non_attack", "status"]' in fc, "the trigger card-kind set")

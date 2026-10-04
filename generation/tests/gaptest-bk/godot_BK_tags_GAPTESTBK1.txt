@@ -1,0 +1,399 @@
+# Phase BK AutoSlay smoke — seed GAPTESTBK1 (godot.log grep, 13159 lines)
+# [BK] lines: 380
+# Auto-selected: 11 (no picker in this tester)
+# mod exceptions: 0
+# BlankTheSpire stack frames: 0
+# Localization formatting errors: 0
+# exception lines (any source): 7
+# run end: [INFO] [AutoSlay] Action: Run completed (max floor reached). Abandoning
+# --- per-source summary (fires, non-zero hits, raw min..max, capped at 10) ---
+  hits_scale attacks_played_this_turn     fired   16  non-zero    8  raw 0..4  capped 0
+  hits_scale cards_in_hand                fired   40  non-zero   34  raw 0..4  capped 0
+  hits_scale energy_spent_this_turn       fired   59  non-zero    0  raw 0..0  capped 0
+  hits_scale exhaust_pile_size            fired   44  non-zero   37  raw 0..8  capped 0
+  hits_scale hp_loss_events_this_combat   fired   24  non-zero   14  raw 0..10  capped 0
+  hits_scale orb_count                    fired   41  non-zero   41  raw 1..3  capped 0
+  hits_scale plays_this_combat            fired   48  non-zero   47  raw 0..90  capped 37
+  hits_scale skills_in_hand               fired   50  non-zero   32  raw 0..3  capped 0
+  hits_scale x                            fired   58  non-zero   58  raw 2..6  capped 0
+# --- every [BK] line ---
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 1 hits (raw 1, cap 10) x 3 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale hp_loss_events_this_combat -> 0 hits, skipped (raw 0) from 'Old Scars'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 0 hits, skipped (raw 0) from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 1 hits (raw 1, cap 10) x 4 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 4 hits (raw 4, cap 10) x 3 from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale hp_loss_events_this_combat -> 0 hits, skipped (raw 0) from 'Old Scars'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 1 hits (raw 1, cap 10) x 3 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 2 hits (raw 2, cap 10) x 4 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 4 hits (raw 4, cap 10) x 3 from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale hp_loss_events_this_combat -> 0 hits, skipped (raw 0) from 'Old Scars'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 0 hits, skipped (raw 0) from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale attacks_played_this_turn -> 3 hits (raw 3, cap 10) x 6 from 'Closing Combo'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 0 hits, skipped (raw 0) from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 14, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 0 hits, skipped (raw 0) from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 2 hits (raw 2, cap 10) x 4 from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale attacks_played_this_turn -> 0 hits, skipped (raw 0) from 'Closing Combo'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 1 hits (raw 1, cap 10) x 3 from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 1 hits (raw 1, cap 10) x 3 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 4 hits (raw 4, cap 10) x 4 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 0 hits, skipped (raw 0) from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 2 hits (raw 2, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 1 hits (raw 1, cap 10) x 4 from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 1 hits (raw 1, cap 10) x 3 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale attacks_played_this_turn -> 0 hits, skipped (raw 0) from 'Closing Combo'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 3 hits (raw 3, cap 10) x 3 from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale hp_loss_events_this_combat -> 1 hits (raw 1, cap 10) x 3 from 'Old Scars'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale hp_loss_events_this_combat -> 0 hits, skipped (raw 0) from 'Old Scars'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 0 hits, skipped (raw 0) from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 4 hits (raw 4, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 1 hits (raw 1, cap 10) x 4 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 0 hits, skipped (raw 0) from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 0 hits, skipped (raw 0) from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 13, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 3 hits (raw 3, cap 10) x 4 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 3 hits (raw 3, cap 10) x 3 from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 1 hits (raw 1, cap 10) x 4 from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 0 hits, skipped (raw 0) from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 1 hits (raw 1, cap 10) x 3 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 5 hits (raw 5, cap 10) x 4 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale hp_loss_events_this_combat -> 1 hits (raw 1, cap 10) x 3 from 'Old Scars'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 1 hits (raw 1, cap 10) x 3 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 3 hits (raw 3, cap 10) x 4 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale attacks_played_this_turn -> 1 hits (raw 1, cap 10) x 6 from 'Closing Combo'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 2 hits (raw 2, cap 10) x 3 from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 15, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 1 hits (raw 1, cap 10) x 4 from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 3 hits (raw 3, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 3 hits (raw 3, cap 10) x 4 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 0 hits, skipped (raw 0) from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 5 hits (raw 5, cap 10) x 4 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 0 hits, skipped (raw 0) from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale attacks_played_this_turn -> 0 hits, skipped (raw 0) from 'Closing Combo'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 1 hits (raw 1, cap 10) x 4 from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale hp_loss_events_this_combat -> 0 hits, skipped (raw 0) from 'Old Scars'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 1 hits (raw 1, cap 10) x 3 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 7 hits (raw 7, cap 10) x 4 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 38, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 7 hits (raw 7, cap 10) x 4 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 0 hits, skipped (raw 0) from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 1 hits (raw 1, cap 10) x 4 from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 4 hits (raw 4, cap 10) x 3 from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 2 hits (raw 2, cap 10) x 4 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 4 hits (raw 4, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 2 hits (raw 2, cap 10) x 4 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 0 hits, skipped (raw 0) from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale hp_loss_events_this_combat -> 0 hits, skipped (raw 0) from 'Old Scars'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 2 hits (raw 2, cap 10) x 3 from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 1 hits (raw 1, cap 10) x 4 from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 17, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 1 hits (raw 1, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale attacks_played_this_turn -> 4 hits (raw 4, cap 10) x 6 from 'Closing Combo'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 3 hits (raw 3, cap 10) x 3 from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 2 hits (raw 2, cap 10) x 3 from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale attacks_played_this_turn -> 1 hits (raw 1, cap 10) x 6 from 'Closing Combo'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 1 hits (raw 1, cap 10) x 3 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 3 hits (raw 3, cap 10) x 4 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 1 hits (raw 1, cap 10) x 3 from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 1 hits (raw 1, cap 10) x 4 from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale hp_loss_events_this_combat -> 3 hits (raw 3, cap 10) x 3 from 'Old Scars'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 2 hits (raw 2, cap 10) x 4 from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 23, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 25, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 28, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 6 hits (raw 6, cap 10) x 4 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 1 hits (raw 1, cap 10) x 3 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale hp_loss_events_this_combat -> 0 hits, skipped (raw 0) from 'Old Scars'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 2 hits (raw 2, cap 10) x 4 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 2 hits (raw 2, cap 10) x 4 from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 4 hits (raw 4, cap 10) x 4 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 2 hits (raw 2, cap 10) x 4 from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 0 hits, skipped (raw 0) from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale hp_loss_events_this_combat -> 0 hits, skipped (raw 0) from 'Old Scars'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 1 hits (raw 1, cap 10) x 4 from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 0 hits, skipped (raw 0) from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 18, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 20, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 0 hits, skipped (raw 0) from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 1 hits (raw 1, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 1 hits (raw 1, cap 10) x 3 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 2 hits (raw 2, cap 10) x 4 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 0 hits, skipped (raw 0) from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale hp_loss_events_this_combat -> 0 hits, skipped (raw 0) from 'Old Scars'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 15, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 1 hits (raw 1, cap 10) x 3 from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale attacks_played_this_turn -> 2 hits (raw 2, cap 10) x 6 from 'Closing Combo'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 2 hits (raw 2, cap 10) x 4 from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 29, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 7 hits (raw 7, cap 10) x 4 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 6 hits (raw 6, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 0 hits, skipped (raw 0) from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 1 hits (raw 1, cap 10) x 6 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 1 hits (raw 1, cap 10) x 3 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 2 hits (raw 2, cap 10) x 3 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 13, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 1 hits (raw 1, cap 10) x 3 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 0 hits, skipped (raw 0) from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 1 hits (raw 1, cap 10) x 4 from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 11, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 4 hits (raw 4, cap 10) x 3 from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 15, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale hp_loss_events_this_combat -> 0 hits, skipped (raw 0) from 'Old Scars'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 1 hits (raw 1, cap 10) x 4 from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 2 hits (raw 2, cap 10) x 3 from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 6 hits (raw 6, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 1 hits (raw 1, cap 10) x 3 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 2 hits (raw 2, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 1 hits (raw 1, cap 10) x 4 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 1 hits (raw 1, cap 10) x 4 from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 1 hits (raw 1, cap 10) x 4 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 1 hits (raw 1, cap 10) x 6 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 20, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 2 hits (raw 2, cap 10) x 3 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 3 hits (raw 3, cap 10) x 3 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 2 hits (raw 2, cap 10) x 3 from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale attacks_played_this_turn -> 2 hits (raw 2, cap 10) x 6 from 'Closing Combo'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale attacks_played_this_turn -> 0 hits, skipped (raw 0) from 'Closing Combo'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 2 hits (raw 2, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 6 hits (raw 6, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 11, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 2 hits (raw 2, cap 10) x 4 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale hp_loss_events_this_combat -> 2 hits (raw 2, cap 10) x 3 from 'Old Scars'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 0 hits, skipped (raw 0) from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 1 hits (raw 1, cap 10) x 3 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 2 hits (raw 2, cap 10) x 3 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 3 hits (raw 3, cap 10) x 4 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 1 hits (raw 1, cap 10) x 4 from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 5 hits (raw 5, cap 10) x 6 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 31, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 2 hits (raw 2, cap 10) x 3 from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 1 hits (raw 1, cap 10) x 4 from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 2 hits (raw 2, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 0 hits, skipped (raw 0) from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 45, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 3 hits (raw 3, cap 10) x 4 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 2 hits (raw 2, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 50, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 0 hits, skipped (raw 0) from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 3 hits (raw 3, cap 10) x 3 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 3 hits (raw 3, cap 10) x 3 from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale attacks_played_this_turn -> 0 hits, skipped (raw 0) from 'Closing Combo'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 0 hits, skipped (raw 0) from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 3 hits (raw 3, cap 10) x 3 from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 2 hits (raw 2, cap 10) x 3 from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 1 hits (raw 1, cap 10) x 3 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 20, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 1 hits (raw 1, cap 10) x 4 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 3 hits (raw 3, cap 10) x 4 from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 12, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 3 hits (raw 3, cap 10) x 3 from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 5 hits (raw 5, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 1 hits (raw 1, cap 10) x 4 from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 1 hits (raw 1, cap 10) x 3 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 0 hits, skipped (raw 0) from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 0 hits, skipped (raw 0) from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 3 hits (raw 3, cap 10) x 3 from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 3 hits (raw 3, cap 10) x 6 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 2 hits (raw 2, cap 10) x 3 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 2 hits (raw 2, cap 10) x 3 from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 3 hits (raw 3, cap 10) x 4 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 39, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale hp_loss_events_this_combat -> 3 hits (raw 3, cap 10) x 3 from 'Old Scars'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 7 hits (raw 7, cap 10) x 6 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale attacks_played_this_turn -> 0 hits, skipped (raw 0) from 'Closing Combo'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 51, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 1 hits (raw 1, cap 10) x 4 from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 1 hits (raw 1, cap 10) x 4 from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale hp_loss_events_this_combat -> 6 hits (raw 6, cap 10) x 3 from 'Old Scars'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 3 hits (raw 3, cap 10) x 4 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 7 hits (raw 7, cap 10) x 4 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 61, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 3 hits (raw 3, cap 10) x 3 from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 1 hits (raw 1, cap 10) x 3 from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 67, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 3 hits (raw 3, cap 10) x 3 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 0 hits, skipped (raw 0) from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 3 hits (raw 3, cap 10) x 3 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale attacks_played_this_turn -> 0 hits, skipped (raw 0) from 'Closing Combo'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 86, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale hp_loss_events_this_combat -> 10 hits (raw 10, cap 10) x 3 from 'Old Scars'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 90, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 3 hits (raw 3, cap 10) x 3 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 8 hits (raw 8, cap 10) x 4 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 2 hits (raw 2, cap 10) x 4 from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 3 hits (raw 3, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 1 hits (raw 1, cap 10) x 4 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 1 hits (raw 1, cap 10) x 6 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 1 hits (raw 1, cap 10) x 4 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 0 hits, skipped (raw 0) from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 2 hits (raw 2, cap 10) x 3 from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 2 hits (raw 2, cap 10) x 3 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 15, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale attacks_played_this_turn -> 0 hits, skipped (raw 0) from 'Closing Combo'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 3 hits (raw 3, cap 10) x 3 from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 1 hits (raw 1, cap 10) x 4 from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 0 hits, skipped (raw 0) from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 28, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 3 hits (raw 3, cap 10) x 3 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale hp_loss_events_this_combat -> 4 hits (raw 4, cap 10) x 3 from 'Old Scars'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 2 hits (raw 2, cap 10) x 3 from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale hp_loss_events_this_combat -> 5 hits (raw 5, cap 10) x 3 from 'Old Scars'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 0 hits, skipped (raw 0) from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 1 hits (raw 1, cap 10) x 3 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 1 hits (raw 1, cap 10) x 4 from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 1 hits (raw 1, cap 10) x 3 from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 1 hits (raw 1, cap 10) x 4 from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale hp_loss_events_this_combat -> 4 hits (raw 4, cap 10) x 3 from 'Old Scars'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 2 hits (raw 2, cap 10) x 3 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 24, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 1 hits (raw 1, cap 10) x 4 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 1 hits (raw 1, cap 10) x 4 from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 4 hits (raw 4, cap 10) x 6 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 2 hits (raw 2, cap 10) x 3 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 1 hits (raw 1, cap 10) x 4 from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 0 hits, skipped (raw 0) from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 4 hits (raw 4, cap 10) x 6 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale attacks_played_this_turn -> 2 hits (raw 2, cap 10) x 6 from 'Closing Combo'.
+[INFO] [BlankTheSpire] [BK] hits_scale hp_loss_events_this_combat -> 2 hits (raw 2, cap 10) x 3 from 'Old Scars'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 6 hits (raw 6, cap 10) x 4 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 0 hits, skipped (raw 0) from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale hp_loss_events_this_combat -> 5 hits (raw 5, cap 10) x 3 from 'Old Scars'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 41, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 44, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 4 hits (raw 4, cap 10) x 3 from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 6 hits (raw 6, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 1 hits (raw 1, cap 10) x 4 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale hp_loss_events_this_combat -> 1 hits (raw 1, cap 10) x 3 from 'Old Scars'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 1 hits (raw 1, cap 10) x 3 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 3 hits (raw 3, cap 10) x 3 from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 3 hits (raw 3, cap 10) x 4 from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 2 hits (raw 2, cap 10) x 4 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 26, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 0 hits, skipped (raw 0) from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 3 hits (raw 3, cap 10) x 3 from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 6 hits (raw 6, cap 10) x 6 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 2 hits (raw 2, cap 10) x 3 from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 2 hits (raw 2, cap 10) x 4 from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale attacks_played_this_turn -> 1 hits (raw 1, cap 10) x 6 from 'Closing Combo'.
+[INFO] [BlankTheSpire] [BK] hits_scale hp_loss_events_this_combat -> 7 hits (raw 7, cap 10) x 3 from 'Old Scars'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 6 hits (raw 6, cap 10) x 4 from 'Pyre Volley'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale orb_count -> 3 hits (raw 3, cap 10) x 3 from 'Static Barrage'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 53, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 54, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale plays_this_combat -> 10 hits (raw 56, cap 10) x 2 from 'Rising Tally'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 1 hits (raw 1, cap 10) x 4 from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale x -> 3 hits (raw 3, cap 10) x 5 from 'Gale Spin'.
+[INFO] [BlankTheSpire] [BK] hits_scale energy_spent_this_turn -> 0 hits, skipped (raw 0) from 'Helix Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 4 hits (raw 4, cap 10) x 3 from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale cards_in_hand -> 3 hits (raw 3, cap 10) x 3 from 'Hand Flurry'.
+[INFO] [BlankTheSpire] [BK] hits_scale skills_in_hand -> 1 hits (raw 1, cap 10) x 4 from 'Needle Fan'.
+[INFO] [BlankTheSpire] [BK] hits_scale exhaust_pile_size -> 6 hits (raw 6, cap 10) x 6 from 'Pyre Volley'.

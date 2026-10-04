@@ -293,6 +293,10 @@ def effect_literal(e: dict) -> str:
             lit = f'new EffectSpec("{op}", {amount}, GrowHeld: {int(e["grow_held"])})'
         elif op == "damage" and hits > 1:
             lit = f'new EffectSpec("damage", {amount}, null, {hits})'
+        elif op == "damage" and e.get("hits_scale"):
+            # Phase BK (v63, gap #65): named HitsScale arg (the hit-count read). ⊥ hits/scale/grow (validator-enforced).
+            hs = str(e["hits_scale"]).strip().lower().replace("\\", "\\\\").replace('"', '\\"')
+            lit = f'new EffectSpec("damage", {amount}, HitsScale: "{hs}")'
         else:
             lit = f'new EffectSpec("{op}", {amount})'
     # Phase H: append the optional per-effect `when` guard as the named `When:` arg (after the positionals).
@@ -342,6 +346,24 @@ def _scale_phrase(scale: str) -> str:
         "cards_generated_this_combat": "the cards you have created this combat",
         "total_enemy_poison": "the total Poison on ALL enemies",
     }.get(scale, "X")
+
+
+# Phase BK (v63, gap #65): the singular noun a `hits_scale` damage counts — "Deal {Damage} damage for each <noun>."
+# Mirrors ForgedCards.HitsPhrase + render.js HITS_NOUN (byte-match; `x` reads "X times" instead).
+_HITS_PHRASE = {
+    "attacks_played_this_turn": "Attack you played this turn",
+    "cards_in_hand": "other card in your hand",
+    "skills_in_hand": "Skill in your hand",
+    "plays_this_combat": "card you have played this combat",
+    "exhaust_pile_size": "card in your exhaust pile",
+    "hp_loss_events_this_combat": "time you have lost HP this combat",
+    "energy_spent_this_turn": "energy you have spent this turn",
+    "orb_count": "orb you have channeled",
+}
+
+
+def _hits_phrase(src: str) -> str:
+    return _HITS_PHRASE.get(src, "X")
 
 
 def _effect_scale_phrase(e: dict) -> str:
@@ -613,6 +635,11 @@ def describe(effects: list[dict], target: str) -> str:
             elif e.get("grow_held", 0):
                 # Phase BD (v58, gap #57, Windmill Strike): the calc-var climbs per held turn. Byte-match ForgedCards.Describe.
                 parts.append(f"Deal {{CalculatedDamage}} damage{dmg_suffix}{ub}. Grows by {int(e['grow_held'])} each turn it is retained.")
+            elif e.get("hits_scale"):
+                # Phase BK (v63, gap #65): Whirlwind / Finisher. Byte-match ForgedCards.Describe.
+                hs = str(e["hits_scale"]).strip().lower()
+                parts.append(f"Deal {{Damage}} damage X times{dmg_suffix}{ub}." if hs == "x"
+                             else f"Deal {{Damage}} damage for each {_hits_phrase(hs)}{dmg_suffix}{ub}.")
             elif e.get("hits", 1) > 1:
                 parts.append(f"Deal {{Damage}} damage {{Hits}} times{dmg_suffix}{ub}.")
             else:
