@@ -30,13 +30,17 @@ public static class Conditions
          // never in a trigger) + two player reads (legal on cards AND as a trigger's fire-time gate).
          "target_hp_below_half", "target_has_block", "energy_ge", "cards_played_this_turn_ge",
          // Phase BB (v56, gap #59): the mirror of turn_at_least — "if it is turn N or earlier" (the opener's window).
-         "turn_at_most"];
+         "turn_at_most",
+         // Phase BJ (v62, gap #64): two combat-history player reads (legal on cards AND as a trigger gate) + one chosen-
+         // target read (in TargetKinds: single-enemy cards only, never in a trigger / orb / relic).
+         "exhausted_this_turn", "played_cards_last_turn_ge", "target_intends_attack"];
 
     /// <summary>Phase AM (v43): the condition kinds that read the CHOSEN TARGET (play.Target). Only meaningful on a
     /// single-enemy card (target:"enemy"); an AoE / self / random_enemy card has no chosen target, and a trigger fires
     /// with none — the validators reject them there (mirrors validator._TARGET_CONDITIONS). target_has_status predates
     /// this set and keeps its looser legacy rule (random_enemy + trigger only).</summary>
-    public static readonly HashSet<string> TargetKinds = ["target_hp_below_half", "target_has_block"];
+    public static readonly HashSet<string> TargetKinds = ["target_hp_below_half", "target_has_block",
+        "target_intends_attack"]; // Phase BJ (v62): Go for the Eyes
 
     /// <summary>Phase AM (v43): value caps — a threshold no realistic turn reaches is a dead effect. energy_ge tops
     /// out at 6 (3 base + a few gains); cards_played_this_turn_ge at 10 (a whole hand and then some).</summary>
@@ -60,13 +64,16 @@ public static class Conditions
              || c.Kind == "light_ge" || c.Kind == "dark_ge" || c.Kind == "centered"
              || c.Kind == "hp_lost_ge" // Phase AD (gap #12)
              || c.Kind == "energy_ge" || c.Kind == "cards_played_this_turn_ge" // Phase AM (v43)
-             || c.Kind == "turn_at_most") && c.Value < 1) // Phase BB (v56)
+             || c.Kind == "turn_at_most" // Phase BB (v56)
+             || c.Kind == "played_cards_last_turn_ge") && c.Value < 1) // Phase BJ (v62)
             return $"condition '{c.Kind}' needs value >= 1.";
         // Phase AM (v43): cap the two new thresholds (see EnergyGeMax / CardsPlayedGeMax).
         if (c.Kind == "energy_ge" && c.Value > EnergyGeMax)
             return $"condition 'energy_ge' may be at most {EnergyGeMax}.";
         if (c.Kind == "cards_played_this_turn_ge" && c.Value > CardsPlayedGeMax)
             return $"condition 'cards_played_this_turn_ge' may be at most {CardsPlayedGeMax}.";
+        if (c.Kind == "played_cards_last_turn_ge" && c.Value > CardsPlayedGeMax) // Phase BJ (v62): the same band
+            return $"condition 'played_cards_last_turn_ge' may be at most {CardsPlayedGeMax}.";
         // Phase AD (gap #12): the HP-spent threshold is capped (a self-fuel payoff shouldn't gate on more HP than
         // any realistic single-turn spend — keeps it in the Ice Shatter band, not "lose 40 HP").
         if (c.Kind == "hp_lost_ge" && c.Value > 15)
@@ -152,6 +159,15 @@ public static class Conditions
             // the finished history, so on a card it counts the OTHER cards played before it — the Finisher pattern).
             case "cards_played_this_turn_ge":
                 return EffectRunner.CardsPlayedThisTurn(player) >= c.Value;
+            // Phase BJ (v62, gap #64): EvilEye — you Exhausted a card this turn (CardExhaustedEntry + HappenedThisTurn).
+            case "exhausted_this_turn":
+                return EffectRunner.ExhaustedThisTurn(player);
+            // Phase BJ: PaleBlueDotPower — the cards you finished playing during your last turn (HappenedLastPlayerTurn).
+            case "played_cards_last_turn_ge":
+                return EffectRunner.CardsPlayedLastTurn(player) >= c.Value;
+            // Phase BJ: GoForTheEyes — the chosen enemy's next move is an Attack / DeathBlow intent (a pet/player has no Monster).
+            case "target_intends_attack":
+                return target?.Monster?.IntendsToAttack ?? false;
             default:
                 return false;
         }
@@ -191,6 +207,9 @@ public static class Conditions
         "target_has_block"     => "the enemy has Block",                                 // Phase AM (v43)
         "energy_ge"            => $"you have {c.Value}+ energy",                         // Phase AM (v43)
         "cards_played_this_turn_ge" => $"you have played {c.Value}+ cards this turn",   // Phase AM (v43)
+        "exhausted_this_turn"       => "you have Exhausted a card this turn",            // Phase BJ (v62)
+        "played_cards_last_turn_ge" => $"you played {c.Value}+ cards last turn",         // Phase BJ (v62)
+        "target_intends_attack"     => "the enemy intends to attack",                    // Phase BJ (v62)
         _ => c.Kind,
     };
 }

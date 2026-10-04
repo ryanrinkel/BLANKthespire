@@ -163,8 +163,9 @@ An ungated pair is rejected (that should just be one bigger number), and a third
   - `block` — your current Block (`damage`/`block` only): "Deal damage equal to your Block" = **Body Slam**; on `block` = Entrench. One or two per class.
   - `hp_lost_this_turn` — the HP you have lost this turn, net of healing (`damage`/`block` only): "Lose 4 HP. Deal damage equal to the HP you have lost this turn."
   - `draw_pile_count` — the cards in your draw pile (`damage`/`block` only): a fat-deck payoff that shrinks as you draw.
-  - `energy` — your current energy (`damage`/`block`/`draw`); **COST-0 CARDS ONLY** (the cost is paid before the card resolves — a paid card would preview one number and deal another). You keep the energy.
+  - `energy` — your current energy (`damage`/`block`/`draw`); **COST-0 CARDS ONLY** (the cost is paid before the card resolves — a paid card would preview one number and deal another). You keep the energy. On `gain_energy` (any cost) it is "Double your energy." (Double Energy).
   - `plays_this_combat` — the cards you have played this combat (player-level, not counting this one; `damage`/`block` only). Grows all fight → uncommon/rare. The per-CARD count is `grow`.
+  - **Combat-history reads (v62, replace-semantics):** `exhaust_pile_size` — cards in your exhaust pile (`damage`/`block`/`draw`); `discard_pile_size` — cards in your discard pile; `discards_this_turn` — cards you discarded by effects this turn; `cards_drawn_this_turn` — cards drawn this turn beyond the turn-start draw; `energy_spent_this_turn` — energy spent this turn before this card; `cards_generated_this_combat` — cards you created this combat (those five `damage`/`block`); `cards_drawn_this_combat`, `hp_loss_events_this_combat` (times you lost HP), `total_enemy_poison` (Poison summed over ALL enemies) — `damage` only, the two combat counts are late-game (uncommon/rare). `target_status_stacks` + `status` vulnerable/weak/poison — "Deal damage equal to the enemy's Vulnerable." (`damage`/`block`, single-enemy cards). `exhaust_pile_size` / `total_enemy_poison` also work in payloads. `draw` + scale `to_hand_size` (`amount` 2–10) = "Draw cards until you have N in hand."
   - The non-`x` scalars have **no cost coupling** (use any cost) — except `energy` (cost 0).
     At most **one scaled damage/block per card** (a scaled `draw` or lifesteal `heal` is exempt). A scaled effect
     can't also be multi-hit. The four PLAYER-level reads (`cards_retained`, `cards_in_hand`,
@@ -232,6 +233,9 @@ condition. (v49: the same `when` is legal inside a custom orb's `passive` / `evo
 | `target_has_block`  | —           | the **chosen enemy** has Block up (a shatter payoff: "Deal 6 damage. Apply Vulnerable if the enemy has Block."). **Single-enemy cards only**; never on an `add_trigger`. |
 | `energy_ge`         | `value` (int 1–6) | you have at least `value` energy — on a card, the energy left AFTER this card's cost is paid; on a `turn_end` trigger, your unspent energy. |
 | `cards_played_this_turn_ge` | `value` (int 1–10) | you have finished playing at least `value` OTHER cards this turn (the **Finisher** combo gate: "Deal 9 damage. Apply Weak if you have played 2+ cards this turn."; a `turn_end` trigger counts the whole turn). |
+| `exhausted_this_turn` | — | you have Exhausted a card this turn (Evil Eye: "Gain 8 Block if you have Exhausted a card this turn."). Legal as a trigger gate. |
+| `played_cards_last_turn_ge` | `value` (int 1–10) | you played at least `value` cards during your LAST turn (a tempo carry-over). Legal as a trigger gate. |
+| `target_intends_attack` | — | the **chosen enemy** intends to attack (Go for the Eyes: "Apply 1 Weak if the enemy intends to attack."). **Single-enemy cards only**; never on an `add_trigger`. |
 
 > Composition is the point: pair `channel_orb orb:"random"` (the pull) with effects gated on `when:{kind:"orbs_match"}`
 > (the jackpot) to build a **"sentient slot machine"** orb class — channel random orbs, and great things happen when

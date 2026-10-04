@@ -92,15 +92,32 @@ _SUPPORTED_SCALES = {"x", "cards_in_hand", "cards_retained", "unspent_energy_las
                      # Phase AM (v43): five more live player reads (replace-semantics). `energy` is damage/block/draw
                      # but COST-0 ONLY (the cost is paid before the card resolves — checked at the card level, below);
                      # the other four are damage/block-only (_DAMAGE_BLOCK_ONLY_SCALES). Mirrors ForgedCards.
-                     "block", "hp_lost_this_turn", "draw_pile_count", "energy", "plays_this_combat"}
-_DAMAGE_BLOCK_ONLY_SCALES = {"block", "hp_lost_this_turn", "draw_pile_count", "plays_this_combat"}
+                     "block", "hp_lost_this_turn", "draw_pile_count", "energy", "plays_this_combat",
+                     # Phase BJ (v62, gap #63): the combat-history / pile reads + target_status_stacks (with `status`)
+                     # + to_hand_size (draw only). Mirrors ForgedCards.SupportedScales.
+                     "exhaust_pile_size", "discard_pile_size", "discards_this_turn", "cards_drawn_this_turn",
+                     "cards_drawn_this_combat", "energy_spent_this_turn", "hp_loss_events_this_combat",
+                     "cards_generated_this_combat", "total_enemy_poison", "target_status_stacks", "to_hand_size"}
+_DAMAGE_BLOCK_ONLY_SCALES = {"block", "hp_lost_this_turn", "draw_pile_count", "plays_this_combat",
+                             # Phase BJ (v62): mirrors ForgedCards.DamageBlockOnlyScales
+                             "discard_pile_size", "discards_this_turn", "cards_drawn_this_turn", "energy_spent_this_turn",
+                             "cards_generated_this_combat"}
+# Phase BJ (v62): damage-only reads — the two unbounded combat counts + the board-wide Poison sum (ForgedCards.DamageOnlyScales).
+_DAMAGE_ONLY_SCALES = {"cards_drawn_this_combat", "hp_loss_events_this_combat", "total_enemy_poison"}
+# Phase BJ (v62): target_status_stacks reads one of these on the chosen target (ForgedCards.StatusStackStatuses).
+_STATUS_STACK_STATUSES = {"vulnerable", "weak", "poison"}
+# Phase BJ (v62): to_hand_size's amount is the target hand size (ForgedCards.Min/MaxHandSizeTarget).
+_HAND_SIZE_TARGET_MIN, _HAND_SIZE_TARGET_MAX = 2, 10
+# Phase BJ (v62): the unbounded combat counts are late-game payoffs — a scaled damage is priced at this expected value.
+_LATE_GAME_SCALE_VALUE = {"cards_drawn_this_combat": 18.0, "hp_loss_events_this_combat": 8.0}
 # Phase AM (v43): the `when` kinds that read the CHOSEN target — single-enemy cards only, never in a trigger
 # (mirrors Conditions.TargetKinds). target_has_status predates this set and keeps its looser legacy rule.
-_TARGET_CONDITIONS = {"target_hp_below_half", "target_has_block"}
+_TARGET_CONDITIONS = {"target_hp_below_half", "target_has_block", "target_intends_attack"}  # + Phase BJ (v62)
 # Phase AL (v42): the scalars a trigger payload may use — PLAYER-level reads only (mirror ForgedCards.TriggerScales);
 # and the payload ops whose amount a scale may replace / add to (mirror ForgedCards.TriggerScalableOps). `forged`
 # keeps its ADDITIVE damage/block-only shape; a TARGETED payload may be scaled only when it is `damage`.
-_TRIGGER_SCALES = {"cards_retained", "cards_in_hand", "unspent_energy_last_turn", "forged"}
+_TRIGGER_SCALES = {"cards_retained", "cards_in_hand", "unspent_energy_last_turn", "forged",
+                   "exhaust_pile_size", "total_enemy_poison"}  # Phase BJ (v62): pure player reads
 _TRIGGER_SCALABLE_OPS = {"damage", "block", "draw", "gain_energy", "heal", "lose_hp", "gain_orb_slot", "apply_status"}
 # Self-buff statuses (mirror C# EffectRunner.SelfBuffStatuses) — a buff_summon's status must be one of these
 # (it lands on the minion, like Strength). Kept in lockstep with the mod's ForgedCards.buff_summon validation.
@@ -409,9 +426,10 @@ class CardValidator:
         if op == "block":
             return "Block"
         if op == "draw":
-            return None if str(eff.get("scale", "")).strip() else "Cards"  # any scaled draw declares no var
+            sc = str(eff.get("scale", "")).strip()
+            return None if sc and sc != "to_hand_size" else "Cards"  # a scaled draw declares no var (BJ: to_hand_size keeps Cards)
         if op == "gain_energy":
-            return "Energy"
+            return None if str(eff.get("scale", "")).strip() else "Energy"  # Phase BJ (v62): Double Energy declares no var
         if op == "heal":
             return "Heal"
         if op == "lose_hp":
@@ -705,6 +723,24 @@ class CardValidator:
                 elif scale in _DAMAGE_BLOCK_ONLY_SCALES:  # Phase AM (v43)
                     if op not in ("damage", "block"):
                         out.append(f"'scale:{scale}' only applies to damage/block (op '{op}').")
+                elif scale in _DAMAGE_ONLY_SCALES:  # Phase BJ (v62)
+                    if op != "damage":
+                        out.append(f"'scale:{scale}' only applies to damage (op '{op}').")
+                elif scale == "target_status_stacks":  # Phase BJ (v62): Bully
+                    if op not in ("damage", "block"):
+                        out.append(f"'scale:target_status_stacks' only applies to damage/block (op '{op}').")
+                    if str(e.get("status", "")).strip().lower() not in _STATUS_STACK_STATUSES:
+                        out.append(f"a 'scale:target_status_stacks' effect needs a 'status' (one of {'/'.join(sorted(_STATUS_STACK_STATUSES))}).")
+                elif scale == "to_hand_size":  # Phase BJ (v62): Expertise — amount IS the target hand size
+                    if op != "draw":
+                        out.append(f"'scale:to_hand_size' only applies to draw (op '{op}').")
+                    hs = e.get("amount")
+                    if not (isinstance(hs, int) and not isinstance(hs, bool) and _HAND_SIZE_TARGET_MIN <= hs <= _HAND_SIZE_TARGET_MAX):
+                        out.append(f"a 'scale:to_hand_size' draw's amount is the target hand size "
+                                   f"({_HAND_SIZE_TARGET_MIN}..{_HAND_SIZE_TARGET_MAX}); got {hs!r}.")
+                elif scale == "energy":  # Phase BJ (v62): + gain_energy (Double Energy)
+                    if op not in ("damage", "block", "draw", "gain_energy"):
+                        out.append(f"'scale:energy' only applies to damage/block/draw/gain_energy (op '{op}').")
                 elif op not in ("damage", "block", "draw"):
                     out.append(f"'scale' only applies to damage/block/draw (op '{op}').")
                 # Phase M (gap #36): the additive "forged" scalar adds Forge to a PRINTED damage/block base —
@@ -717,6 +753,9 @@ class CardValidator:
                     out.append("a scaled effect can't also be multi-hit (hits + scale on one effect).")
             # Phase AE (gap #25): a stray `tag` (not on a tag_cards_owned effect) is a mistake — per-effect (a tag
             # on an unscaled effect must also reject). Mirrors ForgedCards.Validate.
+            # Phase BJ (v62): on damage/block, `status` belongs to a target_status_stacks read alone. Mirrors ForgedCards.Validate.
+            if e.get("status") is not None and op in ("damage", "block") and scale != "target_status_stacks":
+                out.append(f"'status' on {op} only applies with 'scale:target_status_stacks' (op '{op}').")
             if e.get("tag") is not None and scale != "tag_cards_owned":
                 out.append(f"'tag' only applies to a 'scale:tag_cards_owned' effect (op '{op}').")
             # Phase U (gap #23, Rampage): `grow` is an additive per-play damage step — damage-only, NOT a scale.
@@ -977,7 +1016,9 @@ class CardValidator:
         # Phase AM (v43): scale:"energy" is cost-0 ONLY — the game pays the cost BEFORE the card resolves, so on a
         # paid card the in-hand preview (pre-pay) and the dealt amount (post-pay) would differ by the cost. X-cost is
         # excluded too (X spends everything -> always 0). Mirrors ForgedCards.TryParseCardJson.
-        if any(str(e.get("scale", "")).strip().lower() == "energy" for e in effects + up_effects) and (costs_x or cost != 0):
+        # Phase BJ (v62): only the damage/block/draw form — a Double Energy gain_energy reads post-pay energy on any cost.
+        if any(str(e.get("scale", "")).strip().lower() == "energy" and e.get("op") in ("damage", "block", "draw")
+               for e in effects + up_effects) and (costs_x or cost != 0):
             out.append("'scale:energy' requires a cost-0 card (the cost is paid before the card resolves, so a paid card would preview one number and deal another).")
         # Phase AM (v43): the chosen-target conditions need a chosen target — a single-enemy card. AoE (no play
         # target), self and random_enemy cards have none (the gate would silently never open). Mirrors ForgedCards.Validate.
@@ -986,6 +1027,9 @@ class CardValidator:
                 w = e.get("when")
                 if isinstance(w, dict) and w.get("kind") in _TARGET_CONDITIONS:
                     out.append(f"'when:{w.get('kind')}' needs a single-enemy card (target \"enemy\") — it reads the chosen target.")
+                # Phase BJ (v62): the per-target status read needs the chosen target too. Mirrors ForgedCards.Validate.
+                if str(e.get("scale", "")).strip().lower() == "target_status_stacks":
+                    out.append("'scale:target_status_stacks' needs a single-enemy card (target \"enemy\") — it reads the chosen target.")
         # Phase AX (v53): apply_status is the ONE exception to the dup-var guard - a card may declare the same
         # status TWICE when the SECOND one is `when`-gated (the "Weak now, Weak2 if the gate opens" shape). The
         # second takes a SUFFIXED var so the DynamicVarSet still sees unique keys. Mirrors ForgedCards.Validate.
@@ -1131,6 +1175,11 @@ class CardValidator:
                         out.append("'scale:forged' inside a trigger only applies to damage/block (Forge ADDS to a printed damage/block amount).")
                     if ts == "forged" and int(t.get("amount", 0) or 0) < 1:
                         out.append("a 'scale:forged' trigger effect needs amount >= 1 (Forge ADDS to the printed amount).")
+                    # Phase BJ (v62): the two payload-legal history reads keep their card-level op rules.
+                    if ts == "total_enemy_poison" and op != "damage":
+                        out.append("'scale:total_enemy_poison' inside a trigger only applies to damage.")
+                    if ts == "exhaust_pile_size" and op not in ("damage", "block", "draw"):
+                        out.append("'scale:exhaust_pile_size' inside a trigger only applies to damage/block/draw.")
                     if isinstance(thits, int) and not isinstance(thits, bool) and thits > 1:
                         out.append("a scaled trigger effect can't also be multi-hit (hits + scale on one effect).")
                     # AutoSlay finding (GAPTESTAL1): the turn_end hook fires AFTER the end-of-turn discard, so a
@@ -1271,6 +1320,11 @@ class CardValidator:
             held_premium = self._amt(eff.get("grow_held", 0)) * 1.5
             # Phase AN (v44): an unblockable hit is worth more than its number (it lands through any Block).
             unblockable_premium = amt * 0.5 if eff.get("unblockable") is True else 0.0
+            # Phase BJ (v62): an unbounded combat count (cards drawn / HP-loss events this combat) is a late-game payoff —
+            # priced at its expected value, not the ignored nominal amount.
+            late = _LATE_GAME_SCALE_VALUE.get(str(eff.get("scale", "")).strip().lower())
+            if late is not None:
+                amt = max(amt, late)
             return amt + (6.0 if forged else 0.0) + grow_premium + held_premium + unblockable_premium
         if op == "gain_max_hp":
             # Phase AN (v44): a run-permanent stat (+ an immediate heal of the same amount) — priced like a permanent

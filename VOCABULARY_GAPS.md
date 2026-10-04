@@ -671,7 +671,7 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Mechanic sketch:** new `scale` values off combat History: `exhaust_pile_size`, `discard_pile_size`, `discards_this_turn`, `cards_drawn_this_turn`, `cards_drawn_this_combat`, `energy_spent_this_turn` (minus this card's own cost), `hp_loss_events_this_combat`, `cards_generated_this_combat`, `total_enemy_poison`, and `target_status_stacks` + `status` (vulnerable/weak/poison/doom; single-enemy, per-target calc-var). Plus `draw` with `scale:"to_hand_size"` ("Draw cards until you have {Cards} in hand.") and `gain_energy scale:"energy"` ("Double your energy."). Damage/block only, card-only except `total_enemy_poison` / `exhaust_pile_size` (payload-legal). Default (plan §7): replace-semantics ("equal to"); the additive base + N×count form is deferred (#90).
 - **Buildable today?** No — the History reads are new; the mechanism is the existing `plays_this_combat` / `hp_lost_this_turn` path.
 - **Priority:** High — ~25 base cards with #64.
-- **Status:** **planned (Wave 6, Phase BJ, vocab v62)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BJ.
+- **Status:** **done (2026-10-04, vocab v62, Phase BJ)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BJ.
 
 ### 64. Conditions: exhausted this turn, played N+ last turn, enemy intends to attack
 - **Surfaced by:** base-game audit (2026-10-01), "Turn-history conditions" and "Read enemy intent" rows: `EvilEye`, `PaleBlueDotPower`, `GoForTheEyes`.
@@ -679,7 +679,7 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Mechanic sketch:** three `when` kinds: `exhausted_this_turn` ("you have Exhausted a card this turn"), `played_cards_last_turn_ge {value}` ("you played {N}+ cards last turn"), `target_intends_attack` ("the enemy intends to attack"; a target kind, so single-enemy only and never in triggers). Read from `CombatManager.Instance.History` and `MonsterModel.IntendsToAttack`.
 - **Buildable today?** No.
 - **Priority:** Medium — small, ships with #63.
-- **Status:** **planned (Wave 6, Phase BJ, vocab v62)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BJ.
+- **Status:** **done (2026-10-04, vocab v62, Phase BJ)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BJ.
 
 ### 65. `hits_scale` — scaled hit counts and X-cost hits
 - **Surfaced by:** base-game audit (2026-10-01), Partial rows "X-cost" and "Scaled hit counts": `Whirlwind`, `Skewer`, `Finisher`, `Flechettes`, `HelixDrill`, `TearAsunder`, `FiendFire`, `Barrage` (24 cards).

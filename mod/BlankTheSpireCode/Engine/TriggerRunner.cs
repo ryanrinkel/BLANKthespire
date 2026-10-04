@@ -264,6 +264,19 @@ public static class TriggerRunner
                 MainFile.Logger.Info($"[AL] payload scale forged -> {e.Amount} + Forge {EffectRunner.ForgeStacks(player)} = {n} ({e.Op}).");
                 return n;
             }
+            // Phase BJ (v62, gap #63): the two payload-legal history reads (the card-level ScaleValue helpers).
+            case "exhaust_pile_size":
+            {
+                int n = EffectRunner.ExhaustPileSize(player);
+                MainFile.Logger.Info($"[BJ] scale exhaust_pile_size -> {n} (payload {e.Op}) ('trigger').");
+                return n;
+            }
+            case "total_enemy_poison":
+            {
+                int n = EffectRunner.TotalEnemyPoison(player);
+                MainFile.Logger.Info($"[BJ] scale total_enemy_poison -> {n} (payload {e.Op}) ('trigger').");
+                return n;
+            }
             default: return e.Amount;
         }
     }

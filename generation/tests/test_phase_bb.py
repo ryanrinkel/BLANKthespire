@@ -164,7 +164,8 @@ def _t_turn_at_most() -> None:
     check(m is not None and '"turn_at_most"' in m.group(1), "Conditions.Kinds carries turn_at_most")
     check('case "turn_at_most":' in cond and "RoundNumber <= c.Value" in cond, "Eval: RoundNumber <= value")
     check('"turn_at_most"       => $"it is turn {c.Value} or earlier"' in cond, "Phrase: 'it is turn N or earlier'")
-    check('c.Kind == "turn_at_most") && c.Value < 1' in cond, "Validate: needs value >= 1")
+    check('|| c.Kind == "turn_at_most" // Phase BB (v56)' in cond and "&& c.Value < 1)" in cond,
+          "Validate: needs value >= 1")  # Phase BJ (v62) appended played_cards_last_turn_ge to the same list
     schema = json.loads(CARD_SCHEMA.read_text(encoding="utf-8"))
     kinds = set(schema["$defs"]["condition"]["properties"]["kind"]["enum"])
     check("turn_at_most" in kinds, "schema condition enum carries turn_at_most")

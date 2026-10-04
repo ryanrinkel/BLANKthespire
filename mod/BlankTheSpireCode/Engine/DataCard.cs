@@ -66,6 +66,10 @@ public abstract class DataCard : ConstructedCardModel
             // attack's current target, so an AoE flechette computes each enemy's own debuff count (preview + resolve).
             : e.Scale == "target_debuff_count"
                 ? (_, tgt) => EffectRunner.DebuffCount(tgt)
+                // Phase BJ (v62, gap #63): target_status_stacks reads ONE status's stacks on the chosen target (Bully /
+                // Time's Up) — the same per-target calc-var arg as target_debuff_count (single-enemy cards only).
+                : e.Scale == "target_status_stacks"
+                    ? (_, tgt) => EffectRunner.StatusStacks(tgt, e.Status)
                 // Phase AE (gap #25): tag_cards_owned is ADDITIVE like forged (printed amount + the count of cards
                 // carrying e.Tag across your piles), so the payoff is never dead and the in-hand preview tracks live.
                 : e.Scale == "tag_cards_owned"
@@ -169,9 +173,13 @@ public abstract class DataCard : ConstructedCardModel
                     else WithBlock(e.Amount, up);
                     break;
                 case "draw":
-                    if (!e.IsScaled) WithCards(e.Amount, up); // a scaled draw resolves the scalar at play time (no fixed var)
+                    // a scaled draw resolves the scalar at play time (no fixed var). Phase BJ (v62): `to_hand_size` keeps
+                    // the Cards var — its amount IS the target hand size, printed as {Cards} (Expertise).
+                    if (!e.IsScaled || e.Scale == "to_hand_size") WithCards(e.Amount, up);
                     break;
-                case "gain_energy": WithEnergy(e.Amount, up); break;   // var "Energy" + energy tooltip
+                case "gain_energy": // var "Energy" + energy tooltip; Phase BJ (v62): `scale:"energy"` (Double Energy) has no fixed var
+                    if (!e.IsScaled) WithEnergy(e.Amount, up);
+                    break;
                 // Phase P (gap #21): a scaled heal (damage_dealt_unblocked lifesteal) has no fixed var — it
                 // resolves at execution from the unblocked damage dealt, like the scaled-draw path above.
                 case "heal":        if (!e.IsScaled) WithHeal(e.Amount, up); break;     // var "Heal"

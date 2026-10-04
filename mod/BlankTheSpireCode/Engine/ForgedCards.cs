@@ -42,7 +42,24 @@ public static class ForgedCards
     /// v10 (forged statuses, Phase J): + CharacterSpec.StatusPool (a class's ≤4 custom modifier-family statuses
     /// read from `status_pool`; see ForgedCharacters / ForgedStatusPower). Class cards may apply a custom status
     /// by pool name via the `apply_status_custom` op (class-only, like custom-orb channels).</summary>
-    public const int VocabVersion = 61; // 61: Phase BI (VOCAB_EXPANSION_6, gap #62) — CARD TRIGGER FILTERS, the relic v48
+    public const int VocabVersion = 62; // 62: Phase BJ (VOCAB_EXPANSION_6, gaps #63/#64) — COMBAT-HISTORY SCALES +
+                                        //     CONDITIONS, verbatim base-game reads. Scales (replace-semantics, one
+                                        //     EffectRunner.ScaleValue case each; DataCard.BonusFor picks them up):
+                                        //     `exhaust_pile_size` (AshenStrike; damage/block/draw), `discard_pile_size`
+                                        //     (Stack), `discards_this_turn` (MementoMori, effect discards only),
+                                        //     `cards_drawn_this_turn` (DeathMarch, !FromHandDraw), `energy_spent_this_turn`
+                                        //     (HelixDrill, minus this card's cost while in the Play pile),
+                                        //     `cards_generated_this_combat` (Supermassive) — damage/block; and
+                                        //     `cards_drawn_this_combat` (Murder), `hp_loss_events_this_combat`
+                                        //     (TearAsunder), `total_enemy_poison` (Mirage) — damage only;
+                                        //     `target_status_stacks` + `status` vulnerable/weak/poison (Bully; the per-
+                                        //     target calc-var arg, single-enemy cards only; damage/block);
+                                        //     `energy` on gain_energy (Double Energy — "Double your energy."; any cost);
+                                        //     `to_hand_size` on draw (Expertise — amount = the target hand size, {Cards}).
+                                        //     Payload-legal: exhaust_pile_size, total_enemy_poison. Conditions:
+                                        //     `exhausted_this_turn` (EvilEye), `played_cards_last_turn_ge` (PaleBlueDot,
+                                        //     1..10), `target_intends_attack` (GoForTheEyes; a TargetKinds read).
+                                        // 61: Phase BI (VOCAB_EXPANSION_6, gap #62) — CARD TRIGGER FILTERS, the relic v48
                                         //     hook filters ported to card add_trigger: `card_type` (attack/skill/power/
                                         //     non_attack on on_card_played + on_card_drawn; `status` on on_card_drawn only —
                                         //     Rage / Iteration), `every_n` 2..9 on the power-hosted multi-fire kinds (counted
@@ -625,16 +642,32 @@ public static class ForgedCards
          // Phase AM (v43): five more live player reads (replace-semantics). `energy` is damage/block/draw but cost-0
          // ONLY (checked at the card level where the cost is known); the other four are damage/block-only (a draw
          // equal to your Block / draw pile is absurd; see DamageBlockOnlyScales).
-         "block", "hp_lost_this_turn", "draw_pile_count", "energy", "plays_this_combat"];
-    // Phase AM (v43): the AM scales that may NOT drive a draw.
+         "block", "hp_lost_this_turn", "draw_pile_count", "energy", "plays_this_combat",
+         // Phase BJ (v62, gap #63): the combat-history / pile reads (op rules in DamageBlockOnlyScales / DamageOnlyScales;
+         // exhaust_pile_size is damage/block/draw) + target_status_stacks (with `status`) + to_hand_size (draw only).
+         "exhaust_pile_size", "discard_pile_size", "discards_this_turn", "cards_drawn_this_turn", "cards_drawn_this_combat",
+         "energy_spent_this_turn", "hp_loss_events_this_combat", "cards_generated_this_combat", "total_enemy_poison",
+         "target_status_stacks", "to_hand_size"];
+    // Phase AM (v43): the AM scales that may NOT drive a draw. Phase BJ (v62): + five history/pile reads.
     private static readonly HashSet<string> DamageBlockOnlyScales =
-        ["block", "hp_lost_this_turn", "draw_pile_count", "plays_this_combat"];
+        ["block", "hp_lost_this_turn", "draw_pile_count", "plays_this_combat",
+         "discard_pile_size", "discards_this_turn", "cards_drawn_this_turn", "energy_spent_this_turn",
+         "cards_generated_this_combat"];
+    // Phase BJ (v62, gap #63): the reads that only make sense as an attack — the two unbounded combat counts (a late-game
+    // payoff, priced so) and the board-wide Poison sum (Mirage's damage twin).
+    internal static readonly HashSet<string> DamageOnlyScales =
+        ["cards_drawn_this_combat", "hp_loss_events_this_combat", "total_enemy_poison"];
+    // Phase BJ (v62): the statuses target_status_stacks may read (Bully = Vulnerable; Weak; Poison).
+    internal static readonly HashSet<string> StatusStackStatuses = ["vulnerable", "weak", "poison"];
+    // Phase BJ (v62): to_hand_size's amount is the target hand size (the hand holds at most 10).
+    private const int MinHandSizeTarget = 2, MaxHandSizeTarget = 10;
     // The scalars a trigger payload may use — PLAYER-level reads only (a trigger fires with no card, so `x` and the
     // target/lifesteal/tag reads make no sense). cards_retained (F5) is the per-turn snapshot; Phase AL (v42) adds
     // cards_in_hand (the hand when it fires), unspent_energy_last_turn (the turn-end snapshot) and the ADDITIVE
     // forged (printed amount + Forge — damage/block only, amount >= 1, like the card-level rule).
     private static readonly HashSet<string> TriggerScales =
-        ["cards_retained", "cards_in_hand", "unspent_energy_last_turn", "forged"];
+        ["cards_retained", "cards_in_hand", "unspent_energy_last_turn", "forged",
+         "exhaust_pile_size", "total_enemy_poison"]; // Phase BJ (v62): pure player reads, payload-legal
     // The payload ops whose amount a scale may replace/add to (each has a scaled TriggerFragment wording). damage
     // needs a target (H4) — Phase AL lifts the "a targeted effect can't be scaled" rule for damage ONLY.
     private static readonly HashSet<string> TriggerScalableOps =
@@ -854,7 +887,8 @@ public static class ForgedCards
         // (PlayCardAction.SpendResources), so on a paid card the in-hand preview (pre-pay) and the resolved amount
         // (post-pay) would disagree by the cost — only a cost-0 card keeps them equal. X-cost is excluded too
         // (X spends everything → always 0).
-        if (effects.Concat(upgrade ?? []).Any(e => e.Scale == "energy") && (costsX || cost != 0))
+        // Phase BJ (v62): only the damage/block/draw form — a Double Energy gain_energy reads post-pay energy on any cost.
+        if (effects.Concat(upgrade ?? []).Any(e => e.Scale == "energy" && e.Op is "damage" or "block" or "draw") && (costsX || cost != 0))
         { error = "'scale:energy' requires a cost-0 card (the cost is paid before the card resolves, so a paid card would preview one number and deal another)."; return false; }
         // Phase BD (v58, gap #58): a held_discount needs a cost to lower — never on a 0-cost or X-cost card.
         if (effects.Concat(upgrade ?? []).Any(e => e.Op == "held_discount") && (costsX || cost < 1))
@@ -1151,6 +1185,32 @@ public static class ForgedCards
                     if (e.Op is not ("damage" or "block"))
                         return $"'scale:{e.Scale}' only applies to damage/block (op '{e.Op}').";
                 }
+                else if (DamageOnlyScales.Contains(e.Scale!)) // Phase BJ (v62)
+                {
+                    if (e.Op != "damage")
+                        return $"'scale:{e.Scale}' only applies to damage (op '{e.Op}').";
+                }
+                else if (e.Scale == "target_status_stacks") // Phase BJ (v62): Bully — damage/block equal to one status's stacks
+                {
+                    if (e.Op is not ("damage" or "block"))
+                        return $"'scale:target_status_stacks' only applies to damage/block (op '{e.Op}').";
+                    if (e.Status == null || !StatusStackStatuses.Contains(e.Status))
+                        return $"a 'scale:target_status_stacks' effect needs a 'status' (one of {string.Join("/", StatusStackStatuses)}).";
+                    if (target != null && target != TargetType.AnyEnemy)
+                        return "'scale:target_status_stacks' needs a single-enemy card (target \"enemy\") — it reads the chosen target.";
+                }
+                else if (e.Scale == "to_hand_size") // Phase BJ (v62): Expertise — amount IS the target hand size
+                {
+                    if (e.Op != "draw")
+                        return $"'scale:to_hand_size' only applies to draw (op '{e.Op}').";
+                    if (e.Amount < MinHandSizeTarget || e.Amount > MaxHandSizeTarget)
+                        return $"a 'scale:to_hand_size' draw's amount is the target hand size ({MinHandSizeTarget}..{MaxHandSizeTarget}); got {e.Amount}.";
+                }
+                else if (e.Scale == "energy") // Phase BJ (v62): + gain_energy (Double Energy)
+                {
+                    if (e.Op is not ("damage" or "block" or "draw" or "gain_energy"))
+                        return $"'scale:energy' only applies to damage/block/draw/gain_energy (op '{e.Op}').";
+                }
                 else if (e.Op is not ("damage" or "block" or "draw"))
                     return $"'scale' only applies to damage/block/draw (op '{e.Op}').";
                 // Phase M: the additive "forged" scalar adds Forge to a PRINTED damage/block base; a draw has
@@ -1164,6 +1224,9 @@ public static class ForgedCards
                 if (e.Hits > 1)
                     return "a scaled effect can't also be multi-hit (hits + scale on one effect).";
             }
+            // Phase BJ (v62): on damage/block, `status` belongs to a target_status_stacks read alone.
+            if (e.Status != null && e.Op is "damage" or "block" && e.Scale != "target_status_stacks")
+                return $"'status' on {e.Op} only applies with 'scale:target_status_stacks' (op '{e.Op}').";
             // Phase AE (gap #25): a `tag` only means something on a tag_cards_owned effect.
             if (e.Tag != null && e.Scale != "tag_cards_owned")
                 return $"'tag' only applies to a 'scale:tag_cards_owned' effect (op '{e.Op}').";
@@ -1785,6 +1848,11 @@ public static class ForgedCards
                     return "'scale:forged' inside a trigger only applies to damage/block (Forge ADDS to a printed damage/block amount).";
                 if (t.Scale == "forged" && t.Amount < 1)
                     return "a 'scale:forged' trigger effect needs amount >= 1 (Forge ADDS to the printed amount).";
+                // Phase BJ (v62): the two payload-legal history reads keep their card-level op rules.
+                if (t.Scale == "total_enemy_poison" && t.Op != "damage")
+                    return "'scale:total_enemy_poison' inside a trigger only applies to damage.";
+                if (t.Scale == "exhaust_pile_size" && t.Op is not ("damage" or "block" or "draw"))
+                    return "'scale:exhaust_pile_size' inside a trigger only applies to damage/block/draw.";
                 if (t.Hits > 1)
                     return "a scaled trigger effect can't also be multi-hit (hits + scale on one effect).";
                 // AutoSlay finding (GAPTESTAL1): AfterSideTurnEnd fires AFTER the end-of-turn discard, so a turn_end
@@ -1929,8 +1997,8 @@ public static class ForgedCards
     {
         "damage"       => "Damage",
         "block"        => "Block",
-        "draw"         => e.IsScaled ? null : "Cards", // a scaled draw declares no var (resolved at play time)
-        "gain_energy"  => "Energy",
+        "draw"         => e.IsScaled && e.Scale != "to_hand_size" ? null : "Cards", // a scaled draw declares no var (Phase BJ: to_hand_size keeps Cards)
+        "gain_energy"  => e.IsScaled ? null : "Energy", // Phase BJ (v62): Double Energy declares no var
         "heal"         => "Heal",
         "lose_hp"      => "Loss",
         "gain_max_hp"  => "MaxHp", // Phase AN (v44): the Max HP gain (a real MaxHpVar, upgrade-aware in card text)
@@ -1977,8 +2045,23 @@ public static class ForgedCards
         "draw_pile_count"          => "the cards in your draw pile",                   // Phase AM (v43)
         "energy"                   => "your energy",                                   // Phase AM (v43)
         "plays_this_combat"        => "the cards you have played this combat",         // Phase AM (v43)
+        // Phase BJ (v62, gap #63): the combat-history / pile reads. Lockstep with cardgen._scale_phrase.
+        "exhaust_pile_size"           => "the cards in your exhaust pile",
+        "discard_pile_size"           => "the cards in your discard pile",
+        "discards_this_turn"          => "the cards you have discarded this turn",
+        "cards_drawn_this_turn"       => "the cards you have drawn this turn",
+        "cards_drawn_this_combat"     => "the cards you have drawn this combat",
+        "energy_spent_this_turn"      => "the energy you have spent this turn",
+        "hp_loss_events_this_combat"  => "the times you have lost HP this combat",
+        "cards_generated_this_combat" => "the cards you have created this combat",
+        "total_enemy_poison"          => "the total Poison on ALL enemies",
         _ => "X",
     };
+
+    /// <summary>Phase BJ (v62): the effect-aware phrase — target_status_stacks names its status ("the enemy's
+    /// Vulnerable"); everything else is <see cref="ScalePhrase(string?)"/>. Lockstep with cardgen._effect_scale_phrase.</summary>
+    private static string ScalePhrase(EffectSpec e) =>
+        e.Scale == "target_status_stacks" ? $"the enemy's {StatusDisplay(e.Status)}" : ScalePhrase(e.Scale);
 
     // Synthesize card text from effects + target (must match cardgen.py describe()). STS2 AoE cards spell out
     // "to ALL enemies" in their text — the game does NOT auto-append it — so the target must inform the wording.
@@ -2008,7 +2091,7 @@ public static class ForgedCards
                                 ? $"Deal {e.Amount} damage{dmgSuffix}, plus your Forge{ub}."
                                 : e.Scale == "tag_cards_owned"
                                     ? $"Deal {e.Amount} damage{dmgSuffix}, plus 1 per '{e.Tag}' card you own{ub}."
-                                    : $"Deal damage equal to {ScalePhrase(e.Scale)}{dmgSuffix}{ub}.");
+                                    : $"Deal damage equal to {ScalePhrase(e)}{dmgSuffix}{ub}.");
                     else if (e.HasGrow) // Phase U (gap #23): {CalculatedDamage} (the base-game calc-var name; a bare {Damage} is unresolvable here) shows the CURRENT grown value (calc-var)
                         parts.Add($"Deal {{CalculatedDamage}} damage{dmgSuffix}{ub}. Grows by {e.Grow} each time it is played this combat.");
                     else if (e.HasGrowHeld) // Phase BD (v58, gap #57): Windmill Strike — the calc-var climbs per held turn
@@ -2023,11 +2106,12 @@ public static class ForgedCards
                                         : e.Scale == "x" ? "Gain X Block."
                                         : e.Scale == "forged" ? $"Gain {e.Amount} Block, plus your Forge."
                                         : e.Scale == "tag_cards_owned" ? $"Gain {e.Amount} Block, plus 1 per '{e.Tag}' card you own."
-                                        : $"Gain Block equal to {ScalePhrase(e.Scale)}."); break;
+                                        : $"Gain Block equal to {ScalePhrase(e)}."); break;
                 case "draw":        parts.Add(!e.IsScaled ? "Draw {Cards} card(s)."
                                         : e.Scale == "x" ? "Draw X cards."
+                                        : e.Scale == "to_hand_size" ? "Draw cards until you have {Cards} in hand." // Phase BJ (v62): Expertise
                                         : $"Draw cards equal to {ScalePhrase(e.Scale)}."); break;
-                case "gain_energy": parts.Add("Gain {Energy} energy."); break;
+                case "gain_energy": parts.Add(e.Scale == "energy" ? "Double your energy." : "Gain {Energy} energy."); break; // Phase BJ (v62)
                 case "heal":        parts.Add(e.IsScaled ? $"Heal HP equal to {ScalePhrase(e.Scale)}." : "Heal {Heal} HP."); break;
                 case "lose_hp":     parts.Add("Lose {Loss} HP."); break;
                 case "gain_max_hp": parts.Add("Gain {MaxHp} Max HP."); break; // Phase AN (v44): the Feed payoff (MaxHpVar)
@@ -2208,6 +2292,8 @@ public static class ForgedCards
         "cards_retained"           => "cards retained",
         "cards_in_hand"            => "the cards in your hand",
         "unspent_energy_last_turn" => "your unspent energy last turn",
+        "exhaust_pile_size"        => "the cards in your exhaust pile",   // Phase BJ (v62)
+        "total_enemy_poison"       => "the total Poison on ALL enemies",  // Phase BJ (v62)
         _                          => "X",
     };
 

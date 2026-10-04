@@ -66,10 +66,12 @@ _PREFERRED_OPS = ["add_trigger", "transform_card", "graft_card", "spread_debuffs
                   "held_discount",  # Phase BD (v58): the Sands of Time retain payoff
                   "lose_hp"]
 _PREFERRED_SCALES = ["cards_in_hand", "cards_retained", "unspent_energy_last_turn", "forged",
-                     "damage_dealt_unblocked", "target_debuff_count", "tag_cards_owned"]
+                     "damage_dealt_unblocked", "target_debuff_count", "tag_cards_owned",
+                     "exhaust_pile_size"]  # Phase BJ (v62): the commonest base-game history read (Ashen Strike)
 _PREFERRED_CONDITIONS = ["hp_below_half", "no_block", "has_block", "turn_at_least", "turn_at_most", "enemy_count_ge",
                          "hand_size_ge", "retained_last_turn", "target_has_status", "draw_pile_empty",
-                         "hp_lost_ge", "forged_ge"]
+                         "hp_lost_ge", "forged_ge",
+                         "exhausted_this_turn"]  # Phase BJ (v62): Evil Eye
 _PREFERRED_TRIGGERS = ["on_exhaust", "on_card_played", "on_hp_lost", "on_block_gained", "on_card_drawn",
                        "on_damage_dealt", "attacked", "on_discard", "ripen",
                        "on_poison_damage"]  # Phase BE (v59)

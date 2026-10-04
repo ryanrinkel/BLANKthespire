@@ -201,7 +201,9 @@ def _t_census_and_contract() -> None:
     schema = json.loads(paths.CARD_SCHEMA.read_text(encoding="utf-8"))
     te = schema["$defs"]["triggerEffect"]["properties"]
     check({"apply_status_custom", "summon_attack", "buff_summon"} <= set(te["op"]["enum"]), "schema payload op enum has the class engines")
-    check(set(te["scale"]["enum"]) == {"cards_retained", "cards_in_hand", "unspent_energy_last_turn", "forged"}, "schema payload scale enum")
+    check(set(te["scale"]["enum"]) == {"cards_retained", "cards_in_hand", "unspent_energy_last_turn", "forged",
+                                       "exhaust_pile_size", "total_enemy_poison"},  # + Phase BJ (v62)
+          "schema payload scale enum")
     check("hits" in te and "status_name" in te, "schema payload declares hits + status_name")
     vocab = paths.VOCABULARY.read_text(encoding="utf-8")
     check("deal 4 damage 2 times with your summon" in vocab and "gain 1 Razor Focus" in vocab

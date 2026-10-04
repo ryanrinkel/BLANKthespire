@@ -217,9 +217,10 @@ FAMILY_KW = {
                 r"when discarded|if discarded|fuel",
     "conditions": r"\bif\b|\bunless\b|\bwhile\b|only when|when (you|your|the target|the enemy|an enemy) (have|has|"
                   r"hold|are|is)|below half|at least \d+|no block|has block|retained|held|debuffed|"
-                  r"vulnerable target|target (is|has)",
+                  r"vulnerable target|target (is|has)|intends? to attack",  # Phase BJ (v62): the intent gate
     "scaling": r"\d+ times|twice|thrice|x times|multi[- ]?hit|\bhits?\b|per (card|enemy|orb|stack|turn|"
-               r"forge|point)|for each|for every|equal to|scal|grows|plus your|based on|x-cost|\bx\b",
+               r"forge|point)|for each|for every|equal to|scal|grows|plus your|based on|x-cost|\bx\b|"
+               r"double your energy|until you have",  # Phase BJ (v62): Double Energy / Expertise read as scaled
     "orbs": r"\borbs?\b|channel|evoke|lightning|frost|\bdark\b|orb slot|focus",
     "summons": r"summon|minion|companion|familiar|ally|creature|beast|spirit|golem|wolf|pet",
     "custom_status": r"stacks? of|counter|custom|class status|\b(apply|gain|give|add)s? \d+ (?!strength|dexterity|"

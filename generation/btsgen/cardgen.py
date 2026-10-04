@@ -279,6 +279,9 @@ def effect_literal(e: dict) -> str:
             # F5: a scaled effect's amount is a live scalar (x/cards_in_hand/cards_retained/
             # unspent_energy_last_turn); positional (Op, Amount, Status, Hits, Scale). Amount is ignored at runtime.
             lit = f'new EffectSpec("{op}", {amount}, null, {hits}, "{scale}")'
+            if e.get("status"):  # Phase BJ (v62): target_status_stacks carries its status positionally (Status slot).
+                st = str(e["status"]).replace("\\", "\\\\").replace('"', '\\"')
+                lit = f'new EffectSpec("{op}", {amount}, "{st}", {hits}, "{scale}")'
             if scale == "tag_cards_owned":  # Phase AE (gap #25): the counted tag as a named arg (order-independent in C#).
                 tag = str(e.get("tag", "")).replace("\\", "\\\\").replace('"', '\\"')
                 lit = f'{lit[:-1]}, Tag: "{tag}")'
@@ -328,7 +331,26 @@ def _scale_phrase(scale: str) -> str:
         "draw_pile_count": "the cards in your draw pile",
         "energy": "your energy",
         "plays_this_combat": "the cards you have played this combat",
+        # Phase BJ (v62, gap #63): the combat-history / pile reads. Mirrors ForgedCards.ScalePhrase.
+        "exhaust_pile_size": "the cards in your exhaust pile",
+        "discard_pile_size": "the cards in your discard pile",
+        "discards_this_turn": "the cards you have discarded this turn",
+        "cards_drawn_this_turn": "the cards you have drawn this turn",
+        "cards_drawn_this_combat": "the cards you have drawn this combat",
+        "energy_spent_this_turn": "the energy you have spent this turn",
+        "hp_loss_events_this_combat": "the times you have lost HP this combat",
+        "cards_generated_this_combat": "the cards you have created this combat",
+        "total_enemy_poison": "the total Poison on ALL enemies",
     }.get(scale, "X")
+
+
+def _effect_scale_phrase(e: dict) -> str:
+    # Phase BJ (v62): target_status_stacks names its status ("the enemy's Vulnerable"). Mirrors ForgedCards.ScalePhrase(EffectSpec).
+    scale = str(e.get("scale", "")).lower()
+    if scale == "target_status_stacks":
+        st = str(e.get("status", ""))
+        return f"the enemy's {STATUS_NAME.get(st, st)}"
+    return _scale_phrase(scale)
 
 
 def cond_phrase(w: dict) -> str:
@@ -378,6 +400,13 @@ def cond_phrase(w: dict) -> str:
         return f"you have {int(w.get('value', 0) or 0)}+ energy"
     if kind == "cards_played_this_turn_ge":
         return f"you have played {int(w.get('value', 0) or 0)}+ cards this turn"
+    # Phase BJ (v62, gap #64): two combat-history reads + one chosen-target read. Mirrors Conditions.Phrase.
+    if kind == "exhausted_this_turn":
+        return "you have Exhausted a card this turn"
+    if kind == "played_cards_last_turn_ge":
+        return f"you played {int(w.get('value', 0) or 0)}+ cards last turn"
+    if kind == "target_intends_attack":
+        return "the enemy intends to attack"
     return kind
 
 
@@ -388,6 +417,8 @@ def _trigger_scale_phrase(scale: str) -> str:
         "cards_retained": "cards retained",
         "cards_in_hand": "the cards in your hand",
         "unspent_energy_last_turn": "your unspent energy last turn",
+        "exhaust_pile_size": "the cards in your exhaust pile",  # Phase BJ (v62)
+        "total_enemy_poison": "the total Poison on ALL enemies",  # Phase BJ (v62)
     }.get(scale, "X")
 
 
@@ -575,7 +606,7 @@ def describe(effects: list[dict], target: str) -> str:
                 parts.append(f"Deal X damage{dmg_suffix}{ub}." if scale == "x"
                              else f"Deal {e.get('amount', 0)} damage{dmg_suffix}, plus your Forge{ub}." if scale == "forged"
                              else f"Deal {e.get('amount', 0)} damage{dmg_suffix}, plus 1 per '{e.get('tag', '')}' card you own{ub}." if scale == "tag_cards_owned"
-                             else f"Deal damage equal to {_scale_phrase(scale)}{dmg_suffix}{ub}.")
+                             else f"Deal damage equal to {_effect_scale_phrase(e)}{dmg_suffix}{ub}.")
             elif e.get("grow", 0):
                 # Phase U (gap #23, Rampage): {CalculatedDamage} (base-game calc-var name) shows the CURRENT grown value (calc-var). Byte-match ForgedCards.Describe.
                 parts.append(f"Deal {{CalculatedDamage}} damage{dmg_suffix}{ub}. Grows by {e['grow']} each time it is played this combat.")
@@ -593,14 +624,16 @@ def describe(effects: list[dict], target: str) -> str:
                          else "Gain X Block." if scale == "x"
                          else f"Gain {e.get('amount', 0)} Block, plus your Forge." if scale == "forged"
                          else f"Gain {e.get('amount', 0)} Block, plus 1 per '{e.get('tag', '')}' card you own." if scale == "tag_cards_owned"
-                         else f"Gain Block equal to {_scale_phrase(scale)}.")
+                         else f"Gain Block equal to {_effect_scale_phrase(e)}.")
         elif op == "draw":
             scale = str(e.get("scale", "")).lower()
             parts.append("Draw {Cards} card(s)." if not scale
                          else "Draw X cards." if scale == "x"
+                         else "Draw cards until you have {Cards} in hand." if scale == "to_hand_size"  # Phase BJ (v62): Expertise
                          else f"Draw cards equal to {_scale_phrase(scale)}.")
         elif op == "gain_energy":
-            parts.append("Gain {Energy} energy.")
+            # Phase BJ (v62): Double Energy. Byte-match ForgedCards.Describe.
+            parts.append("Double your energy." if str(e.get("scale", "")).lower() == "energy" else "Gain {Energy} energy.")
         elif op == "heal":
             # Phase P (gap #21): a scaled heal (damage_dealt_unblocked lifesteal) reads a live amount. Lockstep
             # with ForgedCards.Describe's heal case.

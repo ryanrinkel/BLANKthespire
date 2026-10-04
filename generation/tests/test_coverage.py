@@ -260,7 +260,8 @@ def test_w2_menu_keys_wired() -> None:
     from btsgen import census
     when_keys = {k for k, _ in coverage.WHEN_MENU_V2}
     for need in ("retained_last_turn", "draw_pile_empty", "hp_lost_ge", "target_has_status",
-                 "target_hp_below_half", "target_has_block", "energy_ge", "cards_played_this_turn_ge"):  # + Phase AM (v43)
+                 "target_hp_below_half", "target_has_block", "energy_ge", "cards_played_this_turn_ge",  # + Phase AM (v43)
+                 "exhausted_this_turn", "played_cards_last_turn_ge", "target_intends_attack"):  # + Phase BJ (v62)
         check(need in when_keys, f"WHEN_MENU_V2 carries {need}")
     check({k for k, _d, _k in coverage.WHEN_MENU_KIND} == {"forged_ge", "dark_ge", "light_ge", "centered",
                                                            "orbs_match", "orb_count_ge"}, "the gated when keys")
@@ -268,7 +269,13 @@ def test_w2_menu_keys_wired() -> None:
                                                   "target_debuff_count", "damage_dealt_unblocked",
                                                   # Phase AM (v43)
                                                   "block", "hp_lost_this_turn", "draw_pile_count", "energy",
-                                                  "plays_this_combat"}, "the scale menu")
+                                                  "plays_this_combat",
+                                                  # Phase BJ (v62)
+                                                  "exhaust_pile_size", "discard_pile_size", "discards_this_turn",
+                                                  "cards_drawn_this_turn", "cards_drawn_this_combat",
+                                                  "energy_spent_this_turn", "hp_loss_events_this_combat",
+                                                  "cards_generated_this_combat", "total_enemy_poison",
+                                                  "target_status_stacks", "to_hand_size"}, "the scale menu")
     check({k for k, _d, _k in coverage.SCALE_MENU_KIND} == {"tag_cards_owned", "forged"}, "the gated scale keys")
     check({k for k, _ in coverage.EXOTIC_NOMINATE_ONLY} == {"ritual", "barricade", "intangible"}, "nominate-only exotics")
     check({k for k, _ in coverage.KEYWORD_MENU} == {"retain", "innate", "ethereal", "hits"}, "the keyword menu")
@@ -319,6 +326,21 @@ def test_w2_menu_keys_wired() -> None:
         "draw_pile_count": {"op": "block", "amount": 1, "scale": "draw_pile_count"},
         "energy": {"op": "damage", "amount": 1, "scale": "energy"},
         "plays_this_combat": {"op": "damage", "amount": 1, "scale": "plays_this_combat"},
+        # Phase BJ (v62): three `when` kinds + eleven scales
+        "exhausted_this_turn": {"op": "block", "amount": 8, "when": {"kind": "exhausted_this_turn"}},
+        "played_cards_last_turn_ge": {"op": "draw", "amount": 1, "when": {"kind": "played_cards_last_turn_ge", "value": 3}},
+        "target_intends_attack": {"op": "apply_status", "status": "weak", "amount": 1, "when": {"kind": "target_intends_attack"}},
+        "exhaust_pile_size": {"op": "damage", "amount": 1, "scale": "exhaust_pile_size"},
+        "discard_pile_size": {"op": "block", "amount": 1, "scale": "discard_pile_size"},
+        "discards_this_turn": {"op": "damage", "amount": 1, "scale": "discards_this_turn"},
+        "cards_drawn_this_turn": {"op": "damage", "amount": 1, "scale": "cards_drawn_this_turn"},
+        "cards_drawn_this_combat": {"op": "damage", "amount": 1, "scale": "cards_drawn_this_combat"},
+        "energy_spent_this_turn": {"op": "block", "amount": 1, "scale": "energy_spent_this_turn"},
+        "hp_loss_events_this_combat": {"op": "damage", "amount": 1, "scale": "hp_loss_events_this_combat"},
+        "cards_generated_this_combat": {"op": "damage", "amount": 1, "scale": "cards_generated_this_combat"},
+        "total_enemy_poison": {"op": "damage", "amount": 1, "scale": "total_enemy_poison"},
+        "target_status_stacks": {"op": "damage", "amount": 1, "scale": "target_status_stacks", "status": "vulnerable"},
+        "to_hand_size": {"op": "draw", "amount": 6, "scale": "to_hand_size"},
     }
     check(set(samples) == set(_w2_keys()), "a sample exists for every W2.2 key")
     for key, eff in samples.items():

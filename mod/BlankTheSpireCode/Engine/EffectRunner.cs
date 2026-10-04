@@ -86,6 +86,10 @@ public static class EffectRunner
                 if (e.When.Kind == "turn_at_most")
                     MainFile.Logger.Info($"[BB] turn_at_most gate {(gateOpen ? "OPEN" : "closed")}{(e.When.Negate ? " (negated)" : "")} " +
                                          $"(round {card.Owner?.Creature?.CombatState?.RoundNumber}; need <= {e.When.Value}).");
+                // Phase BJ (v62, gap #64): both branches of the three combat-history / intent gates, with the live read.
+                if (PhaseBjConditions.Contains(e.When.Kind))
+                    MainFile.Logger.Info($"[BJ] cond {e.When.Kind} -> {(gateOpen ? "true" : "false")}{(e.When.Negate ? " (negated)" : "")} " +
+                                         $"({PhaseBjConditionRead(e.When, card, play)}) ('{spec.Title ?? spec.Id}').");
                 if (!gateOpen) continue;
             }
             // The card's vars (read by CommonActions) already carry the upgrade; for the scalar ops we
@@ -116,6 +120,8 @@ public static class EffectRunner
                         MainFile.Logger.Info($"[AE] tag_cards_owned('{e.Tag}') = {TagCardsOwned(card.Owner, e.Tag)} (damage base {amt}).");
                     if (PhaseAmScales.Contains(e.Scale ?? "")) // Phase AM (v43): prove the live read at resolution
                         MainFile.Logger.Info($"[AM] scale {e.Scale} -> {ScaleValue(e.Scale, card)} (damage, '{card.Id}').");
+                    if (PhaseBjScales.Contains(e.Scale ?? "")) // Phase BJ (v62, gap #63): prove the live history read at resolution
+                        MainFile.Logger.Info($"[BJ] scale {e.Scale} -> {BjScaleRead(e, card, play)} (damage) ('{spec.Title ?? spec.Id}').");
                     if (e.HasGrow) // Phase U (gap #23) smoke logging: prove per-play growth (plays so far = count)
                     {
                         int plays = PlaysThisCombat(card);
@@ -148,13 +154,24 @@ public static class EffectRunner
                         MainFile.Logger.Info($"[AE] tag_cards_owned('{e.Tag}') = {TagCardsOwned(card.Owner, e.Tag)} (block base {amt}).");
                     if (PhaseAmScales.Contains(e.Scale ?? "")) // Phase AM (v43)
                         MainFile.Logger.Info($"[AM] scale {e.Scale} -> {ScaleValue(e.Scale, card)} (block, '{card.Id}').");
+                    if (PhaseBjScales.Contains(e.Scale ?? "")) // Phase BJ (v62, gap #63)
+                        MainFile.Logger.Info($"[BJ] scale {e.Scale} -> {BjScaleRead(e, card, play)} (block) ('{spec.Title ?? spec.Id}').");
                     await CommonActions.CardBlock(card, play);
                     break;
                 case "draw":
                     // A scaled draw (F5: x / cards_in_hand / cards_retained / unspent_energy_last_turn) has no
                     // fixed Cards var; resolve the live scalar here and draw that many. CommonActions.Draw only
                     // reads a fixed Cards var, so the unscaled path keeps using the card's Cards var as before.
-                    if (e.IsScaled)
+                    if (e.Scale == "to_hand_size")
+                    {
+                        // Phase BJ (v62, gap #63): Expertise — draw until the hand holds `amount` (upgrade-aware) cards.
+                        // This card already sits in the Play pile at OnPlay, so the hand count excludes it (the base read).
+                        int h = card.Owner?.PlayerCombatState?.Hand?.Cards?.Count ?? 0;
+                        int n = Math.Max(0, amt - h);
+                        MainFile.Logger.Info($"[BJ] draw to_hand_size: hand {h} -> draw {n} (target {amt}) ('{spec.Title ?? spec.Id}').");
+                        if (n > 0) await CardPileCmd.Draw(ctx, n, card.Owner);
+                    }
+                    else if (e.IsScaled)
                     {
                         int n = ResolveScaleAmount(e, card);
                         if (PhaseAmScales.Contains(e.Scale ?? "")) // Phase AM (v43): only `energy` is draw-legal
@@ -185,7 +202,15 @@ public static class EffectRunner
                     else await ApplyStatus(e.Status, card, ctx, play);
                     break;
                 case "gain_energy":
-                    await PlayerCmd.GainEnergy(amt, card.Owner);
+                    if (e.Scale == "energy")
+                    {
+                        // Phase BJ (v62, gap #63): Double Energy — gain your CURRENT energy (read after this card's cost
+                        // was paid, the base DoubleEnergy recipe). No card var; the text is "Double your energy."
+                        int cur = card.Owner?.PlayerCombatState?.Energy ?? 0;
+                        MainFile.Logger.Info($"[BJ] gain_energy x energy: {cur} -> {cur * 2} ('{spec.Title ?? spec.Id}').");
+                        if (cur > 0) await PlayerCmd.GainEnergy(cur, card.Owner);
+                    }
+                    else await PlayerCmd.GainEnergy(amt, card.Owner);
                     break;
                 case "heal":
                     // Phase P (gap #21): a damage_dealt_unblocked heal lifesteals the unblocked damage this card
@@ -1053,7 +1078,142 @@ public static class EffectRunner
         // (post-pay — PlayCardAction.SpendResources runs before OnPlay) always agree.
         "energy"                   => card.Owner?.PlayerCombatState?.Energy ?? 0,
         "plays_this_combat"        => CardsPlayedThisCombat(card.Owner),                  // the OTHER cards you played
+        // Phase BJ (v62, gap #63): combat-history + pile reads, each a verbatim base-game recipe (replace-semantics).
+        "exhaust_pile_size"          => ExhaustPileSize(card.Owner),                       // AshenStrike
+        "discard_pile_size"          => card.Owner?.PlayerCombatState?.DiscardPile?.Cards?.Count ?? 0, // Stack
+        "discards_this_turn"         => DiscardsThisTurn(card.Owner),                      // MementoMori
+        "cards_drawn_this_turn"      => CardsDrawnThisTurn(card.Owner),                    // DeathMarch
+        "cards_drawn_this_combat"    => CardsDrawnThisCombat(card.Owner),                  // Murder
+        "energy_spent_this_turn"     => EnergySpentThisTurn(card),                         // HelixDrill
+        "hp_loss_events_this_combat" => HpLossEventsThisCombat(card.Owner),                // TearAsunder
+        "cards_generated_this_combat" => CardsGeneratedThisCombat(card.Owner),             // Supermassive
+        "total_enemy_poison"         => TotalEnemyPoison(card.Owner),                      // Mirage
         _ => 0,
+    };
+
+    /// <summary>Phase BJ (v62): the scales this phase added (the [BJ] play-time log). `to_hand_size` logs its own line.</summary>
+    internal static readonly HashSet<string> PhaseBjScales =
+        ["exhaust_pile_size", "discard_pile_size", "discards_this_turn", "cards_drawn_this_turn", "cards_drawn_this_combat",
+         "energy_spent_this_turn", "hp_loss_events_this_combat", "cards_generated_this_combat", "total_enemy_poison",
+         "target_status_stacks"];
+
+    /// <summary>Phase BJ (v62): the condition kinds this phase added (the [BJ] gate log).</summary>
+    internal static readonly HashSet<string> PhaseBjConditions =
+        ["exhausted_this_turn", "played_cards_last_turn_ge", "target_intends_attack"];
+
+    /// <summary>Phase BJ (v62): the live value a [BJ]-logged scale resolved to (target_status_stacks reads the target).</summary>
+    private static int BjScaleRead(EffectSpec e, CardModel card, CardPlay play) =>
+        e.Scale == "target_status_stacks" ? StatusStacks(play?.Target, e.Status) : ScaleValue(e.Scale, card);
+
+    private static IEnumerable<T> HistoryOf<T>() where T : MegaCrit.Sts2.Core.Combat.History.CombatHistoryEntry =>
+        CombatManager.Instance?.History?.Entries?.OfType<T>() ?? [];
+
+    /// <summary>Phase BJ: AshenStrike — the cards in your exhaust pile (0 outside combat).</summary>
+    internal static int ExhaustPileSize(Player? player) => player?.PlayerCombatState?.ExhaustPile?.Cards?.Count ?? 0;
+
+    /// <summary>Phase BJ: MementoMori — cards YOU discarded this turn. Effect discards only: the end-of-turn flush goes
+    /// through CardPileCmd.Add, not CardCmd.Discard, so it never logs a CardDiscardedEntry (matches the base card).</summary>
+    internal static int DiscardsThisTurn(Player? player)
+    {
+        var cs = player?.Creature?.CombatState;
+        if (player == null || cs == null) return 0;
+        return HistoryOf<MegaCrit.Sts2.Core.Combat.History.Entries.CardDiscardedEntry>()
+            .Count(e => e.HappenedThisTurn(cs) && e.Card.Owner == player);
+    }
+
+    /// <summary>Phase BJ: DeathMarch — cards you drew this turn OUTSIDE the turn-start hand draw (!FromHandDraw).</summary>
+    internal static int CardsDrawnThisTurn(Player? player)
+    {
+        var cs = player?.Creature?.CombatState;
+        if (player == null || cs == null) return 0;
+        return HistoryOf<MegaCrit.Sts2.Core.Combat.History.Entries.CardDrawnEntry>()
+            .Count(e => e.HappenedThisTurn(cs) && e.Actor == player.Creature && !e.FromHandDraw);
+    }
+
+    /// <summary>Phase BJ: Murder — every card you drew this combat (hand draws included).</summary>
+    internal static int CardsDrawnThisCombat(Player? player)
+    {
+        if (player?.Creature == null) return 0;
+        return HistoryOf<MegaCrit.Sts2.Core.Combat.History.Entries.CardDrawnEntry>().Count(e => e.Actor == player.Creature);
+    }
+
+    /// <summary>Phase BJ: HelixDrill — the energy you spent this turn, MINUS this card's own cost while it sits in the
+    /// Play pile (so the in-hand preview and the resolved amount agree). Clamped at 0: an auto-played card (AutoSlay,
+    /// Sly) spends nothing but would still subtract its cost.</summary>
+    internal static int EnergySpentThisTurn(CardModel card)
+    {
+        var owner = card.Owner;
+        var cs = owner?.Creature?.CombatState;
+        if (owner == null || cs == null || card.Pile == null) return 0;
+        int n = HistoryOf<MegaCrit.Sts2.Core.Combat.History.Entries.EnergySpentEntry>()
+            .Where(e => e.HappenedThisTurn(cs) && e.Actor.Player == owner).Sum(e => e.Amount);
+        if (card.Pile.Type == PileType.Play)
+            n -= card.EnergyCost.GetWithModifiers(CostModifiers.All);
+        return Math.Max(0, n);
+    }
+
+    /// <summary>Phase BJ: TearAsunder — the times you lost HP this combat (a DamageReceived with unblocked damage).</summary>
+    internal static int HpLossEventsThisCombat(Player? player)
+    {
+        if (player?.Creature == null) return 0;
+        return HistoryOf<MegaCrit.Sts2.Core.Combat.History.Entries.DamageReceivedEntry>()
+            .Count(e => e.Receiver == player.Creature && e.Result.UnblockedDamage > 0);
+    }
+
+    /// <summary>Phase BJ: Supermassive — the cards you created this combat (CardGeneratedEntry.Creator).</summary>
+    internal static int CardsGeneratedThisCombat(Player? player)
+    {
+        if (player == null) return 0;
+        return HistoryOf<MegaCrit.Sts2.Core.Combat.History.Entries.CardGeneratedEntry>().Count(e => e.Creator == player);
+    }
+
+    /// <summary>Phase BJ: Mirage — the Poison stacks summed over every living enemy.</summary>
+    internal static int TotalEnemyPoison(Player? player)
+    {
+        var cs = player?.Creature?.CombatState;
+        if (cs == null) return 0;
+        return cs.Enemies.Where(c => c.IsAlive).Sum(c => c.GetPowerAmount<PoisonPower>());
+    }
+
+    /// <summary>Phase BJ: Bully / Time's Up — one status's stacks on the chosen target (the target_status_stacks
+    /// calc-var arg, like DebuffCount). The closed set the validator allows: vulnerable / weak / poison.</summary>
+    internal static int StatusStacks(Creature? target, string? status)
+    {
+        if (target == null) return 0;
+        return status switch
+        {
+            "vulnerable" => target.GetPowerAmount<VulnerablePower>(),
+            "weak"       => target.GetPowerAmount<WeakPower>(),
+            "poison"     => target.GetPowerAmount<PoisonPower>(),
+            _ => 0,
+        };
+    }
+
+    /// <summary>Phase BJ: did you Exhaust a card this turn (EvilEye's read)?</summary>
+    internal static bool ExhaustedThisTurn(Player? player)
+    {
+        var cs = player?.Creature?.CombatState;
+        if (player == null || cs == null) return false;
+        return HistoryOf<MegaCrit.Sts2.Core.Combat.History.Entries.CardExhaustedEntry>()
+            .Any(e => e.HappenedThisTurn(cs) && e.Card.Owner == player);
+    }
+
+    /// <summary>Phase BJ: cards you finished playing during your LAST turn (PaleBlueDotPower's read).</summary>
+    internal static int CardsPlayedLastTurn(Player? player)
+    {
+        var cm = CombatManager.Instance;
+        if (player == null || cm?.History?.CardPlaysFinished == null) return 0;
+        return cm.History.CardPlaysFinished.Count(c => c.HappenedLastPlayerTurn(player) && c.CardPlay.Card.Owner == player);
+    }
+
+    /// <summary>Phase BJ (v62): the live value a [BJ]-logged gate compared against (log text only).</summary>
+    private static string PhaseBjConditionRead(Condition w, ConstructedCardModel card, CardPlay play) => w.Kind switch
+    {
+        "exhausted_this_turn"       => $"exhausted this turn: {ExhaustedThisTurn(card.Owner)}",
+        "played_cards_last_turn_ge" => $"played {CardsPlayedLastTurn(card.Owner)} cards last turn; need {w.Value}",
+        "target_intends_attack"     => play?.Target == null ? "no target"
+                                       : $"target '{play.Target.Monster?.Id.Entry ?? "?"}' intends attack: {play.Target.Monster?.IntendsToAttack ?? false}",
+        _ => "",
     };
 
     /// <summary>Phase AM (v43): the scales this phase added (for the [AM] play-time log below).</summary>

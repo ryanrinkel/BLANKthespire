@@ -402,6 +402,20 @@ pitch additions to a sentence.
 Expertise, Double Energy, Evil Eye, Go for the Eyes. **Tags:** `[BJ] scale <name> -> <n> ('<card>')` via
 `PhaseAmScales` (:1059) membership, `[BJ] draw to_hand_size: hand <h> -> draw <n>`, `[BJ] gain_energy x energy`, the
 `[AM]` gate line for the conditions.
+**Findings (BJ, done 2026-10-04 on `wave6`):** (1) `target_status_stacks` reads vulnerable / weak / poison only — Doom
+does not exist until Phase BL (add it to `StatusStackStatuses` + the schema `if/then` there). It is single-enemy only
+(target `enemy`), damage/block. (2) `energy_spent_this_turn` clamps at 0: the base HelixDrill recipe subtracts the
+card's cost while it sits in the Play pile even when nothing was paid (AutoPlay / Sly), which would go negative.
+(3) `to_hand_size` takes `amount` 2..10 (the target hand size); `gain_energy` + `scale:"energy"` is legal at any cost
+(the cost-0 rule now covers damage/block/draw only). (4) Pricing: `cards_drawn_this_combat` / `hp_loss_events_this_combat`
+damage is scored at an expected 18 / 8 (late-game payoffs); `total_enemy_poison` is damage-only like the plan says
+(Mirage itself is Block). (5) VOCABULARY: the eleven new scale tokens are ONE bullet (index lists them by name);
+`exhaust_pyre` also claims `exhausted_this_turn`, `poison_attrition` also claims `scale`; `played_cards_last_turn_ge`,
+`hp_loss_events_this_combat` and `cards_generated_this_combat` belong to no archetype yet (index-only).
+(6) Smoke (tests/gaptest-bj, 25-card deck): GAPTESTBJ1 completed the run (max floor) — every [BJ] scale tag fired with
+non-zero values (incl. the payload `exhaust_pile_size`), `energy_spent_this_turn` read 0 on 20 of 22 plays (AutoSlay
+spends nothing; 2 non-zero reads), all three cond tags opened `true`; 0 mod exceptions, 0 localization errors.
+GAPTESTBJ2 completed the run too — every scale non-zero except `energy_spent_this_turn` (0 on all 41 reads: the AutoSlay limit, the READ is proven), all three conds true; 0 mod exceptions, 0 localization errors. One build, one smoke pass per seed (no iteration needed).
 
 ### Phase BK — `hits_scale` (v63; gap #65; ~1 day) — 24 base cards (Finisher, Flechettes, Whirlwind, Skewer …)
 
@@ -776,3 +790,9 @@ web **293**, `test_phase_bh` 101/101. Readings: index 5,924 · per-archetype max
 samples ≤ 80,000; index budget 8,500. Readings: index 7,172 (clause cap 72) · per-archetype max 65,990 (`forge_ramp`) ·
 per-archetype scaffold max 25,345 (`exhaust_pyre`) · triads 59,197 / 68,992 / 75,069 · all-ops 115,544 · all-ops
 scaffold 45,951 (informational) · `full` 108,977. **Next: Phase BJ** (v62).
+
+**Phase BJ DONE 2026-10-04** (on `wave6`, vocab v62; smokes GAPTESTBJ1/BJ2 both completed the run, every `[BJ]` tag fired,
+0 mod exceptions, 0 localization errors; tester + tags in `generation/tests/gaptest-bj/`). Merged suite: generation
+**592**, web **293**, `test_phase_bj` 231/231. Readings: index 7,627 (cap 72) · per-archetype max 67,956
+(`exhaust_pyre`) · per-archetype scaffold max 25,571 · triads 60,934 / 70,730 / 76,807 · all-ops 117,639 · all-ops
+scaffold 46,178 (informational) · `full` 110,775 (scaffold snapshot 45,900, +227). **Next: Phase BK** (v63).

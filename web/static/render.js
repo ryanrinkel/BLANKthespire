@@ -515,6 +515,20 @@ const SCALE_SUFFIX = {
   unspent_energy_last_turn: " per unspent energy",
   forged: " plus your Forge", // Phase M (gap #36): the additive Forge payoff
 };
+// Phase BJ (v62, gap #63): the combat-history reads print the describe noun ("Deal damage equal to …"), lockstep
+// with cardgen._scale_phrase / ForgedCards.ScalePhrase.
+const SCALE_NOUN = {
+  exhaust_pile_size: "the cards in your exhaust pile",
+  discard_pile_size: "the cards in your discard pile",
+  discards_this_turn: "the cards you have discarded this turn",
+  cards_drawn_this_turn: "the cards you have drawn this turn",
+  cards_drawn_this_combat: "the cards you have drawn this combat",
+  energy_spent_this_turn: "the energy you have spent this turn",
+  hp_loss_events_this_combat: "the times you have lost HP this combat",
+  cards_generated_this_combat: "the cards you have created this combat",
+  total_enemy_poison: "the total Poison on ALL enemies",
+};
+const scaleNoun = (e) => e.scale === "target_status_stacks" ? `the enemy's ${statusName(e.status)}` : SCALE_NOUN[e.scale];
 const titleCase = (s) => String(s || "").replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
 const statusName = (s) => STATUS_NAMES[s] || titleCase(s);
 
@@ -543,6 +557,10 @@ function condCore(c) {
     case "target_has_block": return "the enemy has Block";
     case "energy_ge": return `you have ${v ?? "enough"}+ energy`;
     case "cards_played_this_turn_ge": return `you've played ${v ?? "enough"}+ cards this turn`;
+    // Phase BJ (v62, gap #64): lockstep with cardgen.cond_phrase / Conditions.Phrase.
+    case "exhausted_this_turn": return "you have Exhausted a card this turn";
+    case "played_cards_last_turn_ge": return `you played ${v ?? "enough"}+ cards last turn`;
+    case "target_intends_attack": return "the enemy intends to attack";
     default: return titleCase(c.kind);
   }
 }
@@ -553,12 +571,16 @@ function effPhrase(e, target) {
   const scale = (e.scale && e.scale !== "x") ? (SCALE_SUFFIX[e.scale] || "") : "";
   const hits = e.hits > 1 ? ` ×${e.hits}` : "";
   const toAll = target === "all_enemies" ? " to all enemies" : "";
+  const noun = scaleNoun(e); // Phase BJ (v62)
+  if (noun && e.op === "damage") return `Deal damage equal to ${noun}${toAll}${e.unblockable === true ? " (ignores Block)" : ""}`;
+  if (noun && e.op === "block") return `Gain Block equal to ${noun}`;
   switch (e.op) {
     case "damage": return `Deal ${a ?? ""} damage${scale}${toAll}${hits}${e.unblockable === true ? " (ignores Block)" : ""}${e.grow_held ? ` (+${e.grow_held} per turn held)` : ""}`; // Phase AN (v44) / BD (v58)
     case "block": return `Gain ${a ?? ""} Block${scale}${e.grow_held ? ` (+${e.grow_held} per turn held)` : ""}`; // Phase BD (v58)
     case "held_discount": return `Costs ${a ?? 1} less for each turn it is retained`; // Phase BD (v58, gap #58)
-    case "draw": return `Draw ${a ?? 1} card${(a ?? 1) == 1 ? "" : "s"}${scale}`;
-    case "gain_energy": return `Gain ${a ?? 1} energy`;
+    case "draw": return e.scale === "to_hand_size" ? `Draw cards until you have ${a ?? "?"} in hand` // Phase BJ (v62): Expertise
+                                                   : `Draw ${a ?? 1} card${(a ?? 1) == 1 ? "" : "s"}${scale}`;
+    case "gain_energy": return e.scale === "energy" ? "Double your energy" : `Gain ${a ?? 1} energy`; // Phase BJ (v62)
     case "lose_hp": return `Lose ${a ?? ""} HP`;
     case "gain_max_hp": return `Gain ${a ?? ""} Max HP`; // Phase AN (v44)
     case "cost_shift": { // Phase AO (v45)

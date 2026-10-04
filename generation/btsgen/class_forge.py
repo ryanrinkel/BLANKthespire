@@ -399,8 +399,8 @@ archetype should pair "pull random orbs" cards with "if your orbs match, <someth
 the splashy numbers at uncommon/rare. Conditions also work OFF the orb engine on ANY class — \
 `when:{{kind:"hp_below_half"}}` (execute), `when:{{kind:"no_block"}}` (reward aggression), \
 `when:{{kind:"target_has_status", status:"poison|vulnerable|weak|frail"}}` (follow-up), `target_hp_below_half` / \
-`target_has_block` (single-enemy cards), `energy_ge` / `cards_played_this_turn_ge` (value N — the Finisher combo \
-gate) — a real "if X then bonus" twist, not a flat stat line. `orbs_match`/`orb_count_ge` are ORB-CLASS ONLY; \
+`target_has_block` / `target_intends_attack` (single-enemy cards), `energy_ge` / `cards_played_this_turn_ge` (value N — the Finisher combo \
+gate), `exhausted_this_turn` — a real "if X then bonus" twist, not a flat stat line. `orbs_match`/`orb_count_ge` are ORB-CLASS ONLY; \
 the rest are generic.
 
 TRIGGERS / POWER ENGINES (`add_trigger`): a `power`-type card can grant an ONGOING effect that fires every turn \
@@ -421,7 +421,8 @@ SCALED AMOUNTS / RETAIN PAYOFF (`scale`): a damage/block/draw card effect can ma
 instead of a fixed number by adding `"scale": "<source>"` (keep a nominal "amount"; it is ignored). Sources: \
 "cards_in_hand" (other cards in hand), "cards_retained" (cards HELD into this turn), "unspent_energy_last_turn", \
 "block" (Body Slam), "hp_lost_this_turn", "draw_pile_count", "plays_this_combat" (these four damage/block only), \
-"energy" (cost-0 cards only), and "x" (X-cost only). Reach for "cards_retained" plus the `retain` keyword and the \
+"energy" (cost-0 cards only), and "x" (X-cost only). History reads (v62): "exhaust_pile_size", "discards_this_turn", \
+"cards_drawn_this_turn", "energy_spent_this_turn", "total_enemy_poison", "target_status_stacks" + status (Bully). Reach for "cards_retained" plus the `retain` keyword and the \
 `retained_last_turn`/`hand_size_ge` conditions when the concept's fantasy is PATIENCE / coiling / holding cards \
 back for a big release. A signature Retain archetype = cheap/zero-cost cards with `retain`, payoffs that `scale` to \
 cards_retained or are gated `when:{{"kind":"retained_last_turn"}}` / `when:{{"kind":"hand_size_ge","value":N}}`. \
@@ -1107,7 +1108,8 @@ _CONDITIONS_PARAGRAPH = (
     "CONDITIONAL PAYOFFS (`when` — on ANY class): give a card a real \"if X then bonus\" twist instead of a flat "
     "stat line — `when:{\"kind\":\"hp_below_half\"}` (execute), `when:{\"kind\":\"no_block\"}` (reward "
     "aggression), `when:{\"kind\":\"target_has_status\", \"status\":\"poison|vulnerable|weak|frail\"}` "
-    "(follow-up), `turn_at_least`, `enemy_count_ge`, `has_block`, `hand_size_ge`. Conditional payoffs are "
+    "(follow-up), `turn_at_least`, `enemy_count_ge`, `has_block`, `hand_size_ge`, `exhausted_this_turn`, "
+    "`target_intends_attack`. Conditional payoffs are "
     "swings, so put the splashy numbers at uncommon/rare. SHAPE RULE: a card carries ONE damage value, so gate "
     "the card's only damage line or put the conditional bonus on a DIFFERENT op.")
 
@@ -1458,6 +1460,12 @@ def _cond_uptime(when, deck_stats: dict, trigger: str = "", realistic: bool = Fa
         up = min(1.0, max(0.15, (7.0 - value) / 6.0))  # ~6-turn fight
     elif kind == "turn_at_most":  # Phase BB (v56): the mirror — open for the first `value` turns of a ~6-turn fight
         up = min(1.0, max(0.15, value / 6.0))
+    elif kind == "exhausted_this_turn":  # Phase BJ (v62): needs an exhaust earlier the same turn — about every other turn
+        up = 0.4
+    elif kind == "played_cards_last_turn_ge":  # Phase BJ (v62): a normal turn plays ~3 cards
+        up = 1.0 if value <= 2 else (0.6 if value == 3 else (0.3 if value == 4 else 0.12))
+    elif kind == "target_intends_attack":  # Phase BJ (v62): most enemy turns are attacks (card-only; never a hook)
+        up = 0.65
     elif kind == "hand_size_ge":
         held = min(3, round(4 * deck_stats["share"])) if realistic else min(5, round(10 * deck_stats["share"]))
         expected = 5 + held - (1 if str(trigger).strip().lower() == "on_card_played" else 0)
@@ -2168,17 +2176,21 @@ _ORB_TURN_START_ONLY_OPS = {"gain_energy", "draw"}
 # Phase AR (v49): an orb effect's `when` — every card condition kind (card.schema.json's condition enum / C#
 # Conditions.Kinds) EXCEPT the card-instance and chosen-target reads: an orb fires with no card and no chosen target
 # (the trigger rule — mirror ForgedCharacters.OrbForbiddenConditionKinds).
-_ORB_FORBIDDEN_CONDITION_KINDS = {"target_has_status", "retained_last_turn", "target_hp_below_half", "target_has_block"}
+_ORB_FORBIDDEN_CONDITION_KINDS = {"target_has_status", "retained_last_turn", "target_hp_below_half", "target_has_block",
+                                  "target_intends_attack"}  # Phase BJ (v62): a chosen-target read (Conditions.TargetKinds)
 _ORB_CONDITION_KINDS = {
     "orbs_match", "orb_count_ge", "no_block", "hp_below_half", "has_block", "enemy_count_ge", "turn_at_least",
     "hand_size_ge", "forged_ge", "draw_pile_empty", "light_ge", "dark_ge", "centered", "hp_lost_ge", "energy_ge",
     "cards_played_this_turn_ge",
-    "turn_at_most"}  # Phase BB (v56): a player read like its mirror — legal in an orb effect
+    "turn_at_most",  # Phase BB (v56): a player read like its mirror — legal in an orb effect
+    "exhausted_this_turn", "played_cards_last_turn_ge"}  # Phase BJ (v62): combat-history player reads
 # value bounds (mirror C# Conditions.Validate): kinds that NEED value >= 1, and the three capped thresholds.
 _ORB_CONDITION_VALUE_KINDS = {"orb_count_ge", "enemy_count_ge", "turn_at_least", "hand_size_ge", "forged_ge",
                               "light_ge", "dark_ge", "centered", "hp_lost_ge", "energy_ge", "cards_played_this_turn_ge",
-                              "turn_at_most"}  # Phase BB (v56)
-_ORB_CONDITION_VALUE_MAX = {"energy_ge": 6, "cards_played_this_turn_ge": 10, "hp_lost_ge": 15}
+                              "turn_at_most",  # Phase BB (v56)
+                              "played_cards_last_turn_ge"}  # Phase BJ (v62)
+_ORB_CONDITION_VALUE_MAX = {"energy_ge": 6, "cards_played_this_turn_ge": 10, "hp_lost_ge": 15,
+                            "played_cards_last_turn_ge": 10}  # Phase BJ (v62): Conditions.CardsPlayedGeMax
 
 
 def _validate_orb_when(when, where: str) -> list[str]:

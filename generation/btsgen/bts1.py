@@ -25,7 +25,12 @@ import sys
 import zlib
 from pathlib import Path
 
-VOCAB_VERSION = 61  # must be <= ForgedCards.VocabVersion (61: Phase BI — CARD TRIGGER FILTERS: the relic v48 hook
+VOCAB_VERSION = 62  # must be <= ForgedCards.VocabVersion (62: Phase BJ — COMBAT-HISTORY SCALES + CONDITIONS: 12 scale
+                    # forms (exhaust/discard pile, discards/draws this turn, draws/HP-loss events/cards created this
+                    # combat, energy spent this turn, total enemy Poison, target_status_stacks, gain_energy x energy,
+                    # draw to_hand_size) and 3 `when` kinds (exhausted_this_turn, played_cards_last_turn_ge,
+                    # target_intends_attack). No codec change.)
+                    # 61: Phase BI — CARD TRIGGER FILTERS: the relic v48 hook
                     # filters on card add_trigger — `card_type` (attack/skill/power/non_attack; `status` on
                     # on_card_drawn), `every_n` 2..9 (per combat), `scope:"this_turn"` (Rage) and the payload
                     # target `random_enemy`. No codec change.)

@@ -101,6 +101,13 @@ WHEN_MENU_V2 = WHEN_MENU + [
     # Phase BB (v56, gap #59): the opener's window — the mirror of turn_at_least.
     ("turn_at_most", 'REQUIRED: gate a bonus with `when` turn_at_most value:2 (an opener: stronger on turns 1-2, '
                      'before the fight settles).'),
+    # Phase BJ (v62, gap #64): two combat-history reads + the chosen-enemy intent read.
+    ("exhausted_this_turn", 'REQUIRED: gate a bonus with `when` exhausted_this_turn (Evil Eye: stronger once you have '
+                            'Exhausted a card this turn).'),
+    ("played_cards_last_turn_ge", 'REQUIRED: gate a bonus with `when` played_cards_last_turn_ge value:3 (a tempo '
+                                  'carry-over: stronger after a busy last turn).'),
+    ("target_intends_attack", 'REQUIRED: on a single-enemy card, gate a bonus with `when` target_intends_attack (Go '
+                              'for the Eyes: stronger against an enemy about to attack).'),
 ]
 # W2.2: class-kind-GATED `when` entries — (key, directive, kind). Dealt only to a class whose kind set (see
 # harness_v2.pool_kind: the blueprint's orb/status/summon kind UNIONED with the selected archetypes' mechanic_kind)
@@ -138,6 +145,29 @@ SCALE_MENU = [
                'energy; you keep the energy).'),
     ("plays_this_combat", 'REQUIRED: make one damage or block amount scale "plays_this_combat" (equal to the cards you '
                           'have played this combat - grows all fight, so keep it uncommon/rare).'),
+    # Phase BJ (v62, gap #63): the combat-history / pile reads (verbatim base-game recipes).
+    ("exhaust_pile_size", 'REQUIRED: make one damage or block amount scale "exhaust_pile_size" (equal to the cards in '
+                          'your exhaust pile - Ashen Strike).'),
+    ("discard_pile_size", 'REQUIRED: make one block or damage amount scale "discard_pile_size" (equal to the cards in '
+                          'your discard pile).'),
+    ("discards_this_turn", 'REQUIRED: discard first, then make a damage or block amount scale "discards_this_turn" '
+                           '(equal to the cards you discarded this turn).'),
+    ("cards_drawn_this_turn", 'REQUIRED: make one damage or block amount scale "cards_drawn_this_turn" (equal to the '
+                              'cards you drew this turn beyond the turn-start draw).'),
+    ("cards_drawn_this_combat", 'REQUIRED: make one damage amount scale "cards_drawn_this_combat" (every card you drew '
+                                'this combat - a rare late-game payoff).'),
+    ("energy_spent_this_turn", 'REQUIRED: make one damage or block amount scale "energy_spent_this_turn" (the energy '
+                               'you spent earlier this turn).'),
+    ("hp_loss_events_this_combat", 'REQUIRED: make one damage amount scale "hp_loss_events_this_combat" (the times you '
+                                   'lost HP this combat - a late-game payoff).'),
+    ("cards_generated_this_combat", 'REQUIRED: make one damage or block amount scale "cards_generated_this_combat" '
+                                    '(the cards you created this combat).'),
+    ("total_enemy_poison", 'REQUIRED: make one damage amount scale "total_enemy_poison" (the Poison summed over ALL '
+                           'enemies - a Poison payoff).'),
+    ("target_status_stacks", 'REQUIRED: on a single-enemy card, make one damage or block amount scale '
+                             '"target_status_stacks" with status vulnerable/weak/poison (the enemy\'s stacks - Bully).'),
+    ("to_hand_size", 'REQUIRED: a draw with scale "to_hand_size" and amount 5-7 (draw until you hold that many '
+                     'cards - Expertise).'),
 ]
 SCALE_MENU_KIND = [
     ("tag_cards_owned", 'REQUIRED: make one damage or block amount scale "tag_cards_owned" with a matching "tag" '

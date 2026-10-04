@@ -1,0 +1,212 @@
+# Phase BJ AutoSlay smoke — seed GAPTESTBJ2 (godot.log grep, 16538 lines)
+# [BJ] lines: 773
+# Auto-selected: 13 (no picker in this tester)
+# mod exceptions: 0
+# BlankTheSpire stack frames: 0
+# Localization formatting errors: 0
+# exception lines (any source): 7
+# run end: [INFO] [AutoSlay] Action: Run completed (max floor reached). Abandoning
+# --- per-tag summary (fires, non-zero/true, min..max) ---
+  cond exhausted_this_turn                      fired   66  non-zero   26  range 0..1
+  scale discard_pile_size (block)               fired   61  non-zero   59  range 0..42
+  gain_energy x energy (gain)                   fired   50  non-zero   50  range 3..7
+  cond target_intends_attack                    fired   25  non-zero   14  range 0..1
+  scale exhaust_pile_size (damage)              fired   23  non-zero   22  range 0..16
+  scale energy_spent_this_turn (damage)         fired   41  non-zero    0  range 0..0
+  scale discards_this_turn (damage)             fired   50  non-zero   50  range 1..4
+  scale cards_drawn_this_turn (damage)          fired   32  non-zero   32  range 2..11
+  scale total_enemy_poison (damage)             fired   49  non-zero   24  range 0..10
+  scale cards_drawn_this_combat (damage)        fired   62  non-zero   62  range 5..93
+  scale cards_generated_this_combat (damage)    fired   65  non-zero   45  range 0..8
+  scale hp_loss_events_this_combat (damage)     fired   18  non-zero    2  range 0..1
+  scale exhaust_pile_size (block)               fired  110  non-zero  106  range 0..18
+  scale target_status_stacks (damage)           fired   42  non-zero   40  range 0..6
+  draw to_hand_size (draw n)                    fired   39  non-zero   38  range 0..6
+  cond played_cards_last_turn_ge                fired   40  non-zero   34  range 0..1
+# --- distinct [BJ] tags (count  tag) ---
+   46  [BJ] gain_energy x energy: 3 -> 6 ('Double Charge').
+   41  [BJ] scale energy_spent_this_turn -> 0 (damage) ('Helix Bore').
+   40  [BJ] cond exhausted_this_turn -> false (exhausted this turn: False) ('Ember Gaze').
+   31  [BJ] scale target_status_stacks -> 2 (damage) ('Pick On').
+   26  [BJ] cond exhausted_this_turn -> true (exhausted this turn: True) ('Ember Gaze').
+   25  [BJ] scale total_enemy_poison -> 0 (damage) ('Miasma Bloom').
+   23  [BJ] scale discards_this_turn -> 2 (damage) ('Memento').
+   20  [BJ] scale cards_generated_this_combat -> 0 (damage) ('Collapsing Star').
+   19  [BJ] scale cards_generated_this_combat -> 1 (damage) ('Collapsing Star').
+   18  [BJ] scale cards_drawn_this_turn -> 2 (damage) ('Forced March').
+   17  [BJ] scale discards_this_turn -> 3 (damage) ('Memento').
+   16  [BJ] scale hp_loss_events_this_combat -> 0 (damage) ('Old Wounds').
+   16  [BJ] scale exhaust_pile_size -> 5 (payload block) ('trigger').
+   11  [BJ] draw to_hand_size: hand 3 -> draw 3 (target 6) ('Studied Hand').
+   10  [BJ] scale exhaust_pile_size -> 1 (payload block) ('trigger').
+   10  [BJ] cond played_cards_last_turn_ge -> true (played 4 cards last turn; need 2) ('Carried Momentum').
+    9  [BJ] draw to_hand_size: hand 4 -> draw 2 (target 6) ('Studied Hand').
+    9  [BJ] scale exhaust_pile_size -> 14 (payload block) ('trigger').
+    8  [BJ] draw to_hand_size: hand 2 -> draw 4 (target 6) ('Studied Hand').
+    7  [BJ] scale exhaust_pile_size -> 3 (payload block) ('trigger').
+    7  [BJ] scale discards_this_turn -> 1 (damage) ('Memento').
+    7  [BJ] scale exhaust_pile_size -> 8 (payload block) ('trigger').
+    7  [BJ] scale total_enemy_poison -> 4 (damage) ('Miasma Bloom').
+    7  [BJ] scale exhaust_pile_size -> 9 (payload block) ('trigger').
+    7  [BJ] scale cards_generated_this_combat -> 3 (damage) ('Collapsing Star').
+    6  [BJ] scale exhaust_pile_size -> 4 (payload block) ('trigger').
+    6  [BJ] scale exhaust_pile_size -> 6 (payload block) ('trigger').
+    6  [BJ] cond played_cards_last_turn_ge -> true (played 6 cards last turn; need 2) ('Carried Momentum').
+    6  [BJ] scale cards_generated_this_combat -> 2 (damage) ('Collapsing Star').
+    6  [BJ] scale exhaust_pile_size -> 11 (payload block) ('trigger').
+    5  [BJ] scale exhaust_pile_size -> 2 (payload block) ('trigger').
+    5  [BJ] scale discard_pile_size -> 8 (block) ('Stacked Ledger').
+    5  [BJ] cond played_cards_last_turn_ge -> false (played 0 cards last turn; need 2) ('Carried Momentum').
+    5  [BJ] scale target_status_stacks -> 4 (damage) ('Pick On').
+    5  [BJ] draw to_hand_size: hand 1 -> draw 5 (target 6) ('Studied Hand').
+    5  [BJ] scale exhaust_pile_size -> 12 (payload block) ('trigger').
+    5  [BJ] cond played_cards_last_turn_ge -> true (played 8 cards last turn; need 2) ('Carried Momentum').
+    5  [BJ] scale exhaust_pile_size -> 17 (payload block) ('trigger').
+    4  [BJ] scale total_enemy_poison -> 5 (damage) ('Miasma Bloom').
+    4  [BJ] scale cards_drawn_this_combat -> 22 (damage) ('Long Tally').
+    4  [BJ] draw to_hand_size: hand 5 -> draw 1 (target 6) ('Studied Hand').
+    4  [BJ] scale cards_drawn_this_combat -> 5 (damage) ('Long Tally').
+    4  [BJ] scale exhaust_pile_size -> 0 (payload block) ('trigger').
+    4  [BJ] cond played_cards_last_turn_ge -> true (played 5 cards last turn; need 2) ('Carried Momentum').
+    4  [BJ] scale exhaust_pile_size -> 7 (payload block) ('trigger').
+    4  [BJ] scale cards_drawn_this_turn -> 6 (damage) ('Forced March').
+    4  [BJ] scale discard_pile_size -> 13 (block) ('Stacked Ledger').
+    4  [BJ] scale cards_drawn_this_turn -> 5 (damage) ('Forced March').
+    4  [BJ] scale total_enemy_poison -> 3 (damage) ('Miasma Bloom').
+    4  [BJ] scale exhaust_pile_size -> 13 (payload block) ('trigger').
+    4  [BJ] scale cards_generated_this_combat -> 5 (damage) ('Collapsing Star').
+    3  [BJ] scale discard_pile_size -> 1 (block) ('Stacked Ledger').
+    3  [BJ] scale exhaust_pile_size -> 2 (damage) ('Ashen Brand').
+    3  [BJ] scale cards_drawn_this_turn -> 4 (damage) ('Forced March').
+    3  [BJ] scale cards_drawn_this_combat -> 19 (damage) ('Long Tally').
+    3  [BJ] scale discard_pile_size -> 7 (block) ('Stacked Ledger').
+    3  [BJ] scale cards_drawn_this_combat -> 20 (damage) ('Long Tally').
+    3  [BJ] scale discard_pile_size -> 4 (block) ('Stacked Ledger').
+    3  [BJ] scale exhaust_pile_size -> 1 (damage) ('Ashen Brand').
+    3  [BJ] scale discard_pile_size -> 29 (block) ('Stacked Ledger').
+    3  [BJ] cond played_cards_last_turn_ge -> true (played 10 cards last turn; need 2) ('Carried Momentum').
+    3  [BJ] scale exhaust_pile_size -> 9 (damage) ('Ashen Brand').
+    3  [BJ] scale cards_drawn_this_combat -> 43 (damage) ('Long Tally').
+    3  [BJ] scale exhaust_pile_size -> 10 (payload block) ('trigger').
+    3  [BJ] scale discard_pile_size -> 16 (block) ('Stacked Ledger').
+    3  [BJ] scale cards_generated_this_combat -> 8 (damage) ('Collapsing Star').
+    3  [BJ] scale exhaust_pile_size -> 16 (payload block) ('trigger').
+    3  [BJ] scale cards_generated_this_combat -> 4 (damage) ('Collapsing Star').
+    3  [BJ] scale cards_generated_this_combat -> 6 (damage) ('Collapsing Star').
+    3  [BJ] scale target_status_stacks -> 3 (damage) ('Pick On').
+    3  [BJ] scale discards_this_turn -> 4 (damage) ('Memento').
+    3  [BJ] scale exhaust_pile_size -> 16 (damage) ('Ashen Brand').
+    3  [BJ] scale discard_pile_size -> 35 (block) ('Stacked Ledger').
+    2  [BJ] gain_energy x energy: 7 -> 14 ('Double Charge').
+    2  [BJ] scale cards_drawn_this_combat -> 17 (damage) ('Long Tally').
+    2  [BJ] scale cards_drawn_this_combat -> 31 (damage) ('Long Tally').
+    2  [BJ] cond played_cards_last_turn_ge -> true (played 2 cards last turn; need 2) ('Carried Momentum').
+    2  [BJ] scale exhaust_pile_size -> 3 (damage) ('Ashen Brand').
+    2  [BJ] scale discard_pile_size -> 0 (block) ('Stacked Ledger').
+    2  [BJ] scale cards_drawn_this_combat -> 10 (damage) ('Long Tally').
+    2  [BJ] scale discard_pile_size -> 10 (block) ('Stacked Ledger').
+    2  [BJ] scale cards_drawn_this_combat -> 15 (damage) ('Long Tally').
+    2  [BJ] scale cards_drawn_this_combat -> 6 (damage) ('Long Tally').
+    2  [BJ] scale cards_drawn_this_combat -> 23 (damage) ('Long Tally').
+    2  [BJ] scale discard_pile_size -> 5 (block) ('Stacked Ledger').
+    2  [BJ] scale discard_pile_size -> 6 (block) ('Stacked Ledger').
+    2  [BJ] scale total_enemy_poison -> 6 (damage) ('Miasma Bloom').
+    2  [BJ] scale discard_pile_size -> 9 (block) ('Stacked Ledger').
+    2  [BJ] scale cards_drawn_this_combat -> 24 (damage) ('Long Tally').
+    2  [BJ] scale discard_pile_size -> 27 (block) ('Stacked Ledger').
+    2  [BJ] scale discard_pile_size -> 11 (block) ('Stacked Ledger').
+    2  [BJ] cond played_cards_last_turn_ge -> true (played 9 cards last turn; need 2) ('Carried Momentum').
+    2  [BJ] scale exhaust_pile_size -> 5 (damage) ('Ashen Brand').
+    2  [BJ] scale discard_pile_size -> 18 (block) ('Stacked Ledger').
+    2  [BJ] scale cards_drawn_this_combat -> 47 (damage) ('Long Tally').
+    2  [BJ] scale discard_pile_size -> 3 (block) ('Stacked Ledger').
+    2  [BJ] scale exhaust_pile_size -> 11 (damage) ('Ashen Brand').
+    2  [BJ] scale total_enemy_poison -> 2 (damage) ('Miasma Bloom').
+    2  [BJ] gain_energy x energy: 5 -> 10 ('Double Charge').
+    2  [BJ] scale total_enemy_poison -> 7 (damage) ('Miasma Bloom').
+    2  [BJ] scale discard_pile_size -> 25 (block) ('Stacked Ledger').
+    2  [BJ] scale exhaust_pile_size -> 15 (payload block) ('trigger').
+    2  [BJ] scale cards_drawn_this_turn -> 3 (damage) ('Forced March').
+    2  [BJ] scale discard_pile_size -> 24 (block) ('Stacked Ledger').
+    2  [BJ] scale hp_loss_events_this_combat -> 1 (damage) ('Old Wounds').
+    2  [BJ] scale target_status_stacks -> 0 (damage) ('Pick On').
+    2  [BJ] scale discard_pile_size -> 42 (block) ('Stacked Ledger').
+    2  [BJ] scale cards_drawn_this_combat -> 93 (damage) ('Long Tally').
+    1  [BJ] cond target_intends_attack -> false (target 'FUZZY_WURM_CRAWLER' intends attack: False) ('Eye Gouge').
+    1  [BJ] cond target_intends_attack -> true (target 'NIBBIT' intends attack: True) ('Eye Gouge').
+    1  [BJ] scale discard_pile_size -> 15 (block) ('Stacked Ledger').
+    1  [BJ] cond target_intends_attack -> true (target 'MAWLER' intends attack: True) ('Eye Gouge').
+    1  [BJ] scale discard_pile_size -> 17 (block) ('Stacked Ledger').
+    1  [BJ] scale exhaust_pile_size -> 0 (damage) ('Ashen Brand').
+    1  [BJ] scale total_enemy_poison -> 10 (damage) ('Miasma Bloom').
+    1  [BJ] cond target_intends_attack -> false (target 'FOGMOG' intends attack: False) ('Eye Gouge').
+    1  [BJ] scale total_enemy_poison -> 1 (damage) ('Miasma Bloom').
+    1  [BJ] scale cards_drawn_this_combat -> 42 (damage) ('Long Tally').
+    1  [BJ] scale exhaust_pile_size -> 8 (damage) ('Ashen Brand').
+    1  [BJ] cond target_intends_attack -> true (target 'BYRDONIS' intends attack: True) ('Eye Gouge').
+    1  [BJ] scale cards_drawn_this_combat -> 7 (damage) ('Long Tally').
+    1  [BJ] cond target_intends_attack -> true (target 'KIN_PRIEST' intends attack: True) ('Eye Gouge').
+    1  [BJ] cond target_intends_attack -> false (target 'KIN_FOLLOWER' intends attack: False) ('Eye Gouge').
+    1  [BJ] scale cards_drawn_this_combat -> 62 (damage) ('Long Tally').
+    1  [BJ] cond played_cards_last_turn_ge -> true (played 3 cards last turn; need 2) ('Carried Momentum').
+    1  [BJ] cond target_intends_attack -> false (target 'EXOSKELETON' intends attack: False) ('Eye Gouge').
+    1  [BJ] cond target_intends_attack -> true (target 'TUNNELER' intends attack: True) ('Eye Gouge').
+    1  [BJ] cond target_intends_attack -> false (target 'SPINY_TOAD' intends attack: False) ('Eye Gouge').
+    1  [BJ] scale discard_pile_size -> 19 (block) ('Stacked Ledger').
+    1  [BJ] scale cards_drawn_this_combat -> 29 (damage) ('Long Tally').
+    1  [BJ] scale discard_pile_size -> 12 (block) ('Stacked Ledger').
+    1  [BJ] scale cards_drawn_this_combat -> 27 (damage) ('Long Tally').
+    1  [BJ] scale cards_drawn_this_combat -> 28 (damage) ('Long Tally').
+    1  [BJ] scale target_status_stacks -> 6 (damage) ('Pick On').
+    1  [BJ] scale discard_pile_size -> 26 (block) ('Stacked Ledger').
+    1  [BJ] cond target_intends_attack -> true (target 'SLUMBERING_BEETLE' intends attack: True) ('Eye Gouge').
+    1  [BJ] scale discard_pile_size -> 34 (block) ('Stacked Ledger').
+    1  [BJ] cond target_intends_attack -> false (target 'MYTE' intends attack: False) ('Eye Gouge').
+    1  [BJ] draw to_hand_size: hand 6 -> draw 0 (target 6) ('Studied Hand').
+    1  [BJ] cond target_intends_attack -> false (target 'OVICOPTER' intends attack: False) ('Eye Gouge').
+    1  [BJ] scale discard_pile_size -> 2 (block) ('Stacked Ledger').
+    1  [BJ] scale cards_drawn_this_combat -> 37 (damage) ('Long Tally').
+    1  [BJ] scale cards_drawn_this_combat -> 39 (damage) ('Long Tally').
+    1  [BJ] scale cards_drawn_this_combat -> 12 (damage) ('Long Tally').
+    1  [BJ] cond target_intends_attack -> true (target 'INFESTED_PRISM' intends attack: True) ('Eye Gouge').
+    1  [BJ] scale cards_drawn_this_combat -> 16 (damage) ('Long Tally').
+    1  [BJ] cond target_intends_attack -> false (target 'KNOWLEDGE_DEMON' intends attack: False) ('Eye Gouge').
+    1  [BJ] scale exhaust_pile_size -> 10 (damage) ('Ashen Brand').
+    1  [BJ] scale cards_drawn_this_combat -> 65 (damage) ('Long Tally').
+    1  [BJ] scale cards_drawn_this_combat -> 70 (damage) ('Long Tally').
+    1  [BJ] scale total_enemy_poison -> 9 (damage) ('Miasma Bloom').
+    1  [BJ] cond target_intends_attack -> false (target 'SCROLL_OF_BITING' intends attack: False) ('Eye Gouge').
+    1  [BJ] scale discard_pile_size -> 20 (block) ('Stacked Ledger').
+    1  [BJ] scale cards_drawn_this_combat -> 32 (damage) ('Long Tally').
+    1  [BJ] scale exhaust_pile_size -> 6 (damage) ('Ashen Brand').
+    1  [BJ] cond target_intends_attack -> true (target 'DEVOTED_SCULPTOR' intends attack: True) ('Eye Gouge').
+    1  [BJ] scale discard_pile_size -> 38 (block) ('Stacked Ledger').
+    1  [BJ] draw to_hand_size: hand 0 -> draw 6 (target 6) ('Studied Hand').
+    1  [BJ] scale cards_drawn_this_combat -> 13 (damage) ('Long Tally').
+    1  [BJ] cond target_intends_attack -> false (target 'FROG_KNIGHT' intends attack: False) ('Eye Gouge').
+    1  [BJ] scale cards_drawn_this_combat -> 48 (damage) ('Long Tally').
+    1  [BJ] scale exhaust_pile_size -> 14 (damage) ('Ashen Brand').
+    1  [BJ] scale cards_drawn_this_combat -> 63 (damage) ('Long Tally').
+    1  [BJ] cond played_cards_last_turn_ge -> true (played 7 cards last turn; need 2) ('Carried Momentum').
+    1  [BJ] cond target_intends_attack -> true (target 'GLOBE_HEAD' intends attack: True) ('Eye Gouge').
+    1  [BJ] scale cards_drawn_this_combat -> 34 (damage) ('Long Tally').
+    1  [BJ] cond target_intends_attack -> true (target 'SCROLL_OF_BITING' intends attack: True) ('Eye Gouge').
+    1  [BJ] scale cards_drawn_this_combat -> 8 (damage) ('Long Tally').
+    1  [BJ] scale cards_drawn_this_combat -> 44 (damage) ('Long Tally').
+    1  [BJ] scale cards_drawn_this_combat -> 67 (damage) ('Long Tally').
+    1  [BJ] cond target_intends_attack -> true (target 'AXEBOT' intends attack: True) ('Eye Gouge').
+    1  [BJ] scale cards_drawn_this_combat -> 72 (damage) ('Long Tally').
+    1  [BJ] cond target_intends_attack -> true (target 'THE_FORGOTTEN' intends attack: True) ('Eye Gouge').
+    1  [BJ] scale cards_drawn_this_combat -> 35 (damage) ('Long Tally').
+    1  [BJ] scale cards_drawn_this_combat -> 73 (damage) ('Long Tally').
+    1  [BJ] scale cards_drawn_this_turn -> 11 (damage) ('Forced March').
+    1  [BJ] cond target_intends_attack -> true (target 'MECHA_KNIGHT' intends attack: True) ('Eye Gouge').
+    1  [BJ] scale cards_drawn_this_combat -> 58 (damage) ('Long Tally').
+    1  [BJ] scale discard_pile_size -> 21 (block) ('Stacked Ledger').
+    1  [BJ] cond target_intends_attack -> false (target 'MECHA_KNIGHT' intends attack: False) ('Eye Gouge').
+    1  [BJ] scale exhaust_pile_size -> 18 (payload block) ('trigger').
+    1  [BJ] scale cards_drawn_this_combat -> 92 (damage) ('Long Tally').
+    1  [BJ] scale cards_drawn_this_combat -> 40 (damage) ('Long Tally').
+    1  [BJ] cond target_intends_attack -> true (target 'AEONGLASS' intends attack: True) ('Eye Gouge').
+    1  [BJ] scale cards_drawn_this_combat -> 53 (damage) ('Long Tally').
+    1  [BJ] cond played_cards_last_turn_ge -> false (played 1 cards last turn; need 2) ('Carried Momentum').

@@ -41,7 +41,8 @@ WEB_APP = paths.VOCABULARY.parents[2] / "web" / "static" / "render.js"
 CARD_SCHEMA = paths.VOCABULARY.parent / "card.schema.json"
 PHASE_I_PLAN = paths.VOCABULARY.parents[2] / "docs" / "plans" / "PHASE_I_FORGED_ORBS_PLAN.md"
 
-FORBIDDEN = {"target_has_status", "retained_last_turn", "target_hp_below_half", "target_has_block"}
+FORBIDDEN = {"target_has_status", "retained_last_turn", "target_hp_below_half", "target_has_block",
+             "target_intends_attack"}  # Phase BJ (v62): a chosen-target read
 
 
 def check(cond: bool, msg: str) -> None:
@@ -200,7 +201,8 @@ def _t_kind_lockstep() -> None:
     cs_target = set(re.findall(r'"(\w+)"', tk.group(1))) if tk else set()
     check(cs_target | {"target_has_status", "retained_last_turn"} == FORBIDDEN,
           "C# TargetKinds + target_has_status + retained_last_turn == the forbidden set")
-    check(cf._ORB_CONDITION_VALUE_MAX == {"energy_ge": 6, "cards_played_this_turn_ge": 10, "hp_lost_ge": 15},
+    check(cf._ORB_CONDITION_VALUE_MAX == {"energy_ge": 6, "cards_played_this_turn_ge": 10, "hp_lost_ge": 15,
+                                          "played_cards_last_turn_ge": 10},  # Phase BJ (v62)
           "value caps mirror Conditions.EnergyGeMax / CardsPlayedGeMax / the hp_lost_ge 15 cap")
     check("EnergyGeMax = 6" in cond and "CardsPlayedGeMax = 10" in cond and 'c.Kind == "hp_lost_ge" && c.Value > 15' in cond,
           "the C# caps are still 6 / 10 / 15")
