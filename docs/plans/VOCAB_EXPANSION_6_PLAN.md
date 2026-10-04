@@ -224,7 +224,7 @@ the design prompt drops from ~108k to roughly 50–60k, and later waves add ~80 
 
 - Keep the untrimmed reading as an INFORMATIONAL print (it is the `full` rollback path), not an assert.
 - Asserts, all on `BTS_BLUEPRINT_VOCAB=tree` and `harness_v2.enabled()` (revised 2026-10-04, Ryan):
-  (a) `vocab_index` ≤ 8,500 chars (`BP_INDEX_CEILING` = `gate.INDEX_BUDGET`; the adaptive clause cap stays the
+  (a) `vocab_index` ≤ 11,000 chars (`BP_INDEX_CEILING` = `gate.INDEX_BUDGET`, raised 8,500 → 11,000 before Phase BO; the adaptive clause cap stays the
   safety net); (b) for EVERY archetype in `data/archetypes.json` alone (`selected_ops` = its ops, its `class_kind`),
   the design prompt ≤ 80,000 (raised from 70,000 on 2026-10-04 before Phase BL); (b2) three fixed sample triads — normal (`retain_hold`+`poison_attrition`+
   `block_bulwark`), orb (`orb_channel`+`slot_machine`+`tempo_draw`), hybrid orb+status (`orb_channel`+
@@ -883,7 +883,7 @@ exceptions, 0 localization errors; tester + tags in `generation/tests/gaptest-bi
 web **293**, `test_phase_bh` 101/101. Readings: index 5,924 · per-archetype max 64,742 · all-ops 114,296 ·
 **scaffold 45,951 of 46,000 (49 chars of headroom)** · `full` 108,977.
 **Decided 2026-10-04 (Ryan):** scaffold (§2.3 d) measured per archetype on the real (pruned) path ≤ 32,000; triad
-samples ≤ 80,000; index budget 8,500; all-ops tripwire (§2.3 c) 120,000 → 140,000 (decided before Phase BK at
+samples ≤ 80,000; index budget 8,500 (**raised to 11,000 before Phase BO, Ryan 2026-10-04: BM had squeezed the clause cap to 56 chars**); all-ops tripwire (§2.3 c) 120,000 → 140,000 (decided before Phase BK at
 117,639 — the all-ops path is synthetic, the real guards are per-archetype ≤ 70k and the triads ≤ 80k). **Raised once more before Phase BL (Ryan,
 2026-10-04), for the rest of the wave:** per-archetype (b) 70,000 → **80,000** and triads (b2) 80,000 → **90,000**
 (readings at the time: `exhaust_pyre` 68,796 · hybrid triad 77,647). Later growth shortens; it does not raise.

@@ -736,8 +736,9 @@ _MAX_WORDS = 12              # §2.2: "first clause of its meaning, ≤ 12 words
 # vocabulary row therefore costs one name line and makes every clause a little terser — the index never grows past
 # the budget until the names-only floor (~3.5k today) is reached. Raised 6,000 -> 8,500 on 2026-10-04 (Ryan) so the
 # clause cap grows back toward the full 12 words (v61: 7,172 chars at the top 72-char cap; the shrink stays as the
-# safety net for later rows).
-INDEX_BUDGET = 8_500
+# safety net for later rows). Raised 8,500 -> 11,000 on 2026-10-04 (Ryan, rule 0.9) for the stretch phases BO..BR
+# (Phase BM left it at 8,483 chars with the clause cap squeezed to 56).
+INDEX_BUDGET = 11_000
 _CLAUSE_CAPS = tuple(range(72, 15, -2))
 _DANGLING = frozenset("a an the of to and or for at by in on with your its that this is are from into as "
                       "per when if it then".split())

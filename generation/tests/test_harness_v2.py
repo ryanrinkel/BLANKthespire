@@ -395,7 +395,7 @@ BP_TOTAL_TRIPWIRE = 140_000   # NOT a per-phase gate — the line at which the s
 BP_ARCHETYPE_CEILING = 80_000  # (b) the design prompt for ONE archetype's selection
 BP_TRIAD_BUDGET = 90_000       # (b2) the design prompt for each of BP_TRIADS (what a real three-archetype forge gets)
 BP_SCAFFOLD_BUDGET_PER_ARCHETYPE = 32_000  # (d) 25,345 (exhaust_pyre) at the 2026-10-04 decision
-BP_INDEX_CEILING = 8_500       # (a) = gate.INDEX_BUDGET (the index adapts its clause length to stay under it)
+BP_INDEX_CEILING = 11_000      # (a) = gate.INDEX_BUDGET (the index adapts its clause length to stay under it)
 # (b2) the fixed sample forges — the same three the Phase BH dry run builds (tests/test_phase_bh.DRY_RUNS).
 BP_TRIADS = (
     ("normal", ("retain_hold", "poison_attrition", "block_bulwark"), "normal"),

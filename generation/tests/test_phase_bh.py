@@ -105,7 +105,7 @@ def _t_index() -> None:
     idx = gate.vocab_index(v)
     check(idx == gate.vocab_index(v), "deterministic (same file -> same bytes)")
     check(idx.startswith(gate.INDEX_HEADER) and idx.endswith(gate.INDEX_END), "framed by INDEX_HEADER / INDEX_END")
-    check(len(idx) <= gate.INDEX_BUDGET == 8_500, f"index <= 8,500 chars (got {len(idx):,})")
+    check(len(idx) <= gate.INDEX_BUDGET == 11_000, f"index <= 11,000 chars (got {len(idx):,})")
     live = catalog_mod.live_vocab_tokens()
     missing = sorted(t for t in live if f"`{t}`" not in idx)
     check(bool(live) and not missing, f"every live VOCABULARY token is in the index (missing: {missing})")
