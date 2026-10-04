@@ -283,12 +283,21 @@ public static class TriggerRunner
 
     /// <summary>H4 (gap #14): the enemy target(s) of a targeted payload effect. all_enemies = every hittable alive
     /// enemy; enemy = the first hittable alive enemy; attacker (Phase AK, v41) = the creature that just hit you
-    /// (the <c>attacked</c> trigger only — empty if it is gone or unknown). Mirrors RelicRunner/SummonRunner.</summary>
+    /// (the <c>attacked</c> trigger only — empty if it is gone or unknown); that_enemy (Phase BP, v67) = the enemy an
+    /// on_debuff_applied trigger just debuffed (handed through the same slot). Mirrors RelicRunner/SummonRunner.</summary>
     private static List<Creature> ResolveEnemies(string? target, Player player, Creature? attacker = null)
     {
         var cs = player.Creature.CombatState;
         if (target == "all_enemies") return cs.HittableEnemies.Where(c => c.IsAlive).ToList();
         if (target == "attacker") return attacker != null && attacker.IsAlive ? [attacker] : [];
+        // Phase BP (v67, gap #77): `that_enemy` = the enemy an on_debuff_applied trigger just debuffed (Sleight of Flesh) —
+        // ForgedTriggerPower hands power.Owner through the same `attacker` slot; empty if it died meanwhile.
+        if (target == "that_enemy")
+        {
+            bool alive = attacker != null && attacker.IsAlive;
+            MainFile.Logger.Info($"[BP] that_enemy -> '{(attacker?.Monster?.GetType().Name ?? "none")}'{(alive ? "" : " (gone — skipped)")}.");
+            return alive ? [attacker!] : [];
+        }
         // Phase BI (v61, gap #62): a fresh random hittable enemy per fire, rolled on the combat-targets stream exactly
         // like the base game's JuggernautPower / SerpentFormPower.
         if (target == "random_enemy")

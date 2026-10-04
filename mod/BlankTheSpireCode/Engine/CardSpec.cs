@@ -96,8 +96,15 @@ public sealed record EffectSpec(string Op, int Amount = 0, string? Status = null
     int EveryN = 0, // Phase BI (v61, gap #62): on add_trigger, fire only on every Nth event (2..9, counted per combat)
     string? HitsScale = null, // Phase BK (v63, gap #65): a damage op's HIT COUNT comes from a live read (Finisher / Whirlwind)
     string? From = null, // Phase BO (v66, gap #74): put_back's source pile (hand / discard) — Thinking Ahead / Headbutt
-    string? Keyword = null) // Phase BO (v66, gap #75): grant_keyword's keyword (retain / ethereal / sly) — Snap / Hand Trick
+    string? Keyword = null, // Phase BO (v66, gap #75): grant_keyword's keyword (retain / ethereal / sly) — Snap / Hand Trick
+    string? On = null, // Phase BP (v67, gap #76): cost_delta's event (played / drawn / attack_played / skill_played / card_played / card_exhausted)
+    bool SetZero = false) // Phase BP (v67, gap #76): cost_delta on:"played" set_zero — it costs 0 for the rest of combat (Momentum Strike)
 {
+    /// <summary>Phase BP (v67, gap #76): a <c>cost_delta</c> whose event is ANOTHER card of yours being played (Stomp /
+    /// Pinpoint) — the STATELESS form: <see cref="DataCard"/>.TryModifyEnergyCostInCombat counts the matching plays in the
+    /// combat history (this turn, or this combat), so it is always correct, previews live and needs no back-fill.</summary>
+    public bool IsCountedCostDelta => Op == "cost_delta" && On is "attack_played" or "skill_played" or "card_played";
+
     /// <summary>Phase BK (v63, gap #65): this <c>damage</c> op hits once per unit of a live read (<see cref="HitsScale"/> =
     /// <c>x</c> / <c>attacks_played_this_turn</c> / <c>cards_in_hand</c> / <c>skills_in_hand</c> / <c>plays_this_combat</c> /
     /// <c>exhaust_pile_size</c> / <c>hp_loss_events_this_combat</c> / <c>energy_spent_this_turn</c> / <c>orb_count</c>),
@@ -183,6 +190,11 @@ public sealed record CardSpec(
     public bool HasReturnToHand => Effects.Any(e => e.Op == "return_to_hand");
     public bool HasToDrawTop => Effects.Any(e => e.Op == "to_draw_top");
     public bool HasReturnNextTurn => Effects.Any(e => e.Op == "return_next_turn");
+
+    /// <summary>Phase BP (v67, gap #76): this card's one <c>cost_delta</c> (validator: at most one per list), or null.</summary>
+    public EffectSpec? CostDelta => Effects.FirstOrDefault(e => e.Op == "cost_delta");
+    /// <summary>Phase BP (v67): the index of <see cref="CostDelta"/> in <see cref="Effects"/> (for the upgrade delta), or -1.</summary>
+    public int CostDeltaIndex => Array.FindIndex(Effects, e => e.Op == "cost_delta");
 
     /// <summary>The CardSpec for an unfilled forged slot: harmless valid enums, no effects, hidden.</summary>
     public static CardSpec EmptySlot(string id) => new(

@@ -5,7 +5,7 @@
       "id": "retain_hold",
       "name": "Retain / hold & build",
       "description": "Hold cards turn after turn, curate the perfect hand, then unleash it once the payoff is ready.",
-      "build_notes": "What players love here (the Watcher's Windmill Strike, Sands of Time and Establishment; Well-Laid Plans): patience that visibly pays off, and a hand that works as a curated toolkit. Give cards `retain`, bonuses for having been held (`retained_last_turn`), payoffs that read how many cards were held (`cards_retained`), and payoffs ON the held card itself (v58: a damage/Block `grow_held` that climbs each turn it stays in hand - Windmill Strike; a `held_discount` bomb that gets cheaper each held turn - Sands of Time), and enough defense to survive the build-up turns. `retain_hand` (v65, Equilibrium) keeps the whole hand this turn. (v66) `grant_keyword` gives a hand card Retain (Snap), `put_back` sets up next turn's draw (Thinking Ahead), `return_to_hand` keeps a key skill coming back (Particle Wall).",
+      "build_notes": "What players love here (the Watcher's Windmill Strike, Sands of Time and Establishment; Well-Laid Plans): patience that visibly pays off, and a hand that works as a curated toolkit. Give cards `retain`, bonuses for having been held (`retained_last_turn`), payoffs that read how many cards were held (`cards_retained`), and payoffs ON the held card itself (v58: a damage/Block `grow_held` that climbs each turn it stays in hand - Windmill Strike; a `held_discount` bomb that gets cheaper each held turn - Sands of Time), and enough defense to survive the build-up turns. `retain_hand` (v65, Equilibrium) keeps the whole hand this turn. (v66) `grant_keyword` gives a hand card Retain (Snap), `put_back` sets up next turn's draw (Thinking Ahead), `return_to_hand` keeps a key skill coming back (Particle Wall). (v67) `cost_delta` on \"drawn\" makes a held bomb cheaper each time you draw it (Kingly Kick).",
       "metaphors": [
         "the held breath",
         "coiling",
@@ -44,7 +44,8 @@
           "retain_hand",
           "grant_keyword",
           "put_back",
-          "return_to_hand"
+          "return_to_hand",
+          "cost_delta"
         ],
         "class_kind": "normal"
       },
@@ -54,7 +55,8 @@
         "VOCABULARY_GAPS#5",
         "VOCABULARY_GAPS#70",
         "VOCABULARY_GAPS#74",
-        "VOCABULARY_GAPS#75"
+        "VOCABULARY_GAPS#75",
+        "VOCABULARY_GAPS#76"
       ],
       "base_synergies": {
         "hooks": [
@@ -704,7 +706,7 @@
       "id": "poison_attrition",
       "name": "Venom / attrition",
       "description": "Stack Poison on your enemies and wear them down while you stay alive.",
-      "build_notes": "Poison ignores Block, so the class wins over several turns: cheap appliers, ways to multiply or spread Poison, and enough defense to survive while it works. A power with `on_poison_damage` (v59) turns every tick into a little Block or a draw - the engine that lets the class survive while the Poison works. Cash-out (v62): `total_enemy_poison` deals damage equal to the Poison on ALL enemies (Mirage).",
+      "build_notes": "Poison ignores Block, so the class wins over several turns: cheap appliers, ways to multiply or spread Poison, and enough defense to survive while it works. A power with `on_poison_damage` (v59) turns every tick into a little Block or a draw - the engine that lets the class survive while the Poison works. Cash-out (v62): `total_enemy_poison` deals damage equal to the Poison on ALL enemies (Mirage). (v67) an `on_debuff_applied` power with `status` poison pays off every Poison application.",
       "metaphors": [
         "rot",
         "the slow tide",
@@ -737,13 +739,15 @@
           "damage",
           "on_poison_damage",
           "total_enemy_poison",
-          "scale"
+          "scale",
+          "on_debuff_applied"
         ],
         "class_kind": "normal"
       },
       "buildable": true,
       "gap_refs": [
-        "VOCABULARY_GAPS#63"
+        "VOCABULARY_GAPS#63",
+        "VOCABULARY_GAPS#77"
       ],
       "base_synergies": {
         "hooks": [
@@ -1120,14 +1124,16 @@
           "draw_until",
           "card_type",
           "every_n",
-          "hits_scale"
+          "hits_scale",
+          "cost_delta"
         ],
         "class_kind": "normal"
       },
       "buildable": true,
       "gap_refs": [
         "VOCABULARY_GAPS#62",
-        "VOCABULARY_GAPS#65"
+        "VOCABULARY_GAPS#65",
+        "VOCABULARY_GAPS#76"
       ],
       "base_synergies": {
         "hooks": [
@@ -1224,7 +1230,7 @@
           "Needs card flow"
         ]
       },
-      "build_notes": "Cheap swings in volume, and `draw_until` (v57, Pillage) as the attack that digs through the Attacks for the one Skill or Power the turn needs. A Juggling power (`every_n` Attacks: damage to a random enemy) pays off the volume (v61). Finisher (v63): `hits_scale` attacks_played_this_turn hits once per Attack played before it."
+      "build_notes": "Cheap swings in volume, and `draw_until` (v57, Pillage) as the attack that digs through the Attacks for the one Skill or Power the turn needs. A Juggling power (`every_n` Attacks: damage to a random enemy) pays off the volume (v61). Finisher (v63): `hits_scale` attacks_played_this_turn hits once per Attack played before it. (v67) `cost_delta` on \"attack_played\" makes a finisher cheaper for each Attack you play this turn (Stomp)."
     },
     {
       "id": "orb_channel",
@@ -1264,13 +1270,15 @@
           "focus",
           "temp_focus",
           "focus_decay",
-          "lose_focus"
+          "lose_focus",
+          "on_evoke"
         ],
         "class_kind": "orb"
       },
       "buildable": true,
       "gap_refs": [
-        "VOCABULARY_GAPS#68"
+        "VOCABULARY_GAPS#68",
+        "VOCABULARY_GAPS#77"
       ],
       "base_synergies": {
         "hooks": [
@@ -1332,7 +1340,7 @@
           "Slot-limited"
         ]
       },
-      "build_notes": "Focus drawbacks (v65): `focus_decay` (Biased Cognition: big Focus now, less every turn) and `lose_focus` (Hyperbeam) price a burst."
+      "build_notes": "Focus drawbacks (v65): `focus_decay` (Biased Cognition: big Focus now, less every turn) and `lose_focus` (Hyperbeam) price a burst. (v67) an `on_evoke` power pays off each orb you pop."
     },
     {
       "id": "slot_machine",
@@ -1598,7 +1606,7 @@
       "id": "tempo_draw",
       "name": "Flow / card advantage",
       "description": "Draw more, play more: cheap cards and card advantage chain into long, many-card turns.",
-      "build_notes": "Card advantage is the engine: draw, cheap cards and cost reduction so the player plays MANY cards a turn, with payoffs that count cards played (`cards_played_this_turn_ge`) or drawn. Where Overload spends energy on a few big cards, Flow spends it on many small ones. Draw payoffs (v62): `cards_drawn_this_turn` (Death March), rare `cards_drawn_this_combat` (Murder), `to_hand_size` refills (Expertise).",
+      "build_notes": "Card advantage is the engine: draw, cheap cards and cost reduction so the player plays MANY cards a turn, with payoffs that count cards played (`cards_played_this_turn_ge`) or drawn. Where Overload spends energy on a few big cards, Flow spends it on many small ones. Draw payoffs (v62): `cards_drawn_this_turn` (Death March), rare `cards_drawn_this_combat` (Murder), `to_hand_size` refills (Expertise). (v67) `cost_delta` makes a card cheaper as the turn builds (Pinpoint: 1 less this turn for each Skill you play).",
       "metaphors": [
         "the current",
         "the dance",
@@ -1633,13 +1641,15 @@
           "scale",
           "cards_drawn_this_turn",
           "cards_drawn_this_combat",
-          "to_hand_size"
+          "to_hand_size",
+          "cost_delta"
         ],
         "class_kind": "normal"
       },
       "buildable": true,
       "gap_refs": [
-        "VOCABULARY_GAPS#63"
+        "VOCABULARY_GAPS#63",
+        "VOCABULARY_GAPS#76"
       ],
       "base_synergies": {
         "hooks": [
@@ -1869,7 +1879,7 @@
       "id": "debuff_expose",
       "name": "Expose / hex",
       "description": "Crack the enemy open with Vulnerable and Weak, then exploit it: the more debuffs pile up, the harder you hit.",
-      "build_notes": "Touchstone: the base-game Flechettes. `target_status_stacks` (v62) hits for the enemy's Vulnerable / Weak / Poison stacks (Bully). Expose (v64): `strip_block` / `strip_artifact` before the debuff; Strength Down and `doom` (an execute that never decays) count as debuffs.",
+      "build_notes": "Touchstone: the base-game Flechettes. `target_status_stacks` (v62) hits for the enemy's Vulnerable / Weak / Poison stacks (Bully). Expose (v64): `strip_block` / `strip_artifact` before the debuff; Strength Down and `doom` (an execute that never decays) count as debuffs. (v67) an `on_debuff_applied` power pays off each debuff you land (Sleight of Flesh: 3 damage to that enemy; Vicious: draw on Vulnerable).",
       "metaphors": [
         "the opening",
         "the chink",
@@ -1911,7 +1921,8 @@
           "strength_down",
           "strip_block",
           "strip_artifact",
-          "doom"
+          "doom",
+          "on_debuff_applied"
         ],
         "class_kind": "normal"
       },
@@ -1919,7 +1930,8 @@
       "gap_refs": [
         "VOCABULARY_GAPS#63",
         "VOCABULARY_GAPS#66",
-        "VOCABULARY_GAPS#67"
+        "VOCABULARY_GAPS#67",
+        "VOCABULARY_GAPS#77"
       ],
       "base_synergies": {
         "hooks": [
@@ -2593,7 +2605,7 @@
       "id": "token_conjurer",
       "name": "Conjurer / tokens",
       "description": "Conjure copies of your own cards into your piles: a deck that manufactures its own fuel.",
-      "build_notes": "Touchstone: Slay the Spire 1's Anger, an attack that adds a copy of itself. Conjure copies of your own cards (`add_card`, including self-copies) and give the class a reason to want the extras: triggers when cards are played or exhausted, a power that turns each copy into value, and cheap copies that fuel a combo turn. A natural fit for combo decks and for a power that helps it go off.",
+      "build_notes": "Touchstone: Slay the Spire 1's Anger, an attack that adds a copy of itself. Conjure copies of your own cards (`add_card`, including self-copies) and give the class a reason to want the extras: triggers when cards are played or exhausted, a power that turns each copy into value, and cheap copies that fuel a combo turn. A natural fit for combo decks and for a power that helps it go off. (v67) an `on_card_generated` power pays off every card you create, Wounds included (Arsenal).",
       "metaphors": [
         "the conjurer",
         "sleight of hand",
@@ -2623,14 +2635,16 @@
         "ops": [
           "add_card",
           "add_trigger",
-          "exhaust"
+          "exhaust",
+          "on_card_generated"
         ],
         "class_kind": "normal"
       },
       "mechanic_kind": "token",
       "buildable": true,
       "gap_refs": [
-        "VOCABULARY_GAPS#16"
+        "VOCABULARY_GAPS#16",
+        "VOCABULARY_GAPS#77"
       ],
       "base_synergies": {
         "hooks": [
@@ -3030,7 +3044,7 @@
       "id": "big_energy",
       "name": "Overload / mana ramp",
       "description": "Ramp your energy, then spend it on big, expensive cards and X-cost spells.",
-      "build_notes": "The mana-ramp class: energy generation and cost reduction first, then 2-3 cost cards and X-cost spells (`\"cost\": \"X\"` with `scale:\"x\"`) as the payoffs, with card draw to keep the big cards coming. X-cost cards are the signature: give the class a few that scale well with a big energy turn. Energy payoffs (v62): `energy_spent_this_turn` (Helix Drill) and `gain_energy` with scale `energy` (Double Energy). Whirlwind (v63): an X-cost attack with `hits_scale:\"x\"` hits X times. Drawbacks (v65): `no_draw` after a big draw (Battle Trance), `no_energy_gain` after an energy burst (Expect a Fight).",
+      "build_notes": "The mana-ramp class: energy generation and cost reduction first, then 2-3 cost cards and X-cost spells (`\"cost\": \"X\"` with `scale:\"x\"`) as the payoffs, with card draw to keep the big cards coming. X-cost cards are the signature: give the class a few that scale well with a big energy turn. Energy payoffs (v62): `energy_spent_this_turn` (Helix Drill) and `gain_energy` with scale `energy` (Double Energy). Whirlwind (v63): an X-cost attack with `hits_scale:\"x\"` hits X times. Drawbacks (v65): `no_draw` after a big draw (Battle Trance), `no_energy_gain` after an energy burst (Expect a Fight). (v67) `cost_delta` turns a big card into a bargain once paid off (Momentum Strike: after one play it costs 0 for the rest of combat).",
       "metaphors": [
         "the surge",
         "overload",
@@ -3069,7 +3083,8 @@
           "energy",
           "hits_scale",
           "no_draw",
-          "no_energy_gain"
+          "no_energy_gain",
+          "cost_delta"
         ],
         "class_kind": "normal"
       },
@@ -3077,7 +3092,8 @@
       "gap_refs": [
         "VOCABULARY_GAPS#63",
         "VOCABULARY_GAPS#65",
-        "VOCABULARY_GAPS#68"
+        "VOCABULARY_GAPS#68",
+        "VOCABULARY_GAPS#76"
       ],
       "base_synergies": {
         "hooks": [

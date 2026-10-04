@@ -434,6 +434,7 @@ public static class EffectRunner
                 case "ethereal":
                 case "sly": // Phase BB (v56, gap #55): the game plays a discarded Sly card for free (CardCmd.DiscardAndDraw)
                 case "held_discount": // Phase BD (v58, gap #58): the discount lands in DataCard.OnHeldIntoTurn, not at play time
+                case "cost_delta":    // Phase BP (v67, gap #76): the cost moves in DataCard (TryModifyEnergyCostInCombat / AfterCardPlayed / AfterCardDrawn / AfterCardExhausted)
                     // Card-keyword ops: declared as a CardKeyword at declaration time (the game applies the
                     // keyword behavior — exhaust-on-play, opening hand, retain, etc.); nothing to run here.
                     break;

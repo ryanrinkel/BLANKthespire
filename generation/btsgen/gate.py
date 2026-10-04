@@ -114,7 +114,8 @@ GATED_OP_ORDER = ("balance_step", "add_card", "discard", "upgrade_card", "scry",
                   "strip_block", "strip_artifact",  # Phase BL (v64): Expose, unmeasured
                   "replay_next", "block_next_turn", "retain_hand",  # Phase BM (v65): Burst / Prolong / Equilibrium, unmeasured
                   # Phase BO (v66): recursion / put-back / reshuffle / keyword grants, unmeasured
-                  "return_to_hand", "to_draw_top", "return_next_turn", "put_back", "shuffle_hand", "grant_keyword")
+                  "return_to_hand", "to_draw_top", "return_next_turn", "put_back", "shuffle_hand", "grant_keyword",
+                  "cost_delta")  # Phase BP (v67): the self-cost rule, unmeasured
 
 # ---- Phase 1b: which gate UNIT each schema element belongs to. A unit is a gated op name or a family name. An
 # element whose units are all gated moves to the tail (families are "fam:<name>", so the Forge family never
@@ -133,11 +134,12 @@ FIELD_UNITS = {
     "cards": ("discard", "retrieve_card", "upgrade_card", "exhaust_card", "put_back", "grant_keyword"),  # Phase BC (v57) / BO (v66)
     "pole": ("balance_step",), "card_type": ("cost_shift", "exhaust_card", "draw_until", "add_trigger",  # Phase BC (v57) / BI (v61)
                                              "retrieve_card", "grant_keyword"),  # Phase BO (v66)
-    "scope": ("cost_shift", "add_trigger"), "count": ("cost_shift",),
+    "scope": ("cost_shift", "add_trigger", "cost_delta"), "count": ("cost_shift",),  # Phase BP (v67): + cost_delta
     "every_n": ("add_trigger",),  # Phase BI (v61, gap #62): the trigger filters
     "hits_scale": ("fam:scaling",),  # Phase BK (v63, gap #65): the hit COUNT from a live read rides the scaling family
     "card": ("add_status_card",),
     "from": ("put_back",), "keyword": ("grant_keyword",),  # Phase BO (v66, gaps #74/#75)
+    "on": ("cost_delta",), "set_zero": ("cost_delta",),  # Phase BP (v67, gap #76)
 }
 DEF_UNITS = {"triggerEffect": ("add_trigger",)}
 # One vocabulary table row: `| \`token\` | ...`. Shared by the card gate's op-table split and the blueprint tree.

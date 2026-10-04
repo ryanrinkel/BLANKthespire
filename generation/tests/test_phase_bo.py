@@ -202,7 +202,7 @@ def _t_engine() -> None:
             ("list.Insert(0, (\"selectionScreenPrompt\", list[0].Item2));", "the first prompt also fills selectionScreenPrompt")):
         check(frag in dc, f"DataCard: {why}")
     spec = _cs("Engine", "CardSpec.cs")
-    check("string? From = null," in spec and "string? Keyword = null)" in spec, "EffectSpec.From / Keyword")
+    check("string? From = null," in spec and "string? Keyword = null," in spec, "EffectSpec.From / Keyword")  # BP appended On / SetZero
     check('public bool HasReturnToHand => Effects.Any(e => e.Op == "return_to_hand");' in spec, "CardSpec.HasReturnToHand")
     er = _cs("Engine", "EffectRunner.cs")
     for frag, why in (
@@ -402,7 +402,7 @@ def _t_contract() -> None:
           "VOCABULARY: the retrieve_card row says the draw-pile rule is reversed on purpose")
     check("`pile:\"draw\"` (v66" in next(l for l in vocab.splitlines() if l.startswith("| `exhaust_card`")),
           "VOCABULARY: exhaust_card row names the draw pile")
-    check("`on_shuffle` (v66" in vocab and "on_poison_damage/on_shuffle)" in vocab, "VOCABULARY: Triggers prose + add_trigger row")
+    check("`on_shuffle` (v66" in vocab and "on_poison_damage/on_shuffle/" in vocab, "VOCABULARY: Triggers prose + add_trigger row")
     for op in NEW_OPS:
         check(op in gate.GATED_OP_ORDER, f"gate.GATED_OP_ORDER carries {op} (no card core cost)")
     check(gate.FIELD_UNITS["from"] == ("put_back",) and gate.FIELD_UNITS["keyword"] == ("grant_keyword",)

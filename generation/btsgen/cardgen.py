@@ -242,6 +242,15 @@ def effect_literal(e: dict) -> str:
             lit = f'{lit[:-1]}, Scope: "{str(e["scope"]).lower()}")'
         if e.get("every_n"):
             lit = f"{lit[:-1]}, EveryN: {int(e['every_n'])})"
+        if e.get("status"):  # Phase BP (v67, gap #77): the on_debuff_applied status filter (Vicious)
+            lit = f'{lit[:-1]}, Status: "{str(e["status"]).lower()}")'
+    elif op == "cost_delta":
+        # Phase BP (v67, gap #76): signed Amount + named Scope / On (+ SetZero), lockstep with ForgedCards.ParseEffects.
+        sc = str(e.get("scope", "combat")).replace("\\", "\\\\").replace('"', '\\"')
+        on = str(e.get("on", "played")).replace("\\", "\\\\").replace('"', '\\"')
+        lit = f'new EffectSpec("cost_delta", {int(e.get("amount", 0) or 0)}, Scope: "{sc}", On: "{on}")'
+        if e.get("set_zero") is True:
+            lit = f"{lit[:-1]}, SetZero: true)"
     elif op == "apply_status_custom":
         # Phase J: named StatusName arg (the class status_pool entry, resolved against the class at runtime).
         name = str(e.get("status_name", "")).replace("\\", "\\\\").replace('"', '\\"')
@@ -517,8 +526,9 @@ def _trigger_fragment(e: dict) -> str:
     tgt = e.get("target")
     # H4: targeted AoE suffix (single enemy → none); Phase AK (v41): the riposte target reads "to the attacker".
     # Phase BI (v61): "… to a random enemy" for the Juggernaut target.
+    # Phase BP (v67, gap #77): "… to that enemy" for the Sleight of Flesh target.
     to = (" to ALL enemies" if tgt == "all_enemies" else " to the attacker" if tgt == "attacker"
-          else " to a random enemy" if tgt == "random_enemy" else "")
+          else " to a random enemy" if tgt == "random_enemy" else " to that enemy" if tgt == "that_enemy" else "")
     if op == "damage":  # H4 (gap #14): only meaningful with a target
         if not tgt:
             return ""
@@ -644,6 +654,15 @@ def trigger_sentence(t: dict) -> str:
         when = "Whenever an enemy takes Poison damage"
     elif trig == "on_shuffle":  # Phase BO (v66, gap #74). Mirrors ForgedCards.TriggerSentence.
         when = "Whenever you shuffle your draw pile"
+    # Phase BP (v67, gap #77): Arsenal / Sleight of Flesh (+ the Vicious status filter) / the orb evoke. Mirrors
+    # ForgedCards.TriggerSentence.
+    elif trig == "on_card_generated":
+        when = "Whenever you create a card"
+    elif trig == "on_debuff_applied":
+        st = t.get("status")
+        when = f"Whenever you apply {STATUS_NAME.get(st, st)}" if st else "Whenever you apply a debuff"
+    elif trig == "on_evoke":
+        when = "Whenever you Evoke an orb"
     else:
         when = "At the end of your turn"
     when = _trigger_head(t, when)
@@ -667,6 +686,27 @@ def _cost_shift_sentence(e: dict) -> str:
     if count > 1:
         return f"Your next {count} {plural} cost {amt} less {life}."
     return f"Your {plural} cost {amt} less {life}."
+
+
+def _cost_delta_sentence(e: dict) -> str:
+    """Phase BP (v67, gap #76): "Costs 1 less this turn for each Skill you play." / "After you play this, it costs 0 for the
+    rest of combat." / "Whenever you draw this, it costs 1 less this combat." / "Costs 1 more each time you play it."
+    Literal numbers (no var). Byte-lockstep with ForgedCards.CostDeltaSentence."""
+    if e.get("set_zero") is True:
+        return "After you play this, it costs 0 for the rest of combat."
+    amt = int(e.get("amount", -1) or -1)
+    if amt > 0:
+        return f"Costs {amt} more each time you play it."
+    n = max(1, -amt)
+    life = "this combat" if str(e.get("scope", "")).lower() == "combat" else "this turn"
+    on = str(e.get("on", "")).lower()
+    if on == "played":
+        return f"Costs {n} less {life} each time you play it."
+    if on == "drawn":
+        return f"Whenever you draw this, it costs {n} less {life}."
+    noun = {"attack_played": "Attack", "skill_played": "Skill", "card_exhausted": "card"}.get(on, "card")
+    verb = "Exhaust" if on == "card_exhausted" else "play"
+    return f"Costs {n} less {life} for each {noun} you {verb}."
 
 
 def _replay_next_sentence(e: dict) -> str:
@@ -776,6 +816,9 @@ def describe(effects: list[dict], target: str) -> str:
         elif op == "held_discount":
             # Phase BD (v58, gap #58): the Sands of Time sentence (literal). Lockstep with ForgedCards.Describe.
             parts.append(f"Costs {max(1, int(e.get('amount', 1) or 1))} less for each turn it is retained.")
+        elif op == "cost_delta":
+            # Phase BP (v67, gap #76): the self-cost sentence (literal). Lockstep with ForgedCards.CostDeltaSentence.
+            parts.append(_cost_delta_sentence(e))
         elif op == "purge":
             # Phase W (gap #19): the purge keyword sentence. Lockstep with ForgedCards.Describe.
             parts.append("Purge. (Removed from your deck for the rest of the run.)")

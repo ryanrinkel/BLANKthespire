@@ -503,6 +503,9 @@ const TRIGGER_PREFIX = {
   ripen: "After it ripens in hand", on_hp_lost: "Whenever you lose HP",
   on_poison_damage: "Whenever an enemy takes Poison damage", // Phase BE (v59, gap #56)
   on_shuffle: "Whenever you shuffle your draw pile", // Phase BO (v66, gap #74)
+  // Phase BP (v67, gap #77): Arsenal / Sleight of Flesh / the orb evoke
+  on_card_generated: "Whenever you create a card", on_debuff_applied: "Whenever you apply a debuff",
+  on_evoke: "Whenever you Evoke an orb",
 };
 // Phase BI (v61, gap #62): the card-trigger filters read exactly like the card text (cardgen._trigger_head /
 // ForgedCards.TriggerSentence): "Whenever you play an Attack", "Every 3rd time you play an Attack",
@@ -514,14 +517,31 @@ const REACTIVE_HEAD = {
   attacked: "Whenever you are attacked", on_blade_played: "Whenever you play your blade",
   on_poison_damage: "Whenever an enemy takes Poison damage",
   on_shuffle: "Whenever you shuffle your draw pile", // Phase BO (v66, gap #74)
+  on_card_generated: "Whenever you create a card", on_debuff_applied: "Whenever you apply a debuff", // Phase BP (v67)
+  on_evoke: "Whenever you Evoke an orb",
 };
 const TRIGGER_KIND_WORDS = { attack: "an Attack", skill: "a Skill", power: "a Power", non_attack: "a non-Attack card", status: "a Status" };
+// Phase BP (v67, gap #76): "Costs 1 less this turn for each Skill you play" / "After you play this, it costs 0 for the
+// rest of combat" / "Whenever you draw this, it costs 1 less this combat" / "Costs 1 more each time you play it".
+function costDeltaPhrase(e) {
+  if (e.set_zero) return "After you play this, it costs 0 for the rest of combat";
+  const amt = Number(e.amount ?? -1);
+  if (amt > 0) return `Costs ${amt} more each time you play it`;
+  const n = Math.max(1, -amt);
+  const life = e.scope === "combat" ? "this combat" : "this turn";
+  if (e.on === "played") return `Costs ${n} less ${life} each time you play it`;
+  if (e.on === "drawn") return `Whenever you draw this, it costs ${n} less ${life}`;
+  const noun = { attack_played: "Attack", skill_played: "Skill" }[e.on] || "card";
+  return `Costs ${n} less ${life} for each ${noun} you ${e.on === "card_exhausted" ? "Exhaust" : "play"}`;
+}
 function trigHead(e) {
   const n = e.every_n > 1 ? e.every_n : 0;
-  if (!e.card_type && !n && e.scope !== "this_turn") return TRIGGER_PREFIX[e.trigger] || "Each turn";
+  // Phase BP (v67, gap #77): the Vicious status filter — "Whenever you apply Vulnerable"
+  const debuffHead = e.trigger === "on_debuff_applied" && e.status ? `Whenever you apply ${statusName(e.status)}` : null;
+  if (!e.card_type && !n && e.scope !== "this_turn") return debuffHead || TRIGGER_PREFIX[e.trigger] || "Each turn";
   const typed = e.card_type && (e.trigger === "on_card_played" || e.trigger === "on_card_drawn");
   let when = typed ? `Whenever you ${e.trigger === "on_card_drawn" ? "draw" : "play"} ${TRIGGER_KIND_WORDS[e.card_type] || "a card"}`
-                   : (REACTIVE_HEAD[e.trigger] || TRIGGER_PREFIX[e.trigger] || "Each turn");
+                   : (debuffHead || REACTIVE_HEAD[e.trigger] || TRIGGER_PREFIX[e.trigger] || "Each turn");
   if (n) {
     if (!typed && e.trigger === "on_card_played") when = `Every ${ordinal(n)} card you play`;
     else if (!typed && e.trigger === "on_card_drawn") when = `Every ${ordinal(n)} card you draw`;
@@ -613,6 +633,7 @@ function effPhrase(e, target) {
     case "damage": return `Deal ${a ?? ""} damage${scale}${toAll}${hits}${e.unblockable === true ? " (ignores Block)" : ""}${e.grow_held ? ` (+${e.grow_held} per turn held)` : ""}`; // Phase AN (v44) / BD (v58)
     case "block": return `Gain ${a ?? ""} Block${scale}${e.grow_held ? ` (+${e.grow_held} per turn held)` : ""}`; // Phase BD (v58)
     case "held_discount": return `Costs ${a ?? 1} less for each turn it is retained`; // Phase BD (v58, gap #58)
+    case "cost_delta": return costDeltaPhrase(e); // Phase BP (v67, gap #76): lockstep with cardgen._cost_delta_sentence
     case "draw": return e.scale === "to_hand_size" ? `Draw cards until you have ${a ?? "?"} in hand` // Phase BJ (v62): Expertise
                                                    : `Draw ${a ?? 1} card${(a ?? 1) == 1 ? "" : "s"}${scale}`;
     case "gain_energy": return e.scale === "energy" ? "Double your energy" : `Gain ${a ?? 1} energy`; // Phase BJ (v62)
@@ -700,7 +721,8 @@ function effPhrase(e, target) {
     case "sacrifice_summon": return "Sacrifice your minion"; // Phase AV (v52): consume it (its on_death rattle fires)
     case "add_trigger":
       return `${trigHead(e)}: ` // Phase BI (v61): the filtered heads + "to a random enemy"
-             + (e.effects || []).map((x) => effPhrase(x, "self") + (x.target === "random_enemy" ? " to a random enemy" : "")).join(", ");
+             + (e.effects || []).map((x) => effPhrase(x, "self") + (x.target === "random_enemy" ? " to a random enemy"
+                                                                   : x.target === "that_enemy" ? " to that enemy" : "")).join(", "); // Phase BP (v67)
     default: return a != null ? `${titleCase(e.op)} ${a}` : titleCase(e.op);
   }
 }

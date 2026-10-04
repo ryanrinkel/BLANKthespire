@@ -42,7 +42,16 @@ public static class ForgedCards
     /// v10 (forged statuses, Phase J): + CharacterSpec.StatusPool (a class's ≤4 custom modifier-family statuses
     /// read from `status_pool`; see ForgedCharacters / ForgedStatusPower). Class cards may apply a custom status
     /// by pool name via the `apply_status_custom` op (class-only, like custom-orb channels).</summary>
-    public const int VocabVersion = 66; // 66: Phase BO (VOCAB_EXPANSION_6, gaps #74/#75) — RECURSION, PUT-BACK, DRAW TUTOR,
+    public const int VocabVersion = 67; // 67: Phase BP (VOCAB_EXPANSION_6, gaps #76/#77) — COST_DELTA + SMALL REACTIVE TRIGGERS:
+                                        //     card-only op `cost_delta {on, amount -2..+1, scope, set_zero?}` (Stomp / Pinpoint
+                                        //     — the *_played forms are STATELESS: DataCard.TryModifyEnergyCostInCombat counts the
+                                        //     combat history; Momentum Strike / Modded / Kingly Kick / an exhaust-fed discount
+                                        //     mutate CardEnergyCost via DataCard.AfterCardPlayed / AfterCardDrawn /
+                                        //     AfterCardExhausted); trigger kinds `on_card_generated` (AfterCardGeneratedForCombat —
+                                        //     Arsenal), `on_debuff_applied` (AfterPowerAmountChanged, the SleightOfFlesh filter,
+                                        //     optional `status` filter — Vicious) with the payload target `that_enemy`, and
+                                        //     `on_evoke` (AfterOrbEvoked, orb classes). No codec change.
+                                        // 66: Phase BO (VOCAB_EXPANSION_6, gaps #74/#75) — RECURSION, PUT-BACK, DRAW TUTOR,
                                         //     ON_SHUFFLE, GRANT_KEYWORD: card-only flag-ops `return_to_hand` (Particle Wall —
                                         //     DataCard.GetResultPileTypeForCardPlay Discard -> Hand), `to_draw_top` (DataCard.
                                         //     ModifyCardPlayResultPileTypeAndPosition -> (Draw, Top), the ReboundPower pattern),
@@ -529,6 +538,7 @@ public static class ForgedCards
          "exhaust_card", // Phase BC (v57, gap #52): exhaust OTHER cards in your hand (choose / random / up_to / all, optional card_type filter). Card-only.
          "draw_until", // Phase BC (v57, gap #53): draw until you draw a card of `card_type` (Pillage = non_attack). Card-only.
          "held_discount", // Phase BD (v58, gap #58): flag-op — costs N less for the combat per turn it is retained (Sands of Time). Card-only, needs retain.
+         "cost_delta", // Phase BP (v67, gap #76): this card's own cost moves on an event (Stomp / Momentum Strike / Kingly Kick / Modded). Card-only.
          "apply_custom", // EXPLORE SPIKE: apply a hardcoded modifier-family custom status (not in LLM contract)
          "gaptest_enemy_artifact", // PHASE BL GAPTEST (not in the LLM contract): N Artifact on the card's target(s) — the sign-flip smoke
          "summon_spike"]; // PHASE K SPIKE: summon a hardcoded player pet (not in LLM contract)
@@ -540,7 +550,8 @@ public static class ForgedCards
          "on_discard", // Phase R (gap #17): CARD-LATENT Reflex — fires THIS card's payload when ANY effect discards it (v51)
          "on_blade_played", // Phase T: Parry analogue — fires whenever you play your signature blade (a token card)
          "on_poison_damage", // Phase BE (v59, gap #56): fires whenever an ENEMY takes Poison damage (the base-game tick)
-         "on_shuffle"]; // Phase BO (v66, gap #74): fires whenever you shuffle your discard pile into your draw pile (AfterShuffle)
+         "on_shuffle", // Phase BO (v66, gap #74): fires whenever you shuffle your discard pile into your draw pile (AfterShuffle)
+         "on_card_generated", "on_debuff_applied", "on_evoke"]; // Phase BP (v67, gap #77): Arsenal / Sleight of Flesh + Vicious / orb evoke
     // H4: the reactive kinds that can fire MULTIPLE times per turn → eligible for the `once_per_turn` gate.
     // (turn_start/turn_end/ripen already fire at most once per turn, so once_per_turn is rejected on them.)
     private static readonly HashSet<string> MultiFireTriggers =
@@ -548,7 +559,8 @@ public static class ForgedCards
          "on_discard", // Phase R: a card can be discarded → redrawn → discarded again within a turn
          "on_blade_played", // Phase T: you can play the blade more than once a turn (retrieve + replay)
          "on_poison_damage", // Phase BE (v59): several poisoned enemies (or Accelerant) tick in one enemy turn
-         "on_shuffle"]; // Phase BO (v66): a thin deck can reshuffle more than once a turn (draw + shuffle_hand)
+         "on_shuffle", // Phase BO (v66): a thin deck can reshuffle more than once a turn (draw + shuffle_hand)
+         "on_card_generated", "on_debuff_applied", "on_evoke"]; // Phase BP (v67): every token / debuff / evoke is its own event
     // Phase AK (v41): the POWER-HOSTED reactive kinds eligible for `once_per_combat` — the fired flag lives on the
     // granted ForgedTriggerPower, a fresh instance per combat. on_discard is card-latent (no power; DataCard tracks
     // it by round), so it is excluded.
@@ -556,7 +568,8 @@ public static class ForgedCards
         ["on_hp_lost", "on_exhaust", "on_card_played", "on_card_drawn", "on_damage_dealt", "on_block_gained", "attacked",
          "on_blade_played",
          "on_poison_damage", // Phase BE (v59)
-         "on_shuffle"]; // Phase BO (v66): power-hosted, so every_n / scope this_turn / once_per_combat are legal too
+         "on_shuffle", // Phase BO (v66): power-hosted, so every_n / scope this_turn / once_per_combat are legal too
+         "on_card_generated", "on_debuff_applied", "on_evoke"]; // Phase BP (v67): power-hosted too (every_n / this_turn legal)
     // Phase H3: the self/orb-only sub-vocabulary a trigger's payload may use when it has NO target. (H4 lifts this
     // for effects that carry a `target`: damage + enemy-debuff apply_status may then hit enemies — see TriggerRunner.)
     private static readonly HashSet<string> TriggerOps =
@@ -617,6 +630,36 @@ public static class ForgedCards
             return "replay_next carries only 'card_type' + 'count' (no amount / status / scale / hits / scope).";
         return null;
     }
+    /// <summary>Phase BP (v67, gap #76): the cost_delta shape. `on` (played / drawn / attack_played / skill_played /
+    /// card_played / card_exhausted) + `scope` (this_turn / combat) are required; `amount` is SIGNED: −2..−1 lowers the
+    /// cost, +1 (Modded) raises it and is legal only with on:"played" + scope "combat"; `set_zero` (Momentum Strike) is
+    /// on:"played" + scope "combat" with no amount. The counted / exhaust forms over a whole combat move by 1 at most, and
+    /// card_played (every card) is this_turn only — a whole-combat "every card" discount is free by turn 2.</summary>
+    private static string? ValidateCostDelta(EffectSpec e)
+    {
+        if (e.On == null || !CostDeltaEvents.Contains(e.On))
+            return $"cost_delta needs an 'on' event (one of {string.Join("/", CostDeltaEvents)}); got '{e.On}'.";
+        if (e.Scope == null || !CostDeltaScopes.Contains(e.Scope))
+            return $"cost_delta needs a 'scope' (one of {string.Join("/", CostDeltaScopes)}); got '{e.Scope}'.";
+        if (e.Status != null || e.IsScaled || e.Hits > 1 || e.CardKind != null || e.Count != 0)
+            return "cost_delta carries only 'on' + 'scope' + a signed 'amount' (or 'set_zero').";
+        if (e.SetZero)
+        {
+            if (e.On != "played" || e.Scope != "combat" || e.Amount != 0)
+                return "cost_delta 'set_zero' is on:'played' + scope 'combat' with no amount (Momentum Strike: after you play it, it costs 0).";
+            return null;
+        }
+        if (e.Amount == 0 || e.Amount < CostDeltaMin || e.Amount > CostDeltaMax)
+            return $"cost_delta 'amount' must be {CostDeltaMin}..-1 (cheaper) or +1 (dearer); got {e.Amount}.";
+        if (e.Amount > 0 && (e.On != "played" || e.Scope != "combat"))
+            return "cost_delta +1 (a card that costs more each play — Modded) needs on:'played' + scope 'combat'.";
+        if (e.On is not ("played" or "drawn") && e.Scope == "combat" && e.Amount != -1)
+            return "cost_delta over a whole combat for another card's event moves the cost by 1 (amount -1).";
+        if (e.On == "card_played" && e.Scope != "this_turn")
+            return "cost_delta on:'card_played' is this_turn only (a whole-combat discount for EVERY card is free by turn 2).";
+        return null;
+    }
+    private const int CostDeltaMin = -2, CostDeltaMax = 1;
     // Phase BL (v64): the per-effect caps (plan §7 decision 6: Doom 12 per card; strength_down 3 permanent / 9 temporary).
     // A payload Doom fires every turn and never decays, so it caps at 5 per fire. Lockstep with validator._BL_STATUS_CAPS.
     private static readonly Dictionary<string, int> BlStatusCaps =
@@ -687,6 +730,13 @@ public static class ForgedCards
     // Phase BD (v58, gap #58): the held_discount band — Sands of Time / Establishment lower by 1 per turn; 2 is the ceiling
     // (a 3-cost card free after two held turns is already the whole fantasy). Lockstep with validator._HELD_DISCOUNT_MAX.
     private const int HeldDiscountMaxAmount = 2;
+    // Phase BP (v67, gap #76): the cost_delta shape — its events, its lifetimes, the counted (stateless) events, and the
+    // add_trigger `status` filter + payload target of on_debuff_applied (gap #77). Lockstep with validator._COST_DELTA_* /
+    // _DEBUFF_TRIGGER_STATUSES + the schema clauses.
+    internal static readonly HashSet<string> CostDeltaEvents =
+        ["played", "drawn", "attack_played", "skill_played", "card_played", "card_exhausted"];
+    private static readonly HashSet<string> CostDeltaScopes = ["this_turn", "combat"];
+    internal static readonly HashSet<string> DebuffTriggerStatuses = ["vulnerable", "weak", "frail", "poison", "doom"];
     private static readonly HashSet<string> StatusCards = ["dazed", "wound", "burn"];
     private const int RetrieveMaxAmount = 2;   // "Return 2 cards" is the ceiling — a 3+ recursion is a degenerate loop
     private const int StatusCardMaxAmount = 3; // Power Through adds 2 Wounds; 3 is the ceiling
@@ -1013,6 +1063,18 @@ public static class ForgedCards
         // Phase BD (v58, gap #58): a held_discount needs a cost to lower — never on a 0-cost or X-cost card.
         if (effects.Concat(upgrade ?? []).Any(e => e.Op == "held_discount") && (costsX || cost < 1))
         { error = "'held_discount' needs a card that costs 1+ energy (not 0-cost, not X-cost) — there is nothing to discount."; return false; }
+        // Phase BP (v67, gap #76): a cost_delta DISCOUNT (amount < 0 / set_zero) needs a cost to lower (the held_discount rule);
+        // the +1 tax (Modded) may sit on a 0-cost card but never on an X-cost one; on:"played" is never on a Power (a Power
+        // is played once and leaves the piles).
+        {
+            var cds = effects.Concat(upgrade ?? []).Where(e => e.Op == "cost_delta").ToList();
+            if (cds.Any(e => e.Amount < 0 || e.SetZero) && (costsX || cost < 1))
+            { error = "a 'cost_delta' discount needs a card that costs 1+ energy (not 0-cost, not X-cost) — there is nothing to discount."; return false; }
+            if (cds.Count > 0 && costsX)
+            { error = "'cost_delta' is not allowed on an X-cost card (X has no printed cost to move)."; return false; }
+            if (type == CardType.Power && cds.Any(e => e.On == "played"))
+            { error = "cost_delta on:'played' is not allowed on a Power (a Power is played once and leaves the piles)."; return false; }
+        }
 
         // Phase AG (gap #39): an upgrade may LOWER the card's energy cost (absolute, 0..4 since Phase AX). House rules: never on an
         // X-cost card (X has no fixed cost to change); the upgraded cost must be <= the base cost (upgrades cheapen,
@@ -1195,11 +1257,15 @@ public static class ForgedCards
             // Phase BO (v66, gaps #74/#75): put_back's `from` pile and grant_keyword's `keyword` (legality in Validate).
             string? from = e.ContainsKey("from") ? Str(e, "from").Trim().ToLowerInvariant() : null;
             string? keyword = e.ContainsKey("keyword") ? Str(e, "keyword").Trim().ToLowerInvariant() : null;
+            // Phase BP (v67, gap #76): cost_delta's event + the Momentum Strike flag (legality in Validate).
+            string? on = e.ContainsKey("on") ? Str(e, "on").Trim().ToLowerInvariant() : null;
+            bool setZero = e.ContainsKey("set_zero") && e["set_zero"].AsBool();
             list.Add(new EffectSpec(op, amount, status, hits, scale, orb, when, trigger, triggered, statusName,
                                     summonName, oncePerTurn, target, cardId, pile, pole, grow, cards, tag,
                                     OncePerCombat: oncePerCombat, Unblockable: unblockable,
                                     CardKind: cardKind, Scope: scope, Count: count, StatusCard: statusCard,
-                                    GrowHeld: growHeld, EveryN: everyN, HitsScale: hitsScale, From: from, Keyword: keyword));
+                                    GrowHeld: growHeld, EveryN: everyN, HitsScale: hitsScale, From: from, Keyword: keyword,
+                                    On: on, SetZero: setZero));
         }
         return list.ToArray();
     }
@@ -1266,6 +1332,12 @@ public static class ForgedCards
                 var rerr = ValidateReplayNext(e);
                 if (rerr != null) return rerr;
             }
+            // Phase BP (v67, gap #76): cost_delta takes `on` + `scope` (+ a signed `amount` or `set_zero`).
+            else if (e.Op == "cost_delta")
+            {
+                var cderr = ValidateCostDelta(e);
+                if (cderr != null) return cderr;
+            }
             // Phase BI (v61): add_trigger also takes `scope` ("this_turn") and `card_type` (the trigger filter) — both are
             // checked in ValidateTrigger; `count` stays cost_shift-only (Phase BM: + replay_next, above).
             else if (e.Count != 0 || (e.Scope != null && e.Op != "add_trigger"))
@@ -1282,6 +1354,8 @@ public static class ForgedCards
                 return $"'from' only applies to put_back (op '{e.Op}').";
             if (e.Keyword != null && e.Op != "grant_keyword")
                 return $"'keyword' only applies to grant_keyword (op '{e.Op}').";
+            if ((e.On != null || e.SetZero) && e.Op != "cost_delta") // Phase BP (v67, gap #76)
+                return $"'on' / 'set_zero' only apply to cost_delta (op '{e.Op}').";
             if (e.Op == "put_back")
             {
                 if (e.From == null || !PutBackFrom.Contains(e.From))
@@ -1729,6 +1803,19 @@ public static class ForgedCards
             for (int i = 0; i < Math.Min(effects.Length, upgrade.Length); i++)
                 if (effects[i].HitsScale != upgrade[i].HitsScale)
                     return "an upgrade can't change 'hits_scale' (upgrade the per-hit damage instead).";
+        // Phase BP (v67, gap #76): the upgrade overlay is positional — a cost_delta keeps its event, lifetime and set_zero
+        // (only the amount may move), and the one-cost-mechanic rule: never with held_discount, one cost_delta per list.
+        if (upgrade != null)
+            for (int i = 0; i < Math.Min(effects.Length, upgrade.Length); i++)
+                if ((effects[i].Op == "cost_delta" || upgrade[i].Op == "cost_delta")
+                    && (effects[i].Op != upgrade[i].Op || effects[i].On != upgrade[i].On || effects[i].Scope != upgrade[i].Scope
+                        || effects[i].SetZero != upgrade[i].SetZero))
+                    return "an upgrade can't change a cost_delta's 'on' / 'scope' / 'set_zero' (only its amount).";
+        foreach (var list in new[] { effects, upgrade })
+            if (list != null && list.Count(e => e.Op == "cost_delta") > 1)
+                return "at most one 'cost_delta' effect per card (one self-cost rule per card).";
+        if (effects.Concat(upgrade ?? []).Any(e => e.Op == "cost_delta") && effects.Concat(upgrade ?? []).Any(e => e.Op == "held_discount"))
+            return "'cost_delta' and 'held_discount' can't share a card (one self-cost rule per card).";
         // One calculated var per card (BaseLib limit): damage/block scaling each declares a CalculatedVar, so at
         // most one scaled damage/block per card (a scaled draw uses no var and is exempt). Phase U (gap #23): a
         // `grow` damage ALSO declares a CalculatedDamage var, so it counts toward the same one-calc-var budget.
@@ -2066,6 +2153,16 @@ public static class ForgedCards
             if (!OncePerCombatTriggers.Contains(e.Trigger))
                 return $"'scope':'this_turn' only applies to a power-hosted reactive trigger ({string.Join("/", OncePerCombatTriggers)}); got '{e.Trigger}'.";
         }
+        // Phase BP (v67, gap #77): the add_trigger `status` filter belongs to on_debuff_applied alone (Vicious: "Whenever you
+        // apply Vulnerable") and names an enemy debuff the hook can see (the temporary Strength Down shell is excluded, as
+        // base Sleight of Flesh excludes every ITemporaryPower).
+        if (e.Status != null)
+        {
+            if (e.Trigger != "on_debuff_applied")
+                return $"an add_trigger 'status' filter only applies to on_debuff_applied (got '{e.Trigger}').";
+            if (!DebuffTriggerStatuses.Contains(e.Status))
+                return $"an on_debuff_applied 'status' filter must be one of {string.Join("/", DebuffTriggerStatuses)}; got '{e.Status}'.";
+        }
         foreach (var t in e.Triggered)
         {
             // Phase BI (v61): the trigger filters go on the add_trigger op, never on a payload effect.
@@ -2095,11 +2192,15 @@ public static class ForgedCards
             if (t.Target != null)
             {
                 // Phase BI (v61): + `random_enemy` (a fresh random hittable enemy per fire — Juggernaut).
-                if (t.Target != "enemy" && t.Target != "all_enemies" && t.Target != "attacker" && t.Target != "random_enemy")
-                    return $"a trigger effect 'target' must be 'enemy', 'all_enemies', 'random_enemy' or 'attacker' (got '{t.Target}').";
+                // Phase BP (v67, gap #77): + `that_enemy` (the enemy you just debuffed — Sleight of Flesh).
+                if (t.Target is not ("enemy" or "all_enemies" or "attacker" or "random_enemy" or "that_enemy"))
+                    return $"a trigger effect 'target' must be 'enemy', 'all_enemies', 'random_enemy', 'attacker' or 'that_enemy' (got '{t.Target}').";
                 // Phase AK (v41): 'attacker' (the creature that just hit you) only exists on the `attacked` trigger.
                 if (t.Target == "attacker" && e.Trigger != "attacked")
                     return $"a trigger effect target 'attacker' is only valid on the 'attacked' trigger (got '{e.Trigger}').";
+                // Phase BP (v67): 'that_enemy' (the debuffed enemy, handed through the attacker slot) only on on_debuff_applied.
+                if (t.Target == "that_enemy" && e.Trigger != "on_debuff_applied")
+                    return $"a trigger effect target 'that_enemy' is only valid on the 'on_debuff_applied' trigger (got '{e.Trigger}').";
                 if (!TriggerTargetedOps.Contains(t.Op))
                     return $"a targeted trigger effect must be 'damage', an enemy-debuff 'apply_status', 'summon_attack' or 'apply_status_custom' (got '{t.Op}').";
                 if (t.Op == "apply_status" && (t.Status == null || !EnemyDebuffStatuses.Contains(t.Status)))
@@ -2269,6 +2370,26 @@ public static class ForgedCards
     /// <summary>The DynamicVar key an effect declares in <see cref="DataCard"/> (null = declares none). Two
     /// effects with the same key would make the game's DynamicVarSet ctor throw — see the dup check above.
     /// damage/block collapse to one key each (normal or scale:x) since the attack/block path reads one var.</summary>
+    /// <summary>Phase BP (v67, gap #76): the cost_delta sentence — "Costs 1 less this turn for each Skill you play." / "After you
+    /// play this, it costs 0 for the rest of combat." / "Whenever you draw this, it costs 1 less this combat." / "Costs 1 more
+    /// each time you play it." Literal numbers (no var). Byte-lockstep with cardgen._cost_delta_sentence.</summary>
+    private static string CostDeltaSentence(EffectSpec e)
+    {
+        if (e.SetZero) return "After you play this, it costs 0 for the rest of combat.";
+        if (e.Amount > 0) return $"Costs {e.Amount} more each time you play it.";
+        int n = Math.Max(1, -e.Amount);
+        string life = e.Scope == "combat" ? "this combat" : "this turn";
+        return e.On switch
+        {
+            "played"         => $"Costs {n} less {life} each time you play it.",
+            "drawn"          => $"Whenever you draw this, it costs {n} less {life}.",
+            "attack_played"  => $"Costs {n} less {life} for each Attack you play.",
+            "skill_played"   => $"Costs {n} less {life} for each Skill you play.",
+            "card_exhausted" => $"Costs {n} less {life} for each card you Exhaust.",
+            _                => $"Costs {n} less {life} for each card you play.",
+        };
+    }
+
     /// <summary>Phase AO (v45): the cost_shift sentence — "Your Attacks cost 1 less this turn." / "Your next Skill costs 2
     /// less this turn." / "Your next 2 cards cost 1 less this combat." Literal numbers (no DynamicVar, like forge /
     /// balance_step). Byte-lockstep with cardgen._cost_shift_sentence.</summary>
@@ -2481,6 +2602,7 @@ public static class ForgedCards
                 case "ethereal":    parts.Add("Ethereal."); break;
                 case "sly":         parts.Add("Sly."); break; // Phase BB (v56, gap #55): the keyword idiom (byte-lockstep with cardgen.py)
                 case "held_discount": parts.Add($"Costs {Math.Max(1, e.Amount)} less for each turn it is retained."); break; // Phase BD (v58, gap #58)
+                case "cost_delta":    parts.Add(CostDeltaSentence(e)); break; // Phase BP (v67, gap #76): byte-lockstep with cardgen._cost_delta_sentence
                 case "purge":       parts.Add("Purge. (Removed from your deck for the rest of the run.)"); break; // Phase W (gap #19)
                 case "purge_card":  parts.Add("Choose a card in your hand and Purge it. (Removed from your deck for the rest of the run.)"); break; // Phase Z (gap #19 choose)
                 case "sacrifice_summon": parts.Add("Sacrifice your summon."); break; // Phase AV (v52): flag-op sentence (byte-lockstep with cardgen.py)
@@ -2639,6 +2761,10 @@ public static class ForgedCards
             "on_blade_played" => "Whenever you play your blade", // Phase T: Parry analogue (fires on the token blade)
             "on_poison_damage" => "Whenever an enemy takes Poison damage", // Phase BE (v59, gap #56)
             "on_shuffle"      => "Whenever you shuffle your draw pile", // Phase BO (v66, gap #74)
+            // Phase BP (v67, gap #77): Arsenal / Sleight of Flesh (+ the Vicious status filter) / the orb evoke.
+            "on_card_generated" => "Whenever you create a card",
+            "on_debuff_applied" => t.Status != null ? $"Whenever you apply {StatusName(t.Status)}" : "Whenever you apply a debuff",
+            "on_evoke"        => "Whenever you Evoke an orb",
             _                 => "At the end of your turn",
         };
         // Phase BI (v61, gap #62): the filters reword the head. Lockstep with cardgen._trigger_head.
@@ -2694,7 +2820,8 @@ public static class ForgedCards
         // matching the base-card Describe convention). Phase AK (v41): "… to the attacker" for the riposte target.
         // Phase BI (v61): "… to a random enemy" for the Juggernaut target.
         string to = e.Target == "all_enemies" ? " to ALL enemies" : e.Target == "attacker" ? " to the attacker"
-                  : e.Target == "random_enemy" ? " to a random enemy" : "";
+                  : e.Target == "random_enemy" ? " to a random enemy"
+                  : e.Target == "that_enemy" ? " to that enemy" : ""; // Phase BP (v67, gap #77): Sleight of Flesh
         return e.Op switch
         {
             "damage"        => e.Target == null ? ""

@@ -285,6 +285,7 @@ public abstract class DataCard : ConstructedCardModel
                 case "exhaust_card":          // Phase BC (v57, gap #52): exhausts hand cards in OnPlay (literal, no var); text via Describe
                 case "draw_until":            // Phase BC (v57, gap #53): draws until a card type in OnPlay (no var); text via Describe
                 case "held_discount":         // Phase BD (v58, gap #58): the discount lands in OnHeldIntoTurn (no var); text via Describe
+                case "cost_delta":            // Phase BP (v67, gap #76): the cost moves in the cost hooks below (no var); text via Describe
                 case "add_status_card":       // Phase AP (v46): generates Status cards in OnPlay (literal, no var); text via Describe
                 case "summon_blade":          // Phase T: retrieves the class blade to hand in OnPlay (no card var)
                 case "upgrade_card":          // Phase V/X (gap #18): upgrades hand cards in OnPlay — random/all/choose (no card var)
@@ -580,6 +581,104 @@ public abstract class DataCard : ConstructedCardModel
         }
         await CardPileCmd.Add(this, PileType.Hand);
         MainFile.Logger.Info($"[BO] return_next_turn '{Spec.Title ?? Spec.Id}' <- {from}.");
+    }
+
+    // -- Phase BP (v67, gap #76): cost_delta - this card's OWN cost moves on an event ------------------------------------
+    // Two implementations (plan Phase BP): the counted forms (attack_played / skill_played / card_played - Stomp / Pinpoint)
+    // are STATELESS - TryModifyEnergyCostInCombat counts the matching plays in the combat history, so the number is always
+    // right, previews live, a generated copy needs no back-fill, and it composes with ForgedCostShiftPower (the same EARLY
+    // pass) and Corruption (the LATE pass, still wins). The self / exhaust forms MUTATE CardEnergyCost like the base cards:
+    // played (Momentum Strike SetThisCombat(0), Modded AddThisCombat(+1)) in AfterCardPlayed - once per play of a replay
+    // series, as the base OnPlay-side recipes are -, drawn (Kingly Kick AddThisCombat(-1)) in AfterCardDrawn, and
+    // card_exhausted in AfterCardExhausted. X-cost is skipped (the validator also forbids it); the game floors the read at 0.
+    // AutoSlay never pays energy, so the [BP] tags log the cost READ (CardEnergyCost.GetWithModifiers) old -> new.
+
+    /// <summary>Phase BP (v67): the cost_delta amount on this instance (signed, upgrade-aware).</summary>
+    private int CostDeltaAmount(EffectSpec cd)
+        => cd.Amount + (IsUpgraded ? EffectRunner.UpgradeDelta(Spec, Spec.CostDeltaIndex) : 0);
+
+    /// <summary>Phase BP (v67): the matching plays a counted cost_delta has seen - the owner's FINISHED plays of the
+    /// event's card type, this turn (scope this_turn, Stomp's <c>HappenedThisTurn</c> read) or this combat.</summary>
+    private int CountedCostEvents(EffectSpec cd)
+    {
+        var cm = CombatManager.Instance;
+        var cs = Owner?.Creature?.CombatState;
+        if (Owner == null || cs == null || cm?.History?.CardPlaysFinished == null) return 0;
+        return cm.History.CardPlaysFinished.Count(en => en.CardPlay.Card.Owner == Owner
+                                                        && (cd.Scope != "this_turn" || en.HappenedThisTurn(cs))
+                                                        && CostDeltaMatches(cd.On, en.CardPlay.Card));
+    }
+
+    private static bool CostDeltaMatches(string? on, CardModel c) => on switch
+    {
+        "attack_played" => c.Type == CardType.Attack,
+        "skill_played"  => c.Type == CardType.Skill,
+        _               => true, // card_played
+    };
+
+    /// <summary>Phase BP (v67, gap #76): the STATELESS counted discount - "Costs 1 less this turn for each Skill you play."
+    /// Only for this card (every card is a listener), never on X-cost or an already-free / unplayable cost.</summary>
+    public override bool TryModifyEnergyCostInCombat(CardModel card, decimal originalCost, out decimal modifiedCost)
+    {
+        if (card != this) return base.TryModifyEnergyCostInCombat(card, originalCost, out modifiedCost);
+        modifiedCost = originalCost;
+        var cd = Spec.CostDelta;
+        if (cd == null || !cd.IsCountedCostDelta || originalCost <= 0 || EnergyCost.CostsX) return false;
+        int n = CountedCostEvents(cd);
+        if (n <= 0) return false;
+        modifiedCost = Math.Max(0, originalCost + CostDeltaAmount(cd) * n);
+        return true;
+    }
+
+    /// <summary>Phase BP (v67, gap #76): a MUTATING cost_delta lands - SetThisCombat(0) / AddThisCombat / AddThisTurn on this
+    /// card's CardEnergyCost (the base Momentum Strike / Modded / Kingly Kick calls), logged as the local cost read.</summary>
+    private void ApplyCostDelta(EffectSpec cd, string evt)
+    {
+        if (EnergyCost.CostsX) return;
+        int before = EnergyCost.GetWithModifiers(CostModifiers.Local);
+        int amt = CostDeltaAmount(cd);
+        if (cd.SetZero) EnergyCost.SetThisCombat(0);
+        else if (cd.Scope == "combat") EnergyCost.AddThisCombat(amt);
+        else EnergyCost.AddThisTurn(amt);
+        InvokeEnergyCostChanged();
+        string how = cd.SetZero ? "set_zero" : (amt > 0 ? $"+{amt}" : $"{amt}");
+        MainFile.Logger.Info($"[BP] cost_delta '{Spec.Title ?? Spec.Id}' on {evt}: {before} -> " +
+                             $"{EnergyCost.GetWithModifiers(CostModifiers.Local)} ({cd.Scope}, {how}).");
+    }
+
+    /// <summary>Phase BP (v67, gap #76): on:"played" (this card, once per play of a series) mutates the cost; a counted
+    /// form logs its live read when a matching card is played while this one is in hand (or is the card played).</summary>
+    public override async Task AfterCardPlayed(PlayerChoiceContext choiceContext, CardPlay cardPlay)
+    {
+        await base.AfterCardPlayed(choiceContext, cardPlay);
+        var cd = Spec.CostDelta;
+        if (cd == null || Owner == null || cardPlay?.Card == null || EnergyCost.CostsX) return;
+        if (cd.On == "played")
+        {
+            if (cardPlay.Card == this) ApplyCostDelta(cd, "played");
+            return;
+        }
+        if (!cd.IsCountedCostDelta || cardPlay.Card.Owner != Owner || !CostDeltaMatches(cd.On, cardPlay.Card)) return;
+        if (cardPlay.Card != this && Pile?.Type != PileType.Hand) return;
+        int n = CountedCostEvents(cd), amt = CostDeltaAmount(cd), local = EnergyCost.GetWithModifiers(CostModifiers.Local);
+        MainFile.Logger.Info($"[BP] cost_delta '{Spec.Title ?? Spec.Id}' on {cd.On}: {Math.Max(0, local + amt * (n - 1))} -> " +
+                             $"{Math.Max(0, local + amt * n)} ({cd.Scope}; {n} counted, all-modifier cost now " +
+                             $"{EnergyCost.GetWithModifiers(CostModifiers.All)}; '{cardPlay.Card.Title}' played).");
+    }
+
+    /// <summary>Phase BP (v67, gap #76): on:"drawn" - Kingly Kick (this card was just drawn).</summary>
+    public override async Task AfterCardDrawn(PlayerChoiceContext choiceContext, CardModel card, bool fromHandDraw)
+    {
+        await base.AfterCardDrawn(choiceContext, card, fromHandDraw);
+        if (card == this && Spec.CostDelta is { On: "drawn" } cd) ApplyCostDelta(cd, "drawn");
+    }
+
+    /// <summary>Phase BP (v67, gap #76): on:"card_exhausted" - another of the owner's cards was Exhausted.</summary>
+    public override async Task AfterCardExhausted(PlayerChoiceContext choiceContext, CardModel card, bool causedByEthereal)
+    {
+        await base.AfterCardExhausted(choiceContext, card, causedByEthereal);
+        if (card != this && Owner != null && card?.Owner == Owner && Spec.CostDelta is { On: "card_exhausted" } cd)
+            ApplyCostDelta(cd, "card_exhausted");
     }
 
     // Phase R (gap #17): the combat round this card last fired its on_discard payload — for the once_per_turn

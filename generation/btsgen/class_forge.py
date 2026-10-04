@@ -344,7 +344,7 @@ frenzy" -> a custom `status_pool` buff (hook hit_count) or multi-hit `hits`; "be
 -> `forge` income + `scale:"forged"` payoffs, or temp_strength; "venom" -> Poison + a `target_debuff_count` \
 payoff; "tempo" -> draw + gain_energy; "devour/hunger" -> a rare `gain_max_hp` attack; "piercing" -> a damage with \
 `unblockable`; "bristle" -> temp_thorns; "discount / free spell / momentum" -> a `cost_shift` skill ("your Attacks \
-cost 1 less this turn"); "overexertion / reckless swing / a price paid in flesh" -> an over-statted card with \
+cost 1 less this turn") or a `cost_delta` card that cheapens itself (v67: Stomp, Momentum Strike); "overexertion / reckless swing / a price paid in flesh" -> an over-statted card with \
 `add_status_card` (a Wound/Dazed/Burn into your own deck); "necromancy / salvage / second wind" -> `retrieve_card` \
 (return a card from your discard or exhaust pile). Stay strictly INSIDE the vocabulary (a brief that can't be built from \
 it will be dropped) — but WITHIN it, range widely rather than conservatively.
@@ -415,7 +415,8 @@ make a class snowball; give most classes one or two. Keep per-turn numbers small
 payload's numeric effect may also `scale` to "cards_retained" / "cards_in_hand" / "unspent_energy_last_turn" / \
 "forged" (e.g. "power: at end of turn, gain Block equal to cards retained"); a payload damage may carry "hits"; \
 a SUMMON class may fire summon_attack / buff_summon and a STATUS class apply_status_custom inside a payload (the \
-minion strikes / the signature status ticks every turn on its own). Filters (v61): card_type ("whenever you play an Attack"), every_n ("every 3rd"), scope "this_turn" (Rage), payload target random_enemy.
+minion strikes / the signature status ticks every turn on its own). Filters (v61): card_type ("whenever you play an Attack"), every_n ("every 3rd"), scope "this_turn" (Rage), payload target random_enemy. \
+v67: on_card_generated (Arsenal), on_debuff_applied (+ status filter; payload target that_enemy), on_evoke (orb only).
 
 SCALED AMOUNTS / RETAIN PAYOFF (`scale`): a damage/block/draw card effect can make its amount a LIVE value \
 instead of a fixed number by adding `"scale": "<source>"` (keep a nominal "amount"; it is ignored). Sources: \
@@ -2859,6 +2860,8 @@ def _card_uses_orbs(card: dict) -> bool:
         if isinstance(when, dict) and when.get("kind") in _ORB_CONDITIONS:
             return True
         if e.get("hits_scale") == "orb_count":  # Phase BK (v63): a hit count read off your orbs is orb-class only
+            return True
+        if e.get("op") == "add_trigger" and e.get("trigger") == "on_evoke":  # Phase BP (v67): the evoke trigger needs orbs
             return True
     return False
 

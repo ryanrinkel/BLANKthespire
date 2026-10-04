@@ -284,7 +284,8 @@ def test_w2_menu_keys_wired() -> None:
     check(coverage.MIN_KEYWORD_KINDS == 2, "MIN_KEYWORD_KINDS = 2")
     check(coverage.KEY_KIND == {"forged_ge": "forge", "dark_ge": "balance", "light_ge": "balance",
                                 "centered": "balance", "orbs_match": "orb", "orb_count_ge": "orb",
-                                "tag_cards_owned": "tags", "forged": "forge"}, f"KEY_KIND, got {coverage.KEY_KIND}")
+                                "tag_cards_owned": "tags", "forged": "forge",
+                                "on_evoke": "orb"}, f"KEY_KIND, got {coverage.KEY_KIND}")  # Phase BP (v67): the gated reactive key
     for key in _w2_keys():
         d = coverage.DIRECTIVE_BY_KEY.get(key)
         check(isinstance(d, str) and d.startswith("REQUIRED:") and key in d,

@@ -145,7 +145,7 @@ def _t_engine() -> None:
                  "if (effects.Count(e => e.Hits > 1 || e.HitsScale != null) > 1)",
                  "if (effects[i].HitsScale != upgrade[i].HitsScale)",
                  "if (t.HitsScale != null) // Phase BK",
-                 "HitsScale: hitsScale, From: from, Keyword: keyword));",  # Phase BO (v66) appended two fields
+                 "HitsScale: hitsScale, From: from, Keyword: keyword,",  # Phase BO (v66) / BP (v67) appended fields
                  "return \"'hits_scale' and 'scale' can't combine on one effect (the per-hit damage is the printed amount).\";"):
         check(frag in fc, f"ForgedCards: {frag}")
     check("string? HitsScale = null," in _cs("Engine", "CardSpec.cs"), "EffectSpec.HitsScale")  # Phase BO (v66): no longer last

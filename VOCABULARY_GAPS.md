@@ -775,7 +775,7 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Mechanic sketch:** card field `cost_delta {on, amount, scope}` (like `held_discount`): `on` ∈ `played` | `drawn` | `attack_played` | `skill_played` | `card_played` | `card_exhausted`; `amount` −2..+1 (+1 only with `played`); `scope` `this_turn` | `combat`; `set_zero:true` with `played` = Momentum Strike. Describe: "Costs 1 less this turn for each Skill you play." / "After you play this, it costs 0 for the rest of combat." / "Whenever you draw this, it costs 1 less this combat." / "Costs 1 more each time you play it." Not on 0/X cost; AutoSlay proves only the cost READ.
 - **Buildable today?** Partly — `held_discount` mutates cost on one event (retained).
 - **Priority:** Medium.
-- **Status:** **planned (Wave 6, Phase BP, vocab v68)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BP.
+- **Status:** **done (2026-10-04, vocab v67, Phase BP)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BP.
 
 ### 77. Triggers: card generated, debuff applied (→ that enemy), orb evoked
 - **Surfaced by:** base-game audit (2026-10-01), "Whenever a card is generated" and "Whenever you apply a debuff" rows + the orb Partial row: `ArsenalPower`, `SmokestackPower`, `PillarOfCreationPower`, `ViciousPower`, `SleightOfFleshPower`, `ShroudPower`, `ConsumingShadowPower` (11 cards).
@@ -783,7 +783,7 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Mechanic sketch:** reactive `add_trigger` kinds `on_card_generated` (fires for `add_status_card` Wounds too, as base Smokestack), `on_debuff_applied` (your debuffs on enemies, temporary wrappers excluded, optional `status` filter) with new payload target `that_enemy`, and `on_evoke` (orb classes only). Describe: "Whenever you create a card, …" / "Whenever you apply Vulnerable, …" / "Whenever you Evoke an orb, …"; fragment "deal 3 damage to that enemy". `on_energy_spent` is NOT built (#82).
 - **Buildable today?** No.
 - **Priority:** Medium.
-- **Status:** **planned (Wave 6, Phase BP, vocab v68)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BP.
+- **Status:** **done (2026-10-04, vocab v67, Phase BP)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BP.
 
 ### 78. Orb extras (evoke variants, trigger passive, Loop, slot loss, orb scales, per-enemy channel)
 - **Surfaced by:** base-game audit (2026-10-01), Partial row "Orb operations": `Dualcast`, `MultiCast`, `Darkness`, `TeslaCoil`, `LoopPower`, `BulkUp`, `CompileDriver`, `Barrage`, `Chill` (17 cards).

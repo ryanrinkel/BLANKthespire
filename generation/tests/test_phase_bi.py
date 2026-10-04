@@ -126,7 +126,8 @@ def _t_engine() -> None:
     check('HandKindFilters = ["attack", "skill", "power", "non_attack"]' in fc, "... and the hand ops' filter stays status-free")
     check("MinEveryN = 2, MaxEveryN = 9" in fc, "the every_n band")
     check("'every_n' can't be combined with 'once_per_combat'" in fc, "every_n + once_per_combat is rejected")
-    check('t.Target != "random_enemy"' in fc, "ValidateTrigger allows random_enemy")
+    check('t.Target is not ("enemy" or "all_enemies" or "attacker" or "random_enemy"' in fc,  # Phase BP (v67): + that_enemy
+          "ValidateTrigger allows random_enemy")
     check("e.Op is not (\"exhaust_card\" or \"draw_until\" or \"add_trigger\"" in fc, "the stray card_type rule admits add_trigger")  # Phase BO (v66) widened it
 
 
@@ -184,7 +185,7 @@ def _t_rules_and_describe() -> None:
                  '"attack" => "an Attack", "skill" => "a Skill", "power" => "a Power",',
                  '"non_attack" => "a non-Attack card", "status" => "a Status", _ => "a card",',
                  'n + (n == 2 ? "nd" : n == 3 ? "rd" : "th")',
-                 'e.Target == "random_enemy" ? " to a random enemy" : ""'):
+                 'e.Target == "random_enemy" ? " to a random enemy"'):  # Phase BP (v67): + that_enemy follows
         check(frag in fc, f"C# fragment present: {frag}")
     lit = cardgen.effect_literal(JUGGLE)
     check(lit.endswith(', CardKind: "attack", EveryN: 3)') and 'Target: "random_enemy"' in lit, f"effect_literal named args: {lit}")

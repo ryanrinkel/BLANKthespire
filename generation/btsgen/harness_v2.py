@@ -65,6 +65,7 @@ _PREFERRED_OPS = ["add_trigger", "transform_card", "graft_card", "spread_debuffs
                   "exhaust_card", "draw_until",  # Phase BC (v57): the hand ops
                   "held_discount",  # Phase BD (v58): the Sands of Time retain payoff
                   "put_back", "grant_keyword",  # Phase BO (v66): Headbutt / Snap card-flow utilities
+                  "cost_delta",  # Phase BP (v67): Stomp / Momentum Strike / Kingly Kick self-cost rules
                   "lose_hp"]
 _PREFERRED_SCALES = ["cards_in_hand", "cards_retained", "unspent_energy_last_turn", "forged",
                      "damage_dealt_unblocked", "target_debuff_count", "tag_cards_owned",
@@ -75,9 +76,11 @@ _PREFERRED_CONDITIONS = ["hp_below_half", "no_block", "has_block", "turn_at_leas
                          "exhausted_this_turn"]  # Phase BJ (v62): Evil Eye
 _PREFERRED_TRIGGERS = ["on_exhaust", "on_card_played", "on_hp_lost", "on_block_gained", "on_card_drawn",
                        "on_damage_dealt", "attacked", "on_discard", "ripen",
-                       "on_poison_damage"]  # Phase BE (v59)
+                       "on_poison_damage",  # Phase BE (v59)
+                       "on_card_generated", "on_debuff_applied"]  # Phase BP (v67): Arsenal / Sleight of Flesh (on_evoke is orb-only)
 _CLASS_ONLY_TOKENS = {"channel_orb", "evoke", "gain_orb_slot", "focus", "orbs_match", "orb_count_ge", "summon",
                       "focus_decay", "lose_focus",  # Phase BM (v65): the Focus drawbacks are orb-class only
+                      "on_evoke",  # Phase BP (v67, gap #77): the evoke trigger needs orbs
                       "summon_attack", "buff_summon", "heal_summon", "shield_summon",
                       "sacrifice_summon",  # Phase AV (v52)
                       "apply_status_custom",

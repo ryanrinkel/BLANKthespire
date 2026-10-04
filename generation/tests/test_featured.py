@@ -163,6 +163,8 @@ def test_detectors_round_trip() -> None:
         "expose_strip": _card([{"op": "strip_block"}, {"op": "strip_artifact"}, {"op": "apply_status", "status": "vulnerable", "amount": 2}]),
         # Phase BO (v66): the card that comes back (Particle Wall)
         "recursion": _card([{"op": "block", "amount": 9}, {"op": "return_to_hand"}]),
+        # Phase BP (v67): the card that gets cheaper (Stomp)
+        "self_discount": _card([{"op": "block", "amount": 9}, {"op": "cost_delta", "on": "skill_played", "scope": "this_turn", "amount": -1}], cost=2),
         # Phase BM (v65): the replay window (Burst)
         "replay_window": _card([{"op": "replay_next", "card_type": "skill", "count": 1}, {"op": "draw", "amount": 1}]),
         # Phase BF (v60): the next-attack spike

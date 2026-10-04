@@ -25,7 +25,12 @@ import sys
 import zlib
 from pathlib import Path
 
-VOCAB_VERSION = 66  # must be <= ForgedCards.VocabVersion (66: Phase BO — RECURSION, PUT-BACK, DRAW TUTOR, ON_SHUFFLE,
+VOCAB_VERSION = 67  # must be <= ForgedCards.VocabVersion (67: Phase BP — COST_DELTA + SMALL REACTIVE TRIGGERS: card-only op
+                    # cost_delta {on played|drawn|attack_played|skill_played|card_played|card_exhausted, signed amount
+                    # -2..+1, scope this_turn|combat, set_zero?} (Stomp / Momentum Strike / Kingly Kick / Modded); trigger
+                    # kinds on_card_generated (Arsenal), on_debuff_applied (+ status filter, payload target that_enemy —
+                    # Vicious / Sleight of Flesh) and on_evoke (orb classes). No codec change.)
+                    # 66: Phase BO — RECURSION, PUT-BACK, DRAW TUTOR, ON_SHUFFLE,
                     # GRANT_KEYWORD: card-only flag-ops return_to_hand (Particle Wall), to_draw_top (Rebound),
                     # return_next_turn (Bolas), shuffle_hand (Reboot); ops put_back {from hand|discard, cards choose}
                     # (Thinking Ahead / Headbutt) and grant_keyword {keyword retain|ethereal|sly, cards choose, card_type?}

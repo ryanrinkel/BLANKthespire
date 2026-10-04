@@ -209,6 +209,13 @@ FEATURED_MENU: list[Featured] = [
              'the card - Particle Wall), "to_draw_top" (Rebound) or "return_next_turn" (Bolas), never with exhaust - OR a card '
              'with op "put_back" (from "hand" or "discard", cards "choose": put a card on top of your draw pile - Headbutt).',
              lambda cc: bool(cc.ops.keys() & {"return_to_hand", "to_draw_top", "return_next_turn", "put_back"})),
+    # Phase BP (v67, gap #76): the card that gets cheaper (Stomp / Momentum Strike / Kingly Kick).
+    Featured("self_discount", 'a card whose OWN cost falls as the fight goes (op "cost_delta" - Stomp / Momentum Strike / Kingly Kick)',
+             'REQUIRED: add a 2-3 cost attack or skill with op "cost_delta" - on "attack_played" or "skill_played" + scope '
+             '"this_turn" + amount -1 ("Costs 1 less this turn for each Attack you play" - Stomp), OR on "played" + scope '
+             '"combat" + set_zero true (after one play it costs 0 for the rest of combat - Momentum Strike), OR on "drawn" + '
+             'scope "combat" + amount -1 (Kingly Kick). Print it at a fair FULL-cost number.',
+             lambda cc: "cost_delta" in cc.ops),
     # Phase BF (v60, gap #54): the setup-then-release beat on the base game's own amplifiers.
     Featured("setup_spike", 'a SETUP card that spikes your next Attack (apply_status vigor) or a rare that doubles your Attacks for a turn (apply_status double_damage)',
              'REQUIRED: add a skill with apply_status vigor (amount 3-6: your NEXT Attack deals that much more, then it '

@@ -11,6 +11,7 @@ using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Entities.Powers;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Models.Orbs; // Phase BP (v67): OrbModel (the on_evoke hook)
 using MegaCrit.Sts2.Core.Models.Powers; // Phase BE (v59): PoisonPower (the on_poison_damage detector)
 using MegaCrit.Sts2.Core.ValueProps;
 
@@ -247,6 +248,56 @@ public abstract class ForgedTriggerPower : BlankTheSpirePower
         await FireReactive("on_shuffle", ctx);
     }
 
+    // Phase BP (v67, gap #77): on_card_generated — whenever the OWNER creates a card for combat (an add_card token, an
+    // add_status_card Wound — base Arsenal / Smokestack count both). The game hook hands no ctx (Arsenal applies with a
+    // fresh ThrowingPlayerChoiceContext), so the payload runs on the latest captured ctx or a throwing one that is NEVER
+    // stored. A payload that itself generates a card is stopped by FireReactive's _firing guard ([BP] re-entry blocked).
+    public override async Task AfterCardGeneratedForCombat(CardModel card, Player? creator)
+    {
+        if (Trigger?.Trigger != "on_card_generated" || creator == null || creator.Creature != Owner) return;
+        MainFile.Logger.Info($"[BP] on_card_generated fired ('{SourceSpec?.Title ?? SourceSpec?.Id}': '{card?.Title}' created" +
+                             $"{(_firing.Contains("on_card_generated") ? ", inside its own payload" : "")}).");
+        await FireReactive("on_card_generated", _combatCtx ?? new ThrowingPlayerChoiceContext());
+    }
+
+    // Phase BP (v67, gap #77): on_debuff_applied — the base SleightOfFleshPower filter verbatim (a non-zero change that reads
+    // as a DEBUFF, on an ENEMY, applied BY the owner, never a temporary wrapper such as Strength Down's shell) plus the
+    // optional Vicious-style `status` filter. The debuffed enemy rides the `attacker` slot, so a payload with target
+    // "that_enemy" hits it. The ctx may be a ThrowingPlayerChoiceContext (a tick), so like on_poison_damage it is NOT stored.
+    public override async Task AfterPowerAmountChanged(PlayerChoiceContext ctx, PowerModel power, decimal amount,
+        Creature? applier, CardModel? cardSource)
+    {
+        var t = Trigger;
+        if (t?.Trigger != "on_debuff_applied" || power == null) return;
+        if (amount == 0m || power.GetTypeForAmount(amount) != PowerType.Debuff || power.Owner == null || !power.Owner.IsEnemy
+            || applier != Owner || power is ITemporaryPower) return;
+        if (t.Status != null && !DebuffMatches(power, t.Status)) return;
+        MainFile.Logger.Info($"[BP] on_debuff_applied fired ('{SourceSpec?.Title ?? SourceSpec?.Id}': {power.GetType().Name} {amount} on " +
+                             $"'{power.Owner.Monster?.GetType().Name ?? "enemy"}'{(t.Status != null ? $", filter {t.Status}" : "")}).");
+        await FireReactive("on_debuff_applied", ctx, attacker: power.Owner);
+    }
+
+    /// <summary>Phase BP (v67): does <paramref name="power"/> carry the add_trigger's status filter (Vicious = Vulnerable)?
+    /// Lockstep with ForgedCards.DebuffTriggerStatuses.</summary>
+    private static bool DebuffMatches(PowerModel power, string status) => status switch
+    {
+        "vulnerable" => power is VulnerablePower,
+        "weak"       => power is WeakPower,
+        "frail"      => power is FrailPower,
+        "poison"     => power is PoisonPower,
+        "doom"       => power is DoomPower,
+        _            => false,
+    };
+
+    // Phase BP (v67, gap #77): on_evoke — whenever one of the OWNER's orbs is evoked (OrbCmd.Evoke raises AfterOrbEvoked once
+    // per evoke; orb classes only, generation-gated). A payload evoke re-entering is stopped by the _firing guard.
+    public override async Task AfterOrbEvoked(PlayerChoiceContext ctx, OrbModel orb, IEnumerable<Creature> targets)
+    {
+        if (Trigger?.Trigger != "on_evoke" || orb == null || orb.Owner != Owner.Player) return;
+        MainFile.Logger.Info($"[BP] on_evoke fired ('{SourceSpec?.Title ?? SourceSpec?.Id}': {orb.GetType().Name}).");
+        await FireReactive("on_evoke", ctx);
+    }
+
     // on_block_gained: when the owner gains Block (Juggernaut). AfterBlockGained hands no ctx → use the captured one.
     public override async Task AfterBlockGained(Creature creature, decimal amount, ValueProp props, CardModel cardSource)
     {
@@ -263,7 +314,14 @@ public abstract class ForgedTriggerPower : BlankTheSpirePower
     {
         var t = Trigger;
         if (t == null || t.Trigger != kind) return;
-        if (_firing.Contains(kind)) return;
+        if (_firing.Contains(kind))
+        {
+            // Phase BP (v67): a BP payload that re-raises its own event (a debuff payload on on_debuff_applied, a generated card
+            // on on_card_generated, an evoke on on_evoke) is stopped here — tagged so the smoke proves the guard held.
+            if (kind is "on_card_generated" or "on_debuff_applied" or "on_evoke")
+                MainFile.Logger.Info($"[BP] re-entry blocked ({kind}).");
+            return;
+        }
         // Phase BI (v61, gap #62): the card_type filter (on_card_played / on_card_drawn hand in the card) — the relic
         // v48 filter (RelicRunner.Fire), with EffectRunner.HandKindMatches mapping attack/skill/power/non_attack/status.
         if (t.CardKind != null)
@@ -327,6 +385,8 @@ public abstract class ForgedTriggerPower : BlankTheSpirePower
                 "on_blade_played" => "On Blade Played", // Phase T
                 "on_poison_damage" => "On Poison Damage", // Phase BE (v59)
                 "on_shuffle" => "On Shuffle", // Phase BO (v66)
+                "on_card_generated" => "On Card Created", "on_debuff_applied" => "On Debuff Applied", // Phase BP (v67)
+                "on_evoke" => "On Evoke", // Phase BP (v67)
                 _ => "Turn End",
             };
             string desc = t != null ? ForgedCards.DescribeTrigger(t) : "A forged trigger.";

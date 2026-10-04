@@ -740,7 +740,7 @@ test_phase_bk / test_phase_bi (EffectSpec field order, the widened card_type rul
 full 72-char cap). Readings: index 9,115 (cap 72) · per-archetype max 73,278 (`exhaust_pyre`) · per-archetype scaffold max
 26,849 · triads 66,328 / 75,576 / 82,011 · all-ops 124,942 · `full` 116,590.
 
-### Phase BP — `cost_delta` + small reactive triggers (v68; gaps #76, #77; ~1 day) — 24 base cards
+### Phase BP — `cost_delta` + small reactive triggers (v67 — second of the stretch phases, Ryan's order BO → BP → BQ → BN; gaps #76, #77; ~1 day) — 24 base cards
 
 **`cost_delta {on, amount, scope}` (B4, gap #76)** — a card FIELD like `held_discount` (card-only). `on` ∈ `played`
 (self) | `drawn` (self) | `attack_played` | `skill_played` | `card_played` | `card_exhausted`; `amount` −2..+1 (+1 only
@@ -771,6 +771,43 @@ orb, …"; fragment "deal 3 damage to that enemy". The `_firing` guard (:233) co
 **Test:** `tests/test_phase_bp.py`. **Tester** `gaptest-bp`: Stomp, Momentum Strike, Kingly Kick, Arsenal-style power,
 Vicious (Vulnerable → draw), Sleight of Flesh (debuff → 3 damage to that enemy). **Tags:** `[BP] cost_delta '<card>'
 on <event>: <old> -> <new> (<scope>)`, `[BP] <kind> fired (...)`, `[BP] that_enemy -> '<monster>'`.
+**Findings (BP, built 2026-10-04 on `wave6`, vocab v67):** (1) Verify-first held: the DECOMP hook signatures
+(`TryModifyEnergyCostInCombat`, `AfterCardGeneratedForCombat(card, creator)` — no ctx, `AfterPowerAmountChanged(ctx, power,
+amount, applier, cardSource)`, `AfterOrbEvoked(ctx, orb, targets)`, `AfterCardDrawn` / `AfterCardExhausted` / `AfterCardPlayed`),
+the base recipes (Momentum Strike `SetThisCombat(0)`, Kingly Kick `AddThisCombat(-1)` on `card == this`, Modded
+`AddThisCombat(1)`, Stomp's this-turn count), the Sleight of Flesh filter (copied verbatim) and `CardPlayFinished` being
+recorded BEFORE `AfterCardPlayed` (so the counted tag reads the play it reacts to). BaseLib's `CustomTemporaryPowerModel` is an
+`ITemporaryPower`, so the Strength Down shell never fires on_debuff_applied (base parity). (2) **Rule 0.6 — the cost READ:**
+`TryModifyEnergyCostInCombat` is the GLOBAL pass (`CostModifiers.Global`, `Hook.ModifyEnergyCostInCombat`), so
+`GetWithModifiers(CostModifiers.Local)` never moves for the stateless forms. Their `[BP]` tag prints the local cost with the
+counted discount applied (old = count−1, new = count) plus the all-modifier read beside it; the mutating forms log the
+`Local` read before / after the `CardEnergyCost` call, as specified. (3) **Shape:** `cost_delta` is an OP like `held_discount`
+(`{op, on, scope, amount | set_zero}`) with a SIGNED amount −2..+1 — the schema's shared `amount` floor moved to −2 with an
+allOf rule restoring ≥ 1 on every other op. Rules (both validators): `on` + `scope` required; +1 only with on "played" +
+scope "combat" (Modded); `set_zero` only with on "played" + scope "combat" and no amount; a whole-combat count for another
+card's event moves by 1 (amount −1); `card_played` is this_turn only; a DISCOUNT needs cost 1+ (the held_discount rule; the
++1 tax may sit on a 0-cost card); never X-cost; on "played" never on a Power; one per list; the upgrade keeps on / scope /
+set_zero (amount only). **Decision: exclusive with `held_discount`** (one self-cost rule per card). (4) The counted forms
+(attack/skill/card_played) are STATELESS in BOTH scopes (scope "combat" counts the whole combat history, the Banshee's Cry
+shape) — no back-fill for generated copies needed; they compose with ForgedCostShiftPower (same EARLY pass) and Corruption
+(LATE, still wins). The mutating played form runs in `DataCard.AfterCardPlayed`, once per play of a replay series (BM's
+replays apply it twice — the base OnPlay-side recipes do the same). (5) **Decision: BI's `every_n` / `scope:"this_turn"` /
+once_per_* are legal on all three new kinds** (power-hosted, like on_shuffle). The add_trigger `status` filter
+(vulnerable / weak / frail / poison / doom) belongs to on_debuff_applied only; `that_enemy` rides the existing `attacker`
+argument and is legal on on_debuff_applied only. No `card_type` filter on on_card_generated (the deferred status-synergy
+row stays deferred). A debuff payload on on_debuff_applied re-raises the hook on the same power: the `_firing` guard stops it
+and logs `[BP] re-entry blocked (<kind>)` (the tester's Spreading Rot proves it). (6) `on_evoke` is orb-class only on the
+generation side (`coverage.KEY_KIND["on_evoke"] = "orb"` — the shuffled reactive menu is now kind-gated like the when menu;
+`class_forge._card_uses_orbs`; exemplar `needs:"orb"`); the C# side does not gate it (a slotless class simply never evokes).
+The normal-class tester cannot prove it — Phase BQ's orb tester will. (7) Harness: featured += `self_discount`; coverage
+REACTIVE_MENU_V2 += the three kinds; `_PREFERRED_OPS` += cost_delta, `_PREFERRED_TRIGGERS` += on_card_generated /
+on_debuff_applied, on_evoke class-only; gate FIELD_UNITS += on / set_zero (+ scope); bridges surface the status filter;
+11 exemplars (180 -> 191); token claims across eight archetypes (gap_refs #76/#77); two pitch clauses (the translation
+paragraph + the TRIGGERS sentence; `full` scaffold snapshot 47,178 -> 47,371, +193). Stale pins updated: test_coverage
+(KEY_KIND), test_harness_v2 (the kind-gated reactive menu, the scaffold snapshot), test_frontend (retain_hold refs #76),
+test_phase_bi / bk / bo (the widened target rule, the EffectSpec tail, the add_trigger row), test_exemplars (on_evoke is
+orb-only), test_featured (self_discount sample). (8) Readings: index 9,250 (cap 72) · per-archetype max 74,247
+(`exhaust_pyre`) · per-archetype scaffold max 27,042 · triads 67,987 / 77,235 / 82,980 · all-ops 126,601 · `full` 118,114.
 
 ### Phase BQ — Orb extras (v69; gap #78; ~1 day) — 17 base cards, orb classes only
 
@@ -859,7 +896,7 @@ as every merged phase passed its smoke.
 | **cut line** | | | **~7½ days of scout estimate (Wave 5 ran ~5 estimated days in one real day)** | **~114** | |
 | BN | #71–#73 | v66 | 1½ days | 38 | Feed / Sunder on-kill; Discovery / Infernal Blade; Havoc / Uproar / Mayhem |
 | BO | #74, #75 | v66 | 1½ days | 29 | Particle Wall, Bolas, Headbutt, Secret Weapon, Reboot; Snap / Hand Trick |
-| BP | #76, #77 | v68 | 1 day | 24 | Stomp / Momentum Strike / Kingly Kick; Arsenal, Vicious, Sleight of Flesh |
+| BP | #76, #77 | v67 | 1 day | 24 | Stomp / Momentum Strike / Kingly Kick; Arsenal, Vicious, Sleight of Flesh |
 | BQ | #78 | v69 | 1 day | 17 | Dualcast, Darkness, Loop, Compile Driver, Chill — the orb class catches up |
 | BR | #11, #79 | v70 | 1 day | 5 | Whistle; Fiend Fire / Calculated Gamble; Rolling Boulder |
 
@@ -968,3 +1005,9 @@ go-ahead; tester `generation/tests/gaptest-bo/`, `--validate-only` green). Index
 Merged suite: generation **600**, web **293**, `test_phase_bo` 266/266 (smoke record pending). Readings: index 9,115 (cap 72) ·
 per-archetype max 73,278 (`exhaust_pyre`) · per-archetype scaffold max 26,849 · triads 66,328 / 75,576 / 82,011 · all-ops
 124,942 · `full` 116,590 (scaffold snapshot 47,178, +492). See Findings (BO).
+
+**Phase BP BUILT 2026-10-04** (on `wave6`, vocab v67; gaps #76/#77 done; smoke pending — run right after BO's, Ryan's
+go-ahead; tester `generation/tests/gaptest-bp/`, `--validate-only` green). Merged suite: generation **602**, web **293**,
+`test_phase_bp` 299/299 (smoke record pending). Readings: index 9,250 (cap 72) · per-archetype max 74,247 (`exhaust_pyre`) ·
+per-archetype scaffold max 27,042 · triads 67,987 / 77,235 / 82,980 · all-ops 126,601 · `full` 118,114 (scaffold snapshot
+47,371, +193). See Findings (BP).

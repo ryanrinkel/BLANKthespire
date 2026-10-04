@@ -187,7 +187,8 @@ def test_coverage_menus_shuffle_on_concept_seed_and_drop_generic_head(v2):
     for menu in (xa, xb):
         assert menu[0][0] not in ("thorns", "metallicize")
         assert not {k for k, _ in menu} & {"thorns", "metallicize"}
-    assert {k for k, _ in ra} == {k for k, _ in coverage.REACTIVE_MENU_V2}
+    # Phase BP (v67): kinds=None (class unknown) deals no class-kind-gated key (on_evoke is orb-only, coverage.KEY_KIND)
+    assert {k for k, _ in ra} == {k for k, _ in coverage.REACTIVE_MENU_V2} - set(coverage.KEY_KIND)
 
 
 def test_coverage_menus_v1_fixed(v1):
@@ -405,13 +406,15 @@ BP_TRIADS = (
 )
 BP_READING = 108_282          # the untrimmed v2 path (= the `full` rollback with no selection) — 2026-09-30, Wave 5
 BP_READING_V1 = 108_179       # flag-off (informational)
-BP_READING_SCAFFOLD = 47_178  # BP_READING minus VOCABULARY.md: the `full` path's scaffold half, snapshotted by (e)
+BP_READING_SCAFFOLD = 47_371  # BP_READING minus VOCABULARY.md: the `full` path's scaffold half, snapshotted by (e)
                               # (45,537 at BH-3; +136 Phase BI v61: the TRIGGERS pitch's one-line filter sentence;
                               # +227 Phase BJ v62: the SCALED AMOUNTS history-reads sentence + the two new `when` names
                               # in the conditions pitch; +145 Phase BK v63: the SCALED AMOUNTS hit-count sentence; +340 Phase BL
                               # v64: the PRECISION READS enemy-Strength / Expose / Doom sentence; +301 Phase BM v65: the
                               # PRECISION READS prices / replays sentence; +492 Phase BO v66: one recursion sentence each in
-                              # the DISCARD, DECK-THINNING and SCALED AMOUNTS / RETAIN pitches)
+                              # the DISCARD, DECK-THINNING and SCALED AMOUNTS / RETAIN pitches;
+                              # +193 Phase BP v67: the translation-paragraph cost_delta clause, the TRIGGERS v67 sentence and
+                              # the on_evoke (orb) entry in the nomination ask's class-kind keys)
 BP_TREE_READING_SCAFFOLD = 46_323  # INFORMATIONAL reading, not asserted: the scaffold on the all-ops tree path
                                    # (45,789 at BH-3 = 45,537 + the index/detail pointer; 45,951 after BI v61;
                                    # 46,178 after BJ v62; 46,323 after BK v63)

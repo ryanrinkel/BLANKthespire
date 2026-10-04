@@ -90,9 +90,17 @@ _BUILD_AROUND_OPS = {"add_trigger", "apply_status_custom",
                      "replay_next", "retain_hand",  # Phase BM (v65, gaps #69/#70): replays / a held hand are tempo utilities
                      # Phase BO (v66, gaps #74/#75): recursion, put-back, the reshuffle and keyword grants are card-flow
                      # utilities, not stat lines
-                     "return_to_hand", "to_draw_top", "return_next_turn", "put_back", "shuffle_hand", "grant_keyword"}
+                     "return_to_hand", "to_draw_top", "return_next_turn", "put_back", "shuffle_hand", "grant_keyword",
+                     "cost_delta"}  # Phase BP (v67, gap #76): a self-cost rule is energy in disguise, not a stat line
 # Phase BD (v58, gap #58): the held_discount band (mirrors ForgedCards.HeldDiscountMaxAmount + the schema clause).
 _HELD_DISCOUNT_MAX = 2
+# Phase BP (v67, gaps #76/#77): the cost_delta shape (its events, lifetimes, the counted events, the signed band) and the
+# on_debuff_applied `status` filter. Mirrors ForgedCards.CostDeltaEvents / CostDeltaScopes / ValidateCostDelta /
+# DebuffTriggerStatuses + the schema clauses.
+_COST_DELTA_EVENTS = {"played", "drawn", "attack_played", "skill_played", "card_played", "card_exhausted"}
+_COST_DELTA_SCOPES = {"this_turn", "combat"}
+_COST_DELTA_MIN, _COST_DELTA_MAX = -2, 1
+_DEBUFF_TRIGGER_STATUSES = {"vulnerable", "weak", "frail", "poison", "doom"}
 # F5: the live state scalars an effect's amount may scale to (mirrors ForgedCards.SupportedScales). "x" stays
 # the X-cost scalar; the rest are hand/energy state reads. Only "cards_retained" is allowed inside a trigger.
 # Phase M: "forged" is the ADDITIVE exception (printed amount + the Forge counter) and is damage/block-only.
@@ -160,7 +168,10 @@ _MULTI_FIRE_TRIGGERS = {"on_hp_lost", "on_exhaust", "on_card_played", "on_card_d
                         "on_discard",  # Phase R (gap #17): a card can be discarded, redrawn, discarded again
                         "on_blade_played",  # Phase AJ (v40): the blade can be played several times a turn (C# parity)
                         "on_poison_damage",  # Phase BE (v59, gap #56): each poisoned enemy ticks separately
-                        "on_shuffle"}  # Phase BO (v66, gap #74): a thin deck can reshuffle more than once a turn
+                        "on_shuffle",  # Phase BO (v66, gap #74): a thin deck can reshuffle more than once a turn
+                        # Phase BP (v67, gap #77): every token / debuff / evoke is its own event (power-hosted: every_n /
+                        # this_turn / once_per_* legal)
+                        "on_card_generated", "on_debuff_applied", "on_evoke"}
 _ENEMY_DEBUFF_STATUSES = {"vulnerable", "weak", "frail", "poison",
                           "temp_strength_down", "doom"}  # Phase BL (v64): payload-legal (strength_down is card-only)
 # Phase BL (v64, gaps #66/#67): the enemy Strength-loss / Doom bands (plan §7 decision 6: Doom 12 per card, rare for 10+,
@@ -326,6 +337,51 @@ def vocab_misses(errors: list[str]) -> list[tuple[str, str]]:
             if m and _MISS_TOKEN_OK.match(m.group("tok")) and (kind, m.group("tok")) not in out:
                 out.append((kind, m.group("tok")))
     return out
+
+
+def _cost_delta_errors(e: dict, scale: str, hits) -> list[str]:
+    """Phase BP (v67, gap #76): the cost_delta shape. Mirrors ForgedCards.ValidateCostDelta."""
+    out: list[str] = []
+    on = str(e.get("on", "")).strip().lower()
+    sc = str(e.get("scope", "")).strip().lower()
+    amt = e.get("amount")
+    if on not in _COST_DELTA_EVENTS:
+        out.append(f"cost_delta needs an 'on' event (one of {'/'.join(sorted(_COST_DELTA_EVENTS))}); got '{e.get('on')}'.")
+    if sc not in _COST_DELTA_SCOPES:
+        out.append(f"cost_delta needs a 'scope' (one of {'/'.join(sorted(_COST_DELTA_SCOPES))}); got '{e.get('scope')}'.")
+    if any(e.get(k) is not None for k in ("status", "card_type", "count")) or scale or (isinstance(hits, int) and hits > 1):
+        out.append("cost_delta carries only 'on' + 'scope' + a signed 'amount' (or 'set_zero').")
+    if e.get("set_zero") is True:
+        if on != "played" or sc != "combat" or amt not in (None, 0):
+            out.append("cost_delta 'set_zero' is on:'played' + scope 'combat' with no amount (Momentum Strike: after you play it, it costs 0).")
+        return out
+    if not (isinstance(amt, int) and not isinstance(amt, bool) and amt != 0 and _COST_DELTA_MIN <= amt <= _COST_DELTA_MAX):
+        out.append(f"cost_delta 'amount' must be {_COST_DELTA_MIN}..-1 (cheaper) or +1 (dearer); got {amt!r}.")
+        return out
+    if amt > 0 and (on != "played" or sc != "combat"):
+        out.append("cost_delta +1 (a card that costs more each play — Modded) needs on:'played' + scope 'combat'.")
+    if on not in ("played", "drawn") and sc == "combat" and amt != -1:
+        out.append("cost_delta over a whole combat for another card's event moves the cost by 1 (amount -1).")
+    if on == "card_played" and sc != "this_turn":
+        out.append("cost_delta on:'card_played' is this_turn only (a whole-combat discount for EVERY card is free by turn 2).")
+    return out
+
+
+def _COST_DELTA_VALUE(eff: dict) -> float:
+    """Phase BP (v67, gap #76): the cost_delta price (energy in disguise; the +1 tax is negative)."""
+    if eff.get("set_zero") is True:
+        return 4.0
+    amt = eff.get("amount")
+    amt = amt if isinstance(amt, int) and not isinstance(amt, bool) else -1
+    if amt > 0:
+        return -2.0 * amt
+    n = float(-amt)
+    on = str(eff.get("on", "")).strip().lower()
+    combat = str(eff.get("scope", "")).strip().lower() == "combat"
+    if on in ("played", "drawn", "card_exhausted"):
+        return n * (3.0 if combat else 1.5)
+    # the counted forms: ~1-2 matching plays before you cast it this turn; a whole-combat count pays every turn
+    return 4.0 if combat else n * (3.0 if on == "card_played" else 2.0)
 
 
 class CardValidator:
@@ -807,12 +863,18 @@ class CardValidator:
                     out.append(f"replay_next 'count' (the plays that repeat) must be 1..{_REPLAY_MAX_COUNT}; got {rn!r}.")
                 if any(e.get(k) is not None for k in ("amount", "status", "scope")) or scale or (isinstance(hits, int) and hits > 1):
                     out.append("replay_next carries only 'card_type' + 'count' (no amount / status / scale / hits / scope).")
+            # Phase BP (v67, gap #76): cost_delta takes `on` + `scope` + a SIGNED amount (or set_zero). Mirrors
+            # ForgedCards.ValidateCostDelta.
+            elif op == "cost_delta":
+                out.extend(_cost_delta_errors(e, scale, hits))
             # Phase BI (v61): add_trigger also takes `scope` ("this_turn") + `card_type` (checked with the trigger rules).
             elif e.get("count") is not None or (e.get("scope") is not None and op != "add_trigger"):
                 out.append(f"'scope'/'count' only apply to cost_shift / replay_next ('scope':'this_turn' also to add_trigger) (op '{op}').")
             elif e.get("card_type") is not None and op not in ("exhaust_card", "draw_until", "add_trigger",  # Phase BC (v57)
                                                                "retrieve_card", "grant_keyword"):  # Phase BO (v66)
                 out.append(f"'card_type' only applies to cost_shift/replay_next/exhaust_card/draw_until/add_trigger/retrieve_card/grant_keyword (op '{op}').")
+            if (e.get("on") is not None or e.get("set_zero")) and op != "cost_delta":  # Phase BP (v67)
+                out.append(f"'on' / 'set_zero' only apply to cost_delta (op '{op}').")
             # Phase BM (v65, gap #70): block_next_turn — an amount 1..20 or scale "block" (Prolong); retain_hand is a flag-op.
             if op == "block_next_turn":
                 if e.get("status") is not None or (isinstance(hits, int) and hits > 1):
@@ -1071,6 +1133,31 @@ class CardValidator:
                 out.append("'return_to_hand' needs a card that costs 1+ energy (base and upgrade; a 0-cost one comes back forever).")
         if "to_draw_top" in bo_flags and any(ef.get("op") == "corruption" for ef in bo_all):
             out.append("'to_draw_top' can't share a card with 'corruption' (Corruption exhausts the Skill; the hook order would decide).")
+        # Phase BP (v67, gap #76): cost_delta at card level — one per effect list, never beside held_discount (one self-cost
+        # rule per card); a DISCOUNT needs a cost to lower (the held_discount rule); never on an X-cost card; on:"played"
+        # never on a Power; the upgrade keeps on / scope / set_zero (only the amount moves). Mirrors ForgedCards.
+        cd_all = [ef for ef in effects + up_effects if ef.get("op") == "cost_delta"]
+        for lst in (effects, up_effects):
+            if sum(1 for ef in lst if ef.get("op") == "cost_delta") > 1:
+                out.append("at most one 'cost_delta' effect per card (one self-cost rule per card).")
+        if cd_all:
+            if any(ef.get("op") == "held_discount" for ef in effects + up_effects):
+                out.append("'cost_delta' and 'held_discount' can't share a card (one self-cost rule per card).")
+            cdc = card.get("cost")
+            cd_x = isinstance(cdc, str) and cdc.strip().upper() == "X"
+            if cd_x:
+                out.append("'cost_delta' is not allowed on an X-cost card (X has no printed cost to move).")
+            elif any(ef.get("set_zero") is True or (isinstance(ef.get("amount"), int) and ef.get("amount") < 0) for ef in cd_all) \
+                    and not (isinstance(cdc, int) and not isinstance(cdc, bool) and cdc >= 1):
+                out.append("a 'cost_delta' discount needs a card that costs 1+ energy (not 0-cost, not X-cost) -- there is nothing to discount.")
+            if str(card.get("type", "")).strip().lower() == "power" and any(str(ef.get("on", "")).strip().lower() == "played" for ef in cd_all):
+                out.append("cost_delta on:'played' is not allowed on a Power (a Power is played once and leaves the piles).")
+            for i in range(min(len(effects), len(up_effects))):
+                b, u = effects[i], up_effects[i]
+                if "cost_delta" in (b.get("op"), u.get("op")) and (
+                        b.get("op") != u.get("op") or b.get("on") != u.get("on") or b.get("scope") != u.get("scope")
+                        or bool(b.get("set_zero")) != bool(u.get("set_zero"))):
+                    out.append("an upgrade can't change a cost_delta's 'on' / 'scope' / 'set_zero' (only its amount).")
         # Phase W (gap #19): self-purge. purge ⊥ exhaust (both mean "the card leaves after this play"; a card can't
         # do both). Never on a BASIC card — a purgeable basic could thin a class's floors (and reads as a trap). The
         # >3-per-class / merchant-floor concerns are class-level (character_validator). Mirrors ForgedCards.Validate.
@@ -1364,6 +1451,14 @@ class CardValidator:
                     out.append(f"'every_n' must be {_EVERY_N_MIN}..{_EVERY_N_MAX}; got {en!r}.")
                 if e.get("once_per_combat"):
                     out.append("'every_n' can't be combined with 'once_per_combat' (it would fire once, on the Nth event — use one or the other).")
+            # Phase BP (v67, gap #77): the add_trigger `status` filter belongs to on_debuff_applied (Vicious). Mirrors
+            # ForgedCards.ValidateTrigger.
+            tst = e.get("status")
+            if tst is not None:
+                if trig != "on_debuff_applied":
+                    out.append(f"an add_trigger 'status' filter only applies to on_debuff_applied (got '{trig}').")
+                elif str(tst).strip().lower() not in _DEBUFF_TRIGGER_STATUSES:
+                    out.append(f"an on_debuff_applied 'status' filter must be one of {'/'.join(sorted(_DEBUFF_TRIGGER_STATUSES))}; got '{tst}'.")
             sc = e.get("scope")
             if sc is not None:
                 if str(sc).strip().lower() != "this_turn":
@@ -1394,6 +1489,10 @@ class CardValidator:
                     # Phase AK (v41): 'attacker' (the creature that just hit you) exists only on the `attacked` trigger.
                     if tgt == "attacker" and e.get("trigger") != "attacked":
                         out.append(f"a trigger effect target 'attacker' is only valid on the 'attacked' trigger "
+                                   f"(got '{e.get('trigger')}').")
+                    # Phase BP (v67, gap #77): 'that_enemy' (the enemy you just debuffed) exists only on on_debuff_applied.
+                    if tgt == "that_enemy" and e.get("trigger") != "on_debuff_applied":
+                        out.append(f"a trigger effect target 'that_enemy' is only valid on the 'on_debuff_applied' trigger "
                                    f"(got '{e.get('trigger')}').")
                     if op == "apply_status" and str(t.get("status", "")).strip().lower() not in _ENEMY_DEBUFF_STATUSES:
                         out.append(f"a targeted trigger apply_status must be an enemy debuff "
@@ -1619,6 +1718,10 @@ class CardValidator:
         if op == "held_discount":
             # Phase BD (v58, gap #58): energy in disguise, paid for with the held turns — ~a third of gain_energy per point.
             return max(1.0, self._amt(eff.get("amount", 1))) * 2.0
+        if op == "cost_delta":
+            # Phase BP (v67, gap #76): energy in disguise. Momentum Strike's free-for-the-combat ~ a third of its replays;
+            # a whole-combat step pays every later play; a this-turn step ~ one cheaper play; the +1 tax (Modded) is a price.
+            return _COST_DELTA_VALUE(eff)
         if op == "exhaust_card":
             # Phase BC (v57, gap #52): exhausting your OWN hand is a COST — the card loses future plays — unless the
             # class has an on_exhaust engine (unseen here). Priced as a flat negative per card burned so the payoff half

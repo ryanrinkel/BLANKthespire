@@ -32,7 +32,8 @@ NEEDS_KINDS = frozenset({"", "orb", "status", "summon", "forge", "balance"})
 CLASS_ONLY_TOKENS = {
     "orb": {"channel_orb", "evoke", "gain_orb_slot", "focus", "orbs_match", "orb_count_ge",
             "temp_focus",  # Phase AN (v44): the one-turn Focus is orb-class-only like focus
-            "focus_decay", "lose_focus"},  # Phase BM (v65): the Focus drawbacks, likewise
+            "focus_decay", "lose_focus",  # Phase BM (v65): the Focus drawbacks, likewise
+            "on_evoke"},  # Phase BP (v67): the evoke trigger needs orbs
     "status": {"apply_status_custom"},
     "summon": {"summon", "summon_attack", "buff_summon", "heal_summon", "shield_summon",
                "sacrifice_summon"},  # Phase AV (v52)

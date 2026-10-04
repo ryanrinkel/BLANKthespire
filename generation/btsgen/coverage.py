@@ -81,6 +81,10 @@ REACTIVE_MENU_V2 = REACTIVE_MENU + [
     ("on_damage_dealt", 'REQUIRED: add an ongoing power (op "add_trigger", trigger "on_damage_dealt", once_per_turn) that rewards dealing damage.'),
     # Phase BO (v66, gap #74): the reshuffle payoff (a thin deck shuffles often; shuffle_hand does it on demand).
     ("on_shuffle", 'REQUIRED: add an ongoing power (op "add_trigger", trigger "on_shuffle") that pays off each time you shuffle your draw pile (1-3 Block or a draw).'),
+    # Phase BP (v67, gap #77): the token / debuff / evoke engines. on_evoke is ORB-class only (KEY_KIND gates it).
+    ("on_card_generated", 'REQUIRED: add an ongoing power (op "add_trigger", trigger "on_card_generated") that pays off each card you create (add_card tokens, Wounds) - 1-2 Block or Strength (Arsenal).'),
+    ("on_debuff_applied", 'REQUIRED: add an ongoing power (op "add_trigger", trigger "on_debuff_applied", optional "status" filter) that pays off each debuff you apply - e.g. 2-3 damage to that enemy (payload target "that_enemy", Sleight of Flesh).'),
+    ("on_evoke", 'REQUIRED: add an ongoing power (op "add_trigger", trigger "on_evoke") that pays off each time you Evoke an orb (2-3 Block or a draw).'),
 ]
 WHEN_MENU_V2 = WHEN_MENU + [
     ("hand_size_ge", 'REQUIRED: gate a bonus with `when` hand_size_ge value:4 (a full-hand payoff).'),
@@ -264,6 +268,7 @@ NOMINATION_CATEGORIES = ("reactive", "when", "exotic", "scale", "keyword", "sect
 NOMINATION_MAX = {"reactive": 3, "when": 4, "exotic": 3, "scale": 2, "keyword": 2, "sections": 4}
 # W2.2: key -> the class kind it needs ("" = any class). Gated keys are dropped from a class that lacks the kind.
 KEY_KIND = {k: kind for k, _d, kind in (WHEN_MENU_KIND + SCALE_MENU_KIND)}
+KEY_KIND["on_evoke"] = "orb"  # Phase BP (v67, gap #77): the evoke trigger is dealt to orb classes only
 
 
 def sanitize_nominations(raw) -> dict:
@@ -322,7 +327,8 @@ def _menus(nominated: dict | None, seed: int | None, kinds=None) -> tuple[list, 
         return list(REACTIVE_MENU), list(WHEN_MENU), list(EXOTIC_MENU)
     nominated = nominated or {}
     when_menu = list(WHEN_MENU_V2) + [(k, d) for k, d, kind in WHEN_MENU_KIND if _kind_ok(k, kinds)]
-    return (_pick("reactive", REACTIVE_MENU_V2, nominated, seed, kinds, "reactive"),
+    reactive_menu = [(k, d) for k, d in REACTIVE_MENU_V2 if _kind_ok(k, kinds)]  # Phase BP (v67): on_evoke is orb-gated
+    return (_pick("reactive", reactive_menu, nominated, seed, kinds, "reactive"),
             _pick("when", when_menu, nominated, seed, kinds, "when"),
             _pick("exotic", EXOTIC_MENU_V2, nominated, seed, kinds, "exotic"))
 

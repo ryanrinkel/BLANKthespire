@@ -67,8 +67,9 @@ def test_buildability_flips_with_gap_status() -> None:
     cat = load_catalog()
     live = C.live_vocab_tokens()
     e = cat.by_id["retain_hold"]
-    # Phase BM (v65): retain_hold also refs gap #70 (retain_hand); Phase BO (v66): + #74 / #75 — all done alongside #5 here
-    done = {70: "done", 74: "done", 75: "done"}
+    # Phase BM (v65): retain_hold also refs gap #70 (retain_hand); Phase BO (v66): + #74 / #75; Phase BP (v67): + #76
+    # (cost_delta) — all done alongside #5 here
+    done = {70: "done", 74: "done", 75: "done", 76: "done"}
     ok_done, _ = C.resolve_buildability(e.ops, e.gap_refs, live, {5: "done", **done})
     ok_cap, reasons = C.resolve_buildability(e.ops, e.gap_refs, live, {5: "captured", **done})
     check(ok_done, "retain_hold buildable when gap #5 is done")
