@@ -1,0 +1,939 @@
+# Phase BL AutoSlay smoke — seed GAPTESTBL2 (godot.log grep, 11811 lines)
+# [BL] lines: 917
+# mod exceptions: 0
+# BlankTheSpire stack frames: 0
+# BlankTheSpire frames in non-exception [ERROR] traces (logged, non-fatal): 4 -- [ERROR] Attempted to play animation on creature Creature Cubex Construct but its creature node doesn't exist!
+# Localization formatting errors: 0
+# exception lines (any source): 18
+# run end: [INFO] [AutoSlay] Action: Run completed (max floor reached). Abandoning
+# --- per-tag counts ---
+  artifact check                     116
+  doom                               228
+  doom from unblocked                 28
+  gaptest                            179
+  strength_down                       29
+  strip_artifact                      57
+  strip_block                         57
+  temp_strength_down                 150
+  temp_strength_down expired          73
+# artifact-check lines with shell 0->0: 108 of 116
+# strip_artifact with had >= 1: 18
+# doomed=True: 18
+# --- every [BL] line ---
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'ShrinkerBeetle' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'ShrinkerBeetle' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strength_down -2 on 'ShrinkerBeetle' (Str now -2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'ShrinkerBeetle' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] artifact check: 'ShrinkerBeetle' Artifact 2 blocked temp_strength_down, Str now -2 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'ShrinkerBeetle' Artifact 1 blocked temp_strength_down, Str now -2 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'ShrinkerBeetle' (Str now -11).
+[INFO] [BlankTheSpire] [BL] doom from unblocked 14 ('Blighted Edge').
+[INFO] [BlankTheSpire] [BL] doom +14 on 'ShrinkerBeetle' (HP 27, Doom 14, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now -2) on 'ShrinkerBeetle' (had 9).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'ShrinkerBeetle' (HP 15, Doom 17, doomed=True).
+[INFO] [BlankTheSpire] [BL] doom from unblocked 8 ('Blighted Edge').
+[INFO] [BlankTheSpire] [BL] doom +8 on 'TwigSlimeS' (HP 0, Doom 0, doomed=True).
+[INFO] [BlankTheSpire] [BL] strength_down -2 on 'LeafSlimeS' (Str now -2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'TwigSlimeM' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'LeafSlimeS' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'LeafSlimeS' (HP 6, Doom 0, doomed=False) - blocked by Artifact 1.
+[INFO] [BlankTheSpire] [BL] artifact check: 'TwigSlimeM' Artifact 1 blocked strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'TwigSlimeM' (HP 15, Doom 3, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'LeafSlimeS' (HP 6, Doom 3, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'TwigSlimeM' (Str now -9).
+[INFO] [BlankTheSpire] [BL] doom +9 on 'LeafSlimeS' (HP 6, Doom 12, doomed=True).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'TwigSlimeM' (Str now -15).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'LeafSlimeS' (Str now -8).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 0) on 'TwigSlimeM' (had 15).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'TwigSlimeM' (HP 8, Doom 6, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'TwigSlimeM' (Str now -6).
+[INFO] [BlankTheSpire] [BL] doom from unblocked 14 ('Blighted Edge').
+[INFO] [BlankTheSpire] [BL] doom +14 on 'Nibbit' (HP 31, Doom 14, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'Nibbit' (Str now -9).
+[INFO] [BlankTheSpire] [BL] strength_down -3 on 'Nibbit' (Str now -12).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Nibbit' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'SnappingJaxfruit' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'SnappingJaxfruit' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'SnappingJaxfruit' (Str now -6).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'Flyconid' (Str now -6).
+[INFO] [BlankTheSpire] [BL] gaptest: 'SnappingJaxfruit' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Flyconid' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 2) on 'SnappingJaxfruit' (had 6).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 0) on 'Flyconid' (had 6).
+[INFO] [BlankTheSpire] [BL] artifact check: 'Flyconid' Artifact 1 blocked strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'Flyconid' (Str now -9).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 0) on 'Flyconid' (had 9).
+[INFO] [BlankTheSpire] [BL] doom +9 on 'SnappingJaxfruit' (HP 16, Doom 9, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'SnappingJaxfruit' (Str now -5).
+[INFO] [BlankTheSpire] [BL] strength_down -3 on 'Flyconid' (Str now -3).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'Flyconid' (Str now -9).
+[INFO] [BlankTheSpire] [BL] doom from unblocked 8 ('Blighted Edge').
+[INFO] [BlankTheSpire] [BL] doom +8 on 'Flyconid' (HP 0, Doom 0, doomed=True).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Fogmog' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Fogmog' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] artifact check: 'Fogmog' Artifact 4 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] doom +9 on 'Fogmog' (HP 65, Doom 0, doomed=False) - blocked by Artifact 3.
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'EyeWithTeeth' (Str now -6).
+[INFO] [BlankTheSpire] [BL] artifact check: 'Fogmog' Artifact 1 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'EyeWithTeeth' (Str now -15).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 0) on 'EyeWithTeeth' (had 15).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'EyeWithTeeth' (HP 5, Doom 3, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'Fogmog' (HP 62, Doom 3, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom from unblocked 5 ('Blighted Edge').
+[INFO] [BlankTheSpire] [BL] doom +5 on 'EyeWithTeeth' (HP 0, Doom 0, doomed=True).
+[INFO] [BlankTheSpire] [BL] strength_down -2 on 'Fogmog' (Str now -1).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'Fogmog' (Str now -7).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 0) on 'Fogmog' (had 6).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'EyeWithTeeth' (HP 6, Doom 3, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'Fogmog' (HP 45, Doom 6, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'Fogmog' (HP 45, Doom 9, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +9 on 'EyeWithTeeth' (HP 6, Doom 12, doomed=True).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'Fogmog' (HP 42, Doom 12, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +9 on 'Fogmog' (HP 34, Doom 21, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom from unblocked 9 ('Blighted Edge').
+[INFO] [BlankTheSpire] [BL] doom +9 on 'Fogmog' (HP 25, Doom 30, doomed=True).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'Fogmog' (Str now -6).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'Fogmog' (Str now -12).
+[INFO] [BlankTheSpire] [BL] doom +9 on 'CubexConstruct' (HP 70, Doom 0, doomed=False) - blocked by Artifact 1.
+[INFO] [BlankTheSpire] [BL] gaptest: 'CubexConstruct' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'CubexConstruct' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] artifact check: 'CubexConstruct' Artifact 4 blocked strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'CubexConstruct' Artifact 3 blocked temp_strength_down, Str now 2 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'CubexConstruct' Artifact 2 blocked temp_strength_down, Str now 2 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'CubexConstruct' Artifact 1 blocked strength_down, Str now 2 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'CubexConstruct' (Str now -2).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 6) on 'CubexConstruct' (had 6).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'CubexConstruct' (HP 47, Doom 3, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'CubexConstruct' (HP 47, Doom 6, doomed=False).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'CubexConstruct' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'CubexConstruct' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] doom from unblocked 13 ('Blighted Edge').
+[INFO] [BlankTheSpire] [BL] doom +13 on 'CubexConstruct' (HP 24, Doom 19, doomed=False).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Inklet' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Inklet' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Inklet' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Inklet' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Inklet' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Inklet' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Inklet' gains Artifact 2 (now 6).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Inklet' gains Artifact 2 (now 6).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Inklet' gains Artifact 2 (now 6).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'Inklet' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 5) on 'Inklet' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] artifact check: 'Inklet' Artifact 5 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'Inklet' Artifact 4 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] doom +9 on 'Inklet' (HP 1, Doom 0, doomed=False) - blocked by Artifact 3.
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'Byrdonis' (Str now -9).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Byrdonis' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'Byrdonis' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 2) on 'Byrdonis' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] gaptest: 'Byrdonis' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Byrdonis' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 1) on 'Byrdonis' (had 9).
+[INFO] [BlankTheSpire] [BL] doom from unblocked 21 ('Blighted Edge').
+[INFO] [BlankTheSpire] [BL] doom +21 on 'Byrdonis' (HP 56, Doom 0, doomed=False) - blocked by Artifact 4.
+[INFO] [BlankTheSpire] [BL] artifact check: 'Byrdonis' Artifact 3 blocked temp_strength_down, Str now 1 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'Byrdonis' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 2) on 'Byrdonis' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] doom +3 on 'Byrdonis' (HP 35, Doom 3, doomed=False).
+[INFO] [BlankTheSpire] [BL] strength_down -2 on 'Byrdonis' (Str now 0).
+[INFO] [BlankTheSpire] [BL] doom +9 on 'Byrdonis' (HP 35, Doom 12, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'Byrdonis' (HP 24, Doom 15, doomed=False).
+[INFO] [BlankTheSpire] [BL] strength_down -3 on 'Byrdonis' (Str now -2).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'Byrdonis' (Str now -11).
+[INFO] [BlankTheSpire] [BL] gaptest: 'LeafSlimeM' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Flyconid' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'LeafSlimeM' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Flyconid' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] artifact check: 'LeafSlimeM' Artifact 4 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'Flyconid' Artifact 4 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] gaptest: 'LeafSlimeM' gains Artifact 2 (now 5).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Flyconid' gains Artifact 2 (now 5).
+[INFO] [BlankTheSpire] [BL] artifact check: 'LeafSlimeM' Artifact 4 blocked strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] doom from unblocked 14 ('Blighted Edge').
+[INFO] [BlankTheSpire] [BL] doom +14 on 'Flyconid' (HP 30, Doom 0, doomed=False) - blocked by Artifact 4.
+[INFO] [BlankTheSpire] [BL] artifact check: 'Flyconid' Artifact 3 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'LeafSlimeM' (HP 24, Doom 0, doomed=False) - blocked by Artifact 3.
+[INFO] [BlankTheSpire] [BL] doom +3 on 'Flyconid' (HP 30, Doom 0, doomed=False) - blocked by Artifact 2.
+[INFO] [BlankTheSpire] [BL] strength_down -2 on 'Flyconid' (Str now -2).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'LeafSlimeM' (HP 19, Doom 0, doomed=False) - blocked by Artifact 1.
+[INFO] [BlankTheSpire] [BL] doom +3 on 'Flyconid' (HP 15, Doom 3, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +8 on 'LeafSlimeM' (Str now -8).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +8 on 'Flyconid' (Str now -10).
+[INFO] [BlankTheSpire] [BL] doom +9 on 'Flyconid' (HP 15, Doom 12, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 0) on 'LeafSlimeM' (had 8).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'LeafSlimeM' (HP 7, Doom 3, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'LeafSlimeM' (Str now -9).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'LeafSlimeM' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'LeafSlimeM' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'LeafSlimeM' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'LeafSlimeM' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] doom +3 on 'LeafSlimeM' (HP 2, Doom 6, doomed=True).
+[INFO] [BlankTheSpire] [BL] gaptest: 'KinFollower' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'KinFollower' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'KinPriest' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'KinFollower' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] gaptest: 'KinFollower' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] gaptest: 'KinPriest' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] gaptest: 'KinFollower' gains Artifact 2 (now 6).
+[INFO] [BlankTheSpire] [BL] gaptest: 'KinFollower' gains Artifact 2 (now 6).
+[INFO] [BlankTheSpire] [BL] gaptest: 'KinPriest' gains Artifact 2 (now 6).
+[INFO] [BlankTheSpire] [BL] artifact check: 'KinFollower' Artifact 5 blocked temp_strength_down, Str now 3 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'KinFollower' Artifact 5 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'KinPriest' Artifact 5 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'KinFollower' Artifact 4 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'KinFollower' (HP 36, Doom 0, doomed=False) - blocked by Artifact 4.
+[INFO] [BlankTheSpire] [BL] doom +3 on 'KinFollower' (HP 29, Doom 0, doomed=False) - blocked by Artifact 3.
+[INFO] [BlankTheSpire] [BL] doom +3 on 'KinPriest' (HP 188, Doom 0, doomed=False) - blocked by Artifact 4.
+[INFO] [BlankTheSpire] [BL] doom from unblocked 6 ('Blighted Edge').
+[INFO] [BlankTheSpire] [BL] doom +6 on 'KinPriest' (HP 182, Doom 0, doomed=False) - blocked by Artifact 2.
+[INFO] [BlankTheSpire] [BL] artifact check: 'KinPriest' Artifact 1 blocked strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] strength_down -3 on 'KinPriest' (Str now -3).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'KinFollower' (HP 32, Doom 0, doomed=False) - blocked by Artifact 2.
+[INFO] [BlankTheSpire] [BL] doom +3 on 'KinFollower' (HP 24, Doom 0, doomed=False) - blocked by Artifact 1.
+[INFO] [BlankTheSpire] [BL] doom +3 on 'KinPriest' (HP 176, Doom 3, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'KinPriest' (Str now -12).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'KinFollower' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'KinFollower' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 0) on 'KinPriest' (had 9).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'KinFollower' (HP 27, Doom 3, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'KinFollower' (HP 16, Doom 3, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'KinPriest' (HP 171, Doom 6, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'KinFollower' (Str now 0).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'KinFollower' (Str now -3).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'KinPriest' (Str now -6).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'KinFollower' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'KinFollower' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] doom +3 on 'KinFollower' (HP 5, Doom 6, doomed=True).
+[INFO] [BlankTheSpire] [BL] doom +6 on 'KinFollower' (HP 1, Doom 9, doomed=True).
+[INFO] [BlankTheSpire] [BL] doom +6 on 'KinPriest' (HP 166, Doom 12, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'KinFollower' (Str now -9).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'KinPriest' (Str now -12).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 0) on 'KinPriest' (had 12).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'KinPriest' (HP 162, Doom 15, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'KinPriest' (Str now -9).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'KinPriest' (HP 150, Doom 18, doomed=False).
+[INFO] [BlankTheSpire] [BL] gaptest: 'KinPriest' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] artifact check: 'KinPriest' Artifact 2 blocked temp_strength_down, Str now -9 (shell 9->9).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 0) on 'KinPriest' (had 9).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'KinPriest' (HP 122, Doom 18, doomed=False) - blocked by Artifact 1.
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'KinPriest' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'KinPriest' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'KinPriest' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'KinPriest' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] doom from unblocked 10 ('Blighted Edge').
+[INFO] [BlankTheSpire] [BL] doom +10 on 'KinPriest' (HP 112, Doom 28, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'KinPriest' (Str now -6).
+[INFO] [BlankTheSpire] [BL] gaptest: 'KinPriest' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 0) on 'KinPriest' (had 6).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'KinPriest' (HP 98, Doom 28, doomed=False) - blocked by Artifact 2.
+[INFO] [BlankTheSpire] [BL] gaptest: 'KinPriest' gains Artifact 2 (now 3).
+[INFO] [BlankTheSpire] [BL] gaptest: 'KinPriest' gains Artifact 2 (now 5).
+[INFO] [BlankTheSpire] [BL] doom +9 on 'KinPriest' (HP 46, Doom 28, doomed=False) - blocked by Artifact 5.
+[INFO] [BlankTheSpire] [BL] doom +3 on 'KinPriest' (HP 41, Doom 28, doomed=False) - blocked by Artifact 4.
+[INFO] [BlankTheSpire] [BL] doom from unblocked 10 ('Blighted Edge').
+[INFO] [BlankTheSpire] [BL] doom +10 on 'KinPriest' (HP 31, Doom 28, doomed=False) - blocked by Artifact 3.
+[INFO] [BlankTheSpire] [BL] gaptest: 'KinPriest' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] artifact check: 'KinPriest' Artifact 4 blocked temp_strength_down, Str now 3 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'Exoskeleton' (Str now -9).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Exoskeleton' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Exoskeleton' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Exoskeleton' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Exoskeleton' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Exoskeleton' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Exoskeleton' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] doom +9 on 'Exoskeleton' (HP 20, Doom 0, doomed=False) - blocked by Artifact 4.
+[INFO] [BlankTheSpire] [BL] gaptest: 'Exoskeleton' gains Artifact 2 (now 6).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Exoskeleton' gains Artifact 2 (now 6).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Exoskeleton' gains Artifact 2 (now 5).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'Exoskeleton' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 6) on 'Exoskeleton' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 0) on 'Exoskeleton' (had 9).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'Exoskeleton' (HP 15, Doom 0, doomed=False) - blocked by Artifact 4.
+[INFO] [BlankTheSpire] [BL] artifact check: 'Exoskeleton' Artifact 3 blocked temp_strength_down, Str now 2 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +8 on 'Exoskeleton' (Str now -8).
+[INFO] [BlankTheSpire] [BL] artifact check: 'Exoskeleton' Artifact 2 blocked temp_strength_down, Str now 2 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 2) on 'Exoskeleton' (had 8).
+[INFO] [BlankTheSpire] [BL] strength_down -2 on 'Exoskeleton' (Str now 0).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'Exoskeleton' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'Exoskeleton' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] gaptest: 'BowlbugRock' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'BowlbugEgg' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] artifact check: 'BowlbugEgg' Artifact 2 blocked strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] gaptest: 'BowlbugRock' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] gaptest: 'BowlbugEgg' gains Artifact 2 (now 3).
+[INFO] [BlankTheSpire] [BL] gaptest: 'BowlbugRock' gains Artifact 2 (now 6).
+[INFO] [BlankTheSpire] [BL] gaptest: 'BowlbugEgg' gains Artifact 2 (now 5).
+[INFO] [BlankTheSpire] [BL] artifact check: 'BowlbugRock' Artifact 6 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'BowlbugEgg' Artifact 5 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'BowlbugRock' Artifact 4 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'BowlbugEgg' Artifact 3 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'BowlbugRock' Artifact 3 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'BowlbugRock' (HP 31, Doom 0, doomed=False) - blocked by Artifact 2.
+[INFO] [BlankTheSpire] [BL] doom +3 on 'BowlbugEgg' (HP 1, Doom 0, doomed=False) - blocked by Artifact 2.
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'BowlbugRock' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'BowlbugRock' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] doom +9 on 'BowlbugRock' (HP 31, Doom 9, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'BowlbugRock' (Str now -6).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 0) on 'BowlbugRock' (had 6).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'BowlbugRock' (HP 23, Doom 12, doomed=False).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'BowlbugRock' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'BowlbugRock' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] doom +3 on 'BowlbugRock' (HP 23, Doom 15, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'BowlbugRock' (Str now -9).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'LouseProgenitor' (HP 128, Doom 3, doomed=False).
+[INFO] [BlankTheSpire] [BL] gaptest: 'LouseProgenitor' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'LouseProgenitor' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] gaptest: 'LouseProgenitor' gains Artifact 2 (now 6).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'LouseProgenitor' (HP 125, Doom 3, doomed=False) - blocked by Artifact 6.
+[INFO] [BlankTheSpire] [BL] artifact check: 'LouseProgenitor' Artifact 5 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] doom +9 on 'LouseProgenitor' (HP 125, Doom 3, doomed=False) - blocked by Artifact 4.
+[INFO] [BlankTheSpire] [BL] artifact check: 'LouseProgenitor' Artifact 3 blocked strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'LouseProgenitor' (HP 120, Doom 3, doomed=False) - blocked by Artifact 2.
+[INFO] [BlankTheSpire] [BL] artifact check: 'LouseProgenitor' Artifact 1 blocked temp_strength_down, Str now 5 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] strip_block 6->0 on 'LouseProgenitor' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'LouseProgenitor' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strength_down -3 on 'LouseProgenitor' (Str now 2).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'LouseProgenitor' (HP 112, Doom 6, doomed=False).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'LouseProgenitor' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'LouseProgenitor' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'LouseProgenitor' (Str now -4).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'LouseProgenitor' (Str now -13).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 2) on 'LouseProgenitor' (had 15).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'LouseProgenitor' (HP 91, Doom 9, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'LouseProgenitor' (Str now -4).
+[INFO] [BlankTheSpire] [BL] gaptest: 'LouseProgenitor' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] artifact check: 'LouseProgenitor' Artifact 2 blocked temp_strength_down, Str now -4 (shell 6->6).
+[INFO] [BlankTheSpire] [BL] artifact check: 'LouseProgenitor' Artifact 1 blocked temp_strength_down, Str now -4 (shell 6->6).
+[INFO] [BlankTheSpire] [BL] doom from unblocked 13 ('Blighted Edge').
+[INFO] [BlankTheSpire] [BL] doom +13 on 'LouseProgenitor' (HP 63, Doom 22, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 7) on 'LouseProgenitor' (had 6).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'LouseProgenitor' (HP 63, Doom 25, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'LouseProgenitor' (HP 63, Doom 28, doomed=False).
+[INFO] [BlankTheSpire] [BL] strip_block 18->0 on 'LouseProgenitor' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'LouseProgenitor' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] gaptest: 'LouseProgenitor' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'BowlbugRock' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'BowlbugSilk' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'SlumberingBeetle' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] artifact check: 'BowlbugRock' Artifact 2 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] gaptest: 'BowlbugRock' gains Artifact 2 (now 3).
+[INFO] [BlankTheSpire] [BL] gaptest: 'BowlbugSilk' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] gaptest: 'SlumberingBeetle' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] gaptest: 'BowlbugRock' gains Artifact 2 (now 5).
+[INFO] [BlankTheSpire] [BL] gaptest: 'BowlbugSilk' gains Artifact 2 (now 6).
+[INFO] [BlankTheSpire] [BL] gaptest: 'SlumberingBeetle' gains Artifact 2 (now 6).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'BowlbugRock' (HP 37, Doom 0, doomed=False) - blocked by Artifact 5.
+[INFO] [BlankTheSpire] [BL] doom +3 on 'BowlbugSilk' (HP 33, Doom 0, doomed=False) - blocked by Artifact 6.
+[INFO] [BlankTheSpire] [BL] doom +3 on 'SlumberingBeetle' (HP 89, Doom 0, doomed=False) - blocked by Artifact 6.
+[INFO] [BlankTheSpire] [BL] artifact check: 'BowlbugRock' Artifact 3 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'BowlbugSilk' Artifact 4 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'SlumberingBeetle' Artifact 4 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] strip_block 18->0 on 'SlumberingBeetle' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 3) on 'SlumberingBeetle' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] artifact check: 'BowlbugRock' Artifact 2 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'BowlbugSilk' Artifact 3 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'SlumberingBeetle' (Str now -6).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 0) on 'SlumberingBeetle' (had 6).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'BowlbugRock' (HP 32, Doom 0, doomed=False) - blocked by Artifact 1.
+[INFO] [BlankTheSpire] [BL] doom +3 on 'BowlbugSilk' (HP 24, Doom 0, doomed=False) - blocked by Artifact 2.
+[INFO] [BlankTheSpire] [BL] doom +3 on 'SlumberingBeetle' (HP 84, Doom 3, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +9 on 'BowlbugRock' (HP 32, Doom 9, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'BowlbugRock' (Str now -6).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'BowlbugSilk' (Str now -6).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'SlumberingBeetle' (Str now -6).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'BowlbugRock' (Str now -12).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'BowlbugSilk' (Str now -12).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'SlumberingBeetle' (Str now -12).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 0) on 'BowlbugRock' (had 12).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 0) on 'BowlbugSilk' (had 12).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 2) on 'SlumberingBeetle' (had 12).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'BowlbugRock' (HP 25, Doom 12, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'BowlbugSilk' (HP 19, Doom 3, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'SlumberingBeetle' (HP 81, Doom 6, doomed=False).
+[INFO] [BlankTheSpire] [BL] strength_down -2 on 'SlumberingBeetle' (Str now 0).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'BowlbugRock' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'BowlbugRock' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'SlumberingBeetle' (Str now -9).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 2) on 'SlumberingBeetle' (had 9).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'BowlbugRock' (HP 20, Doom 15, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'SlumberingBeetle' (HP 70, Doom 9, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'SlumberingBeetle' (Str now -7).
+[INFO] [BlankTheSpire] [BL] strength_down -3 on 'BowlbugRock' (Str now -3).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'SlumberingBeetle' (HP 70, Doom 12, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +12 on 'BowlbugRock' (HP 11, Doom 27, doomed=True).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'BowlbugRock' (Str now -12).
+[INFO] [BlankTheSpire] [BL] doom from unblocked 9 ('Blighted Edge').
+[INFO] [BlankTheSpire] [BL] doom +9 on 'SlumberingBeetle' (HP 48, Doom 21, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +8 on 'SlumberingBeetle' (Str now -15).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'SlumberingBeetle' (Str now -21).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 4) on 'SlumberingBeetle' (had 23).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'SlumberingBeetle' (HP 45, Doom 24, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'SlumberingBeetle' (Str now -5).
+[INFO] [BlankTheSpire] [BL] gaptest: 'SlumberingBeetle' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'SlumberingBeetle' (HP 41, Doom 24, doomed=False) - blocked by Artifact 2.
+[INFO] [BlankTheSpire] [BL] artifact check: 'SlumberingBeetle' Artifact 1 blocked temp_strength_down, Str now -5 (shell 9->9).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'SlumberingBeetle' (Str now -11).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 6) on 'SlumberingBeetle' (had 15).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'SlumberingBeetle' (HP 34, Doom 27, doomed=False).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'SlumberingBeetle' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'SlumberingBeetle' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'SlumberingBeetle' (Str now 0).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Myte' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Myte' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Myte' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Myte' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Myte' gains Artifact 2 (now 6).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Myte' gains Artifact 2 (now 6).
+[INFO] [BlankTheSpire] [BL] artifact check: 'Myte' Artifact 6 blocked strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Myte' gains Artifact 2 (now 7).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Myte' gains Artifact 2 (now 8).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'Myte' (HP 64, Doom 0, doomed=False) - blocked by Artifact 7.
+[INFO] [BlankTheSpire] [BL] doom +3 on 'Myte' (HP 60, Doom 0, doomed=False) - blocked by Artifact 8.
+[INFO] [BlankTheSpire] [BL] artifact check: 'Myte' Artifact 5 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'Myte' Artifact 6 blocked temp_strength_down, Str now 3 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] doom from unblocked 14 ('Blighted Edge').
+[INFO] [BlankTheSpire] [BL] doom +14 on 'Myte' (HP 49, Doom 0, doomed=False) - blocked by Artifact 4.
+[INFO] [BlankTheSpire] [BL] artifact check: 'Myte' Artifact 3 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'Myte' Artifact 5 blocked temp_strength_down, Str now 3 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'Myte' Artifact 2 blocked strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'Myte' (HP 41, Doom 0, doomed=False) - blocked by Artifact 1.
+[INFO] [BlankTheSpire] [BL] doom +3 on 'Myte' (HP 55, Doom 0, doomed=False) - blocked by Artifact 4.
+[INFO] [BlankTheSpire] [BL] artifact check: 'Myte' Artifact 2 blocked temp_strength_down, Str now 3 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'Myte' (HP 34, Doom 3, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'Myte' (HP 42, Doom 0, doomed=False) - blocked by Artifact 1.
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'Myte' (Str now -6).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'Myte' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'Myte' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] doom +9 on 'Myte' (HP 27, Doom 9, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 3) on 'Myte' (had 9).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'Myte' (HP 23, Doom 6, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'Myte' (HP 18, Doom 12, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'Myte' (Str now -3).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'Myte' (Str now 0).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'Myte' (Str now -12).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'Myte' (HP 9, Doom 15, doomed=True).
+[INFO] [BlankTheSpire] [BL] doom +15 on 'Myte' (HP 16, Doom 21, doomed=True).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'Myte' (Str now -18).
+[INFO] [BlankTheSpire] [BL] strength_down -2 on 'SpinyToad' (Str now -2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'SpinyToad' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'SpinyToad' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] gaptest: 'SpinyToad' gains Artifact 2 (now 6).
+[INFO] [BlankTheSpire] [BL] artifact check: 'SpinyToad' Artifact 6 blocked temp_strength_down, Str now -2 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] gaptest: 'SpinyToad' gains Artifact 2 (now 7).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'SpinyToad' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 7) on 'SpinyToad' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] doom +9 on 'SpinyToad' (HP 114, Doom 9, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'SpinyToad' (HP 110, Doom 12, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'SpinyToad' (Str now -11).
+[INFO] [BlankTheSpire] [BL] strength_down -3 on 'SpinyToad' (Str now -14).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'SpinyToad' (Str now -23).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'SpinyToad' (Str now -29).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now -5) on 'SpinyToad' (had 24).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'SpinyToad' (HP 67, Doom 15, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'SpinyToad' (Str now -11).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'SpinyToad' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'SpinyToad' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] doom +3 on 'SpinyToad' (HP 42, Doom 18, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now -5) on 'SpinyToad' (had 6).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'SpinyToad' (HP 37, Doom 21, doomed=False).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Entomancer' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Entomancer' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Entomancer' gains Artifact 2 (now 6).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Entomancer' gains Artifact 2 (now 8).
+[INFO] [BlankTheSpire] [BL] artifact check: 'Entomancer' Artifact 8 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'Entomancer' Artifact 7 blocked strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'Entomancer' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 6) on 'Entomancer' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'Entomancer' (Str now -6).
+[INFO] [BlankTheSpire] [BL] strength_down -3 on 'Entomancer' (Str now -9).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now -2) on 'Entomancer' (had 6).
+[INFO] [BlankTheSpire] [BL] doom +9 on 'Entomancer' (HP 85, Doom 9, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'Entomancer' (HP 85, Doom 12, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'Entomancer' (Str now -8).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now -2) on 'Entomancer' (had 6).
+[INFO] [BlankTheSpire] [BL] doom from unblocked 9 ('Blighted Edge').
+[INFO] [BlankTheSpire] [BL] doom +9 on 'Entomancer' (HP 47, Doom 21, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'Entomancer' (Str now -11).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now -1) on 'Entomancer' (had 9).
+[INFO] [BlankTheSpire] [BL] gaptest: 'DecimillipedeSegmentFront' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'DecimillipedeSegmentMiddle' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'DecimillipedeSegmentBack' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'DecimillipedeSegmentFront' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] gaptest: 'DecimillipedeSegmentMiddle' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] gaptest: 'DecimillipedeSegmentBack' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] gaptest: 'DecimillipedeSegmentFront' gains Artifact 2 (now 6).
+[INFO] [BlankTheSpire] [BL] gaptest: 'DecimillipedeSegmentMiddle' gains Artifact 2 (now 6).
+[INFO] [BlankTheSpire] [BL] gaptest: 'DecimillipedeSegmentBack' gains Artifact 2 (now 6).
+[INFO] [BlankTheSpire] [BL] gaptest: 'DecimillipedeSegmentFront' gains Artifact 2 (now 8).
+[INFO] [BlankTheSpire] [BL] gaptest: 'DecimillipedeSegmentMiddle' gains Artifact 2 (now 8).
+[INFO] [BlankTheSpire] [BL] gaptest: 'DecimillipedeSegmentBack' gains Artifact 2 (now 8).
+[INFO] [BlankTheSpire] [BL] gaptest: 'DecimillipedeSegmentFront' gains Artifact 2 (now 10).
+[INFO] [BlankTheSpire] [BL] gaptest: 'DecimillipedeSegmentMiddle' gains Artifact 2 (now 10).
+[INFO] [BlankTheSpire] [BL] gaptest: 'DecimillipedeSegmentBack' gains Artifact 2 (now 10).
+[INFO] [BlankTheSpire] [BL] doom +9 on 'DecimillipedeSegmentMiddle' (HP 32, Doom 0, doomed=False) - blocked by Artifact 9.
+[INFO] [BlankTheSpire] [BL] artifact check: 'DecimillipedeSegmentFront' Artifact 9 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'DecimillipedeSegmentMiddle' Artifact 8 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'DecimillipedeSegmentBack' Artifact 9 blocked temp_strength_down, Str now 2 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'DecimillipedeSegmentMiddle' Artifact 7 blocked strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'DecimillipedeSegmentFront' (HP 27, Doom 0, doomed=False) - blocked by Artifact 7.
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'DecimillipedeSegmentBack' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 7) on 'DecimillipedeSegmentBack' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] doom +3 on 'DecimillipedeSegmentFront' (HP 23, Doom 0, doomed=False) - blocked by Artifact 6.
+[INFO] [BlankTheSpire] [BL] doom +3 on 'DecimillipedeSegmentMiddle' (HP 18, Doom 0, doomed=False) - blocked by Artifact 5.
+[INFO] [BlankTheSpire] [BL] doom +3 on 'DecimillipedeSegmentBack' (HP 18, Doom 3, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'DecimillipedeSegmentFront' (HP 12, Doom 0, doomed=False) - blocked by Artifact 4.
+[INFO] [BlankTheSpire] [BL] doom +3 on 'DecimillipedeSegmentMiddle' (HP 14, Doom 0, doomed=False) - blocked by Artifact 3.
+[INFO] [BlankTheSpire] [BL] doom +3 on 'DecimillipedeSegmentBack' (HP 11, Doom 6, doomed=False).
+[INFO] [BlankTheSpire] [BL] artifact check: 'DecimillipedeSegmentFront' Artifact 2 blocked temp_strength_down, Str now 2 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'DecimillipedeSegmentMiddle' Artifact 1 blocked temp_strength_down, Str now 2 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'DecimillipedeSegmentBack' (Str now -2).
+[INFO] [BlankTheSpire] [BL] artifact check: 'DecimillipedeSegmentFront' Artifact 1 blocked temp_strength_down, Str now 2 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +8 on 'DecimillipedeSegmentFront' (Str now -6).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +8 on 'DecimillipedeSegmentMiddle' (Str now -6).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +8 on 'DecimillipedeSegmentBack' (Str now -10).
+[INFO] [BlankTheSpire] [BL] strength_down -2 on 'DecimillipedeSegmentFront' (Str now -8).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 2) on 'DecimillipedeSegmentFront' (had 8).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 2) on 'DecimillipedeSegmentMiddle' (had 8).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'DecimillipedeSegmentFront' (HP 1, Doom 3, doomed=True).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'DecimillipedeSegmentMiddle' (HP 7, Doom 3, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'DecimillipedeSegmentMiddle' (Str now -7).
+[INFO] [BlankTheSpire] [BL] doom from unblocked 1 ('Blighted Edge').
+[INFO] [BlankTheSpire] [BL] doom +1 on 'DecimillipedeSegmentFront' (HP 0, Doom 0, doomed=True).
+[INFO] [BlankTheSpire] [BL] gaptest: 'KnowledgeDemon' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'KnowledgeDemon' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] gaptest: 'KnowledgeDemon' gains Artifact 2 (now 6).
+[INFO] [BlankTheSpire] [BL] artifact check: 'KnowledgeDemon' Artifact 6 blocked strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] gaptest: 'KnowledgeDemon' gains Artifact 2 (now 7).
+[INFO] [BlankTheSpire] [BL] gaptest: 'KnowledgeDemon' gains Artifact 2 (now 9).
+[INFO] [BlankTheSpire] [BL] artifact check: 'KnowledgeDemon' Artifact 9 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'KnowledgeDemon' Artifact 8 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'KnowledgeDemon' Artifact 7 blocked strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'KnowledgeDemon' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 6) on 'KnowledgeDemon' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'KnowledgeDemon' (Str now -9).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 0) on 'KnowledgeDemon' (had 9).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'KnowledgeDemon' (HP 346, Doom 3, doomed=False).
+[INFO] [BlankTheSpire] [BL] strength_down -2 on 'KnowledgeDemon' (Str now -2).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'KnowledgeDemon' (Str now -8).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +8 on 'KnowledgeDemon' (Str now -16).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 1) on 'KnowledgeDemon' (had 14).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'KnowledgeDemon' (HP 336, Doom 6, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom from unblocked 9 ('Blighted Edge').
+[INFO] [BlankTheSpire] [BL] doom +9 on 'KnowledgeDemon' (HP 327, Doom 15, doomed=False).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'KnowledgeDemon' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'KnowledgeDemon' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] doom +9 on 'KnowledgeDemon' (HP 327, Doom 24, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'KnowledgeDemon' (Str now -5).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 1) on 'KnowledgeDemon' (had 6).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'KnowledgeDemon' (HP 313, Doom 27, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'KnowledgeDemon' (Str now -8).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 1) on 'KnowledgeDemon' (had 9).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'KnowledgeDemon' (HP 304, Doom 30, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'KnowledgeDemon' (Str now -5).
+[INFO] [BlankTheSpire] [BL] doom from unblocked 13 ('Blighted Edge').
+[INFO] [BlankTheSpire] [BL] doom +13 on 'KnowledgeDemon' (HP 291, Doom 43, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 1) on 'KnowledgeDemon' (had 6).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'KnowledgeDemon' (HP 213, Doom 46, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'KnowledgeDemon' (Str now -5).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 4) on 'KnowledgeDemon' (had 6).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'KnowledgeDemon' (HP 198, Doom 49, doomed=False).
+[INFO] [BlankTheSpire] [BL] gaptest: 'KnowledgeDemon' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'KnowledgeDemon' (HP 190, Doom 49, doomed=False) - blocked by Artifact 2.
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'KnowledgeDemon' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 1) on 'KnowledgeDemon' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] doom +3 on 'KnowledgeDemon' (HP 126, Doom 52, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'KnowledgeDemon' (Str now -2).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 4) on 'KnowledgeDemon' (had 6).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'KnowledgeDemon' (HP 96, Doom 55, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'KnowledgeDemon' (Str now -2).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'KnowledgeDemon' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'KnowledgeDemon' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 7) on 'KnowledgeDemon' (had 6).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'KnowledgeDemon' (HP 118, Doom 58, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom from unblocked 13 ('Blighted Edge').
+[INFO] [BlankTheSpire] [BL] doom +13 on 'KnowledgeDemon' (HP 105, Doom 71, doomed=False).
+[INFO] [BlankTheSpire] [BL] gaptest: 'DevotedSculptor' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'DevotedSculptor' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] gaptest: 'DevotedSculptor' gains Artifact 2 (now 6).
+[INFO] [BlankTheSpire] [BL] gaptest: 'DevotedSculptor' gains Artifact 2 (now 8).
+[INFO] [BlankTheSpire] [BL] doom +9 on 'DevotedSculptor' (HP 167, Doom 0, doomed=False) - blocked by Artifact 8.
+[INFO] [BlankTheSpire] [BL] gaptest: 'DevotedSculptor' gains Artifact 2 (now 9).
+[INFO] [BlankTheSpire] [BL] artifact check: 'DevotedSculptor' Artifact 9 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'DevotedSculptor' Artifact 8 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'DevotedSculptor' (HP 130, Doom 0, doomed=False) - blocked by Artifact 7.
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'DevotedSculptor' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 6) on 'DevotedSculptor' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'DevotedSculptor' (Str now 3).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 18) on 'DevotedSculptor' (had 6).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'DevotedSculptor' (Str now 12).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 27) on 'DevotedSculptor' (had 6).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'DevotedSculptor' (HP 101, Doom 3, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'DevotedSculptor' (Str now 21).
+[INFO] [BlankTheSpire] [BL] strength_down -3 on 'DevotedSculptor' (Str now 18).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'DevotedSculptor' (Str now 9).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 33) on 'DevotedSculptor' (had 15).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'DevotedSculptor' (HP 83, Doom 6, doomed=False).
+[INFO] [BlankTheSpire] [BL] strength_down -2 on 'DevotedSculptor' (Str now 31).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'DevotedSculptor' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'DevotedSculptor' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'DevotedSculptor' (Str now 22).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'DevotedSculptor' (Str now 13).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 40) on 'DevotedSculptor' (had 18).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'DevotedSculptor' (HP 56, Doom 9, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'DevotedSculptor' (Str now 34).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +8 on 'DevotedSculptor' (Str now 26).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'DevotedSculptor' (HP 29, Doom 12, doomed=False).
+[INFO] [BlankTheSpire] [BL] gaptest: 'DevotedSculptor' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 49) on 'DevotedSculptor' (had 14).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'DevotedSculptor' (HP 25, Doom 12, doomed=False) - blocked by Artifact 2.
+[INFO] [BlankTheSpire] [BL] gaptest: 'DevotedSculptor' gains Artifact 2 (now 3).
+[INFO] [BlankTheSpire] [BL] gaptest: 'LivingShield' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'TurretOperator' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'LivingShield' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] gaptest: 'TurretOperator' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] gaptest: 'LivingShield' gains Artifact 2 (now 6).
+[INFO] [BlankTheSpire] [BL] gaptest: 'TurretOperator' gains Artifact 2 (now 6).
+[INFO] [BlankTheSpire] [BL] gaptest: 'LivingShield' gains Artifact 2 (now 8).
+[INFO] [BlankTheSpire] [BL] gaptest: 'TurretOperator' gains Artifact 2 (now 8).
+[INFO] [BlankTheSpire] [BL] gaptest: 'LivingShield' gains Artifact 2 (now 10).
+[INFO] [BlankTheSpire] [BL] gaptest: 'TurretOperator' gains Artifact 2 (now 10).
+[INFO] [BlankTheSpire] [BL] gaptest: 'LivingShield' gains Artifact 2 (now 12).
+[INFO] [BlankTheSpire] [BL] gaptest: 'TurretOperator' gains Artifact 2 (now 12).
+[INFO] [BlankTheSpire] [BL] artifact check: 'LivingShield' Artifact 11 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'TurretOperator' Artifact 11 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'LivingShield' Artifact 10 blocked strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'LivingShield' (HP 31, Doom 0, doomed=False) - blocked by Artifact 9.
+[INFO] [BlankTheSpire] [BL] doom +3 on 'TurretOperator' (HP 21, Doom 0, doomed=False) - blocked by Artifact 10.
+[INFO] [BlankTheSpire] [BL] artifact check: 'TurretOperator' Artifact 8 blocked strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'LivingShield' Artifact 7 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'TurretOperator' Artifact 7 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'LivingShield' Artifact 6 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'TurretOperator' Artifact 6 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'LivingShield' (HP 24, Doom 0, doomed=False) - blocked by Artifact 5.
+[INFO] [BlankTheSpire] [BL] doom +3 on 'TurretOperator' (HP 21, Doom 0, doomed=False) - blocked by Artifact 5.
+[INFO] [BlankTheSpire] [BL] doom from unblocked 9 ('Blighted Edge').
+[INFO] [BlankTheSpire] [BL] doom +9 on 'LivingShield' (HP 15, Doom 0, doomed=False) - blocked by Artifact 3.
+[INFO] [BlankTheSpire] [BL] artifact check: 'LivingShield' Artifact 2 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'TurretOperator' Artifact 3 blocked temp_strength_down, Str now 1 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'LivingShield' Artifact 1 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'TurretOperator' Artifact 2 blocked temp_strength_down, Str now 1 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'LivingShield' (HP 11, Doom 3, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'TurretOperator' (HP 6, Doom 0, doomed=False) - blocked by Artifact 1.
+[INFO] [BlankTheSpire] [BL] temp_strength_down +8 on 'LivingShield' (Str now -8).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +8 on 'TurretOperator' (Str now -7).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'TurretOperator' (HP 6, Doom 3, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'LivingShield' (HP 11, Doom 6, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +8 on 'LivingShield' (Str now -16).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'LivingShield' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'LivingShield' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] gaptest: 'PunchConstruct' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'CubexConstruct' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'CubexConstruct' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'PunchConstruct' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] gaptest: 'CubexConstruct' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] gaptest: 'CubexConstruct' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] gaptest: 'PunchConstruct' gains Artifact 2 (now 6).
+[INFO] [BlankTheSpire] [BL] gaptest: 'CubexConstruct' gains Artifact 2 (now 6).
+[INFO] [BlankTheSpire] [BL] gaptest: 'CubexConstruct' gains Artifact 2 (now 6).
+[INFO] [BlankTheSpire] [BL] gaptest: 'PunchConstruct' gains Artifact 2 (now 8).
+[INFO] [BlankTheSpire] [BL] gaptest: 'CubexConstruct' gains Artifact 2 (now 8).
+[INFO] [BlankTheSpire] [BL] gaptest: 'CubexConstruct' gains Artifact 2 (now 8).
+[INFO] [BlankTheSpire] [BL] gaptest: 'PunchConstruct' gains Artifact 2 (now 10).
+[INFO] [BlankTheSpire] [BL] gaptest: 'CubexConstruct' gains Artifact 2 (now 10).
+[INFO] [BlankTheSpire] [BL] gaptest: 'CubexConstruct' gains Artifact 2 (now 10).
+[INFO] [BlankTheSpire] [BL] artifact check: 'PunchConstruct' Artifact 9 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'CubexConstruct' Artifact 9 blocked temp_strength_down, Str now 2 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'CubexConstruct' Artifact 9 blocked temp_strength_down, Str now 2 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'CubexConstruct' Artifact 7 blocked strength_down, Str now 4 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'PunchConstruct' Artifact 7 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'CubexConstruct' Artifact 7 blocked temp_strength_down, Str now 4 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'CubexConstruct' Artifact 6 blocked temp_strength_down, Str now 4 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'PunchConstruct' Artifact 6 blocked strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'PunchConstruct' Artifact 5 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'CubexConstruct' Artifact 6 blocked temp_strength_down, Str now 4 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'CubexConstruct' Artifact 5 blocked temp_strength_down, Str now 4 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] doom +9 on 'CubexConstruct' (HP 47, Doom 0, doomed=False) - blocked by Artifact 4.
+[INFO] [BlankTheSpire] [BL] doom +3 on 'PunchConstruct' (HP 38, Doom 0, doomed=False) - blocked by Artifact 4.
+[INFO] [BlankTheSpire] [BL] doom +3 on 'CubexConstruct' (HP 47, Doom 0, doomed=False) - blocked by Artifact 5.
+[INFO] [BlankTheSpire] [BL] doom +3 on 'CubexConstruct' (HP 45, Doom 0, doomed=False) - blocked by Artifact 3.
+[INFO] [BlankTheSpire] [BL] artifact check: 'CubexConstruct' Artifact 3 blocked temp_strength_down, Str now 6 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'PunchConstruct' (HP 37, Doom 0, doomed=False) - blocked by Artifact 2.
+[INFO] [BlankTheSpire] [BL] artifact check: 'PunchConstruct' Artifact 1 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'CubexConstruct' Artifact 2 blocked temp_strength_down, Str now 6 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'CubexConstruct' Artifact 1 blocked temp_strength_down, Str now 6 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'CubexConstruct' Artifact 1 blocked temp_strength_down, Str now 6 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'PunchConstruct' (HP 32, Doom 3, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'CubexConstruct' (HP 36, Doom 3, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'CubexConstruct' (HP 33, Doom 3, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'PunchConstruct' (Str now -6).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'CubexConstruct' (Str now 0).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'CubexConstruct' (Str now 0).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'PunchConstruct' (Str now -12).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'CubexConstruct' (Str now -6).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'CubexConstruct' (Str now -6).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'CubexConstruct' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'CubexConstruct' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 0) on 'PunchConstruct' (had 12).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 8) on 'CubexConstruct' (had 12).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'PunchConstruct' (HP 26, Doom 6, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'CubexConstruct' (HP 21, Doom 6, doomed=False).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'CubexConstruct' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'CubexConstruct' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'CubexConstruct' (Str now -1).
+[INFO] [BlankTheSpire] [BL] strength_down -2 on 'CubexConstruct' (Str now -3).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'PunchConstruct' (HP 14, Doom 9, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'PunchConstruct' (Str now -6).
+[INFO] [BlankTheSpire] [BL] doom +9 on 'PunchConstruct' (HP 14, Doom 18, doomed=True).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +8 on 'OwlMagistrate' (Str now -8).
+[INFO] [BlankTheSpire] [BL] gaptest: 'OwlMagistrate' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'OwlMagistrate' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] gaptest: 'OwlMagistrate' gains Artifact 2 (now 6).
+[INFO] [BlankTheSpire] [BL] gaptest: 'OwlMagistrate' gains Artifact 2 (now 8).
+[INFO] [BlankTheSpire] [BL] gaptest: 'OwlMagistrate' gains Artifact 2 (now 10).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 0) on 'OwlMagistrate' (had 8).
+[INFO] [BlankTheSpire] [BL] artifact check: 'OwlMagistrate' Artifact 10 blocked strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'OwlMagistrate' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 9) on 'OwlMagistrate' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] doom +3 on 'OwlMagistrate' (HP 208, Doom 3, doomed=False).
+[INFO] [BlankTheSpire] [BL] strength_down -3 on 'OwlMagistrate' (Str now -3).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'OwlMagistrate' (Str now -9).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now -3) on 'OwlMagistrate' (had 6).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'OwlMagistrate' (HP 178, Doom 6, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'OwlMagistrate' (Str now -12).
+[INFO] [BlankTheSpire] [BL] doom from unblocked 4 ('Blighted Edge').
+[INFO] [BlankTheSpire] [BL] doom +4 on 'OwlMagistrate' (HP 170, Doom 10, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'OwlMagistrate' (Str now -18).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'OwlMagistrate' (Str now -24).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'OwlMagistrate' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'OwlMagistrate' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now -3) on 'OwlMagistrate' (had 21).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'OwlMagistrate' (HP 163, Doom 13, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +9 on 'OwlMagistrate' (HP 163, Doom 22, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'OwlMagistrate' (Str now -9).
+[INFO] [BlankTheSpire] [BL] strength_down -2 on 'OwlMagistrate' (Str now -11).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'OwlMagistrate' (Str now -20).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'OwlMagistrate' (Str now -26).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now -5) on 'OwlMagistrate' (had 21).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'OwlMagistrate' (HP 134, Doom 25, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'OwlMagistrate' (HP 134, Doom 28, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +8 on 'OwlMagistrate' (Str now -13).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'OwlMagistrate' (Str now -22).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now -5) on 'OwlMagistrate' (had 17).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'OwlMagistrate' (HP 45, Doom 31, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +9 on 'OwlMagistrate' (HP 45, Doom 40, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'OwlMagistrate' (Str now -11).
+[INFO] [BlankTheSpire] [BL] gaptest: 'OwlMagistrate' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'OwlMagistrate' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 2) on 'OwlMagistrate' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'OwlMagistrate' (Str now -17).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'OwlMagistrate' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'OwlMagistrate' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] gaptest: 'SlimedBerserker' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'SlimedBerserker' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] gaptest: 'SlimedBerserker' gains Artifact 2 (now 6).
+[INFO] [BlankTheSpire] [BL] gaptest: 'SlimedBerserker' gains Artifact 2 (now 8).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'SlimedBerserker' (HP 276, Doom 0, doomed=False) - blocked by Artifact 8.
+[INFO] [BlankTheSpire] [BL] gaptest: 'SlimedBerserker' gains Artifact 2 (now 9).
+[INFO] [BlankTheSpire] [BL] artifact check: 'SlimedBerserker' Artifact 9 blocked temp_strength_down, Str now 0 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'SlimedBerserker' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 8) on 'SlimedBerserker' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'SlimedBerserker' (Str now -6).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +8 on 'SlimedBerserker' (Str now -14).
+[INFO] [BlankTheSpire] [BL] doom from unblocked 10 ('Blighted Edge').
+[INFO] [BlankTheSpire] [BL] doom +10 on 'SlimedBerserker' (HP 215, Doom 10, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 3) on 'SlimedBerserker' (had 14).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'SlimedBerserker' (HP 215, Doom 13, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'SlimedBerserker' (Str now -3).
+[INFO] [BlankTheSpire] [BL] strength_down -3 on 'SlimedBerserker' (Str now -6).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 0) on 'SlimedBerserker' (had 6).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'SlimedBerserker' (HP 182, Doom 16, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'SlimedBerserker' (Str now -9).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'SlimedBerserker' (Str now -18).
+[INFO] [BlankTheSpire] [BL] strength_down -2 on 'SlimedBerserker' (Str now -20).
+[INFO] [BlankTheSpire] [BL] strength_down -2 on 'SlimedBerserker' (Str now -22).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +8 on 'SlimedBerserker' (Str now -30).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now -4) on 'SlimedBerserker' (had 26).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'SlimedBerserker' (HP 161, Doom 19, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +9 on 'SlimedBerserker' (HP 161, Doom 28, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'SlimedBerserker' (Str now -10).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'SlimedBerserker' (Str now -16).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'SlimedBerserker' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'SlimedBerserker' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'SlimedBerserker' (Str now -25).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now -4) on 'SlimedBerserker' (had 21).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'SlimedBerserker' (HP 120, Doom 31, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'SlimedBerserker' (Str now -10).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'SlimedBerserker' (Str now -16).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'SlimedBerserker' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'SlimedBerserker' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] doom +3 on 'SlimedBerserker' (HP 105, Doom 34, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now -1) on 'SlimedBerserker' (had 12).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'SlimedBerserker' (HP 60, Doom 37, doomed=False).
+[INFO] [BlankTheSpire] [BL] gaptest: 'SlimedBerserker' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] artifact check: 'SlimedBerserker' Artifact 2 blocked temp_strength_down, Str now -1 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'SlimedBerserker' Artifact 1 blocked temp_strength_down, Str now -1 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'SlimedBerserker' (HP 44, Doom 40, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +9 on 'SlimedBerserker' (HP 44, Doom 49, doomed=True).
+[INFO] [BlankTheSpire] [BL] gaptest: 'SlimedBerserker' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Axebot' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'Axebot' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 2) on 'Axebot' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] gaptest: 'Axebot' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Axebot' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Axebot' gains Artifact 2 (now 6).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Axebot' gains Artifact 2 (now 8).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'Axebot' (HP 63, Doom 0, doomed=False) - blocked by Artifact 8.
+[INFO] [BlankTheSpire] [BL] doom +3 on 'Axebot' (HP 63, Doom 0, doomed=False) - blocked by Artifact 7.
+[INFO] [BlankTheSpire] [BL] doom +9 on 'Axebot' (HP 63, Doom 0, doomed=False) - blocked by Artifact 6.
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'Axebot' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 5) on 'Axebot' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] doom +3 on 'Axebot' (HP 52, Doom 3, doomed=False).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'Axebot' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'Axebot' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'Axebot' (Str now -6).
+[INFO] [BlankTheSpire] [BL] doom from unblocked 10 ('Blighted Edge').
+[INFO] [BlankTheSpire] [BL] doom +10 on 'Axebot' (HP 3, Doom 13, doomed=True).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'Axebot' (HP 83, Doom 3, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'Axebot' (Str now -6).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'Axebot' (Str now -15).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'Axebot' (Str now -21).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'Axebot' (Str now -27).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'Axebot' (Str now -33).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 4) on 'Axebot' (had 33).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'Axebot' (HP 63, Doom 6, doomed=False).
+[INFO] [BlankTheSpire] [BL] strength_down -2 on 'Axebot' (Str now 2).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +8 on 'Axebot' (Str now -6).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +8 on 'Axebot' (Str now -14).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 2) on 'Axebot' (had 16).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'Axebot' (HP 61, Doom 9, doomed=False).
+[INFO] [BlankTheSpire] [BL] strength_down -2 on 'Axebot' (Str now 0).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +8 on 'Axebot' (Str now -8).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 0) on 'Axebot' (had 8).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'Axebot' (HP 33, Doom 12, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'Axebot' (Str now -9).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'Axebot' (Str now -18).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Axebot' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] artifact check: 'Axebot' Artifact 2 blocked temp_strength_down, Str now -18 (shell 18->18).
+[INFO] [BlankTheSpire] [BL] artifact check: 'Axebot' Artifact 1 blocked strength_down, Str now -18 (shell 18->18).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'Axebot' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'Axebot' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 0) on 'Axebot' (had 18).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'Axebot' (HP 18, Doom 15, doomed=False).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'Axebot' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'Axebot' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'Axebot' (Str now -6).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 8) on 'Axebot' (had 6).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'Axebot' (HP 70, Doom 3, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +9 on 'Axebot' (HP 70, Doom 12, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +8 on 'Axebot' (Str now 0).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Axebot' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] artifact check: 'Axebot' Artifact 2 blocked temp_strength_down, Str now 0 (shell 8->8).
+[INFO] [BlankTheSpire] [BL] artifact check: 'Axebot' Artifact 1 blocked temp_strength_down, Str now 0 (shell 8->8).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 8) on 'Axebot' (had 8).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'Axebot' (HP 63, Doom 15, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'Axebot' (Str now 2).
+[INFO] [BlankTheSpire] [BL] doom from unblocked 6 ('Blighted Edge').
+[INFO] [BlankTheSpire] [BL] doom +6 on 'Axebot' (HP 53, Doom 21, doomed=False).
+[INFO] [BlankTheSpire] [BL] gaptest: 'Axebot' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 8) on 'Axebot' (had 6).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'Axebot' (HP 44, Doom 21, doomed=False) - blocked by Artifact 2.
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'Axebot' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 1) on 'Axebot' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] gaptest: 'Axebot' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'TestSubject' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'TestSubject' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] gaptest: 'TestSubject' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'TestSubject' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 2) on 'TestSubject' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] gaptest: 'TestSubject' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] artifact check: 'TestSubject' Artifact 2 blocked strength_down, Str now 12 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] gaptest: 'TestSubject' gains Artifact 2 (now 3).
+[INFO] [BlankTheSpire] [BL] gaptest: 'TestSubject' gains Artifact 2 (now 5).
+[INFO] [BlankTheSpire] [BL] gaptest: 'TestSubject' gains Artifact 2 (now 7).
+[INFO] [BlankTheSpire] [BL] artifact check: 'TestSubject' Artifact 7 blocked temp_strength_down, Str now 24 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'TestSubject' Artifact 6 blocked temp_strength_down, Str now 27 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'TestSubject' Artifact 5 blocked temp_strength_down, Str now 30 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'TestSubject' Artifact 4 blocked temp_strength_down, Str now 33 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'TestSubject' Artifact 3 blocked temp_strength_down, Str now 36 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] doom from unblocked 11 ('Blighted Edge').
+[INFO] [BlankTheSpire] [BL] doom +11 on 'TestSubject' (HP 4, Doom 0, doomed=False) - blocked by Artifact 2.
+[INFO] [BlankTheSpire] [BL] doom +3 on 'TestSubject' (HP 212, Doom 3, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'TestSubject' (HP 212, Doom 6, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +8 on 'TestSubject' (Str now -8).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'TestSubject' (HP 212, Doom 9, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'TestSubject' (Str now -14).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 0) on 'TestSubject' (had 14).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'TestSubject' (HP 167, Doom 12, doomed=False).
+[INFO] [BlankTheSpire] [BL] strength_down -2 on 'TestSubject' (Str now -2).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'TestSubject' (Str now -11).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'TestSubject' (Str now -20).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now -2) on 'TestSubject' (had 18).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'TestSubject' (HP 137, Doom 15, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'TestSubject' (Str now -8).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'TestSubject' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'TestSubject' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now -2) on 'TestSubject' (had 6).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'TestSubject' (HP 57, Doom 18, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'TestSubject' (Str now -8).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'TestSubject' (Str now -14).
+[INFO] [BlankTheSpire] [BL] gaptest: 'TestSubject' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'TestSubject' (HP 313, Doom 3, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'TestSubject' (Str now -9).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'TestSubject' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'TestSubject' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] gaptest: 'TestSubject' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 0) on 'TestSubject' (had 9).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'TestSubject' (HP 305, Doom 3, doomed=False) - blocked by Artifact 2.
+[INFO] [BlankTheSpire] [BL] doom +3 on 'TestSubject' (HP 305, Doom 3, doomed=False) - blocked by Artifact 1.
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'TestSubject' (Str now -6).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'TestSubject' (Str now -12).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 0) on 'TestSubject' (had 12).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'TestSubject' (HP 284, Doom 6, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'TestSubject' (Str now -6).
+[INFO] [BlankTheSpire] [BL] doom from unblocked 1 ('Blighted Edge').
+[INFO] [BlankTheSpire] [BL] doom +1 on 'TestSubject' (HP 282, Doom 7, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'TestSubject' (Str now -12).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +8 on 'TestSubject' (Str now -20).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'TestSubject' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'TestSubject' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 3) on 'TestSubject' (had 20).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'TestSubject' (HP 281, Doom 10, doomed=False).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'TestSubject' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'TestSubject' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] gaptest: 'TestSubject' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'TestSubject' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'TestSubject' (HP 252, Doom 10, doomed=False) - blocked by Artifact 4.
+[INFO] [BlankTheSpire] [BL] doom +3 on 'TestSubject' (HP 251, Doom 10, doomed=False) - blocked by Artifact 3.
+[INFO] [BlankTheSpire] [BL] artifact check: 'TestSubject' Artifact 2 blocked temp_strength_down, Str now 3 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'TestSubject' Artifact 1 blocked temp_strength_down, Str now 3 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +9 on 'TestSubject' (Str now -6).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'TestSubject' (Str now -12).
+[INFO] [BlankTheSpire] [BL] temp_strength_down expired (Str now 3) on 'TestSubject' (had 15).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'TestSubject' (HP 246, Doom 13, doomed=False).
+[INFO] [BlankTheSpire] [BL] gaptest: 'TestSubject' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] gaptest: 'TestSubject' gains Artifact 2 (now 4).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'TestSubject' (HP 230, Doom 13, doomed=False) - blocked by Artifact 4.
+[INFO] [BlankTheSpire] [BL] gaptest: 'TestSubject' gains Artifact 2 (now 5).
+[INFO] [BlankTheSpire] [BL] artifact check: 'TestSubject' Artifact 5 blocked temp_strength_down, Str now 6 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'TestSubject' Artifact 4 blocked temp_strength_down, Str now 6 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] gaptest: 'TestSubject' gains Artifact 2 (now 5).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'TestSubject' (HP 223, Doom 13, doomed=False) - blocked by Artifact 5.
+[INFO] [BlankTheSpire] [BL] doom +3 on 'TestSubject' (HP 223, Doom 13, doomed=False) - blocked by Artifact 4.
+[INFO] [BlankTheSpire] [BL] doom +9 on 'TestSubject' (HP 211, Doom 13, doomed=False) - blocked by Artifact 3.
+[INFO] [BlankTheSpire] [BL] artifact check: 'TestSubject' Artifact 2 blocked temp_strength_down, Str now 6 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'TestSubject' (HP 200, Doom 13, doomed=False) - blocked by Artifact 1.
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'TestSubject' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'TestSubject' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] gaptest: 'TestSubject' gains Artifact 2 (now 2).
+[INFO] [BlankTheSpire] [BL] artifact check: 'TestSubject' Artifact 2 blocked temp_strength_down, Str now 6 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] artifact check: 'TestSubject' Artifact 1 blocked temp_strength_down, Str now 6 (shell 0->0).
+[INFO] [BlankTheSpire] [BL] doom from unblocked 1 ('Blighted Edge').
+[INFO] [BlankTheSpire] [BL] doom +1 on 'TestSubject' (HP 196, Doom 14, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'TestSubject' (HP 196, Doom 17, doomed=False).
+[INFO] [BlankTheSpire] [BL] strip_block 0->0 on 'TestSubject' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] strip_artifact (had 0) on 'TestSubject' ('Lay Bare').
+[INFO] [BlankTheSpire] [BL] doom +3 on 'TestSubject' (HP 135, Doom 20, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'TestSubject' (HP 134, Doom 23, doomed=False).
+[INFO] [BlankTheSpire] [BL] doom +3 on 'TestSubject' (HP 132, Doom 26, doomed=False).
+[INFO] [BlankTheSpire] [BL] temp_strength_down +6 on 'TestSubject' (Str now 3).

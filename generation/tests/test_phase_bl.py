@@ -7,8 +7,8 @@ Doom site copied from poison, the Blight Strike widening of damage_dealt_unblock
 debuff count); the validator rules on both sides; the describe byte-match (Python literals asserted, the C# fragments
 grepped); the contract surfaces (schema, VOCABULARY rows, statuses/*.json, gate order, census, coverage, featured,
 archetypes, exemplars, heuristics, gap log, render.js, the pitch sentence, the per-class Doom warning); the tester's
-validate-only path; the saved AutoSlay tag greps under tests/gaptest-bl/ IF they exist (otherwise "smoke pending" —
-the smoke runs after Ryan's go-ahead); and prints the rule-0.9 readings.
+validate-only path; the saved AutoSlay tag greps under tests/gaptest-bl/ (GAPTESTBL1 / BL2); and prints the rule-0.9
+readings.
 """
 from __future__ import annotations
 
@@ -400,16 +400,12 @@ def _t_tester() -> None:
 
 def _t_smoke_record() -> None:
     print("the saved AutoSlay tag greps (TEST_AUDIT_2026-10 §7):")
-    recs = [TESTER_DIR / f"godot_BL_tags_{s}.txt" for s in SMOKE_SEEDS]
-    if not any(p.exists() for p in recs):
-        print("  smoke pending (no godot_BL_tags_*.txt yet — the smoke runs after Ryan's go-ahead)")
-        return
     seen = ""
-    for p in recs:
-        if not p.exists():
-            print(f"  smoke pending for {p.name}")
-            continue
+    for s in SMOKE_SEEDS:
+        p = TESTER_DIR / f"godot_BL_tags_{s}.txt"
+        assert p.exists(), f"missing smoke record {p}"
         txt = p.read_text(encoding="utf-8")
+        check("Run completed" in txt, f"{p.name}: the run completed")
         check("[BL]" in txt, f"{p.name} holds [BL] tags")
         check("mod exceptions: 0" in txt and "Localization formatting errors: 0" in txt
               and "BlankTheSpire stack frames: 0" in txt, f"{p.name} records a clean run")
@@ -418,6 +414,10 @@ def _t_smoke_record() -> None:
         check(t in seen, f"the smoke fired '{t}'")
     check(re.search(r"\[BL\] artifact check: '[^']+' Artifact \d+ blocked temp_strength_down, Str now -?\d+ \(shell 0->0\)", seen)
           is not None, "the sign-flip proof: an Artifact enemy's temp Strength Down was negated WHOLE (shell 0->0)")
+    # every blocked Strength Down left the shell exactly as it was (0->0 = nothing to restore; N->N = a shell applied
+    # BEFORE the Artifact arrived, untouched by the blocked apply) — Artifact never grows a shell
+    shells = re.findall(r"\[BL\] artifact check: .*\(shell (\d+)->(\d+)\)", seen)
+    check(shells and all(a == b for a, b in shells), f"no blocked Strength Down ever grew a shell ({len(shells)} checks)")
     check(re.search(r"\[BL\] strip_artifact \(had [1-9]", seen) is not None, "strip_artifact removed a real Artifact stack")
     check("doomed=True" in seen, "a Doom stack reached the enemy's HP")
 

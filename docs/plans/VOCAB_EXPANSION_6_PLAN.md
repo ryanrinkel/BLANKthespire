@@ -496,7 +496,7 @@ Expose, a Doom stacker + Time's Up, **an Artifact-enemy check** (seed through an
 **Tags:** `[BL] temp_strength_down +N on '<monster>' (Str now <s>)`, `[BL] temp_strength_down expired`, `[BL]
 strength_down -N`, `[BL] strip_block <b>->0`, `[BL] strip_artifact (had <n>)`, `[BL] doom +N on '<monster>' (HP <hp>,
 Doom <d>, doomed=<bool>)`.
-**Findings (BL, built 2026-10-04 on `wave6`, smoke pending Ryan's go-ahead):** (1) Verify-first held: BaseLib
+**Findings (BL, done 2026-10-04 on `wave6`):** (1) Verify-first held: BaseLib
 `CustomTemporaryPowerModel.Type => InternallyAppliedPower.Type` (Buff for Strength), so the `PowerType.Debuff` override
 on `ForgedTempStrengthDownPower` is in; DECOMP `PowerCmd.Apply` calls `BeforeApplied` with the Artifact-modified amount
 (0 → applies -0 = nothing) and `ApplyInternal` skips a 0-amount power, so a blocked shell leaves NOTHING to restore.
@@ -517,6 +517,16 @@ per class = `character_validator.doom_warnings` (advisory, wired in `character_p
 snapshot 46,045 → 46,385 (+340, the PRECISION READS sentence); stale pins in test_phase_bf / bj updated.
 (8) Readings: index 8,065 (cap 72) · per-archetype max 70,043 (`exhaust_pyre`) · per-archetype scaffold max 26,056 ·
 triads 63,021 / 72,817 / 79,252 · all-ops 120,084 · all-ops scaffold 46,663 (informational) · `full` 112,782.
+(9) Smoke (tests/gaptest-bl, one build, no code iteration): GAPTESTBL1 completed the run — 890 [BL] lines, 117 artifact
+checks (115 `shell 0->0`; the other 2 `shell 6->6` = a shell applied BEFORE the injected Artifact, left untouched — its
+expiry restored only what it took), strip_artifact had >= 1 on 15 plays, doomed=True 28x, Blight Strike 35x. The first
+GAPTESTBL2 launch never reached the game ("no AutoSlay log written", no new godot.log — a Steam relaunch race, no mod
+involvement); re-run alone it completed the run — 917 [BL] lines, 116 artifact checks (108 `0->0`, 8 `N->N`, incl. a
+blocked permanent `strength_down`), strip_artifact had >= 1 18x, doomed=True 18x. Both seeds: 0 mod exceptions, 0
+BlankTheSpire frames in an exception/stall stack, 0 localization errors. BL2 logged one non-fatal base `[ERROR] Attempted
+to play animation on creature Cubex Construct but its creature node doesn't exist!` whose trace runs through the smoke's
+`--relic auto` Sigil (ForgedRelic.AfterDamageReceived -> RelicRunner.Fire) hitting a just-killed creature — pre-existing
+relic path, no exception, run unaffected (recorded in the tags file).
 
 ### Phase BM — Base-power statuses: self-drawbacks, replay, next-turn Block, retain hand (v65; gaps #68–#70; ~1 day) — 30 base cards
 
@@ -847,8 +857,8 @@ generation **594**, web **293**, `test_phase_bk` 151/151. Readings: index 7,743 
 (`exhaust_pyre`) · per-archetype scaffold max 25,716 · triads 61,774 / 71,570 / 77,647 · all-ops 118,479 · all-ops
 scaffold 46,323 (informational) · `full` 111,499 (scaffold snapshot 46,045, +145). **Next: Phase BL** (v64).
 
-**Phase BL BUILT 2026-10-04** (on `wave6`, vocab v64; smoke PENDING — Ryan approves the game launch first). Ceilings
+**Phase BL DONE 2026-10-04** (on `wave6`, vocab v64; smokes GAPTESTBL1/BL2 both completed the run, every `[BL]` tag fired, the Artifact sign-flip disproven: no blocked Strength Down ever grew a shell; 0 mod exceptions, 0 localization errors). Ceilings
 raised first for the rest of the wave (0774055: per-archetype 80,000, triads 90,000). Merged suite: generation **596**,
-web **293**, `test_phase_bl` 197/197 (smoke record pending). Readings: index 8,065 · per-archetype max 70,043
+web **293**, `test_phase_bl` 215/215. Readings: index 8,065 · per-archetype max 70,043
 (`exhaust_pyre`) · per-archetype scaffold max 26,056 · triads 63,021 / 72,817 / 79,252 · all-ops 120,084 · `full`
 112,782 (scaffold snapshot 46,385, +340). Tester: `generation/tests/gaptest-bl/` (`--validate-only` green).
