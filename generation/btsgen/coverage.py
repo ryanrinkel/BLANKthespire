@@ -116,6 +116,9 @@ WHEN_MENU_V2 = WHEN_MENU + [
                                   'carry-over: stronger after a busy last turn).'),
     ("target_intends_attack", 'REQUIRED: on a single-enemy card, gate a bonus with `when` target_intends_attack (Go '
                               'for the Eyes: stronger against an enemy about to attack).'),
+    # Phase BN (v69, gap #71): the on-kill payoff (Feed / Sunder) — the gate sits AFTER the card's damage.
+    ("target_killed", 'REQUIRED: on an attack, put the damage FIRST, then gate a payoff with `when` target_killed (Feed / '
+                      'Sunder: "Gain 3 energy if this kills the enemy." - a finisher that rewards landing the kill).'),
 ]
 # W2.2: class-kind-GATED `when` entries — (key, directive, kind). Dealt only to a class whose kind set (see
 # harness_v2.pool_kind: the blueprint's orb/status/summon kind UNIONED with the selected archetypes' mechanic_kind)

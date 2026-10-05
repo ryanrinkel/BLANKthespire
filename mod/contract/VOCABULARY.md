@@ -38,6 +38,8 @@ validator. (The vocabulary grows as the interpreter grows — more ops/statuses 
 | `put_back`     | `from` (hand/discard), `cards` choose | (v66, Thinking Ahead / Headbutt) Put a card you pick on top of your draw pile. Card-only, one per card. |
 | `shuffle_hand` | *(none)* | (v66, Reboot) Shuffle your hand and discard pile into your draw pile; add a `draw`. Fires `on_shuffle`. |
 | `grant_keyword`| `keyword` (retain/ethereal/sly), `cards` choose, optional `card_type` | (v66, Snap / Hand Trick) A hand card you pick gains Retain / Ethereal / Sly this turn. Card-only, one per card. |
+| `add_random_card`| `pile` (hand/discard/draw), optional `card_type`, `amount` 1–2, `choose_of` 2–3, `free_this_turn` (hand) | (v69, Discovery / Infernal Blade) Add random cards from YOUR class's pool: "Add a random Attack to your hand. It costs 0 this turn." / "Choose 1 of 3 random Skills to add to your hand." Fires `on_card_generated`. One per card; payload turn_start only, no `choose_of` (Creative AI). |
+| `autoplay`     | `from` (draw_top/draw_random), `amount` 1–2, optional `card_type` (draw_random) | (v69, Havoc / Uproar) "Play the top card of your draw pile and Exhaust it." / "Play a random Attack from your draw pile." Free plays; autoplay cards are never picked. One per card; payload turn_start only (Mayhem). |
 | `channel_orb`  | `orb` (lightning/frost/dark/**random**), optional `amount` (count) | Channel an orb into your next open slot. `orb:"random"` rolls one of lightning/frost/dark — **independently per orb** when `amount > 1`, so a multi-channel "pull" can come up all-matching (the slot-machine jackpot). `per_enemy:true` (v68) = one per enemy (Chill). **ORB-CLASS ONLY** — see Orbs below. |
 | `evoke`        | optional `amount` (count) | Evoke (trigger + consume) your oldest orb(s) now. v68: `keep:true` = "Evoke your next orb twice." (Dualcast); `which:"newest"` = your newest orb. **ORB-CLASS ONLY.** |
 | `gain_orb_slot`| `amount` (int ≥1) | Gain `amount` orb slots this combat. **ORB-CLASS ONLY.** |
@@ -272,6 +274,7 @@ condition. (v49: the same `when` is legal inside a custom orb's `passive` / `evo
 | `exhausted_this_turn` | — | you have Exhausted a card this turn (Evil Eye: "Gain 8 Block if you have Exhausted a card this turn."). Legal as a trigger gate. |
 | `played_cards_last_turn_ge` | `value` (int 1–10) | you played at least `value` cards during your LAST turn (a tempo carry-over). Legal as a trigger gate. |
 | `target_intends_attack` | — | the **chosen enemy** intends to attack (Go for the Eyes: "Apply 1 Weak if the enemy intends to attack."). **Single-enemy cards only**; never on an `add_trigger`. |
+| `target_killed` | — | this card's earlier `damage` killed an enemy (v69, Feed / Sunder: "Gain 3 Max HP if this kills the enemy."; AoE = any kill; minions don't count). Only AFTER a `damage` op; never on a trigger or orb. |
 
 > Composition is the point: pair `channel_orb orb:"random"` (the pull) with effects gated on `when:{kind:"orbs_match"}`
 > (the jackpot) to build a **"sentient slot machine"** orb class — channel random orbs, and great things happen when
@@ -338,7 +341,8 @@ draw/energy engine at turn start, an orb auto-channeler, etc.
   engines**: `apply_status_custom` (**STATUS-CLASS** — "At the start of your turn, gain 1 Razor Focus"; give a
   custom DEBUFF a `target`), `summon_attack` (**SUMMON-CLASS** — the minion strikes on its own each turn: "At the
   end of your turn, deal 4 damage 2 times with your summon"; optional `target`, default the first enemy) and
-  `buff_summon` (**SUMMON-CLASS** — "At the start of your turn, your summon gains 1 Strength"). A payload
+  `buff_summon` (**SUMMON-CLASS** — "At the start of your turn, your summon gains 1 Strength"); v69, `turn_start`
+  only: `add_random_card` (Creative AI) and `autoplay` (Mayhem). A payload
   `damage` / `summon_attack` may carry `hits` (multi-hit each fire, v42); no other payload op may.
 - **`on_discard` is CARD-LATENT (Reflex) — the exception to the whole model.** A card with
   `{ "op": "add_trigger", "trigger": "on_discard", "effects": [...] }` grants NO power when played; instead, its

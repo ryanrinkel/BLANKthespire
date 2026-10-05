@@ -352,6 +352,22 @@ def effect_literal(e: dict) -> str:
         if e.get("card_type"):  # Phase BO (v66, gap #74): the tutor's type filter (Secret Weapon = attack)
             ck = str(e["card_type"]).replace("\\", "\\\\").replace('"', '\\"')
             lit = f'{lit[:-1]}, CardKind: "{ck}")'
+    elif op == "add_random_card":
+        # Phase BN (v69, gap #72): named Pile (+ CardKind / ChooseOf / FreeThisTurn) args. Amount = cards added (default 1).
+        pile = str(e.get("pile", "hand")).replace("\\", "\\\\").replace('"', '\\"')
+        lit = f'new EffectSpec("add_random_card", {e.get("amount", 0)}, Pile: "{pile}")'
+        if e.get("card_type"):
+            lit = f'{lit[:-1]}, CardKind: "{str(e["card_type"]).strip().lower()}")'
+        if e.get("choose_of"):
+            lit = f"{lit[:-1]}, ChooseOf: {int(e['choose_of'])})"
+        if e.get("free_this_turn") is True:
+            lit = f"{lit[:-1]}, FreeThisTurn: true)"
+    elif op == "autoplay":
+        # Phase BN (v69, gap #73): named From (+ CardKind) args. Amount = cards played (default 1).
+        frm = str(e.get("from", "draw_top")).strip().lower()
+        lit = f'new EffectSpec("autoplay", {e.get("amount", 0)}, From: "{frm}")'
+        if e.get("card_type"):
+            lit = f'{lit[:-1]}, CardKind: "{str(e["card_type"]).strip().lower()}")'
     elif op == "add_status_card":
         # Phase AP (v46): named StatusCard / Pile args. Amount = Status cards added (default 1).
         kind = str(e.get("card", "wound")).replace("\\", "\\\\").replace('"', '\\"')
@@ -520,6 +536,8 @@ def cond_phrase(w: dict) -> str:
         return f"you played {int(w.get('value', 0) or 0)}+ cards last turn"
     if kind == "target_intends_attack":
         return "the enemy intends to attack"
+    if kind == "target_killed":  # Phase BN (v69, gap #71): Feed / Sunder (describe() says "an enemy" on an AoE card)
+        return "this kills the enemy"
     return kind
 
 
@@ -609,6 +627,10 @@ def _trigger_fragment(e: dict) -> str:
         return "put your blade into your hand from anywhere"
     if op == "upgrade_card":  # Phase V (gap #18): trigger-side upgrade (random only). Mirrors ForgedCards.TriggerFragment.
         return _upgrade_sentence(e, capitalize=False)
+    if op == "add_random_card":  # Phase BN (v69, gap #72): Creative AI. Mirrors ForgedCards.TriggerFragment.
+        return _add_random_card_sentence(e, capitalize=False)
+    if op == "autoplay":  # Phase BN (v69, gap #73): Mayhem. Mirrors ForgedCards.TriggerFragment.
+        return _autoplay_sentence(e, capitalize=False)
     if op == "heal_summon":  # Phase AC (gap #2): the medic-engine fragment. Mirrors ForgedCards.TriggerFragment.
         return f"heal your summon {amt} HP"
     if op == "shield_summon":  # Phase AC (gap #2). Mirrors ForgedCards.TriggerFragment.
@@ -731,6 +753,51 @@ def _cost_delta_sentence(e: dict) -> str:
     noun = {"attack_played": "Attack", "skill_played": "Skill", "card_exhausted": "card"}.get(on, "card")
     verb = "Exhaust" if on == "card_exhausted" else "play"
     return f"Costs {n} less {life} for each {noun} you {verb}."
+
+
+# Phase BN (v69, gaps #72/#73): the noun a random-generation / auto-play filter names. Mirrors ForgedCards.RandomCardNoun.
+_RANDOM_NOUNS = {"attack": ("Attack", "Attacks"), "skill": ("Skill", "Skills"), "power": ("Power", "Powers"),
+                 "non_attack": ("non-Attack card", "non-Attack cards")}
+
+
+def _random_noun(kind, plural: bool) -> str:
+    one, many = _RANDOM_NOUNS.get(str(kind or "").strip().lower(), ("card", "cards"))
+    return many if plural else one
+
+
+def _add_random_card_sentence(e: dict, capitalize: bool) -> str:
+    """Phase BN (v69, gap #72): "Add a random Attack to your hand. It costs 0 this turn." / "Add 2 random cards to your discard
+    pile." / "Choose 1 of 3 random Skills to add to your hand. It costs 0 this turn." capitalize=False = the payload fragment.
+    Byte-lockstep with ForgedCards.AddRandomCardSentence."""
+    pile = _pile_phrase(e.get("pile"))
+    n = max(1, int(e.get("amount", 1) or 1))
+    k = int(e.get("choose_of", 0) or 0)
+    choose = k > 1
+    kind = e.get("card_type")
+    if choose:
+        body = f"{'Choose' if capitalize else 'choose'} 1 of {k} random {_random_noun(kind, True)} to add to your {pile}"
+    elif n > 1:
+        body = f"{'Add' if capitalize else 'add'} {n} random {_random_noun(kind, True)} to your {pile}"
+    else:
+        body = f"{'Add' if capitalize else 'add'} a random {_random_noun(kind, False)} to your {pile}"
+    if e.get("free_this_turn") is True:
+        body += ". They cost 0 this turn" if (not choose and n > 1) else ". It costs 0 this turn"
+    return body + "." if capitalize else body
+
+
+def _autoplay_sentence(e: dict, capitalize: bool) -> str:
+    """Phase BN (v69, gap #73): "Play the top card of your draw pile and Exhaust it." (Havoc) / "Play a random Attack from your
+    draw pile." (Uproar). capitalize=False = the payload fragment (Mayhem). Byte-lockstep with ForgedCards.AutoplaySentence."""
+    verb = "Play" if capitalize else "play"
+    n = max(1, int(e.get("amount", 1) or 1))
+    if str(e.get("from", "")).strip().lower() == "draw_random":
+        kind = e.get("card_type")
+        body = (f"{verb} {n} random {_random_noun(kind, True)} from your draw pile" if n > 1
+                else f"{verb} a random {_random_noun(kind, False)} from your draw pile")
+    else:
+        body = (f"{verb} the top {n} cards of your draw pile and Exhaust them" if n > 1
+                else f"{verb} the top card of your draw pile and Exhaust it")
+    return body + "." if capitalize else body
 
 
 def _trigger_passive_sentence(e: dict) -> str:
@@ -898,6 +965,11 @@ def describe(effects: list[dict], target: str) -> str:
             parts.append("Shuffle your hand and discard pile into your draw pile.")
         elif op == "grant_keyword":
             parts.append(_grant_keyword_sentence(e))
+        # Phase BN (v69, gaps #72/#73): Discovery / Infernal Blade, Havoc / Uproar. Byte-lockstep with ForgedCards.Describe.
+        elif op == "add_random_card":
+            parts.append(_add_random_card_sentence(e, capitalize=True))
+        elif op == "autoplay":
+            parts.append(_autoplay_sentence(e, capitalize=True))
         elif op == "corruption":
             # Phase AB (gap #20): two sentences (joined by the "\n" that separates parts). Lockstep with ForgedCards.Describe.
             parts.append("Your Skills cost 0.")
@@ -1007,7 +1079,10 @@ def describe(effects: list[dict], target: str) -> str:
         when = e.get("when")
         if isinstance(when, dict) and len(parts) > before:
             p = parts[-1]
-            clause = ("unless " if when.get("negate") else "if ") + cond_phrase(when)
+            phrase = cond_phrase(when)
+            if when.get("kind") == "target_killed" and target != "enemy":  # Phase BN (v69): AoE / random = ANY kill
+                phrase = "this kills an enemy"
+            clause = ("unless " if when.get("negate") else "if ") + phrase
             parts[-1] = f"{p[:-1]} {clause}." if p.endswith(".") else f"{p} {clause}"
     return "\n".join(parts)
 

@@ -618,10 +618,18 @@ function condCore(c) {
     case "exhausted_this_turn": return "you have Exhausted a card this turn";
     case "played_cards_last_turn_ge": return `you played ${v ?? "enough"}+ cards last turn`;
     case "target_intends_attack": return "the enemy intends to attack";
+    case "target_killed": return "this kills the enemy"; // Phase BN (v69, gap #71): Feed / Sunder (cardgen.cond_phrase)
     default: return titleCase(c.kind);
   }
 }
 const condText = (c) => ` (${c.negate ? "unless" : "if"} ${condCore(c)})`;
+
+// Phase BN (v69, gaps #72/#73): the noun a random-generation / auto-play filter names (cardgen._RANDOM_NOUNS).
+function randomNoun(kind, plural) {
+  const [one, many] = { attack: ["Attack", "Attacks"], skill: ["Skill", "Skills"], power: ["Power", "Powers"],
+                        non_attack: ["non-Attack card", "non-Attack cards"] }[kind] || ["card", "cards"];
+  return plural ? many : one;
+}
 
 function effPhrase(e, target) {
   const a = e.amount;
@@ -720,6 +728,23 @@ function effPhrase(e, target) {
       return (a ?? 1) > 1 ? `Trigger the passive of ${whose} ${a} times` : `Trigger the passive of ${whose}`;
     }
     case "lose_orb_slot": return "Lose 1 Orb Slot"; // Phase BQ (v68, gap #78): Bulk Up
+    // Phase BN (v69, gaps #72/#73): lockstep with cardgen._add_random_card_sentence / _autoplay_sentence.
+    case "add_random_card": {
+      const pile = { discard: "discard pile", draw: "draw pile" }[e.pile] || "hand";
+      const n = Math.max(1, a ?? 1);
+      const choose = (e.choose_of ?? 0) > 1;
+      const txt = choose ? `Choose 1 of ${e.choose_of} random ${randomNoun(e.card_type, true)} to add to your ${pile}`
+                : n > 1 ? `Add ${n} random ${randomNoun(e.card_type, true)} to your ${pile}`
+                : `Add a random ${randomNoun(e.card_type, false)} to your ${pile}`;
+      return txt + (e.free_this_turn ? (!choose && n > 1 ? ". They cost 0 this turn" : ". It costs 0 this turn") : "");
+    }
+    case "autoplay": {
+      const n = Math.max(1, a ?? 1);
+      if (e.from === "draw_random")
+        return n > 1 ? `Play ${n} random ${randomNoun(e.card_type, true)} from your draw pile`
+                     : `Play a random ${randomNoun(e.card_type, false)} from your draw pile`;
+      return n > 1 ? `Play the top ${n} cards of your draw pile and Exhaust them` : "Play the top card of your draw pile and Exhaust it";
+    }
     case "apply_status":
       // Phase BL (v64, gaps #66/#67): the permanent Strength loss + Blight Strike's Doom read like the card text.
       if (e.status === "strength_down")

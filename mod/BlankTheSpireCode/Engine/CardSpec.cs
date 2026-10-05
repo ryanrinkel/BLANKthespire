@@ -1,4 +1,4 @@
-﻿using System.Linq;
+using System.Linq;
 using MegaCrit.Sts2.Core.Entities.Cards;
 
 namespace BlankTheSpire.BlankTheSpireCode.Engine;
@@ -102,7 +102,9 @@ public sealed record EffectSpec(string Op, int Amount = 0, string? Status = null
     bool Keep = false, // Phase BQ (v68, gap #78): evoke keep — evoke the next orb WITHOUT consuming it, then evoke it again (Dualcast)
     string? Which = null, // Phase BQ (v68, gap #78): evoke which — "next" (oldest, the default) | "newest" (OrbCmd.EvokeLast)
     string? Orbs = null, // Phase BQ (v68, gap #78): trigger_passive's reach — "first" (your next orb, the default) | "all" (every orb)
-    bool PerEnemy = false) // Phase BQ (v68, gap #78): channel_orb per_enemy — channel one orb per hittable enemy (Chill)
+    bool PerEnemy = false, // Phase BQ (v68, gap #78): channel_orb per_enemy — channel one orb per hittable enemy (Chill)
+    int ChooseOf = 0, // Phase BN (v69, gap #72): add_random_card choose_of — pick 1 of N (2..3) random cards (Discovery); 0 = no pick
+    bool FreeThisTurn = false) // Phase BN (v69, gap #72): add_random_card free_this_turn — the added card costs 0 this turn (Infernal Blade)
 {
     /// <summary>Phase BP (v67, gap #76): a <c>cost_delta</c> whose event is ANOTHER card of yours being played (Stomp /
     /// Pinpoint) — the STATELESS form: <see cref="DataCard"/>.TryModifyEnergyCostInCombat counts the matching plays in the
@@ -200,6 +202,12 @@ public sealed record CardSpec(
     public EffectSpec? CostDelta => Effects.FirstOrDefault(e => e.Op == "cost_delta");
     /// <summary>Phase BP (v67): the index of <see cref="CostDelta"/> in <see cref="Effects"/> (for the upgrade delta), or -1.</summary>
     public int CostDeltaIndex => Array.FindIndex(Effects, e => e.Op == "cost_delta");
+
+    /// <summary>Phase BN (v69, gaps #72/#73): does this card carry <paramref name="op"/> anywhere — the base list, the upgrade
+    /// list, or an add_trigger payload? The depth-1 loop rules read it: a card that itself <c>add_random_card</c>s is never a
+    /// random-generation candidate, and an <c>autoplay</c> card is never an auto-play candidate.</summary>
+    public bool HasOp(string op) =>
+        Effects.Concat(Upgrade ?? []).Any(e => e.Op == op || (e.Triggered ?? []).Any(t => t.Op == op));
 
     /// <summary>The CardSpec for an unfilled forged slot: harmless valid enums, no effects, hidden.</summary>
     public static CardSpec EmptySlot(string id) => new(

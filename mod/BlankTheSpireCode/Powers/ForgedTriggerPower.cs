@@ -106,6 +106,9 @@ public abstract class ForgedTriggerPower : BlankTheSpirePower
         _firedThisTurn.Clear();   // H4: a new turn resets every once_per_turn gate
         if (t.Trigger == "turn_start")
         {
+            // Phase BN (v69, gap #73): a payload that auto-plays (Mayhem) waits for AfterAutoPrePlayPhaseEntered — after the hand
+            // draw, where the base MayhemPower plays — so the whole payload fires there instead.
+            if (PlaysCards(t)) return;
             Flash();
             await TriggerRunner.Run(t, player, ctx);
             return;
@@ -127,6 +130,20 @@ public abstract class ForgedTriggerPower : BlankTheSpirePower
                     Owner.RemovePowerInternal(this);
             }
         }
+    }
+
+    /// <summary>Phase BN (v69, gap #73): does this turn_start payload auto-play a card (Mayhem)?</summary>
+    private static bool PlaysCards(EffectSpec t) => (t.Triggered ?? []).Any(x => x.Op == "autoplay");
+
+    /// <summary>Phase BN (v69, gap #73): Mayhem — the base MayhemPower plays from AfterAutoPrePlayPhaseEntered (the hand is drawn
+    /// and the turn's auto-play window is open), NOT AfterPlayerTurnStart. A turn_start payload carrying `autoplay` fires here.</summary>
+    public override async Task AfterAutoPrePlayPhaseEntered(PlayerChoiceContext ctx, Player player)
+    {
+        var t = Trigger;
+        if (t?.Trigger != "turn_start" || !PlaysCards(t) || Owner == null || player != Owner.Player) return;
+        MainFile.Logger.Info($"[BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('{SourceSpec?.Title ?? SourceSpec?.Id}').");
+        Flash();
+        await TriggerRunner.Run(t, player, ctx);
     }
 
     // gap #9 "on_hp_lost" (Rupture) + H4 "attacked" (reactive Thorns) share the damage-received hook.

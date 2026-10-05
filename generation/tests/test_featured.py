@@ -167,6 +167,10 @@ def test_detectors_round_trip() -> None:
         "self_discount": _card([{"op": "block", "amount": 9}, {"op": "cost_delta", "on": "skill_played", "scope": "this_turn", "amount": -1}], cost=2),
         # Phase BM (v65): the replay window (Burst)
         "replay_window": _card([{"op": "replay_next", "card_type": "skill", "count": 1}, {"op": "draw", "amount": 1}]),
+        # Phase BN (v69): the on-kill finisher (Sunder), random generation (Discovery), the free play (Havoc)
+        "kill_payoff": _card([{"op": "damage", "amount": 24}, {"op": "gain_energy", "amount": 3, "when": {"kind": "target_killed"}}]),
+        "discovery": _card([{"op": "add_random_card", "pile": "hand", "choose_of": 3, "free_this_turn": True}, {"op": "exhaust"}]),
+        "havoc_play": _card([{"op": "autoplay", "from": "draw_top"}]),
         # Phase BF (v60): the next-attack spike
         "setup_spike": _card([{"op": "apply_status", "status": "vigor", "amount": 4}, {"op": "draw", "amount": 1}]),
         # Phase BE (v59): the Venom engine

@@ -116,7 +116,8 @@ GATED_OP_ORDER = ("balance_step", "add_card", "discard", "upgrade_card", "scry",
                   "replay_next", "block_next_turn", "retain_hand",  # Phase BM (v65): Burst / Prolong / Equilibrium, unmeasured
                   # Phase BO (v66): recursion / put-back / reshuffle / keyword grants, unmeasured
                   "return_to_hand", "to_draw_top", "return_next_turn", "put_back", "shuffle_hand", "grant_keyword",
-                  "cost_delta")  # Phase BP (v67): the self-cost rule, unmeasured
+                  "cost_delta",  # Phase BP (v67): the self-cost rule, unmeasured
+                  "add_random_card", "autoplay")  # Phase BN (v69): Discovery / Havoc, unmeasured
 
 # ---- Phase 1b: which gate UNIT each schema element belongs to. A unit is a gated op name or a family name. An
 # element whose units are all gated moves to the tail (families are "fam:<name>", so the Forge family never
@@ -131,15 +132,18 @@ FIELD_UNITS = {
     "effects": ("add_trigger",),
     "orb": ("channel_orb",), "status_name": ("apply_status_custom",), "summon_name": ("summon",),
     "card_id": ("add_card", "transform_card", "graft_card"),
-    "pile": ("add_card", "add_status_card", "retrieve_card", "exhaust_card"),  # Phase BO (v66): + exhaust_card pile draw
+    "pile": ("add_card", "add_status_card", "retrieve_card", "exhaust_card",  # Phase BO (v66): + exhaust_card pile draw
+             "add_random_card"),  # Phase BN (v69)
     "cards": ("discard", "retrieve_card", "upgrade_card", "exhaust_card", "put_back", "grant_keyword"),  # Phase BC (v57) / BO (v66)
     "pole": ("balance_step",), "card_type": ("cost_shift", "exhaust_card", "draw_until", "add_trigger",  # Phase BC (v57) / BI (v61)
-                                             "retrieve_card", "grant_keyword"),  # Phase BO (v66)
+                                             "retrieve_card", "grant_keyword",  # Phase BO (v66)
+                                             "add_random_card", "autoplay"),  # Phase BN (v69)
     "scope": ("cost_shift", "add_trigger", "cost_delta"), "count": ("cost_shift",),  # Phase BP (v67): + cost_delta
     "every_n": ("add_trigger",),  # Phase BI (v61, gap #62): the trigger filters
     "hits_scale": ("fam:scaling",),  # Phase BK (v63, gap #65): the hit COUNT from a live read rides the scaling family
     "card": ("add_status_card",),
-    "from": ("put_back",), "keyword": ("grant_keyword",),  # Phase BO (v66, gaps #74/#75)
+    "from": ("put_back", "autoplay"), "keyword": ("grant_keyword",),  # Phase BO (v66, gaps #74/#75); BN (v69): + autoplay
+    "choose_of": ("add_random_card",), "free_this_turn": ("add_random_card",),  # Phase BN (v69, gap #72)
     "on": ("cost_delta",), "set_zero": ("cost_delta",),  # Phase BP (v67, gap #76)
     # Phase BQ (v68, gap #78): the orb-extras fields ride the orb family's ops (never the card core).
     "keep": ("evoke",), "which": ("evoke",), "orbs": ("trigger_passive",), "per_enemy": ("channel_orb",),

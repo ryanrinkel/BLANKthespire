@@ -98,7 +98,8 @@ def test_exemplar_pool_is_schema_valid_and_spans_families():
     # Wave 5 (v56-v60) added one exemplar per new token -> 127; the ceiling is a sanity bound, not a prompt budget
     # (a brief samples 3), so it moves with the one-exemplar-per-token rule. Wave 6 BL (v64): 150 -> 175 (156 after BL).
     # Phase BO (v66): 175 -> 200 (180 after BO: twelve recursion / put-back / tutor / grant exemplars).
-    assert 60 <= len(pool) <= 200, len(pool)
+    # Phase BN (v69): 200 -> 225 (210 after BN: ten on-kill / random-generation / autoplay exemplars, one per form).
+    assert 60 <= len(pool) <= 225, len(pool)
     # exemplar_validator() registers every pool id so same-family transform_card/graft_card targets resolve.
     v = harness_v2.exemplar_validator()
     for e in pool:
@@ -406,7 +407,7 @@ BP_TRIADS = (
 )
 BP_READING = 108_282          # the untrimmed v2 path (= the `full` rollback with no selection) — 2026-09-30, Wave 5
 BP_READING_V1 = 108_179       # flag-off (informational)
-BP_READING_SCAFFOLD = 47_532  # BP_READING minus VOCABULARY.md: the `full` path's scaffold half, snapshotted by (e)
+BP_READING_SCAFFOLD = 47_751  # BP_READING minus VOCABULARY.md: the `full` path's scaffold half, snapshotted by (e)
                               # (45,537 at BH-3; +136 Phase BI v61: the TRIGGERS pitch's one-line filter sentence;
                               # +227 Phase BJ v62: the SCALED AMOUNTS history-reads sentence + the two new `when` names
                               # in the conditions pitch; +145 Phase BK v63: the SCALED AMOUNTS hit-count sentence; +340 Phase BL

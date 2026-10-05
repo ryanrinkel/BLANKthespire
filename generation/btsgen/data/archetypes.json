@@ -2022,7 +2022,7 @@
       "id": "reaper_lifesteal",
       "name": "Reaper / lifesteal",
       "description": "Heal yourself with every hit: dealing damage and gaining life are the same action.",
-      "build_notes": "A LifeLink build: attacks heal for the unblocked damage they deal (`heal` scaled by `damage_dealt_unblocked`). Vulnerable and multi-hit get more damage through; area damage is optional, not the identity. Blight Strike (v64): `doom` scaled by `damage_dealt_unblocked` marks what the hit did not kill.",
+      "build_notes": "A LifeLink build: attacks heal for the unblocked damage they deal (`heal` scaled by `damage_dealt_unblocked`). Vulnerable and multi-hit get more damage through; area damage is optional, not the identity. Blight Strike (v64): `doom` scaled by `damage_dealt_unblocked` marks what the hit did not kill. Feed (v69): `when` target_killed after the damage \u2014 \"Heal 6 HP if this kills the enemy.\"",
       "metaphors": [
         "the reaper",
         "the red harvest",
@@ -2054,14 +2054,16 @@
           "damage",
           "heal",
           "damage_dealt_unblocked",
-          "doom"
+          "doom",
+          "target_killed"
         ],
         "class_kind": "normal"
       },
       "buildable": true,
       "gap_refs": [
         "VOCABULARY_GAPS#21",
-        "VOCABULARY_GAPS#67"
+        "VOCABULARY_GAPS#67",
+        "VOCABULARY_GAPS#71"
       ],
       "base_synergies": {
         "hooks": [
@@ -2469,7 +2471,7 @@
       "id": "madness_discard",
       "name": "Madness / discard-matters",
       "description": "Churn your hand: discard is fuel, and some cards pay out when you throw them away.",
-      "build_notes": "Touchstone: the base-game Reflex and Sly cards. Discard is a resource: pair discard outlets (random or the player's choice, `scry`, discard-then-draw) with cards that are fine to play but even better when an effect discards them (an `on_discard` trigger that adds value on top of a normal play, or the `sly` keyword: discarded by an effect, the card plays itself for free). Add payoffs that react to discards, and `retrieve_card` to bring a key card back. Every card should be playable on its own; avoid cards that do nothing unless discarded. Payoffs (v62): `discards_this_turn` (Memento Mori) and `discard_pile_size` (Stack) scale to the churn. Recursion (v66): `put_back` stacks a discarded card on top of your draw pile (Headbutt), `grant_keyword` makes a hand card Sly this turn (Hand Trick), `return_next_turn` brings an attack back next turn (Bolas).",
+      "build_notes": "Touchstone: the base-game Reflex and Sly cards. Discard is a resource: pair discard outlets (random or the player's choice, `scry`, discard-then-draw) with cards that are fine to play but even better when an effect discards them (an `on_discard` trigger that adds value on top of a normal play, or the `sly` keyword: discarded by an effect, the card plays itself for free). Add payoffs that react to discards, and `retrieve_card` to bring a key card back. Every card should be playable on its own; avoid cards that do nothing unless discarded. Payoffs (v62): `discards_this_turn` (Memento Mori) and `discard_pile_size` (Stack) scale to the churn. Recursion (v66): `put_back` stacks a discarded card on top of your draw pile (Headbutt), `grant_keyword` makes a hand card Sly this turn (Hand Trick), `return_next_turn` brings an attack back next turn (Bolas). (v69) `autoplay` plays the top card of your draw pile and Exhausts it (Havoc) \u2014 chaos churn that plays your Reflex fuel for free.",
       "metaphors": [
         "the gambler",
         "sifting the ashes",
@@ -2515,7 +2517,8 @@
           "discard_pile_size",
           "put_back",
           "grant_keyword",
-          "return_next_turn"
+          "return_next_turn",
+          "autoplay"
         ],
         "class_kind": "normal"
       },
@@ -2525,7 +2528,8 @@
         "VOCABULARY_GAPS#17",
         "VOCABULARY_GAPS#63",
         "VOCABULARY_GAPS#74",
-        "VOCABULARY_GAPS#75"
+        "VOCABULARY_GAPS#75",
+        "VOCABULARY_GAPS#73"
       ],
       "base_synergies": {
         "hooks": [
@@ -2614,7 +2618,7 @@
       "id": "token_conjurer",
       "name": "Conjurer / tokens",
       "description": "Conjure copies of your own cards into your piles: a deck that manufactures its own fuel.",
-      "build_notes": "Touchstone: Slay the Spire 1's Anger, an attack that adds a copy of itself. Conjure copies of your own cards (`add_card`, including self-copies) and give the class a reason to want the extras: triggers when cards are played or exhausted, a power that turns each copy into value, and cheap copies that fuel a combo turn. A natural fit for combo decks and for a power that helps it go off. (v67) an `on_card_generated` power pays off every card you create, Wounds included (Arsenal).",
+      "build_notes": "Touchstone: Slay the Spire 1's Anger, an attack that adds a copy of itself. Conjure copies of your own cards (`add_card`, including self-copies) and give the class a reason to want the extras: triggers when cards are played or exhausted, a power that turns each copy into value, and cheap copies that fuel a combo turn. A natural fit for combo decks and for a power that helps it go off. (v67) an `on_card_generated` power pays off every card you create, Wounds included (Arsenal). (v69) `add_random_card` conjures RANDOM cards from your own pool (Discovery: choose 1 of 3, free this turn) \u2014 each one also fires `on_card_generated`.",
       "metaphors": [
         "the conjurer",
         "sleight of hand",
@@ -2645,7 +2649,8 @@
           "add_card",
           "add_trigger",
           "exhaust",
-          "on_card_generated"
+          "on_card_generated",
+          "add_random_card"
         ],
         "class_kind": "normal"
       },
@@ -2653,7 +2658,8 @@
       "buildable": true,
       "gap_refs": [
         "VOCABULARY_GAPS#16",
-        "VOCABULARY_GAPS#77"
+        "VOCABULARY_GAPS#77",
+        "VOCABULARY_GAPS#72"
       ],
       "base_synergies": {
         "hooks": [
@@ -3053,7 +3059,7 @@
       "id": "big_energy",
       "name": "Overload / mana ramp",
       "description": "Ramp your energy, then spend it on big, expensive cards and X-cost spells.",
-      "build_notes": "The mana-ramp class: energy generation and cost reduction first, then 2-3 cost cards and X-cost spells (`\"cost\": \"X\"` with `scale:\"x\"`) as the payoffs, with card draw to keep the big cards coming. X-cost cards are the signature: give the class a few that scale well with a big energy turn. Energy payoffs (v62): `energy_spent_this_turn` (Helix Drill) and `gain_energy` with scale `energy` (Double Energy). Whirlwind (v63): an X-cost attack with `hits_scale:\"x\"` hits X times. Drawbacks (v65): `no_draw` after a big draw (Battle Trance), `no_energy_gain` after an energy burst (Expect a Fight). (v67) `cost_delta` turns a big card into a bargain once paid off (Momentum Strike: after one play it costs 0 for the rest of combat).",
+      "build_notes": "The mana-ramp class: energy generation and cost reduction first, then 2-3 cost cards and X-cost spells (`\"cost\": \"X\"` with `scale:\"x\"`) as the payoffs, with card draw to keep the big cards coming. X-cost cards are the signature: give the class a few that scale well with a big energy turn. Energy payoffs (v62): `energy_spent_this_turn` (Helix Drill) and `gain_energy` with scale `energy` (Double Energy). Whirlwind (v63): an X-cost attack with `hits_scale:\"x\"` hits X times. Drawbacks (v65): `no_draw` after a big draw (Battle Trance), `no_energy_gain` after an energy burst (Expect a Fight). (v67) `cost_delta` turns a big card into a bargain once paid off (Momentum Strike: after one play it costs 0 for the rest of combat). (v69) `autoplay` turns spare energy into free plays (Havoc / Uproar; a rare Mayhem power autoplays every turn).",
       "metaphors": [
         "the surge",
         "overload",
@@ -3093,7 +3099,8 @@
           "hits_scale",
           "no_draw",
           "no_energy_gain",
-          "cost_delta"
+          "cost_delta",
+          "autoplay"
         ],
         "class_kind": "normal"
       },
@@ -3102,7 +3109,8 @@
         "VOCABULARY_GAPS#63",
         "VOCABULARY_GAPS#65",
         "VOCABULARY_GAPS#68",
-        "VOCABULARY_GAPS#76"
+        "VOCABULARY_GAPS#76",
+        "VOCABULARY_GAPS#73"
       ],
       "base_synergies": {
         "hooks": [
@@ -3432,13 +3440,15 @@
           "damage",
           "all_enemies",
           "enemy_count_ge",
-          "hits_scale"
+          "hits_scale",
+          "target_killed"
         ],
         "class_kind": "normal"
       },
       "buildable": true,
       "gap_refs": [
-        "VOCABULARY_GAPS#65"
+        "VOCABULARY_GAPS#65",
+        "VOCABULARY_GAPS#71"
       ],
       "base_synergies": {
         "hooks": [
@@ -3514,7 +3524,7 @@
           "Low single-target damage"
         ]
       },
-      "build_notes": "Whirlwind / Skewer (v63): an X-cost AoE attack with `hits_scale:\"x\"` sweeps the room X times."
+      "build_notes": "Whirlwind / Skewer (v63): an X-cost AoE attack with `hits_scale:\"x\"` sweeps the room X times. Sunder (v69): an AoE hit with a `when` target_killed payoff \u2014 \"Gain 2 energy if this kills an enemy.\""
     },
     {
       "id": "ambush_alpha",
@@ -3653,7 +3663,7 @@
       "id": "fleeting_flux",
       "name": "Fleeting / ethereal",
       "description": "Over-powered cards that vanish at end of turn: play them now or lose them.",
-      "build_notes": "Every card here asks a question the moment it's drawn: play it now or lose it. Ethereal cards are over-statted for their cost, but a deck can't hold many before the waste adds up, so pair them with draw, energy and cheap enablers. Crosses well with small-deck (Ascetic) and combo plans, where the same ethereal cards come around every turn. `grant_keyword` (v66) can make another hand card Ethereal for a fast exhaust.",
+      "build_notes": "Every card here asks a question the moment it's drawn: play it now or lose it. Ethereal cards are over-statted for their cost, but a deck can't hold many before the waste adds up, so pair them with draw, energy and cheap enablers. Crosses well with small-deck (Ascetic) and combo plans, where the same ethereal cards come around every turn. `grant_keyword` (v66) can make another hand card Ethereal for a fast exhaust. (v69) `add_random_card` with free_this_turn hands you a card to play now or lose (Infernal Blade).",
       "metaphors": [
         "the fading spark",
         "the melting snow",
@@ -3685,13 +3695,15 @@
           "ethereal",
           "draw",
           "damage",
-          "grant_keyword"
+          "grant_keyword",
+          "add_random_card"
         ],
         "class_kind": "normal"
       },
       "buildable": true,
       "gap_refs": [
-        "VOCABULARY_GAPS#75"
+        "VOCABULARY_GAPS#75",
+        "VOCABULARY_GAPS#72"
       ],
       "base_synergies": {
         "hooks": [
@@ -4018,12 +4030,15 @@
           "heal",
           "regen",
           "gain_max_hp",
-          "apply_status"
+          "apply_status",
+          "target_killed"
         ],
         "class_kind": "normal"
       },
       "buildable": true,
-      "gap_refs": [],
+      "gap_refs": [
+        "VOCABULARY_GAPS#71"
+      ],
       "base_synergies": {
         "hooks": [
           "heal",
@@ -4097,7 +4112,8 @@
           "Low damage",
           "Weak to enemy scaling"
         ]
-      }
+      },
+      "build_notes": "Feed (v69): a rare exhaust attack whose `gain_max_hp` is gated `when` target_killed \u2014 \"Gain 3 Max HP if this kills the enemy.\""
     }
   ]
 }

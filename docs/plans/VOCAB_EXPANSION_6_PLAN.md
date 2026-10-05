@@ -619,7 +619,7 @@ the cost_shift replay skip; 0 mod exceptions, 0 BlankTheSpire frames, 0 localiza
 eaten by an Artifact (the tester has no Artifact source). Both seeds logged AutoSlay's post-completion "Options NButton
 not found" in AbandonRunAsync (base AutoSlay, after the run already counted as completed — also in BL2).
 
-### Phase BN — On-kill, random generation, auto-play (v66; gaps #71–#73; ~1½ days) — 38 base cards
+### Phase BN — On-kill, random generation, auto-play (v69 — the last of the stretch phases built, Ryan's order BO → BP → BQ → BN, rule 0.8; gaps #71–#73; ~1½ days) — 38 base cards
 
 **`when target_killed` (A3, gap #71).** Cannot live in `Conditions.Eval` (no play-local state). `EffectRunner.Execute`
 (:64): `bool killedThisPlay` beside `unblockedDealt`; after each damage op OR in
@@ -658,6 +658,49 @@ false` until #73 flips). `gate.GATED_OP_ORDER` += both ops; `FEATURED_MENU` entr
 a Creative-AI power. **Tags:** `[BN] target_killed gate OPEN|closed (killed=<b>, fatal=<b>)`, `[BN] add_random_card
 <type> x<n> -> <pile> ('<titles>'; free=<b>; choose_of=<n>)` + grep `Auto-selected 1 card(s)`, `[BN] autoplay <from>
 '<card>' -> <target|none> (depth <d>)`.
+**Findings (BN, built 2026-10-04 on `wave6`, vocab v69):** (1) **Rule 0.6 — the fatal read is a SNAPSHOT.** DECOMP Feed (and
+HandOfGreed / TheHunt) read `cardPlay.Target.Powers.All(p => p.ShouldOwnerDeathTriggerFatal())` BEFORE the attack, and
+`CreatureCmd` runs `RemoveAllPowersAfterDeath()` on a kill — so the spec's post-hit `r.Receiver.Powers.All(...)` reads an empty
+power list (All = true) and would pay out a minion kill. `EffectRunner.Execute` snapshots the enemies whose deaths are fatal
+before each damage op and sets `killedThisPlay` on `WasTargetKilled && fatalBefore.Contains(r.Receiver)` (`killedAny` rides the
+tag). AoE = ANY fatal kill (§7 decision 5; Sunder itself has no fatal filter). The gate is play-local: `Conditions.PlayLocalKinds`
+= {target_killed} (Eval returns false), rejected on add_trigger (both its own `when` and a trigger gate), in an orb gate
+(`OrbForbiddenConditionKinds`) and anywhere not AFTER a damage op in the same list (base and upgrade independently). Describe:
+"… if this kills the enemy." on a single-enemy card, "… if this kills an enemy." on AoE / random_enemy (both describers),
+negated "unless this kills the enemy". Pricing: a kill-gated payoff ×0.5; a kill-gated `gain_max_hp` is Feed (×0.75 — the
+player engineers the kill and it is run-permanent). (2) `add_random_card` follows Discovery / Infernal Blade / Creative AI
+verbatim (`Character.CardPool.GetUnlockedCards(UnlockState, CardMultiplayerConstraint)`, `Rng.CombatCardGeneration`,
+`CardFactory.GetDistinctForCombat`, `SetToFreeThisTurn`), filtered by `card_type` (HandKindMatches), `CanBeGeneratedInCombat`
+and the depth-1 rule (`DataCard.HasOp("add_random_card")`, a new `CardSpec.HasOp` over base + upgrade + payloads); an empty
+pool is logged and skipped (never ReportSoftlock). `choose_of` is clamped to 3 and uses `FromChooseACardScreen` with canSkip
+false (AutoSlay auto-picks 1; base Discovery lets a human skip — accepted). The generated card goes through the SAME
+generate-into-combat call as `add_card` (`EffectRunner.AddGenerated`, creator = the player), so BP's `on_card_generated` fires
+for it. (3) **`autoplay` draw_top re-implements `CardPileCmd.AutoPlayFromDrawPile`'s loop** (ShuffleIfNecessary, the top card
+to the Play pile, `ExhaustOnNextPlay = true`, `CardCmd.AutoPlay`) instead of calling it, so the "autoplay cards are never
+candidates" rule holds on the top card too: an autoplay card on top is NOT played (logged). draw_random = Uproar (playable,
+typed, never an autoplay card, `StableShuffle(Rng.Shuffle)`). The single-enemy target is rolled on `Rng.CombatTargets` exactly as
+`CardCmd.AutoPlay` would (so the tag names it). Static depth guard 3 (`EffectRunner.AutoplayDepth`) behind the candidate rule.
+**Decision: the Mayhem payload ALSO force-exhausts** (base Mayhem does not; one rule for every draw_top). (4) Cross-checks: BO's
+`return_to_hand` / `to_draw_top` redirect only a Discard result, and the forced exhaust makes the base result Exhaust, so a
+draw_top auto-play always exhausts; a draw_random auto-play (no forced exhaust, Uproar parity) of a `return_to_hand` card
+returns it to hand / of a `to_draw_top` card puts it back on top — **accepted** (one bonus play per op; the card is no autoplay
+card, so no loop); a `purge` card auto-played is still purged. BM's replay re-runs `Execute` whole, so a replayed autoplay card
+autoplays again (bounded: candidates + depth guard). (5) Payload forms are `turn_start` ONLY (both validators): a reactive
+generator / auto-player would chain off its own event (on_card_generated / on_card_played); no `choose_of` in a payload (rule
+0.5). The Mayhem payload fires from `ForgedTriggerPower.AfterAutoPrePlayPhaseEntered` (a turn_start payload carrying `autoplay`
+skips AfterPlayerTurnStart). (6) Harness: gate GATED_OP_ORDER += both ops, FIELD_UNITS += choose_of / free_this_turn (+ from /
+pile / card_type owners); coverage WHEN_MENU_V2 += target_killed; featured += kill_payoff / discovery / havoc_play (a payload op
+counts); `_PREFERRED_OPS` += both, `_PREFERRED_CONDITIONS` += target_killed; class_forge `_ORB_FORBIDDEN_CONDITION_KINDS` +=
+target_killed, `_cond_uptime` 0.35, one sentence each in the TOKEN GENERATION and DISCARD pitches + target_killed in the
+always-on conditions paragraph (`full` scaffold snapshot 47,532 -> 47,751, +219), and the two sections now keep for
+add_random_card / autoplay; seven archetype claims (reaper_lifesteal / horde_breaker / iron_regrowth: target_killed;
+token_conjurer / fleeting_flux: add_random_card; madness_discard / big_energy: autoplay; gap_refs #71/#72/#73; no chaos_havoc
+archetype); 10 exemplars (200 -> 210; the harness sanity ceiling 200 -> 225); seven DESIGN_HEURISTICS notes (the autoplay policy
+vs gap #37 on madness_discard / big_energy). Stale pins updated: test_phase_ar (the forbidden set + PlayLocalKinds), test_phase_ao
+(a payload card_type is now BN's), test_phase_bo (`from` enum, card_type rule, FIELD_UNITS), test_phase_bq (the EffectSpec
+tail), test_coverage (when key + sample), test_featured (three samples), test_harness_v2 (scaffold snapshot, exemplar ceiling).
+(7) Readings: index 9,603 (cap 72) · per-archetype max 76,948 (`slot_machine`) · per-archetype scaffold max 27,220
+(`exhaust_pyre`) · triads 68,486 / 78,762 / 84,507 · all-ops 129,302 · `full` 120,462.
 
 ### Phase BO — Recursion, put-back, draw-pile tutor, `on_shuffle`, `grant_keyword` (v66 — built first of the stretch phases, Ryan's order BO → BP → BQ → BN, rule 0.8; gaps #74, #75; ~1½ days) — 29 base cards
 
@@ -957,7 +1000,7 @@ as every merged phase passed its smoke.
 | BL | #66, #67 | v64 | 1½ days | 24 | Piercing Wail, Dark Shackles, Malaise, Expose; Doom executes (Necrobinder's axis for any class) |
 | BM | #68–#70 | v65 | 1 day | 30 | Battle Trance, Panic Button, Wraith Form prices; Burst / Double Tap / Echo Form; Prolong; Equilibrium |
 | **cut line** | | | **~7½ days of scout estimate (Wave 5 ran ~5 estimated days in one real day)** | **~114** | |
-| BN | #71–#73 | v66 | 1½ days | 38 | Feed / Sunder on-kill; Discovery / Infernal Blade; Havoc / Uproar / Mayhem |
+| BN | #71–#73 | v69 | 1½ days | 38 | Feed / Sunder on-kill; Discovery / Infernal Blade; Havoc / Uproar / Mayhem |
 | BO | #74, #75 | v66 | 1½ days | 29 | Particle Wall, Bolas, Headbutt, Secret Weapon, Reboot; Snap / Hand Trick |
 | BP | #76, #77 | v67 | 1 day | 24 | Stomp / Momentum Strike / Kingly Kick; Arsenal, Vicious, Sleight of Flesh |
 | BQ | #78 | v68 | 1 day | 17 | Dualcast, Darkness, Loop, Compile Driver, Chill — the orb class catches up |
@@ -1083,3 +1126,8 @@ done; smoke pending — the BN agent runs GAPTESTBQ1/BQ2 with BN's, Ryan pre-app
 `--validate-only` green; DLL built + deployed). Merged suite: generation **604**, web **293**, `test_phase_bq` 240/240 (smoke record
 pending). Readings: index 9,392 (cap 72) · per-archetype max 76,654 (`slot_machine`) · per-archetype scaffold max 27,042 · triads
 68,129 / 78,468 / 84,213 · all-ops 127,834 · `full` 119,205 (scaffold snapshot 47,532, +161). See Findings (BQ).
+
+**Phase BN BUILT 2026-10-04** (on `wave6`, vocab v69 — the last stretch phase built, Ryan's order BO → BP → BQ → BN; gaps
+#71–#73 done; tester `generation/tests/gaptest-bn/`, `--validate-only` green; DLL built + deployed; smoke next, with BQ's).
+Readings: index 9,603 (cap 72) · per-archetype max 76,948 (`slot_machine`) · per-archetype scaffold max 27,220 · triads
+68,486 / 78,762 / 84,507 · all-ops 129,302 · `full` 120,462 (scaffold snapshot 47,751, +219). See Findings (BN).

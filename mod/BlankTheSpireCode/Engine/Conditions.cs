@@ -33,7 +33,16 @@ public static class Conditions
          "turn_at_most",
          // Phase BJ (v62, gap #64): two combat-history player reads (legal on cards AND as a trigger gate) + one chosen-
          // target read (in TargetKinds: single-enemy cards only, never in a trigger / orb / relic).
-         "exhausted_this_turn", "played_cards_last_turn_ge", "target_intends_attack"];
+         "exhausted_this_turn", "played_cards_last_turn_ge", "target_intends_attack",
+         // Phase BN (v69, gap #71): Feed / Sunder — "if this kills the enemy". PLAY-LOCAL: EffectRunner.Execute owns it (a
+         // kill flag beside unblockedDealt), so Eval returns false here; legal only on a card effect AFTER a damage op, never
+         // on add_trigger / a trigger gate / an orb gate (see PlayLocalKinds).
+         "target_killed"];
+
+    /// <summary>Phase BN (v69, gap #71): the condition kinds that read THIS PLAY's own results — no combat-state read can
+    /// answer them, so <see cref="EffectRunner"/>.Execute gates them itself and every non-card surface (a trigger's fire-time
+    /// gate, an orb effect's gate, a relic hook) rejects them.</summary>
+    public static readonly HashSet<string> PlayLocalKinds = ["target_killed"];
 
     /// <summary>Phase AM (v43): the condition kinds that read the CHOSEN TARGET (play.Target). Only meaningful on a
     /// single-enemy card (target:"enemy"); an AoE / self / random_enemy card has no chosen target, and a trigger fires
@@ -176,6 +185,10 @@ public static class Conditions
             // Phase BJ: GoForTheEyes — the chosen enemy's next move is an Attack / DeathBlow intent (a pet/player has no Monster).
             case "target_intends_attack":
                 return target?.Monster?.IntendsToAttack ?? false;
+            // Phase BN (v69, gap #71): play-local — EffectRunner.Execute gates it from the kill flag; anywhere else it is
+            // validator-rejected, so this harmless fallback never opens a gate.
+            case "target_killed":
+                return false;
             default:
                 return false;
         }
@@ -235,6 +248,7 @@ public static class Conditions
         "exhausted_this_turn"       => "you have Exhausted a card this turn",            // Phase BJ (v62)
         "played_cards_last_turn_ge" => $"you played {c.Value}+ cards last turn",         // Phase BJ (v62)
         "target_intends_attack"     => "the enemy intends to attack",                    // Phase BJ (v62)
+        "target_killed"             => "this kills the enemy",                           // Phase BN (v69): AoE cards read "an enemy" (ForgedCards.Describe)
         _ => c.Kind,
     };
 }

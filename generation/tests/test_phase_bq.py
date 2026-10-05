@@ -202,7 +202,7 @@ def _t_engine() -> None:
         check(frag in co, f"Conditions: {frag[:70]}")
     spec = _cs("Engine", "CardSpec.cs")
     check("bool Keep = false," in spec and "string? Which = null," in spec and "string? Orbs = null," in spec
-          and "bool PerEnemy = false)" in spec and "string? Orb = null);" in spec, "EffectSpec Keep / Which / Orbs / PerEnemy + Condition.Orb")
+          and "bool PerEnemy = false" in spec and "string? Orb = null);" in spec, "EffectSpec Keep / Which / Orbs / PerEnemy + Condition.Orb")
     dc = _cs("Engine", "DataCard.cs")
     check('case "trigger_passive":' in dc and 'case "lose_orb_slot":' in dc
           and 'case "loop":           Power<LoopPower>(vname, e.Amount, up); break;' in dc, "DataCard declares the new ops + Loop's hover tip")

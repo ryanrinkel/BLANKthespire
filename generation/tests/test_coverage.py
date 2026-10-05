@@ -261,7 +261,8 @@ def test_w2_menu_keys_wired() -> None:
     when_keys = {k for k, _ in coverage.WHEN_MENU_V2}
     for need in ("retained_last_turn", "draw_pile_empty", "hp_lost_ge", "target_has_status",
                  "target_hp_below_half", "target_has_block", "energy_ge", "cards_played_this_turn_ge",  # + Phase AM (v43)
-                 "exhausted_this_turn", "played_cards_last_turn_ge", "target_intends_attack"):  # + Phase BJ (v62)
+                 "exhausted_this_turn", "played_cards_last_turn_ge", "target_intends_attack",  # + Phase BJ (v62)
+                 "target_killed"):  # + Phase BN (v69)
         check(need in when_keys, f"WHEN_MENU_V2 carries {need}")
     check({k for k, _d, _k in coverage.WHEN_MENU_KIND} == {"forged_ge", "dark_ge", "light_ge", "centered",
                                                            "orbs_match", "orb_count_ge"}, "the gated when keys")
@@ -337,6 +338,8 @@ def test_w2_menu_keys_wired() -> None:
         "exhausted_this_turn": {"op": "block", "amount": 8, "when": {"kind": "exhausted_this_turn"}},
         "played_cards_last_turn_ge": {"op": "draw", "amount": 1, "when": {"kind": "played_cards_last_turn_ge", "value": 3}},
         "target_intends_attack": {"op": "apply_status", "status": "weak", "amount": 1, "when": {"kind": "target_intends_attack"}},
+        # Phase BN (v69): the on-kill gate
+        "target_killed": {"op": "gain_energy", "amount": 2, "when": {"kind": "target_killed"}},
         "exhaust_pile_size": {"op": "damage", "amount": 1, "scale": "exhaust_pile_size"},
         "discard_pile_size": {"op": "block", "amount": 1, "scale": "discard_pile_size"},
         "discards_this_turn": {"op": "damage", "amount": 1, "scale": "discards_this_turn"},

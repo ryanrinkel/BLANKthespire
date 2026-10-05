@@ -93,7 +93,8 @@ _BUILD_AROUND_OPS = {"add_trigger", "apply_status_custom",
                      # utilities, not stat lines
                      "return_to_hand", "to_draw_top", "return_next_turn", "put_back", "shuffle_hand", "grant_keyword",
                      "cost_delta",  # Phase BP (v67, gap #76): a self-cost rule is energy in disguise, not a stat line
-                     "trigger_passive", "lose_orb_slot"}  # Phase BQ (v68, gap #78): orb pumps / a slot-for-stats trade
+                     "trigger_passive", "lose_orb_slot",  # Phase BQ (v68, gap #78): orb pumps / a slot-for-stats trade
+                     "add_random_card", "autoplay"}  # Phase BN (v69, gaps #72/#73): card generation / free plays
 # Phase BD (v58, gap #58): the held_discount band (mirrors ForgedCards.HeldDiscountMaxAmount + the schema clause).
 _HELD_DISCOUNT_MAX = 2
 # Phase BP (v67, gaps #76/#77): the cost_delta shape (its events, lifetimes, the counted events, the signed band) and the
@@ -128,6 +129,19 @@ _EVOKE_WHICH = {"next", "newest"}
 _TRIGGER_PASSIVE_REACH = {"first", "all"}
 _TRIGGER_PASSIVE_MAX = {"first": 3, "all": 2}
 _TRIGGER_PASSIVE_VALUE = {"first": 3.0, "all": 7.0}  # one passive ~ a Lightning tick; `all` ~ a 2-3 orb rack
+# Phase BN (v69, gaps #71-#73): the random-generation / auto-play shapes (mirror ForgedCards.AddRandomCardMaxAmount /
+# ChooseOfMin..Max / AutoplayFrom / AutoplayMaxAmount + the schema clauses) and their prices: a random card in HAND ~ a
+# little under a draw (4; into the discard / draw pile half that), each extra option of a choose_of +1, free this turn
+# ~ two thirds of an energy (+4); a free auto-play ~ a card's worth (draw_top 4 — it Exhausts; a typed draw_random 5).
+_ADD_RANDOM_MAX = 2
+_CHOOSE_OF_MIN, _CHOOSE_OF_MAX = 2, 3
+_AUTOPLAY_FROM = {"draw_top", "draw_random"}
+_AUTOPLAY_MAX = 2
+_BN_ONE_PER_CARD_OPS = ("add_random_card", "autoplay")
+# A kill-gated payoff fires about half the time; a kill-gated Max HP is Feed: the player engineers the kill (the card is an
+# exhausting finisher), so it lands most plays and is run-permanent — priced at 0.75 of the ungated line, not the 0.6 default.
+_TARGET_KILLED_DISCOUNT = 0.5
+_FEED_DISCOUNT = 0.75
 _DAMAGE_BLOCK_ONLY_SCALES = {"block", "hp_lost_this_turn", "draw_pile_count", "plays_this_combat",
                              # Phase BJ (v62): mirrors ForgedCards.DamageBlockOnlyScales
                              "discard_pile_size", "discards_this_turn", "cards_drawn_this_turn", "energy_spent_this_turn",
@@ -571,6 +585,51 @@ class CardValidator:
             return "status:" + str(eff.get("status"))
         return None  # channel_orb / evoke / gain_orb_slot / exhaust / innate / retain / ethereal: no var
 
+    @staticmethod
+    def _bn_errors(e: dict, op, scale, hits, payload: bool = False) -> list[str]:
+        """Phase BN (v69, gaps #72/#73): add_random_card / autoplay shapes; choose_of / free_this_turn belong to add_random_card.
+        Mirrors ForgedCards.ValidateBnOps."""
+        out: list[str] = []
+        if (e.get("choose_of") is not None or e.get("free_this_turn")) and op != "add_random_card":
+            out.append(f"'choose_of' / 'free_this_turn' only apply to add_random_card (op '{op}').")
+        amt = e.get("amount")
+        amt = amt if isinstance(amt, int) and not isinstance(amt, bool) else 0
+        ck = e.get("card_type")
+        ck = str(ck).strip().lower() if ck is not None else None
+        stray = e.get("status") is not None or scale or (isinstance(hits, int) and hits > 1)
+        if op == "add_random_card":
+            if str(e.get("pile", "")).strip().lower() not in _ADD_CARD_PILES:
+                out.append(f"add_random_card needs a 'pile' (one of {'/'.join(sorted(_ADD_CARD_PILES))}); got '{e.get('pile')}'.")
+            if amt < 0 or amt > _ADD_RANDOM_MAX:
+                out.append(f"add_random_card 'amount' (cards added) must be 1..{_ADD_RANDOM_MAX}; got {e.get('amount')!r}.")
+            if ck is not None and ck not in _HAND_KIND_FILTERS:
+                out.append(f"add_random_card 'card_type' must be one of {'/'.join(sorted(_HAND_KIND_FILTERS))}; got '{ck}'.")
+            co = e.get("choose_of")
+            if co is not None:
+                if payload:
+                    out.append("a trigger add_random_card can't use 'choose_of' (a pick screen every turn — card-only).")
+                elif not (isinstance(co, int) and not isinstance(co, bool) and _CHOOSE_OF_MIN <= co <= _CHOOSE_OF_MAX):
+                    out.append(f"add_random_card 'choose_of' must be {_CHOOSE_OF_MIN}..{_CHOOSE_OF_MAX}; got {co!r}.")
+                elif amt > 1:
+                    out.append("add_random_card with 'choose_of' adds the ONE card you pick (no amount above 1).")
+            if e.get("free_this_turn") and str(e.get("pile", "")).strip().lower() != "hand":
+                out.append("add_random_card 'free_this_turn' needs pile 'hand' (it costs 0 THIS turn).")
+            if stray or e.get("card_id") is not None:
+                out.append("add_random_card carries only card_type / pile / amount / choose_of / free_this_turn.")
+        if op == "autoplay":
+            frm = str(e.get("from", "")).strip().lower()
+            if frm not in _AUTOPLAY_FROM:
+                out.append(f"autoplay needs a 'from' (one of {'/'.join(sorted(_AUTOPLAY_FROM))}); got '{e.get('from')}'.")
+            if amt < 0 or amt > _AUTOPLAY_MAX:
+                out.append(f"autoplay 'amount' (cards played) must be 1..{_AUTOPLAY_MAX}; got {e.get('amount')!r}.")
+            if ck is not None and frm != "draw_random":
+                out.append("autoplay 'card_type' only applies with from 'draw_random' (the top card is whatever it is).")
+            elif ck is not None and ck not in _HAND_KIND_FILTERS:
+                out.append(f"autoplay 'card_type' must be one of {'/'.join(sorted(_HAND_KIND_FILTERS))}; got '{ck}'.")
+            if stray or e.get("pile") is not None or e.get("card_id") is not None:
+                out.append("autoplay carries only from / amount / card_type.")
+        return out
+
     def _orb_extra_errors(self, e: dict, op, scale, hits) -> list[str]:
         """Phase BQ (v68, gap #78): the orb extras' per-effect rules. Mirrors ForgedCards.ValidateOrbExtras."""
         out: list[str] = []
@@ -784,7 +843,8 @@ class CardValidator:
                 amt = e.get("amount")
                 if isinstance(amt, int) and not isinstance(amt, bool) and amt > _STATUS_CARD_MAX:
                     out.append(f"add_status_card 'amount' (cards added) may be at most {_STATUS_CARD_MAX}; got {amt}.")
-            elif e.get("card_id") is not None or (e.get("pile") is not None and e.get("op") != "exhaust_card"):
+            elif e.get("card_id") is not None or (e.get("pile") is not None
+                                                  and e.get("op") not in ("exhaust_card", "add_random_card")):  # Phase BN (v69)
                 out.append(f"'card_id'/'pile' only apply to add_card/transform_card/graft_card/retrieve_card/add_status_card/exhaust_card (op '{e.get('op')}').")
             if e.get("card") is not None and e.get("op") != "add_status_card":
                 out.append(f"'card' only applies to add_status_card (op '{e.get('op')}').")
@@ -846,8 +906,8 @@ class CardValidator:
                 if (pa is not None and pa != 1) or e.get("status") is not None or str(e.get("scale", "")).strip() \
                         or (isinstance(e.get("hits"), int) and e.get("hits") > 1):
                     out.append("put_back moves ONE card (amount 1 at most; no status / scale / hits).")
-            elif e.get("from") is not None:
-                out.append(f"'from' only applies to put_back (op '{bop}').")
+            elif e.get("from") is not None and bop != "autoplay":  # Phase BN (v69, gap #73): + autoplay's from
+                out.append(f"'from' only applies to put_back / autoplay (op '{bop}').")
             if bop == "grant_keyword":
                 if str(e.get("keyword", "")).strip().lower() not in _GRANT_KEYWORDS:
                     out.append(f"grant_keyword needs a 'keyword' (one of {'/'.join(sorted(_GRANT_KEYWORDS))}); got '{e.get('keyword')}'.")
@@ -922,8 +982,10 @@ class CardValidator:
             elif e.get("count") is not None or (e.get("scope") is not None and op != "add_trigger"):
                 out.append(f"'scope'/'count' only apply to cost_shift / replay_next ('scope':'this_turn' also to add_trigger) (op '{op}').")
             elif e.get("card_type") is not None and op not in ("exhaust_card", "draw_until", "add_trigger",  # Phase BC (v57)
-                                                               "retrieve_card", "grant_keyword"):  # Phase BO (v66)
-                out.append(f"'card_type' only applies to cost_shift/replay_next/exhaust_card/draw_until/add_trigger/retrieve_card/grant_keyword (op '{op}').")
+                                                               "retrieve_card", "grant_keyword",  # Phase BO (v66)
+                                                               "add_random_card", "autoplay"):  # Phase BN (v69)
+                out.append(f"'card_type' only applies to cost_shift/replay_next/exhaust_card/draw_until/add_trigger/retrieve_card/grant_keyword/add_random_card/autoplay (op '{op}').")
+            out.extend(self._bn_errors(e, op, scale, hits))  # Phase BN (v69, gaps #72/#73)
             if (e.get("on") is not None or e.get("set_zero")) and op != "cost_delta":  # Phase BP (v67)
                 out.append(f"'on' / 'set_zero' only apply to cost_delta (op '{op}').")
             # Phase BM (v65, gap #70): block_next_turn — an amount 1..20 or scale "block" (Prolong); retain_hand is a flag-op.
@@ -1116,6 +1178,20 @@ class CardValidator:
                         and not any(p.get("op") == "damage" for p in lst[:i])):
                     out.append("a 'scale:damage_dealt_unblocked' heal / Doom needs a 'damage' op earlier in the same card "
                                "(it reads the damage you dealt).")
+        # Phase BN (v69, gap #71): a `when:target_killed` gate reads THIS play's kills — a damage op EARLIER in the same list,
+        # never the add_trigger op's gate; one add_random_card / autoplay per list. Mirrors ForgedCards.Validate.
+        for lst in (effects, up_effects):
+            for i, ef in enumerate(lst):
+                w = ef.get("when")
+                if isinstance(w, dict) and w.get("kind") == "target_killed":
+                    if ef.get("op") == "add_trigger":
+                        out.append("'when:target_killed' can't gate an add_trigger (a granted power has no attack to read).")
+                    elif not any(p.get("op") == "damage" for p in lst[:i]):
+                        out.append("a 'when:target_killed' effect needs a 'damage' op earlier in the same card "
+                                   "(it reads whether that damage killed).")
+            for one in _BN_ONE_PER_CARD_OPS:
+                if sum(1 for ef in lst if ef.get("op") == one) > 1:
+                    out.append(f"at most one '{one}' effect per card.")
         # Phase BL (v64, gaps #66/#67): one strip_block / strip_artifact / permanent strength_down per effect list, and the
         # strips come BEFORE every enemy debuff on the card (the Expose order). Mirrors ForgedCards.Validate.
         for lst in (effects, up_effects):
@@ -1482,7 +1558,7 @@ class CardValidator:
             if e.get("op") != "add_trigger":
                 continue
             if (isinstance(e.get("when"), dict)
-                    and (e["when"].get("kind") in ("target_has_status", "retained_last_turn")
+                    and (e["when"].get("kind") in ("target_has_status", "retained_last_turn", "target_killed")  # BN: play-local
                          or e["when"].get("kind") in _TARGET_CONDITIONS)):  # Phase AM (v43): the chosen-target reads
                 out.append(f"a trigger's 'when' can't use {e['when'].get('kind')} (no card/target at end/start of turn).")
             # gap #6 "ripen": a one-shot after N turns — the add_trigger amount is the countdown (>= 1).
@@ -1536,10 +1612,17 @@ class CardValidator:
             for t in (e.get("effects") or []):
                 if not isinstance(t, dict):
                     continue
-                if any(t.get(k) is not None for k in ("every_n", "card_type", "scope", "count")):  # Phase BI (v61)
+                op = t.get("op")
+                if any(t.get(k) is not None for k in ("every_n", "scope", "count")) or (  # Phase BI (v61)
+                        t.get("card_type") is not None and op not in ("add_random_card", "autoplay")):  # BN: their own type
                     out.append("'every_n' / 'card_type' / 'scope' / 'count' are not allowed on a trigger payload effect "
                                "(put the filter on the add_trigger op).")
-                op = t.get("op")
+                # Phase BN (v69, gaps #72/#73): Creative AI / Mayhem are turn_start engines (a reactive generator / auto-player
+                # would chain off its own event). Mirrors ForgedCards.ValidateTrigger.
+                if op in ("add_random_card", "autoplay"):
+                    if e.get("trigger") != "turn_start":
+                        out.append(f"a trigger '{op}' is only allowed on a turn_start trigger (Creative AI / Mayhem); got '{e.get('trigger')}'.")
+                    out.extend(self._bn_errors(t, op, str(t.get("scale", "")).strip().lower(), t.get("hits", 1), payload=True))
                 tgt = t.get("target")
                 ts = str(t.get("scale", "")).strip().lower()
                 if t.get("once_per_turn") or t.get("once_per_combat"):
@@ -1724,7 +1807,8 @@ class CardValidator:
     # build-around gate (base-game Grand Finale prints ~2.5-3x an ungated card's numbers behind it — the
     # player must draw/thin their whole deck first), so it earns the deepest discount.
     _WHEN_DISCOUNT_DEFAULT = 0.6
-    _WHEN_DISCOUNT = {"draw_pile_empty": 0.35}
+    _WHEN_DISCOUNT = {"draw_pile_empty": 0.35,
+                      "target_killed": _TARGET_KILLED_DISCOUNT}  # Phase BN (v69, gap #71): a kill-gated payoff (Sunder)
 
     def score_card(self, card: dict) -> float:
         return sum(self._score_effect(e) for e in card.get("effects", []))
@@ -1735,6 +1819,8 @@ class CardValidator:
         when = eff.get("when")
         if isinstance(when, dict):
             gate = self._WHEN_DISCOUNT.get(str(when.get("kind", "")), self._WHEN_DISCOUNT_DEFAULT)
+            if str(when.get("kind", "")) == "target_killed" and eff.get("op") == "gain_max_hp":
+                gate = _FEED_DISCOUNT  # Phase BN (v69, gap #71): Feed-exact — the engineered kill, a run-permanent payoff
             ungated = {k: v for k, v in eff.items() if k != "when"}
             return gate * self._score_effect(ungated)
         amt = self._amt(eff.get("amount", 0))
@@ -1785,6 +1871,16 @@ class CardValidator:
         if op == "held_discount":
             # Phase BD (v58, gap #58): energy in disguise, paid for with the held turns — ~a third of gain_energy per point.
             return max(1.0, self._amt(eff.get("amount", 1))) * 2.0
+        if op == "add_random_card":
+            # Phase BN (v69, gap #72): Discovery / Infernal Blade — see _ADD_RANDOM_MAX's pricing note.
+            n = 1 if eff.get("choose_of") else max(1, amt)
+            per = 4.0 if str(eff.get("pile", "hand")).strip().lower() == "hand" else 2.0
+            pick = max(0, self._amt(eff.get("choose_of", 0)) - 1) * 1.0
+            return n * per + pick + (4.0 * n if eff.get("free_this_turn") is True else 0.0)
+        if op == "autoplay":
+            # Phase BN (v69, gap #73): a free play — the top card (Exhausted, Havoc) or a typed random draw-pile card (Uproar).
+            rnd = str(eff.get("from", "")).strip().lower() == "draw_random"
+            return max(1.0, amt) * (5.0 if rnd and eff.get("card_type") else 4.5 if rnd else 4.0)
         if op == "trigger_passive":
             # Phase BQ (v68, gap #78): a free orb passive (~ a Lightning tick) per time; `all` fires the whole rack.
             reach = str(eff.get("orbs") or "first").strip().lower()

@@ -154,6 +154,16 @@ public static class TriggerRunner
                     // (a generated card can't itself add_card) is enforced in ForgedCharacters.ResolveClassCardModel.
                     await EffectRunner.AddCards(e, player);
                     break;
+                case "add_random_card":
+                    // Phase BN (v69, gap #72): Creative AI ("At the start of your turn, add a random Power to your hand") — the
+                    // card path's executor (no choose_of in a payload; ValidateTrigger keeps it on turn_start).
+                    await EffectRunner.AddRandomCards(e, Math.Max(1, e.Amount), player, ctx, "payload");
+                    break;
+                case "autoplay":
+                    // Phase BN (v69, gap #73): Mayhem — fired from ForgedTriggerPower.AfterAutoPrePlayPhaseEntered (after the
+                    // hand draw, like the base MayhemPower), through the card path's executor (forced exhaust, depth guard).
+                    await EffectRunner.Autoplay(e, Math.Max(1, e.Amount), player, ctx, "payload");
+                    break;
                 case "discard":
                     // Phase R (gap #17): trigger-side forced churn ("At the start of your turn, discard 1"). The
                     // shared executor also fires the discarded cards' on_discard payoffs (effect-driven).

@@ -1085,7 +1085,8 @@ public static class ForgedCharacters
     /// entry is legal (orbs_match / orb_count_ge included: "if you have 3+ orbs, shatter for 12").
     /// Mirrors class_forge._ORB_FORBIDDEN_CONDITION_KINDS.</summary>
     public static readonly HashSet<string> OrbForbiddenConditionKinds =
-        ["target_has_status", "retained_last_turn", .. Conditions.TargetKinds];
+        ["target_has_status", "retained_last_turn", .. Conditions.TargetKinds,
+         .. Conditions.PlayLocalKinds]; // Phase BN (v69, gap #71): target_killed reads a card play's own damage results
 
     /// <summary>The max custom orb defs a single class may forge (the rest of its pool is base orbs).</summary>
     public const int MaxCustomOrbs = 3;

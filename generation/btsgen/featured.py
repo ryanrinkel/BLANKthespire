@@ -216,6 +216,22 @@ FEATURED_MENU: list[Featured] = [
              '"combat" + set_zero true (after one play it costs 0 for the rest of combat - Momentum Strike), OR on "drawn" + '
              'scope "combat" + amount -1 (Kingly Kick). Print it at a fair FULL-cost number.',
              lambda cc: "cost_delta" in cc.ops),
+    # Phase BN (v69, gaps #71-#73): the on-kill finisher, random generation and free auto-plays.
+    Featured("kill_payoff", 'a finisher that pays off when it KILLS (`when` target_killed - Feed / Sunder)',
+             'REQUIRED: add an attack whose damage comes FIRST and whose payoff is gated `when` target_killed - gain 2-3 '
+             'energy (Sunder), or gain_max_hp 2-3 on a rare exhaust attack (Feed). On an AoE attack it reads "if this kills '
+             'an enemy".',
+             lambda cc: "target_killed" in cc.whens),
+    Featured("discovery", 'a card that ADDS random cards from your own class pool (op "add_random_card" - Discovery / Infernal Blade)',
+             'REQUIRED: add a skill with op "add_random_card" - choose_of 3 + free_this_turn (Discovery: "Choose 1 of 3 random '
+             'Skills to add to your hand. It costs 0 this turn."), or a card_type attack + free_this_turn (Infernal Blade), '
+             'usually with exhaust.',
+             lambda cc: "add_random_card" in cc.ops or "add_random_card" in cc.payload_ops),
+    Featured("havoc_play", 'a card that PLAYS cards from your draw pile for free (op "autoplay" - Havoc / Uproar)',
+             'REQUIRED: add a card with op "autoplay" - from "draw_top" (Havoc: "Play the top card of your draw pile and Exhaust '
+             'it.") or from "draw_random" + card_type attack (Uproar), or a rare POWER whose turn_start payload autoplays '
+             '(Mayhem).',
+             lambda cc: "autoplay" in cc.ops or "autoplay" in cc.payload_ops),
     # Phase BF (v60, gap #54): the setup-then-release beat on the base game's own amplifiers.
     Featured("setup_spike", 'a SETUP card that spikes your next Attack (apply_status vigor) or a rare that doubles your Attacks for a turn (apply_status double_damage)',
              'REQUIRED: add a skill with apply_status vigor (amount 3-6: your NEXT Attack deals that much more, then it '

@@ -66,6 +66,7 @@ _PREFERRED_OPS = ["add_trigger", "transform_card", "graft_card", "spread_debuffs
                   "held_discount",  # Phase BD (v58): the Sands of Time retain payoff
                   "put_back", "grant_keyword",  # Phase BO (v66): Headbutt / Snap card-flow utilities
                   "cost_delta",  # Phase BP (v67): Stomp / Momentum Strike / Kingly Kick self-cost rules
+                  "add_random_card", "autoplay",  # Phase BN (v69): Discovery / Infernal Blade, Havoc / Uproar
                   "lose_hp"]
 _PREFERRED_SCALES = ["cards_in_hand", "cards_retained", "unspent_energy_last_turn", "forged",
                      "damage_dealt_unblocked", "target_debuff_count", "tag_cards_owned",
@@ -73,7 +74,8 @@ _PREFERRED_SCALES = ["cards_in_hand", "cards_retained", "unspent_energy_last_tur
 _PREFERRED_CONDITIONS = ["hp_below_half", "no_block", "has_block", "turn_at_least", "turn_at_most", "enemy_count_ge",
                          "hand_size_ge", "retained_last_turn", "target_has_status", "draw_pile_empty",
                          "hp_lost_ge", "forged_ge",
-                         "exhausted_this_turn"]  # Phase BJ (v62): Evil Eye
+                         "exhausted_this_turn",  # Phase BJ (v62): Evil Eye
+                         "target_killed"]  # Phase BN (v69): Feed / Sunder
 _PREFERRED_TRIGGERS = ["on_exhaust", "on_card_played", "on_hp_lost", "on_block_gained", "on_card_drawn",
                        "on_damage_dealt", "attacked", "on_discard", "ripen",
                        "on_poison_damage",  # Phase BE (v59)

@@ -9,6 +9,8 @@ using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Entities.Players;
+using MegaCrit.Sts2.Core.Extensions; // Phase BN (v69, gap #73): StableShuffle (the Uproar pick)
+using MegaCrit.Sts2.Core.Factories; // Phase BN (v69, gap #72): CardFactory.GetDistinctForCombat (Discovery / Infernal Blade)
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.Localization; // Phase BO (v66): LocString (the custom picker prompts)
 using MegaCrit.Sts2.Core.Localization.DynamicVars; // Phase BK (v63): CalculatedVar (the CalculatedHits count)
@@ -65,6 +67,10 @@ public static class EffectRunner
         // damage_dealt_unblocked heal (lifesteal) heals exactly what got through the enemy's Block. Accumulates
         // across multi-hit and AoE (every DamageResult from each damage effect's attack).
         int unblockedDealt = 0;
+        // Phase BN (v69, gap #71): the play-local on-kill flags (Feed / Sunder). killedAny = some hit of this play killed its
+        // receiver; killedThisPlay = a killed receiver whose powers ALL said ShouldOwnerDeathTriggerFatal BEFORE the hit (a
+        // minion / a reattaching part never pays out, as Feed snapshots before its attack — the powers are gone after death).
+        bool killedAny = false, killedThisPlay = false;
         for (int i = 0; i < spec.Effects.Length; i++)
         {
             var e = spec.Effects[i];
@@ -73,7 +79,15 @@ public static class EffectRunner
             // power is always granted, and it re-evaluates When each turn (see TriggerRunner), so don't skip here.
             if (e.Op != "add_trigger" && e.When != null)
             {
-                bool gateOpen = Conditions.Evaluate(e.When, card, ctx, play);
+                bool gateOpen;
+                if (e.When.Kind == "target_killed")
+                {
+                    // Phase BN (v69, gap #71): play-local — read the kill flags this play's earlier damage ops set.
+                    gateOpen = killedThisPlay ^ e.When.Negate;
+                    MainFile.Logger.Info($"[BN] target_killed gate {(gateOpen ? "OPEN" : "closed")}{(e.When.Negate ? " (negated)" : "")} " +
+                                         $"(killed={killedAny}, fatal={killedThisPlay}) ('{spec.Title ?? spec.Id}').");
+                }
+                else gateOpen = Conditions.Evaluate(e.When, card, ctx, play);
                 // Phase AD (gap #12): log BOTH branches of an hp_lost_ge gate at play time (the smoke's
                 // both-branches proof — gate OPEN grants the bonus, gate closed skips it). Play-time only
                 // (Execute is the OnPlay path), so no tooltip-preview spam.
@@ -158,12 +172,23 @@ public static class EffectRunner
                     if (e.Unblockable) // Phase AN (v44) smoke: the Unblockable prop rides the damage var (BaseLib CardAttack reads .Props)
                         MainFile.Logger.Info($"[AN] unblockable damage x{hits} from '{card.Id}' (target Block {(play?.Target != null ? play.Target.Block.ToString() : "n/a")}; " +
                                              $"props {(card.DynamicVars.ContainsKey("CalculatedDamage") ? card.DynamicVars.CalculatedDamage.Props : card.DynamicVars.Damage.Props)}).");
+                    // Phase BN (v69, gap #71): the Feed snapshot — which enemies' deaths would be FATAL, read BEFORE the hit.
+                    var fatalBefore = (card.Owner?.Creature?.CombatState?.Enemies ?? [])
+                        .Where(c => c.Powers.All(p => p.ShouldOwnerDeathTriggerFatal())).ToHashSet();
                     var atk = CommonActions.CardAttack(card, play, hits);
                     await atk.Execute(ctx);
                     // Results is per-hit lists of per-target DamageResults — flatten both to sum every unblocked hit.
                     if (atk.Results != null)
                         foreach (var hitResults in atk.Results)
-                            foreach (var r in hitResults) unblockedDealt += (int)r.UnblockedDamage;
+                            foreach (var r in hitResults)
+                            {
+                                unblockedDealt += (int)r.UnblockedDamage;
+                                if (r.WasTargetKilled)
+                                {
+                                    killedAny = true;
+                                    if (fatalBefore.Contains(r.Receiver)) killedThisPlay = true; // AoE: ANY fatal kill (plan §7 decision 5)
+                                }
+                            }
                     break;
                 case "block":
                     if (e.Scale == "forged")
@@ -714,6 +739,15 @@ public static class EffectRunner
                     // path a summon's own `block` move uses). No summon out → logged no-op.
                     await HealOrShieldSummon(card, "shield_summon", amt);
                     break;
+                case "add_random_card":
+                    // Phase BN (v69, gap #72): Discovery / Infernal Blade — random cards from YOUR class pool (choose 1 of N, or
+                    // N at random), optionally free this turn, through the shared generate-into-combat path.
+                    await AddRandomCards(e, Math.Max(1, amt), card.Owner, ctx, spec.Title ?? spec.Id);
+                    break;
+                case "autoplay":
+                    // Phase BN (v69, gap #73): Havoc (the top card, forced Exhaust) / Uproar (a random draw-pile card).
+                    await Autoplay(e, Math.Max(1, amt), card.Owner, ctx, spec.Title ?? spec.Id);
+                    break;
                 case "add_card":
                     // Phase Q (gap #16): generate combat-transient copies of a SAME-CLASS card into a pile. The
                     // class index comes off the player (add_card is a class mechanic); ResolveClassCardModel enforces
@@ -778,24 +812,157 @@ public static class EffectRunner
     internal static async Task AddCards(EffectSpec e, Player owner, string? adderId = null)
     {
         int k = ForgedCharacters.ClassIndexOfPlayer(owner);
-        PileType pile = e.Pile switch
-        {
-            "draw"    => PileType.Draw,
-            "discard" => PileType.Discard,
-            _         => PileType.Hand,
-        };
+        PileType pile = GeneratedPile(e.Pile);
         int copies = Math.Max(1, e.Amount);
         int made = 0;
         for (int c = 0; c < copies; c++)
         {
             var model = ForgedCharacters.ResolveClassCardModel(k, e.CardId, owner, adderId); // owner-bound copy; null = skip
             if (model == null) break;   // unknown id or depth-1 refusal — ResolveClassCardModel logs the reason
-            // creator = the player (marks the copy player-generated, like base-game Shivs/Insight); position Random.
-            await CardPileCmd.AddGeneratedCardToCombat(model, pile, owner, CardPilePosition.Random);
+            await AddGenerated(model, pile, owner);
             made++;
         }
         if (made > 0) MainFile.Logger.Info($"[Q] add_card '{e.CardId}' x{made} -> {pile}.");
         else MainFile.Logger.Warn($"[Q] add_card '{e.CardId}': nothing added (class {k}).");
+    }
+
+    /// <summary>Phase Q / BN: the combat pile a generated card drops into (hand / discard / draw).</summary>
+    private static PileType GeneratedPile(string? pile) => pile switch
+    {
+        "draw"    => PileType.Draw,
+        "discard" => PileType.Discard,
+        _         => PileType.Hand,
+    };
+
+    /// <summary>Phase Q / BN: the ONE generate-into-combat call add_card and add_random_card share — creator = the player (marks
+    /// the card player-generated, like base-game Shivs / Discovery, so BP's on_card_generated sees it); position Random.</summary>
+    private static Task AddGenerated(CardModel model, PileType pile, Player owner)
+        => CardPileCmd.AddGeneratedCardToCombat(model, pile, owner, CardPilePosition.Random);
+
+    /// <summary>Phase BN (v69, gap #72): <c>add_random_card</c> — the base Discovery / Infernal Blade / Creative AI recipe on the
+    /// player's OWN class pool (<c>Character.CardPool.GetUnlockedCards</c>; a forged class's pool holds only its filled cards).
+    /// Filters: the optional <c>card_type</c> (HandKindMatches), never a card that itself add_random_cards (depth-1, the
+    /// ResolveClassCardModel idea), <c>CanBeGeneratedInCombat</c> (drops the blade token; CardFactory also drops Basic). An empty
+    /// pool is logged and skipped (never FromChooseACardScreen's ReportSoftlock). <c>choose_of</c> offers that many distinct cards
+    /// (<c>CardSelectCmd.FromChooseACardScreen</c>, max 3 — it throws above; AutoSlay auto-picks 1), else <paramref name="n"/>
+    /// distinct random ones. <c>free_this_turn</c> = <c>SetToFreeThisTurn()</c>. Shared by the card path and TriggerRunner.</summary>
+    internal static async Task AddRandomCards(EffectSpec e, int n, Player owner, PlayerChoiceContext ctx, string source)
+    {
+        string type = e.CardKind ?? "any";
+        var pool = owner.Character.CardPool.GetUnlockedCards(owner.UnlockState, owner.RunState.CardMultiplayerConstraint)
+            .Where(c => (e.CardKind == null || HandKindMatches(c, e.CardKind)) && c.CanBeGeneratedInCombat
+                        && !(c is DataCard dc && dc.HasOp("add_random_card")))
+            .ToList();
+        if (pool.Count == 0)
+        {
+            MainFile.Logger.Info($"[BN] add_random_card: empty pool, skipped ({type}; '{source}').");
+            return;
+        }
+        var rng = owner.RunState.Rng.CombatCardGeneration;
+        var picked = new List<CardModel>();
+        int chooseOf = Math.Min(e.ChooseOf, ForgedCards.ChooseOfMax);
+        if (chooseOf > 1)
+        {
+            var offer = CardFactory.GetDistinctForCombat(owner, pool, chooseOf, rng).ToList();
+            if (offer.Count == 0)
+            {
+                MainFile.Logger.Info($"[BN] add_random_card: empty pool, skipped ({type}; '{source}'; nothing combat-generatable).");
+                return;
+            }
+            var pick = await CardSelectCmd.FromChooseACardScreen(ctx, offer, owner);
+            if (pick != null) picked.Add(pick);
+        }
+        else
+            picked.AddRange(CardFactory.GetDistinctForCombat(owner, pool, n, rng));
+        if (picked.Count == 0)
+        {
+            MainFile.Logger.Info($"[BN] add_random_card: empty pool, skipped ({type}; '{source}'; nothing picked).");
+            return;
+        }
+        var pile = GeneratedPile(e.Pile);
+        foreach (var c in picked)
+        {
+            if (e.FreeThisTurn) c.SetToFreeThisTurn();
+            await AddGenerated(c, pile, owner);
+        }
+        MainFile.Logger.Info($"[BN] add_random_card {type} x{picked.Count} -> {pile} ('{string.Join("', '", picked.Select(c => c.Title))}'; " +
+                             $"free={e.FreeThisTurn}; choose_of={e.ChooseOf}) ('{source}').");
+    }
+
+    // Phase BN (v69, gap #73): how deep we are inside our own autoplay ops (a static guard like DataCard's on_discard flag — the
+    // plays resolve one at a time). At AutoplayDepthMax the op is skipped and logged. autoplay cards are never candidates
+    // either, so the guard is the belt to that brace.
+    internal static int AutoplayDepth;
+    internal const int AutoplayDepthMax = 3;
+
+    /// <summary>Phase BN (v69, gap #73): <c>autoplay</c> — <c>draw_top</c> = Havoc (CardPileCmd.AutoPlayFromDrawPile's own loop:
+    /// ShuffleIfNecessary, the top card to the Play pile, then AutoPlay it with ExhaustOnNextPlay — the FORCED exhaust that
+    /// keeps a top-card loop from cycling the deck); <c>draw_random</c> = Uproar (a random playable draw-pile card of the
+    /// optional type, StableShuffle on Rng.Shuffle, AutoPlay from where it sits). Never an autoplay card (depth-1), and a static
+    /// depth guard of <see cref="AutoplayDepthMax"/>. A single-enemy card gets a random hittable enemy (the AutoPlay rule,
+    /// rolled here on the same CombatTargets stream so the tag can name it). Shared by the card path and the Mayhem payload.</summary>
+    internal static async Task Autoplay(EffectSpec e, int n, Player owner, PlayerChoiceContext ctx, string source)
+    {
+        if (AutoplayDepth >= AutoplayDepthMax)
+        {
+            MainFile.Logger.Info($"[BN] autoplay depth guard hit (depth {AutoplayDepth}; {e.From}) ('{source}').");
+            return;
+        }
+        AutoplayDepth++;
+        try
+        {
+            string from = e.From ?? "draw_top";
+            if (from == "draw_random")
+            {
+                for (int i = 0; i < n; i++)
+                {
+                    if (CombatManager.Instance.IsOverOrEnding || owner.Creature.IsDead) break;
+                    var pick = owner.PlayerCombatState.DrawPile.Cards
+                        .Where(c => !c.Keywords.Contains(CardKeyword.Unplayable) && (e.CardKind == null || HandKindMatches(c, e.CardKind))
+                                    && !(c is DataCard dc && dc.HasOp("autoplay")))
+                        .ToList().StableShuffle(owner.RunState.Rng.Shuffle).FirstOrDefault();
+                    if (pick == null)
+                    {
+                        MainFile.Logger.Info($"[BN] autoplay draw_random: no playable {e.CardKind ?? "card"} in the draw pile ('{source}').");
+                        break;
+                    }
+                    await AutoplayOne(ctx, pick, owner, "draw_random", source);
+                }
+                return;
+            }
+            var cards = new List<CardModel>(n);
+            for (int i = 0; i < n; i++)
+            {
+                if (CombatManager.Instance.IsOverOrEnding) break;
+                await CardPileCmd.ShuffleIfNecessary(ctx, owner);
+                var top = owner.PlayerCombatState.DrawPile.Cards.FirstOrDefault();
+                if (top == null) break;
+                if (top is DataCard dc && dc.HasOp("autoplay"))
+                {
+                    MainFile.Logger.Info($"[BN] autoplay draw_top: '{top.Title}' is an autoplay card — never auto-played ('{source}').");
+                    break;
+                }
+                cards.Add(top);
+                await CardPileCmd.Add(top, PileType.Play);
+            }
+            foreach (var c in cards)
+            {
+                if (owner.Creature.IsDead) break;
+                c.ExhaustOnNextPlay = true; // Havoc: the forced exhaust is mandatory (a non-exhausting top-card loop never ends)
+                await AutoplayOne(ctx, c, owner, "draw_top", source);
+            }
+        }
+        finally { AutoplayDepth--; }
+    }
+
+    private static async Task AutoplayOne(PlayerChoiceContext ctx, CardModel card, Player owner, string from, string source)
+    {
+        Creature? target = null;
+        if (card.TargetType == TargetType.AnyEnemy)
+            target = owner.RunState.Rng.CombatTargets.NextItem(owner.Creature.CombatState.HittableEnemies);
+        MainFile.Logger.Info($"[BN] autoplay {from} '{card.Title}' -> {(target != null ? MonsterName(target) : "none")} " +
+                             $"(depth {AutoplayDepth}) ('{source}').");
+        await CardCmd.AutoPlay(ctx, card, target);
     }
 
     // Phase AU (v51): how deep we are inside one of the MOD's OWN discard ops (discard / scry). Purely for the

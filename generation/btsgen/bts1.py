@@ -25,7 +25,12 @@ import sys
 import zlib
 from pathlib import Path
 
-VOCAB_VERSION = 68  # must be <= ForgedCards.VocabVersion (68: Phase BQ — ORB EXTRAS (orb classes): evoke + keep (Dualcast)
+VOCAB_VERSION = 69  # must be <= ForgedCards.VocabVersion (69: Phase BN — ON-KILL, RANDOM GENERATION, AUTOPLAY: condition
+                    # target_killed (Feed / Sunder; play-local, after a damage op, AoE = any kill); op add_random_card
+                    # {card_type?, pile, amount 1..2, choose_of 2..3, free_this_turn} (Discovery / Infernal Blade; payload =
+                    # Creative AI); op autoplay {from draw_top|draw_random, amount 1..2, card_type?} (Havoc / Uproar; payload =
+                    # Mayhem). No codec change.)
+                    # 68: Phase BQ — ORB EXTRAS (orb classes): evoke + keep (Dualcast)
                     # / which newest; card-only ops trigger_passive {amount, orbs first|all} (Darkness / Tesla Coil) and
                     # lose_orb_slot (Bulk Up, 3+ slots); status loop (LoopPower); scales orb_count / orb_types (Compile
                     # Driver); orb_count_ge + an orb filter; channel_orb + per_enemy (Chill). No codec change.)

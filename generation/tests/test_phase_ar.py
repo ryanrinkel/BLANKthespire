@@ -42,7 +42,8 @@ CARD_SCHEMA = paths.VOCABULARY.parent / "card.schema.json"
 PHASE_I_PLAN = paths.VOCABULARY.parents[2] / "docs" / "plans" / "PHASE_I_FORGED_ORBS_PLAN.md"
 
 FORBIDDEN = {"target_has_status", "retained_last_turn", "target_hp_below_half", "target_has_block",
-             "target_intends_attack"}  # Phase BJ (v62): a chosen-target read
+             "target_intends_attack",  # Phase BJ (v62): a chosen-target read
+             "target_killed"}  # Phase BN (v69): a card play's own kill (Conditions.PlayLocalKinds)
 
 
 def check(cond: bool, msg: str) -> None:
@@ -199,8 +200,10 @@ def _t_kind_lockstep() -> None:
     check(cs_kinds == enum, f"C# Conditions.Kinds == schema enum (diff {sorted(cs_kinds ^ enum)})")
     tk = re.search(r"TargetKinds =\s*\[(.*?)\];", cond, re.S)
     cs_target = set(re.findall(r'"(\w+)"', tk.group(1))) if tk else set()
-    check(cs_target | {"target_has_status", "retained_last_turn"} == FORBIDDEN,
-          "C# TargetKinds + target_has_status + retained_last_turn == the forbidden set")
+    pl = re.search(r"PlayLocalKinds =\s*\[(.*?)\];", cond, re.S)  # Phase BN (v69): target_killed
+    cs_local = set(re.findall(r'"(\w+)"', pl.group(1))) if pl else set()
+    check(cs_target | cs_local | {"target_has_status", "retained_last_turn"} == FORBIDDEN,
+          "C# TargetKinds + PlayLocalKinds + target_has_status + retained_last_turn == the forbidden set")
     check(cf._ORB_CONDITION_VALUE_MAX == {"energy_ge": 6, "cards_played_this_turn_ge": 10, "hp_lost_ge": 15,
                                           "played_cards_last_turn_ge": 10},  # Phase BJ (v62)
           "value caps mirror Conditions.EnergyGeMax / CardsPlayedGeMax / the hp_lost_ge 15 cap")
@@ -223,7 +226,7 @@ def _t_csharp_mirror() -> None:
           "ForgedCharacters.OrbTurnStartOnlyOps = gain_energy + draw")
     fk = re.search(r"OrbForbiddenConditionKinds =\s*\[([^\]]*)\]", fch)
     check(fk is not None and set(re.findall(r'"(\w+)"', fk.group(1))) == {"target_has_status", "retained_last_turn"}
-          and "Conditions.TargetKinds" in fk.group(1),
+          and "Conditions.TargetKinds" in fk.group(1) and "Conditions.PlayLocalKinds" in fk.group(1),
           "ForgedCharacters.OrbForbiddenConditionKinds = target_has_status + retained_last_turn + ..Conditions.TargetKinds")
     check('e.ContainsKey("when")' in fch and "var cerr = Conditions.Validate(when);" in fch
           and "OrbForbiddenConditionKinds.Contains(when.Kind)" in fch,

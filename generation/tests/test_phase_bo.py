@@ -378,7 +378,7 @@ def _t_contract() -> None:
     schema = json.loads(CARD_SCHEMA.read_text(encoding="utf-8"))
     eff = schema["$defs"]["effect"]
     check(set(NEW_OPS) <= set(eff["properties"]["op"]["enum"]), "schema: op enum += the six ops")
-    check(eff["properties"]["from"]["enum"] == ["hand", "discard"], "schema: the `from` field")
+    check(eff["properties"]["from"]["enum"][:2] == ["hand", "discard"], "schema: the `from` field (Phase BN v69 adds autoplay's)")
     check(eff["properties"]["keyword"]["enum"] == ["retain", "ethereal", "sly"], "schema: the `keyword` field")
     check("on_shuffle" in eff["properties"]["trigger"]["enum"], "schema: trigger enum += on_shuffle")
     te = schema["$defs"]["triggerEffect"]
@@ -390,7 +390,7 @@ def _t_contract() -> None:
           "schema: put_back / grant_keyword required fields")
     check('"op": {"enum": ["return_to_hand", "to_draw_top", "return_next_turn", "shuffle_hand"]}' in rules,
           "schema: the flag-op rule")
-    check('"retrieve_card", "grant_keyword"]' in rules, "schema: card_type belongs to retrieve_card + grant_keyword too")
+    check('"retrieve_card", "grant_keyword"' in rules, "schema: card_type belongs to retrieve_card + grant_keyword too")
     vocab = paths.VOCABULARY.read_text(encoding="utf-8")
     idx = gate.vocab_index(vocab)
     for t in NEW_OPS:
@@ -405,7 +405,7 @@ def _t_contract() -> None:
     check("`on_shuffle` (v66" in vocab and "on_poison_damage/on_shuffle/" in vocab, "VOCABULARY: Triggers prose + add_trigger row")
     for op in NEW_OPS:
         check(op in gate.GATED_OP_ORDER, f"gate.GATED_OP_ORDER carries {op} (no card core cost)")
-    check(gate.FIELD_UNITS["from"] == ("put_back",) and gate.FIELD_UNITS["keyword"] == ("grant_keyword",)
+    check("put_back" in gate.FIELD_UNITS["from"] and gate.FIELD_UNITS["keyword"] == ("grant_keyword",)  # BN (v69): + autoplay
           and "exhaust_card" in gate.FIELD_UNITS["pile"], "gate.FIELD_UNITS: from / keyword / exhaust_card pile")
     check(set(FLAG_OPS) <= census.KEYWORD_OPS, "census.KEYWORD_OPS += the three flag-ops")
     check("on_shuffle" in {k for k, _ in coverage.REACTIVE_MENU_V2} and "on_shuffle" in coverage.CENSUS_DETECTOR,

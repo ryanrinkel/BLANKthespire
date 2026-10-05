@@ -464,7 +464,8 @@ combo/engine concepts: conjure cheap attacks into hand, or — the COMPOST loop 
 discard pile" pairs `on_exhaust` with `add_card`). LOOP DISCIPLINE (hard): keep amounts small (1-2); the \
 referenced card must NOT itself `add_card`; and NEVER make a 0-cost card that re-adds ITSELF to hand (a one-card \
 engine) — send self-copies to the DISCARD pile (the Anger pattern) or charge a real price. `add_card` is \
-CLASS-ONLY (it copies your class's own cards).
+CLASS-ONLY (it copies your class's own cards). v69: `add_random_card` adds RANDOM cards from your own pool \
+(Discovery: choose 1 of 3, free this turn).
 
 RAMPAGE (`grow` — an attack that grows as you replay it): a `damage` card may carry `{{"op":"damage",\
 "amount":8,"grow":5}}` so its damage climbs by `grow` EACH time you play THIS card this combat (first play = \
@@ -510,7 +511,8 @@ fits sifting/foresight concepts on its own. Card-only (no repeating-trigger scry
 `{{"op":"retrieve_card","pile":"discard"|"exhaust","cards":"choose"|"random","amount":1}}` returns a spent card to \
 your hand (Headbutt / Exhume; Status/Curse cards never come back) — the recursion half of a churn or exhaust class. \
 (5) v66: `put_back` (from discard) re-stacks a card on your draw pile, `grant_keyword` sly makes a hand card Sly this \
-turn, `return_next_turn` brings an attack back next turn (Bolas).
+turn, `return_next_turn` brings an attack back next turn (Bolas). (6) v69: `autoplay` plays the top card of your \
+draw pile (Havoc; it Exhausts) or a random Attack from it (Uproar).
 
 CORRUPTION (`corruption` — your Skills cost 0 but Exhaust when played): reach for this when the fantasy is \
 RECKLESS TEMPO / spending yourself / a Faustian bargain — a burst of free skills at the cost of burning them. ONE \
@@ -1085,13 +1087,15 @@ _PRUNABLE_SECTIONS: list[tuple[str, frozenset, str | None, str, str]] = [
     ("THE ORB POOL", _ORB_TOKENS, "orb", "orb", ""),
     ("THE SLOT-MACHINE ARCHETYPE", _ORB_TOKENS, "orb", "orb", ""),
     ("TAGGED SYNERGY", frozenset({"tag_cards_owned"}), None, "tags", "tags + scale tag_cards_owned (strikes-matter)"),
-    ("TOKEN GENERATION", frozenset({"add_card"}), None, "tokens", "tokens (add_card copies of your own cards)"),
+    ("TOKEN GENERATION", frozenset({"add_card", "add_random_card"}), None, "tokens",  # Phase BN (v69): + random generation
+     "tokens (add_card copies of your own cards)"),
     ("RAMPAGE", frozenset({"grow"}), None, "rampage", "rampage (a damage `grow` per replay)"),
     ("IN-RUN UPGRADE", frozenset({"upgrade_card"}), None, "upgrade", "in-run upgrade (upgrade_card, Armaments)"),
     ("DECK-THINNING", frozenset({"purge", "purge_card", "exhaust_card"}), None, "purge",  # Phase BC (v57): hand-burning fuel
      "deck-thinning (purge / purge_card / exhaust_card)"),
     ("DISCARD / HAND-CHURN", frozenset({"discard", "scry", "on_discard", "retrieve_card",
-                                        "sly"}), None, "discard",  # Phase BB (v56): Sly is discard-class vocabulary
+                                        "sly",  # Phase BB (v56): Sly is discard-class vocabulary
+                                        "autoplay"}), None, "discard",  # Phase BN (v69): Havoc churns the draw pile
      "discard / scry + on_discard / sly fuel + retrieve_card"),
     ("CORRUPTION", frozenset({"corruption"}), None, "corruption", "corruption (Skills cost 0 but Exhaust)"),
     ("METAMORPH", frozenset({"transform_card", "graft_card"}), None, "transform",
@@ -1117,7 +1121,7 @@ _CONDITIONS_PARAGRAPH = (
     "stat line — `when:{\"kind\":\"hp_below_half\"}` (execute), `when:{\"kind\":\"no_block\"}` (reward "
     "aggression), `when:{\"kind\":\"target_has_status\", \"status\":\"poison|vulnerable|weak|frail\"}` "
     "(follow-up), `turn_at_least`, `enemy_count_ge`, `has_block`, `hand_size_ge`, `exhausted_this_turn`, "
-    "`target_intends_attack`. Conditional payoffs are "
+    "`target_intends_attack`, `target_killed` (after the damage: \"if this kills the enemy\"). Conditional payoffs are "
     "swings, so put the splashy numbers at uncommon/rare. SHAPE RULE: a card carries ONE damage value, so gate "
     "the card's only damage line or put the conditional bonus on a DIFFERENT op.")
 
@@ -1474,6 +1478,8 @@ def _cond_uptime(when, deck_stats: dict, trigger: str = "", realistic: bool = Fa
         up = 1.0 if value <= 2 else (0.6 if value == 3 else (0.3 if value == 4 else 0.12))
     elif kind == "target_intends_attack":  # Phase BJ (v62): most enemy turns are attacks (card-only; never a hook)
         up = 0.65
+    elif kind == "target_killed":  # Phase BN (v69): a finisher lands the kill about a third of its plays (card-only; never a hook)
+        up = 0.35
     elif kind == "hand_size_ge":
         held = min(3, round(4 * deck_stats["share"])) if realistic else min(5, round(10 * deck_stats["share"]))
         expected = 5 + held - (1 if str(trigger).strip().lower() == "on_card_played" else 0)
@@ -2185,7 +2191,8 @@ _ORB_TURN_START_ONLY_OPS = {"gain_energy", "draw"}
 # Conditions.Kinds) EXCEPT the card-instance and chosen-target reads: an orb fires with no card and no chosen target
 # (the trigger rule — mirror ForgedCharacters.OrbForbiddenConditionKinds).
 _ORB_FORBIDDEN_CONDITION_KINDS = {"target_has_status", "retained_last_turn", "target_hp_below_half", "target_has_block",
-                                  "target_intends_attack"}  # Phase BJ (v62): a chosen-target read (Conditions.TargetKinds)
+                                  "target_intends_attack",  # Phase BJ (v62): a chosen-target read (Conditions.TargetKinds)
+                                  "target_killed"}  # Phase BN (v69): a card play's own kill (Conditions.PlayLocalKinds)
 _ORB_CONDITION_KINDS = {
     "orbs_match", "orb_count_ge", "no_block", "hp_below_half", "has_block", "enemy_count_ge", "turn_at_least",
     "hand_size_ge", "forged_ge", "draw_pile_empty", "light_ge", "dark_ge", "centered", "hp_lost_ge", "energy_ge",

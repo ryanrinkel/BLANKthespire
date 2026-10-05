@@ -735,7 +735,7 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Mechanic sketch:** `when {kind:"target_killed"}` on an effect AFTER a `damage` op (the `damage_dealt_unblocked` ordering rule), never in `add_trigger` / trigger `when` / orb `when`; minions and reattaching parts don't pay out (as Feed). Phrase "this kills the enemy" → "Gain 3 Max HP if this kills the enemy."; negated "unless this kills the enemy". Gated `gain_max_hp` repriced Feed-exact. Default (plan §7): on AoE it reads "if this kills an enemy" (any kill).
 - **Buildable today?** No — `gain_max_hp` is unconditional (a Feed approximation).
 - **Priority:** Medium.
-- **Status:** **planned (Wave 6, Phase BN, vocab v66)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BN.
+- **Status:** **done (2026-10-04, vocab v69, Phase BN)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BN.
 
 ### 72. `add_random_card` (random generation from the class pool)
 - **Surfaced by:** base-game audit (2026-10-01), "Random card generation" row: `InfernalBlade`, `WhiteNoise`, `Discovery`, `Splash`, `Quasar`, `JackOfAllTrades`, `Calamity`, `CreativeAiPower` (19 cards).
@@ -743,7 +743,7 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Mechanic sketch:** op `add_random_card {card_type?, pile, amount? 1..2, choose_of? 2..3, free_this_turn?}` over the forged class pool (excluding cards that themselves carry `add_random_card`, guarding an empty pool); `choose_of` uses the base choose-a-card screen (max 3). Payload form on `turn_start` only, without `choose_of`. Describe: "Add a random Attack to your hand. It costs 0 this turn." / "Choose 1 of 3 random Skills to add to your hand. It costs 0 this turn."; fragment "add a random Power to your hand". Colorless source out of scope.
 - **Buildable today?** No — `add_card` names a fixed same-class id.
 - **Priority:** High — 19 base cards.
-- **Status:** **planned (Wave 6, Phase BN, vocab v66)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BN.
+- **Status:** **done (2026-10-04, vocab v69, Phase BN)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BN.
 
 ### 73. `autoplay` (play cards from your draw pile)
 - **Surfaced by:** base-game audit (2026-10-01), "Auto-play other cards" row: `Havoc`, `Cascade`, `MayhemPower`, `Uproar`, `Catastrophe` (13 cards incl. the deferred forms).
@@ -751,7 +751,7 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Mechanic sketch:** op `autoplay {from: draw_top|draw_random, amount? 1..2, card_type?}`. `draw_top` is Havoc (the played card is ALWAYS exhausted, else a top-card loop cycles the deck forever); `draw_random` plays a random (typed) playable card from the draw pile at a random enemy. Static depth guard ≤ 3; `autoplay` cards are never autoplay candidates. Payload form on `turn_start` (Mayhem). Describe: "Play the top card of your draw pile and Exhaust it." / "Play a random Attack from your draw pile." Default (plan §7): GO — this is an effect the player chose to play, not #37's override; forced play from hand stays rejected and Howl-from-Beyond stays deferred (#37 / #42 / #43).
 - **Buildable today?** No — but AutoSlay already plays every card through `CardCmd.AutoPlay`, so the path is exercised.
 - **Priority:** Medium.
-- **Status:** **planned (Wave 6, Phase BN, vocab v66)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BN.
+- **Status:** **done (2026-10-04, vocab v69, Phase BN)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BN.
 
 ### 74. Self-routing recursion, put-back, draw-pile tutor, `on_shuffle`
 - **Surfaced by:** base-game audit (2026-10-01), "Self-routing recursion", "Put-back / draw-pile ordering" and "Tutor from the draw pile" rows: `ParticleWall`, `Bolas`, `MakeItSo`, `ReboundPower`, `Headbutt`, `ThinkingAhead`, `Reboot`, `SecretWeapon`, `SecretTechnique`, `Wish`, `StratagemPower` (23 cards).

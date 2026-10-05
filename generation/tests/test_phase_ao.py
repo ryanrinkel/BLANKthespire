@@ -193,7 +193,9 @@ def _t_contract() -> None:
     # Phase BI (v61): + `status` (the on_card_drawn add_trigger filter — the add_trigger clause admits it, cost_shift's does not)
     check(set(eff["card_type"]["enum"]) == {"attack", "skill", "power", "all", "non_attack", "status"} and set(eff["scope"]["enum"]) == {"this_turn", "combat"}
           and eff["count"]["maximum"] == 3, "schema: card_type / scope / count properties")
-    check(all(k not in trig for k in ("card_type", "scope", "count")), "schema: the three fields are not on triggerEffect")
+    # Phase BN (v69): a payload add_random_card / autoplay carries its OWN card_type (the hand filters, never cost_shift's "all").
+    check(all(k not in trig for k in ("scope", "count")) and "all" not in trig["card_type"]["enum"],
+          "schema: scope / count are not on triggerEffect (card_type there is BN's hand filter only)")
     vocab = paths.VOCABULARY.read_text(encoding="utf-8")
     check("`cost_shift`" in vocab and "Your Attacks cost 1 less this turn." in vocab and "rare-only" in vocab, "VOCABULARY.md names cost_shift with the wording + the rare rule")
     rschema = json.loads(paths.RELIC_SCHEMA.read_text(encoding="utf-8"))

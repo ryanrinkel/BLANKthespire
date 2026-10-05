@@ -42,7 +42,17 @@ public static class ForgedCards
     /// v10 (forged statuses, Phase J): + CharacterSpec.StatusPool (a class's ≤4 custom modifier-family statuses
     /// read from `status_pool`; see ForgedCharacters / ForgedStatusPower). Class cards may apply a custom status
     /// by pool name via the `apply_status_custom` op (class-only, like custom-orb channels).</summary>
-    public const int VocabVersion = 68; // 68: Phase BQ (VOCAB_EXPANSION_6, gap #78) — ORB EXTRAS (orb classes): `evoke` + `keep`
+    public const int VocabVersion = 69; // 69: Phase BN (VOCAB_EXPANSION_6, gaps #71-#73) — ON-KILL, RANDOM GENERATION, AUTOPLAY:
+                                        //     condition `target_killed` (Feed / Sunder — play-local: EffectRunner.Execute ORs
+                                        //     every damage op's WasTargetKilled over the targets whose powers were fatal BEFORE
+                                        //     the hit; AoE = any kill; only after a damage op, never a trigger / orb gate);
+                                        //     op `add_random_card` {card_type?, pile, amount 1..2, choose_of 2..3, free_this_turn}
+                                        //     (Discovery / Infernal Blade — the class pool via GetUnlockedCards, no add_random_card
+                                        //     card generated; payload on turn_start = Creative AI, no choose_of); op `autoplay`
+                                        //     {from draw_top|draw_random, amount 1..2, card_type?} (Havoc forced-exhaust / Uproar;
+                                        //     depth guard 3; autoplay cards are never candidates; the turn_start payload = Mayhem,
+                                        //     fired from AfterAutoPrePlayPhaseEntered). No codec change.
+                                        // 68: Phase BQ (VOCAB_EXPANSION_6, gap #78) — ORB EXTRAS (orb classes): `evoke` + `keep`
                                         //     (Dualcast: EvokeNext(dequeue:false) then EvokeNext) / `which:"newest"` (EvokeLast);
                                         //     card-only ops `trigger_passive` {amount, orbs: first|all} (Darkness / Tesla Coil —
                                         //     OrbCmd.Passive; ForgedOrb now overrides OrbModel.Passive -> OrbRunner.RunPassive) and
@@ -548,6 +558,7 @@ public static class ForgedCards
          "held_discount", // Phase BD (v58, gap #58): flag-op — costs N less for the combat per turn it is retained (Sands of Time). Card-only, needs retain.
          "cost_delta", // Phase BP (v67, gap #76): this card's own cost moves on an event (Stomp / Momentum Strike / Kingly Kick / Modded). Card-only.
          "trigger_passive", "lose_orb_slot", // Phase BQ (v68, gap #78): Darkness / Tesla Coil (OrbCmd.Passive), Bulk Up (OrbCmd.RemoveSlots). Card-only, orb classes.
+         "add_random_card", "autoplay", // Phase BN (v69, gaps #72/#73): Discovery / Infernal Blade, Havoc / Uproar. Payload on turn_start only.
          "apply_custom", // EXPLORE SPIKE: apply a hardcoded modifier-family custom status (not in LLM contract)
          "gaptest_enemy_artifact", // PHASE BL GAPTEST (not in the LLM contract): N Artifact on the card's target(s) — the sign-flip smoke
          "summon_spike"]; // PHASE K SPIKE: summon a hardcoded player pet (not in LLM contract)
@@ -596,7 +607,10 @@ public static class ForgedCards
          // player's class at fire time (TriggerRunner) exactly like heal_summon / trigger channel_orb.
          "apply_status_custom", // status class: "At the start of your turn, gain 1 Razor Focus" (a debuff needs a target)
          "summon_attack", // summon class: "At the end of your turn, deal 4 damage 2 times with your summon" (the dormant move-cycle as a card engine)
-         "buff_summon"]; // summon class: "At the start of your turn, your summon gains 1 Strength"
+         "buff_summon", // summon class: "At the start of your turn, your summon gains 1 Strength"
+         // Phase BN (v69, gaps #72/#73): turn_start ONLY (ValidateTrigger) — Creative AI ("add a random Power to your hand")
+         // and Mayhem ("play the top card of your draw pile", fired from AfterAutoPrePlayPhaseEntered).
+         "add_random_card", "autoplay"];
     // H4 (gap #14): payload ops that may aim at enemies (with a `target`), and the debuffs a targeted apply_status
     // may apply. Everything else stays self/orb-only. Phase AL (v42): + summon_attack (the summon strikes the
     // resolved enemies; no target = the first living enemy) and apply_status_custom (a custom DEBUFF lands on the
@@ -726,6 +740,58 @@ public static class ForgedCards
         }
         return null;
     }
+    // Phase BN (v69, gaps #72/#73): the random-generation and auto-play shapes. Lockstep with validator._ADD_RANDOM_* /
+    // _AUTOPLAY_* + the schema clauses.
+    internal const int AddRandomCardMaxAmount = 2, ChooseOfMin = 2, ChooseOfMax = 3; // FromChooseACardScreen throws above 3
+    internal static readonly HashSet<string> AutoplayFrom = ["draw_top", "draw_random"];
+    internal const int AutoplayMaxAmount = 2;
+
+    /// <summary>Phase BN (v69, gaps #72/#73): the per-effect rules of <c>add_random_card</c> {card_type?, pile, amount 1..2,
+    /// choose_of 2..3, free_this_turn} and <c>autoplay</c> {from draw_top|draw_random, amount 1..2, card_type? (draw_random
+    /// only)}; <c>choose_of</c> / <c>free_this_turn</c> belong to add_random_card alone. <paramref name="payload"/> = inside an
+    /// add_trigger payload (no choose_of: a pick screen every turn is rule 0.5's footgun).</summary>
+    internal static string? ValidateBnOps(EffectSpec e, bool payload = false)
+    {
+        if ((e.ChooseOf != 0 || e.FreeThisTurn) && e.Op != "add_random_card")
+            return $"'choose_of' / 'free_this_turn' only apply to add_random_card (op '{e.Op}').";
+        if (e.Op == "add_random_card")
+        {
+            if (e.Pile == null || !AddCardPiles.Contains(e.Pile))
+                return $"add_random_card needs a 'pile' (one of {string.Join("/", AddCardPiles)}); got '{e.Pile}'.";
+            if (e.Amount < 0 || e.Amount > AddRandomCardMaxAmount)
+                return $"add_random_card 'amount' (cards added) must be 1..{AddRandomCardMaxAmount}; got {e.Amount}.";
+            if (e.CardKind != null && !HandKindFilters.Contains(e.CardKind))
+                return $"add_random_card 'card_type' must be one of {string.Join("/", HandKindFilters)}; got '{e.CardKind}'.";
+            if (e.ChooseOf != 0)
+            {
+                if (payload)
+                    return "a trigger add_random_card can't use 'choose_of' (a pick screen every turn — card-only).";
+                if (e.ChooseOf < ChooseOfMin || e.ChooseOf > ChooseOfMax)
+                    return $"add_random_card 'choose_of' must be {ChooseOfMin}..{ChooseOfMax}; got {e.ChooseOf}.";
+                if (e.Amount > 1)
+                    return "add_random_card with 'choose_of' adds the ONE card you pick (no amount above 1).";
+            }
+            if (e.FreeThisTurn && e.Pile != "hand")
+                return "add_random_card 'free_this_turn' needs pile 'hand' (it costs 0 THIS turn).";
+            if (e.Status != null || e.IsScaled || e.Hits > 1 || e.CardId != null)
+                return "add_random_card carries only card_type / pile / amount / choose_of / free_this_turn.";
+        }
+        if (e.Op == "autoplay")
+        {
+            if (e.From == null || !AutoplayFrom.Contains(e.From))
+                return $"autoplay needs a 'from' (one of {string.Join("/", AutoplayFrom)}); got '{e.From}'.";
+            if (e.Amount < 0 || e.Amount > AutoplayMaxAmount)
+                return $"autoplay 'amount' (cards played) must be 1..{AutoplayMaxAmount}; got {e.Amount}.";
+            if (e.CardKind != null && e.From != "draw_random")
+                return "autoplay 'card_type' only applies with from 'draw_random' (the top card is whatever it is).";
+            if (e.CardKind != null && !HandKindFilters.Contains(e.CardKind))
+                return $"autoplay 'card_type' must be one of {string.Join("/", HandKindFilters)}; got '{e.CardKind}'.";
+            if (e.Status != null || e.IsScaled || e.Hits > 1 || e.Pile != null || e.CardId != null)
+                return "autoplay carries only from / amount / card_type.";
+        }
+        return null;
+    }
+
     // Phase BL (v64): the per-effect caps (plan §7 decision 6: Doom 12 per card; strength_down 3 permanent / 9 temporary).
     // A payload Doom fires every turn and never decays, so it caps at 5 per fire. Lockstep with validator._BL_STATUS_CAPS.
     private static readonly Dictionary<string, int> BlStatusCaps =
@@ -1348,12 +1414,16 @@ public static class ForgedCards
             string? which = e.ContainsKey("which") ? Str(e, "which").Trim().ToLowerInvariant() : null;
             string? orbs = e.ContainsKey("orbs") ? Str(e, "orbs").Trim().ToLowerInvariant() : null;
             bool perEnemy = e.ContainsKey("per_enemy") && e["per_enemy"].AsBool();
+            // Phase BN (v69, gap #72): add_random_card's pick-1-of-N + the cost-0-this-turn flag (legality in ValidateBnOps).
+            int chooseOf = e.ContainsKey("choose_of") ? Int(e, "choose_of") : 0;
+            bool freeThisTurn = e.ContainsKey("free_this_turn") && e["free_this_turn"].AsBool();
             list.Add(new EffectSpec(op, amount, status, hits, scale, orb, when, trigger, triggered, statusName,
                                     summonName, oncePerTurn, target, cardId, pile, pole, grow, cards, tag,
                                     OncePerCombat: oncePerCombat, Unblockable: unblockable,
                                     CardKind: cardKind, Scope: scope, Count: count, StatusCard: statusCard,
                                     GrowHeld: growHeld, EveryN: everyN, HitsScale: hitsScale, From: from, Keyword: keyword,
-                                    On: on, SetZero: setZero, Keep: keep, Which: which, Orbs: orbs, PerEnemy: perEnemy));
+                                    On: on, SetZero: setZero, Keep: keep, Which: which, Orbs: orbs, PerEnemy: perEnemy,
+                                    ChooseOf: chooseOf, FreeThisTurn: freeThisTurn));
         }
         return list.ToArray();
     }
@@ -1432,14 +1502,18 @@ public static class ForgedCards
                 return $"'scope'/'count' only apply to cost_shift / replay_next ('scope':'this_turn' also to add_trigger) (op '{e.Op}').";
             // Phase BC (v57): `card_type` is shared by cost_shift (its own attack/skill/power/all band, above) and the two
             // hand ops (attack/skill/power/non_attack, below); anywhere else it is a stray field.
-            else if (e.CardKind != null && e.Op is not ("exhaust_card" or "draw_until" or "add_trigger" or "retrieve_card" or "grant_keyword"))
-                return $"'card_type' only applies to cost_shift/replay_next/exhaust_card/draw_until/add_trigger/retrieve_card/grant_keyword (op '{e.Op}').";
+            else if (e.CardKind != null && e.Op is not ("exhaust_card" or "draw_until" or "add_trigger" or "retrieve_card" or "grant_keyword"
+                                                         or "add_random_card" or "autoplay")) // Phase BN (v69)
+                return $"'card_type' only applies to cost_shift/replay_next/exhaust_card/draw_until/add_trigger/retrieve_card/grant_keyword/add_random_card/autoplay (op '{e.Op}').";
             // Phase BO (v66, gaps #74/#75): the self-routing flag-ops + shuffle_hand carry nothing; `from` belongs to put_back,
             // `keyword` to grant_keyword. All card-only (not in TriggerOps).
             if ((PileFlagOps.Contains(e.Op) || e.Op == "shuffle_hand") && (e.Amount != 0 || e.Status != null || e.IsScaled || e.Hits > 1))
                 return $"{e.Op} is a flag-op (no amount / status / scale / hits).";
-            if (e.From != null && e.Op != "put_back")
-                return $"'from' only applies to put_back (op '{e.Op}').";
+            if (e.From != null && e.Op is not ("put_back" or "autoplay")) // Phase BN (v69, gap #73): + autoplay's draw_top / draw_random
+                return $"'from' only applies to put_back / autoplay (op '{e.Op}').";
+            // Phase BN (v69, gaps #72/#73): add_random_card / autoplay shapes (choose_of / free_this_turn belong to the former).
+            var bnerr = ValidateBnOps(e);
+            if (bnerr != null) return bnerr;
             if (e.Keyword != null && e.Op != "grant_keyword")
                 return $"'keyword' only applies to grant_keyword (op '{e.Op}').";
             if ((e.On != null || e.SetZero) && e.Op != "cost_delta") // Phase BP (v67, gap #76)
@@ -1788,7 +1862,8 @@ public static class ForgedCards
                 if (e.Amount > StatusCardMaxAmount)
                     return $"add_status_card 'amount' (cards added) may be at most {StatusCardMaxAmount}; got {e.Amount}.";
             }
-            else if (e.CardId != null || (e.Pile != null && e.Op != "exhaust_card")) // Phase BO (v66): exhaust_card's pile is checked above
+            // Phase BN (v69, gap #72): add_random_card's pile is checked in ValidateBnOps above.
+            else if (e.CardId != null || (e.Pile != null && e.Op is not ("exhaust_card" or "add_random_card"))) // Phase BO (v66): exhaust_card's pile is checked above
                 return $"'card_id'/'pile' only apply to add_card/transform_card/graft_card/retrieve_card/add_status_card/exhaust_card (op '{e.Op}').";
             if (e.StatusCard != null && e.Op != "add_status_card")
                 return $"'card' only applies to add_status_card (op '{e.Op}').";
@@ -2087,6 +2162,24 @@ public static class ForgedCards
                     && !list.Take(i).Any(p => p.Op == "damage"))
                     return "a 'scale:damage_dealt_unblocked' heal / Doom needs a 'damage' op earlier in the same card (it reads the damage you dealt).";
         }
+        // Phase BN (v69, gap #71): a `when:target_killed` gate reads THIS play's kills, so it needs a damage op EARLIER in the
+        // same list (the damage_dealt_unblocked ordering rule — base and upgrade checked independently) and is never the
+        // add_trigger op's gate (a granted power has no play to read). One add_random_card / autoplay per list.
+        foreach (var list in new[] { effects, upgrade })
+        {
+            if (list == null) continue;
+            for (int i = 0; i < list.Length; i++)
+                if (list[i].When?.Kind == "target_killed")
+                {
+                    if (list[i].Op == "add_trigger")
+                        return "'when:target_killed' can't gate an add_trigger (a granted power has no attack to read).";
+                    if (!list.Take(i).Any(p => p.Op == "damage"))
+                        return "a 'when:target_killed' effect needs a 'damage' op earlier in the same card (it reads whether that damage killed).";
+                }
+            foreach (var one in new[] { "add_random_card", "autoplay" })
+                if (list.Count(e => e.Op == one) > 1)
+                    return $"at most one '{one}' effect per card.";
+        }
         // Phase AX (v53, gap #44): a `when:forged_ge` gate reads the LIVE Forge counter at execution time, and
         // effects resolve top-to-bottom — so a gated payoff placed AFTER the spend_forge that empties the counter
         // would test a number the same card just spent (the gate reads 0 and the payoff never fires). Order the
@@ -2258,8 +2351,20 @@ public static class ForgedCards
         foreach (var t in e.Triggered)
         {
             // Phase BI (v61): the trigger filters go on the add_trigger op, never on a payload effect.
-            if (t.EveryN != 0 || t.CardKind != null || t.Scope != null || t.Count != 0)
+            // Phase BN (v69, gaps #72/#73): add_random_card / autoplay carry their OWN card_type (the type generated / played).
+            if (t.EveryN != 0 || (t.CardKind != null && t.Op is not ("add_random_card" or "autoplay")) || t.Scope != null || t.Count != 0)
                 return "'every_n' / 'card_type' / 'scope' / 'count' are not allowed on a trigger payload effect (put the filter on the add_trigger op).";
+            if (t.Op is "add_random_card" or "autoplay")
+            {
+                // Phase BN (v69): Creative AI / Mayhem are turn_start engines — a reactive generator / auto-player would chain
+                // off its own event (a generated card is an on_card_generated, an auto-play an on_card_played).
+                if (e.Trigger != "turn_start")
+                    return $"a trigger '{t.Op}' is only allowed on a turn_start trigger (Creative AI / Mayhem); got '{e.Trigger}'.";
+                var bnerr = ValidateBnOps(t, payload: true);
+                if (bnerr != null) return bnerr;
+            }
+            else if (t.ChooseOf != 0 || t.FreeThisTurn || t.From != null)
+                return $"'choose_of' / 'free_this_turn' / 'from' are not allowed on a trigger '{t.Op}'.";
             // Phase U (gap #23): `grow` is a per-card-play attack mechanic (a card growing as YOU replay IT) — it
             // has no meaning in a trigger payload (which re-runs from a granted power, not a card the player replays).
             if (t.HasGrow)
@@ -2392,8 +2497,8 @@ public static class ForgedCards
                 if (t.Amount > AddCardMaxAmount)
                     return $"a trigger add_card 'amount' (copies) may be at most {AddCardMaxAmount}; got {t.Amount}.";
             }
-            else if (t.CardId != null || t.Pile != null)
-                return $"'card_id'/'pile' only apply to add_card (trigger effect '{t.Op}').";
+            else if (t.CardId != null || (t.Pile != null && t.Op != "add_random_card")) // Phase BN (v69): + add_random_card's pile
+                return $"'card_id'/'pile' only apply to add_card / add_random_card (trigger effect '{t.Op}').";
             // Phase T: a trigger-payload summon_blade (blade retrieval on a reactive trigger) — class-only, no amount.
             if (t.Op == "summon_blade" && !allowCustomOrbs)
                 return "a trigger summon_blade is only valid on a class card (it retrieves this class's signature blade).";
@@ -2456,7 +2561,8 @@ public static class ForgedCards
             // (Phase AL, v42: multi-hit inside a trigger is legal on damage/summon_attack — see the hits rule above.)
         }
         if (e.When != null && (e.When.Kind == "target_has_status" || e.When.Kind == "retained_last_turn"
-                               || Conditions.TargetKinds.Contains(e.When.Kind))) // Phase AM (v43): the chosen-target reads
+                               || Conditions.TargetKinds.Contains(e.When.Kind) // Phase AM (v43): the chosen-target reads
+                               || Conditions.PlayLocalKinds.Contains(e.When.Kind))) // Phase BN (v69): target_killed
             return $"a trigger's 'when' can't use {e.When.Kind} (a trigger fires with no card/target).";
         return null;
     }
@@ -2732,6 +2838,9 @@ public static class ForgedCards
                                                                        : "Put a card from your hand on top of your draw pile."); break;
                 case "shuffle_hand":     parts.Add("Shuffle your hand and discard pile into your draw pile."); break;
                 case "grant_keyword":    parts.Add(GrantKeywordSentence(e)); break;
+                // Phase BN (v69, gaps #72/#73): Discovery / Infernal Blade, Havoc / Uproar. Byte-lockstep with cardgen.describe.
+                case "add_random_card":  parts.Add(AddRandomCardSentence(e, capitalize: true)); break;
+                case "autoplay":         parts.Add(AutoplaySentence(e, capitalize: true)); break;
                 case "gaptest_enemy_artifact": parts.Add($"Enemies gain {Math.Max(1, e.Amount)} Artifact (gap test)."); break; // PHASE BL GAPTEST only
                 case "corruption":  parts.Add("Your Skills cost 0."); parts.Add("Your Skills Exhaust when played."); break; // Phase AB (gap #20)
                 case "cost_shift":  parts.Add(CostShiftSentence(e)); break; // Phase AO (v45): the discount sentence (literal, no var)
@@ -2834,7 +2943,10 @@ public static class ForgedCards
             if (e.When != null && parts.Count > before)
             {
                 string p = parts[^1];
-                string clause = (e.When.Negate ? "unless " : "if ") + Conditions.Phrase(e.When);
+                // Phase BN (v69, gap #71): on an AoE / random-enemy card a kill is ANY kill ("if this kills an enemy").
+                string phrase = e.When.Kind == "target_killed" && target != TargetType.AnyEnemy
+                    ? "this kills an enemy" : Conditions.Phrase(e.When);
+                string clause = (e.When.Negate ? "unless " : "if ") + phrase;
                 parts[^1] = p.EndsWith(".") ? $"{p[..^1]} {clause}." : $"{p} {clause}";
             }
         }
@@ -2969,6 +3081,8 @@ public static class ForgedCards
             "add_card"      => AddCardSentence(e, capitalize: false), // Phase Q (gap #16): the compost-loop fragment
             "summon_blade"  => "put your blade into your hand from anywhere", // Phase T: blade-retrieval fragment
             "upgrade_card"  => UpgradeSentence(e, capitalize: false), // Phase V (gap #18): trigger-side upgrade (random only)
+            "add_random_card" => AddRandomCardSentence(e, capitalize: false), // Phase BN (v69, gap #72): Creative AI
+            "autoplay"      => AutoplaySentence(e, capitalize: false), // Phase BN (v69, gap #73): Mayhem
             "heal_summon"   => $"heal your summon {e.Amount} HP", // Phase AC (gap #2): the medic-engine fragment
             "shield_summon" => $"your summon gains {e.Amount} Block", // Phase AC (gap #2)
             _ => "",
@@ -3000,6 +3114,48 @@ public static class ForgedCards
         int n = Math.Max(1, e.Amount);
         string body = n > 1 ? $"{verb} {n} copies of {name} to your {pile}"
                             : $"{verb} a copy of {name} to your {pile}";
+        return capitalize ? body + "." : body;
+    }
+
+    /// <summary>Phase BN (v69, gaps #72/#73): the noun a random-generation / auto-play filter names — "Attack" / "Skill" /
+    /// "Power" / "non-Attack card" / "card" (plural with an "s"). Lockstep with cardgen._RANDOM_NOUNS.</summary>
+    private static string RandomCardNoun(string? kind, bool plural) => kind switch
+    {
+        "attack"     => plural ? "Attacks" : "Attack",
+        "skill"      => plural ? "Skills" : "Skill",
+        "power"      => plural ? "Powers" : "Power",
+        "non_attack" => plural ? "non-Attack cards" : "non-Attack card",
+        _            => plural ? "cards" : "card",
+    };
+
+    /// <summary>Phase BN (v69, gap #72): "Add a random Attack to your hand. It costs 0 this turn." / "Add 2 random cards to your
+    /// discard pile." / "Choose 1 of 3 random Skills to add to your hand. It costs 0 this turn." <paramref name="capitalize"/> =
+    /// a card sentence (with the period); false = the payload fragment ("add a random Power to your hand"). Byte-lockstep with
+    /// cardgen._add_random_card_sentence.</summary>
+    internal static string AddRandomCardSentence(EffectSpec e, bool capitalize)
+    {
+        string pile = PilePhrase(e.Pile);
+        int n = Math.Max(1, e.Amount);
+        bool choose = e.ChooseOf > 1;
+        string body = choose ? $"{(capitalize ? "Choose" : "choose")} 1 of {e.ChooseOf} random {RandomCardNoun(e.CardKind, true)} to add to your {pile}"
+                    : n > 1 ? $"{(capitalize ? "Add" : "add")} {n} random {RandomCardNoun(e.CardKind, true)} to your {pile}"
+                    : $"{(capitalize ? "Add" : "add")} a random {RandomCardNoun(e.CardKind, false)} to your {pile}";
+        if (e.FreeThisTurn) body += !choose && n > 1 ? ". They cost 0 this turn" : ". It costs 0 this turn";
+        return capitalize ? body + "." : body;
+    }
+
+    /// <summary>Phase BN (v69, gap #73): "Play the top card of your draw pile and Exhaust it." (Havoc; forced exhaust) / "Play the
+    /// top 2 cards of your draw pile and Exhaust them." / "Play a random Attack from your draw pile." (Uproar) / "Play 2 random
+    /// cards from your draw pile." Byte-lockstep with cardgen._autoplay_sentence.</summary>
+    internal static string AutoplaySentence(EffectSpec e, bool capitalize)
+    {
+        string verb = capitalize ? "Play" : "play";
+        int n = Math.Max(1, e.Amount);
+        string body = e.From == "draw_random"
+            ? (n > 1 ? $"{verb} {n} random {RandomCardNoun(e.CardKind, true)} from your draw pile"
+                     : $"{verb} a random {RandomCardNoun(e.CardKind, false)} from your draw pile")
+            : (n > 1 ? $"{verb} the top {n} cards of your draw pile and Exhaust them"
+                     : $"{verb} the top card of your draw pile and Exhaust it");
         return capitalize ? body + "." : body;
     }
 
