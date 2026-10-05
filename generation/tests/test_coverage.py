@@ -278,13 +278,15 @@ def test_w2_menu_keys_wired() -> None:
                                                   "target_status_stacks", "to_hand_size",
                                                   # Phase BK (v63)
                                                   "hits_scale"}, "the scale menu")
-    check({k for k, _d, _k in coverage.SCALE_MENU_KIND} == {"tag_cards_owned", "forged"}, "the gated scale keys")
+    check({k for k, _d, _k in coverage.SCALE_MENU_KIND} == {"tag_cards_owned", "forged",
+                                                             "orb_count", "orb_types"}, "the gated scale keys")  # Phase BQ (v68)
     check({k for k, _ in coverage.EXOTIC_NOMINATE_ONLY} == {"ritual", "barricade", "intangible"}, "nominate-only exotics")
     check({k for k, _ in coverage.KEYWORD_MENU} == {"retain", "innate", "ethereal", "hits"}, "the keyword menu")
     check(coverage.MIN_KEYWORD_KINDS == 2, "MIN_KEYWORD_KINDS = 2")
     check(coverage.KEY_KIND == {"forged_ge": "forge", "dark_ge": "balance", "light_ge": "balance",
                                 "centered": "balance", "orbs_match": "orb", "orb_count_ge": "orb",
                                 "tag_cards_owned": "tags", "forged": "forge",
+                                "orb_count": "orb", "orb_types": "orb",  # Phase BQ (v68): the orb reads
                                 "on_evoke": "orb"}, f"KEY_KIND, got {coverage.KEY_KIND}")  # Phase BP (v67): the gated reactive key
     for key in _w2_keys():
         d = coverage.DIRECTIVE_BY_KEY.get(key)
@@ -312,6 +314,8 @@ def test_w2_menu_keys_wired() -> None:
         "damage_dealt_unblocked": {"op": "heal", "amount": 1, "scale": "damage_dealt_unblocked"},
         "tag_cards_owned": {"op": "damage", "amount": 6, "scale": "tag_cards_owned", "tag": "strike"},
         "forged": {"op": "damage", "amount": 6, "scale": "forged"},
+        "orb_count": {"op": "damage", "amount": 1, "scale": "orb_count"},  # Phase BQ (v68)
+        "orb_types": {"op": "draw", "amount": 1, "scale": "orb_types"},
         "ritual": {"op": "apply_status", "status": "ritual", "amount": 1},
         "barricade": {"op": "apply_status", "status": "barricade", "amount": 1},
         "intangible": {"op": "apply_status", "status": "intangible", "amount": 1},

@@ -42,7 +42,15 @@ public static class ForgedCards
     /// v10 (forged statuses, Phase J): + CharacterSpec.StatusPool (a class's ≤4 custom modifier-family statuses
     /// read from `status_pool`; see ForgedCharacters / ForgedStatusPower). Class cards may apply a custom status
     /// by pool name via the `apply_status_custom` op (class-only, like custom-orb channels).</summary>
-    public const int VocabVersion = 67; // 67: Phase BP (VOCAB_EXPANSION_6, gaps #76/#77) — COST_DELTA + SMALL REACTIVE TRIGGERS:
+    public const int VocabVersion = 68; // 68: Phase BQ (VOCAB_EXPANSION_6, gap #78) — ORB EXTRAS (orb classes): `evoke` + `keep`
+                                        //     (Dualcast: EvokeNext(dequeue:false) then EvokeNext) / `which:"newest"` (EvokeLast);
+                                        //     card-only ops `trigger_passive` {amount, orbs: first|all} (Darkness / Tesla Coil —
+                                        //     OrbCmd.Passive; ForgedOrb now overrides OrbModel.Passive -> OrbRunner.RunPassive) and
+                                        //     `lose_orb_slot` (Bulk Up — OrbCmd.RemoveSlots, amount 1, class has 3+ slots); status
+                                        //     `loop` (base LoopPower; a Power, amount 1); scales `orb_count` / `orb_types` (Compile
+                                        //     Driver) on damage/block/draw; `orb_count_ge` + an `orb` filter; `channel_orb` +
+                                        //     `per_enemy` (Chill: one per hittable enemy). No codec change.
+                                        // 67: Phase BP (VOCAB_EXPANSION_6, gaps #76/#77) — COST_DELTA + SMALL REACTIVE TRIGGERS:
                                         //     card-only op `cost_delta {on, amount -2..+1, scope, set_zero?}` (Stomp / Pinpoint
                                         //     — the *_played forms are STATELESS: DataCard.TryModifyEnergyCostInCombat counts the
                                         //     combat history; Momentum Strike / Modded / Kingly Kick / an exhaust-fed discount
@@ -539,6 +547,7 @@ public static class ForgedCards
          "draw_until", // Phase BC (v57, gap #53): draw until you draw a card of `card_type` (Pillage = non_attack). Card-only.
          "held_discount", // Phase BD (v58, gap #58): flag-op — costs N less for the combat per turn it is retained (Sands of Time). Card-only, needs retain.
          "cost_delta", // Phase BP (v67, gap #76): this card's own cost moves on an event (Stomp / Momentum Strike / Kingly Kick / Modded). Card-only.
+         "trigger_passive", "lose_orb_slot", // Phase BQ (v68, gap #78): Darkness / Tesla Coil (OrbCmd.Passive), Bulk Up (OrbCmd.RemoveSlots). Card-only, orb classes.
          "apply_custom", // EXPLORE SPIKE: apply a hardcoded modifier-family custom status (not in LLM contract)
          "gaptest_enemy_artifact", // PHASE BL GAPTEST (not in the LLM contract): N Artifact on the card's target(s) — the sign-flip smoke
          "summon_spike"]; // PHASE K SPIKE: summon a hardcoded player pet (not in LLM contract)
@@ -604,7 +613,8 @@ public static class ForgedCards
          "temp_strength_down", "strength_down", "doom", // Phase BL (v64, gaps #66/#67): enemy Strength loss + Doom
          // Phase BM (v65, gaps #68/#69): the card-only self-drawbacks (EffectRunner.SelfDebuffStatuses) + Echo Form.
          "no_draw", "no_energy_gain", "no_block_gain", "dex_decay", "focus_decay", "lose_strength", "lose_dexterity", "lose_focus",
-         "echo_form"];
+         "echo_form",
+         "loop"]; // Phase BQ (v68, gap #78): the base LoopPower (a card-only self status like echo_form; orb classes)
     // Phase BM (v65, gaps #68/#69): the per-card bands of the self statuses. no_draw / no_energy_gain / echo_form are
     // Single-shaped (amount 1); no_block_gain is TURNS (2..3, Panic Button = 2); the decays tick every turn (1..2); the literal
     // stat losses 1..5 (Friendship 2, Hyperbeam 3). Lockstep with validator._BM_STATUS_CAPS / _BM_STATUS_MIN.
@@ -612,6 +622,7 @@ public static class ForgedCards
     {
         ["no_draw"] = 1, ["no_energy_gain"] = 1, ["no_block_gain"] = 3, ["dex_decay"] = 2, ["focus_decay"] = 2,
         ["lose_strength"] = 5, ["lose_dexterity"] = 5, ["lose_focus"] = 5, ["echo_form"] = 1,
+        ["loop"] = 1, // Phase BQ (v68, gap #78): Loop is Single-shaped on the card (a second Loop stacks the Counter)
     };
     private static readonly Dictionary<string, int> BmStatusMin = new() { ["no_block_gain"] = 2 };
     // Phase BM (v65, gaps #69/#70): replay_next's card filter (BurstPower = skill, OneTwoPunchPower = attack,
@@ -660,6 +671,61 @@ public static class ForgedCards
         return null;
     }
     private const int CostDeltaMin = -2, CostDeltaMax = 1;
+
+    // Phase BQ (v68, gap #78): the orb-extras shape. Lockstep with validator._EVOKE_WHICH / _TRIGGER_PASSIVE_* / the schema.
+    private static readonly HashSet<string> EvokeWhich = ["next", "newest"];
+    private static readonly HashSet<string> TriggerPassiveReach = ["first", "all"];
+    internal const int TriggerPassiveMaxFirst = 3, TriggerPassiveMaxAll = 2;
+    /// <summary>Phase BQ (v68, gap #78): the fewest starting orb slots a class needs before one of its cards may
+    /// <c>lose_orb_slot</c> (at 0 slots a forged class channels into nothing: OrbCmd.Channel only re-adds a slot when
+    /// BaseOrbSlotCount == 0). Lockstep with class_forge._LOSE_ORB_SLOT_MIN_SLOTS.</summary>
+    internal const int LoseOrbSlotMinSlots = 3;
+
+    /// <summary>Phase BQ (v68, gap #78): the per-effect rules of the orb extras — <c>evoke</c> + <c>keep</c> (Dualcast) /
+    /// <c>which</c> (next | newest); <c>trigger_passive</c> (amount = times, <c>orbs</c> first | all); <c>lose_orb_slot</c>
+    /// (amount 1); <c>channel_orb</c> + <c>per_enemy</c> (one orb per enemy, amount 1); a <c>when</c>'s <c>orb</c> filter
+    /// (orb_count_ge only; a base orb or one of the class's own orbs, never "random").</summary>
+    private static string? ValidateOrbExtras(EffectSpec e, bool allowCustomOrbs, IReadOnlySet<string>? orbNames)
+    {
+        if ((e.Keep || e.Which != null) && e.Op != "evoke")
+            return $"'keep' / 'which' only apply to evoke (op '{e.Op}').";
+        if (e.Orbs != null && e.Op != "trigger_passive")
+            return $"'orbs' only applies to trigger_passive (op '{e.Op}').";
+        if (e.PerEnemy && e.Op != "channel_orb")
+            return $"'per_enemy' only applies to channel_orb (op '{e.Op}').";
+        if (e.Op == "evoke")
+        {
+            if (e.Which != null && !EvokeWhich.Contains(e.Which))
+                return $"evoke 'which' must be one of {string.Join("/", EvokeWhich)}; got '{e.Which}'.";
+            if (e.Keep && (e.Amount > 1 || e.Which == "newest"))
+                return "evoke 'keep' evokes your NEXT orb twice (Dualcast) — no amount above 1, never with which 'newest'.";
+        }
+        if (e.Op == "trigger_passive")
+        {
+            string reach = e.Orbs ?? "first";
+            if (!TriggerPassiveReach.Contains(reach))
+                return $"trigger_passive 'orbs' must be one of {string.Join("/", TriggerPassiveReach)}; got '{e.Orbs}'.";
+            int cap = reach == "all" ? TriggerPassiveMaxAll : TriggerPassiveMaxFirst;
+            if (e.Amount < 0 || e.Amount > cap)
+                return $"trigger_passive 'amount' (times) must be 1..{cap} for orbs '{reach}'; got {e.Amount}.";
+            if (e.Status != null || e.IsScaled || e.Hits > 1)
+                return "trigger_passive carries only 'amount' (times) + 'orbs'.";
+        }
+        if (e.Op == "lose_orb_slot" && (e.Amount > 1 || e.Status != null || e.IsScaled || e.Hits > 1))
+            return "lose_orb_slot loses ONE orb slot (amount 1; no status / scale / hits).";
+        if (e.PerEnemy && e.Amount > 1)
+            return "channel_orb 'per_enemy' channels ONE orb per enemy (amount 1).";
+        if (e.When?.Orb is { } wo)
+        {
+            if (e.When.Kind != "orb_count_ge")
+                return $"a condition 'orb' filter only applies to orb_count_ge (got '{e.When.Kind}').";
+            if (wo == "random")
+                return "a condition 'orb' filter names one orb (a base orb or one of your class's orbs), never 'random'.";
+            var oerr = OrbNameError(wo, allowCustomOrbs, orbNames, "the orb_count_ge 'orb' filter");
+            if (oerr != null) return oerr;
+        }
+        return null;
+    }
     // Phase BL (v64): the per-effect caps (plan §7 decision 6: Doom 12 per card; strength_down 3 permanent / 9 temporary).
     // A payload Doom fires every turn and never decays, so it caps at 5 per fire. Lockstep with validator._BL_STATUS_CAPS.
     private static readonly Dictionary<string, int> BlStatusCaps =
@@ -790,7 +856,8 @@ public static class ForgedCards
          // exhaust_pile_size is damage/block/draw) + target_status_stacks (with `status`) + to_hand_size (draw only).
          "exhaust_pile_size", "discard_pile_size", "discards_this_turn", "cards_drawn_this_turn", "cards_drawn_this_combat",
          "energy_spent_this_turn", "hp_loss_events_this_combat", "cards_generated_this_combat", "total_enemy_poison",
-         "target_status_stacks", "to_hand_size"];
+         "target_status_stacks", "to_hand_size",
+         "orb_count", "orb_types"]; // Phase BQ (v68, gap #78): your orbs / their distinct types (Compile Driver); damage/block/draw, orb classes
     // Phase AM (v43): the AM scales that may NOT drive a draw. Phase BJ (v62): + five history/pile reads.
     private static readonly HashSet<string> DamageBlockOnlyScales =
         ["block", "hp_lost_this_turn", "draw_pile_count", "plays_this_combat",
@@ -1021,6 +1088,20 @@ public static class ForgedCards
             { error = "replay_next card_type 'all' (your next card of ANY type plays twice) is RARE-only."; return false; }
             if (all.Any(e => e.Op == "replay_next") && rarity == CardRarity.Basic)
             { error = "replay_next is not allowed on a BASIC card."; return false; }
+            // Phase BQ (v68, gap #78): Loop is the base Power (a turn-start passive pump for the whole combat); a slot loss
+            // is a one-shot drawback (Bulk Up is a Power) — on a Power or an Exhaust card, never a Basic, one per list.
+            if (all.Any(e => e.Op == "apply_status" && e.Status == "loop") && (type != CardType.Power || rarity == CardRarity.Basic))
+            { error = "'loop' belongs on a POWER card (the base Loop), never a Basic."; return false; }
+            if (all.Any(e => e.Op == "lose_orb_slot"))
+            {
+                if (rarity == CardRarity.Basic)
+                { error = "lose_orb_slot is not allowed on a BASIC card."; return false; }
+                if (type != CardType.Power && (!effects.Any(e => e.Op == "exhaust")
+                                               || (upgrade != null && !upgrade.Any(e => e.Op == "exhaust"))))
+                { error = "lose_orb_slot needs a Power or an Exhaust card (a slot lost on every replay drains the rack)."; return false; }
+                if (effects.Count(e => e.Op == "lose_orb_slot") > 1 || (upgrade ?? []).Count(e => e.Op == "lose_orb_slot") > 1)
+                { error = "at most one lose_orb_slot per card."; return false; }
+            }
         }
 
         // Phase BO (v66, gap #74): a Power is never in a pile after play, so the self-routing flag-ops are Attack/Skill only.
@@ -1207,7 +1288,9 @@ public static class ForgedCards
                     Str(w, "kind").Trim().ToLowerInvariant(),
                     Int(w, "value"),
                     w.ContainsKey("status") ? Str(w, "status").Trim().ToLowerInvariant() : null,
-                    w.ContainsKey("negate") && w["negate"].AsBool());
+                    w.ContainsKey("negate") && w["negate"].AsBool(),
+                    // Phase BQ (v68, gap #78): orb_count_ge's optional orb filter (lowercased like channel_orb's `orb`).
+                    w.ContainsKey("orb") ? Str(w, "orb").Trim().ToLowerInvariant() : null);
             }
             // Phase H3: add_trigger carries a trigger kind + a nested payload effects list (parsed recursively).
             string? trigger = null;
@@ -1260,12 +1343,17 @@ public static class ForgedCards
             // Phase BP (v67, gap #76): cost_delta's event + the Momentum Strike flag (legality in Validate).
             string? on = e.ContainsKey("on") ? Str(e, "on").Trim().ToLowerInvariant() : null;
             bool setZero = e.ContainsKey("set_zero") && e["set_zero"].AsBool();
+            // Phase BQ (v68, gap #78): the orb extras (legality in ValidateOrbExtras).
+            bool keep = e.ContainsKey("keep") && e["keep"].AsBool();
+            string? which = e.ContainsKey("which") ? Str(e, "which").Trim().ToLowerInvariant() : null;
+            string? orbs = e.ContainsKey("orbs") ? Str(e, "orbs").Trim().ToLowerInvariant() : null;
+            bool perEnemy = e.ContainsKey("per_enemy") && e["per_enemy"].AsBool();
             list.Add(new EffectSpec(op, amount, status, hits, scale, orb, when, trigger, triggered, statusName,
                                     summonName, oncePerTurn, target, cardId, pile, pole, grow, cards, tag,
                                     OncePerCombat: oncePerCombat, Unblockable: unblockable,
                                     CardKind: cardKind, Scope: scope, Count: count, StatusCard: statusCard,
                                     GrowHeld: growHeld, EveryN: everyN, HitsScale: hitsScale, From: from, Keyword: keyword,
-                                    On: on, SetZero: setZero));
+                                    On: on, SetZero: setZero, Keep: keep, Which: which, Orbs: orbs, PerEnemy: perEnemy));
         }
         return list.ToArray();
     }
@@ -1553,6 +1641,10 @@ public static class ForgedCards
                 var oerr = OrbNameError(e.Orb, allowCustomOrbs, orbNames, "channel_orb");
                 if (oerr != null) return oerr;
             }
+            // Phase BQ (v68, gap #78): the orb extras. Each field belongs to one op; all card-only (ValidateTrigger rejects
+            // them in a payload; trigger_passive / lose_orb_slot are not TriggerOps).
+            var bqerr = ValidateOrbExtras(e, allowCustomOrbs, orbNames);
+            if (bqerr != null) return bqerr;
             // Phase AJ (v40): a random_enemy card has NO chosen target — BaseLib rolls a random hittable enemy per
             // damage hit and per status effect — so the target-reading condition/scale can't be evaluated on it.
             if (target == TargetType.RandomEnemy)
@@ -2174,6 +2266,8 @@ public static class ForgedCards
                 return "'grow' is not allowed in a trigger payload (it's a per-card-play attack mechanic).";
             if (t.HasGrowHeld) // Phase BD (v58)
                 return "'grow_held' is not allowed in a trigger payload (it's a per-card held-turn mechanic).";
+            if (t.Keep || t.Which != null || t.Orbs != null || t.PerEnemy) // Phase BQ (v68, gap #78): card-only orb extras
+                return "'keep' / 'which' / 'orbs' / 'per_enemy' are not allowed in a trigger payload (card-only orb extras).";
             if (t.HitsScale != null) // Phase BK (v63): the hit count rides a CARD calc-var; a payload loops literal hits
                 return "'hits_scale' is not allowed in a trigger payload (it's a card-level damage field; use 'hits').";
             // Phase AN (v44): `unblockable` rides a CARD's damage var; a payload damage is an intrinsic CreatureCmd hit
@@ -2417,8 +2511,19 @@ public static class ForgedCards
         "lose_dexterity" => "Lose {SelfDexterityLoss} Dexterity.",
         "lose_focus"     => "Lose {SelfFocusLoss} Focus.",
         "echo_form"      => "The first card you play each turn is played twice.",
+        "loop"           => "At the start of your turn, trigger your next orb's passive.", // Phase BQ (v68, gap #78)
         _ => null,
     };
+
+    /// <summary>Phase BQ (v68, gap #78): "Trigger the passive of your next orb." / "… of your next orb 2 times." / "Trigger
+    /// the passive of all your orbs." / "… of all your orbs 2 times." Literal count (no var). Byte-lockstep with
+    /// cardgen._trigger_passive_sentence.</summary>
+    private static string TriggerPassiveSentence(EffectSpec e)
+    {
+        int n = Math.Max(1, e.Amount);
+        string whose = e.Orbs == "all" ? "all your orbs" : "your next orb";
+        return n > 1 ? $"Trigger the passive of {whose} {n} times." : $"Trigger the passive of {whose}.";
+    }
 
     /// <summary>Phase BM (v65, gap #69): "This turn, your next Skill is played twice." / "This turn, your next 2 Attacks
     /// are played twice." / "Your next Power is played twice." (Signal Boost persists until used) / "This turn, your next
@@ -2476,6 +2581,7 @@ public static class ForgedCards
         "no_draw" => "No Draw", "no_energy_gain" => "No Energy Gain", "no_block_gain" => "No Block",
         "dex_decay" => "Wraith Form", "focus_decay" => "Biased Cognition", "lose_strength" => "Strength",
         "lose_dexterity" => "Dexterity", "lose_focus" => "Focus", "echo_form" => "Echo Form",
+        "loop" => "Loop", // Phase BQ (v68, gap #78)
         _ => status ?? "",
     };
 
@@ -2510,6 +2616,9 @@ public static class ForgedCards
         "hp_loss_events_this_combat"  => "the times you have lost HP this combat",
         "cards_generated_this_combat" => "the cards you have created this combat",
         "total_enemy_poison"          => "the total Poison on ALL enemies",
+        // Phase BQ (v68, gap #78): the orb reads (Compile Driver). Lockstep with cardgen._scale_phrase.
+        "orb_count"                   => "the orbs you have channeled",
+        "orb_types"                   => "the different orbs you have channeled",
         _ => "X",
     };
 
@@ -2635,12 +2744,18 @@ public static class ForgedCards
                 case "channel_orb":
                     string orbName = OrbDisplay(e.Orb);
                     int oc = Math.Max(1, e.Amount);
-                    parts.Add(oc > 1 ? $"Channel {oc} {orbName} orbs." : $"Channel a {orbName} orb.");
+                    parts.Add(e.PerEnemy ? $"Channel a {orbName} orb for each enemy." // Phase BQ (v68, gap #78): Chill
+                              : oc > 1 ? $"Channel {oc} {orbName} orbs." : $"Channel a {orbName} orb.");
                     break;
                 case "evoke":
                     int ec = Math.Max(1, e.Amount);
-                    parts.Add(ec > 1 ? $"Evoke {ec} times." : "Evoke your next orb.");
+                    // Phase BQ (v68, gap #78): Dualcast (keep) / the newest orb. Byte-lockstep with cardgen.describe.
+                    parts.Add(e.Keep ? "Evoke your next orb twice."
+                              : e.Which == "newest" ? (ec > 1 ? $"Evoke your {ec} newest orbs." : "Evoke your newest orb.")
+                              : ec > 1 ? $"Evoke {ec} times." : "Evoke your next orb.");
                     break;
+                case "trigger_passive": parts.Add(TriggerPassiveSentence(e)); break; // Phase BQ (v68, gap #78): Darkness / Tesla Coil
+                case "lose_orb_slot":   parts.Add("Lose 1 Orb Slot."); break;          // Phase BQ (v68, gap #78): Bulk Up
                 case "apply_custom": // EXPLORE SPIKE
                     parts.Add($"Gain {Math.Max(1, e.Amount)} 🗡️ Sharpen.");
                     break;
@@ -3010,7 +3125,7 @@ public static class ForgedCards
     /// <summary>Display name for an orb in card text. Base orbs title-cased; <c>random</c> stays lowercase; a
     /// custom orb name (Phase I, declared in a class orb_pool) is title-cased from its lowercase id. Mirrors
     /// cardgen.py <c>_orb_display</c>.</summary>
-    private static string OrbDisplay(string? orb) => orb switch
+    internal static string OrbDisplay(string? orb) => orb switch
     {
         "lightning" => "Lightning", "frost" => "Frost", "dark" => "Dark", "random" => "random",
         null or "" => "orb",
@@ -3033,6 +3148,7 @@ public static class ForgedCards
         "no_draw" => "No Draw", "no_energy_gain" => "No Energy Gain", "no_block_gain" => "No Block",
         "dex_decay" => "Wraith Form", "focus_decay" => "Biased Cognition", "lose_strength" => "Strength",
         "lose_dexterity" => "Dexterity", "lose_focus" => "Focus", "echo_form" => "Echo Form",
+        "loop" => "Loop", // Phase BQ (v68, gap #78)
         _ => status ?? "",
     };
 

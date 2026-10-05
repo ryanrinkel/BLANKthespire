@@ -218,7 +218,7 @@ def _t_engine() -> None:
             ("case \"cost_delta\":            // Phase BP (v67, gap #76)", "DeclareEffects: cost_delta declares no var")):
         check(frag in dc, f"DataCard: {why}")
     spec = _cs("Engine", "CardSpec.cs")
-    check("string? On = null," in spec and "bool SetZero = false)" in spec, "EffectSpec.On / SetZero")
+    check("string? On = null," in spec and "bool SetZero = false," in spec, "EffectSpec.On / SetZero")  # BQ appended fields
     check('public bool IsCountedCostDelta => Op == "cost_delta" && On is "attack_played" or "skill_played" or "card_played";' in spec,
           "EffectSpec.IsCountedCostDelta")
     check("public EffectSpec? CostDelta => Effects.FirstOrDefault(e => e.Op == \"cost_delta\");" in spec, "CardSpec.CostDelta")

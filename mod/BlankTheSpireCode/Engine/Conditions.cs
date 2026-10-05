@@ -58,6 +58,12 @@ public static class Conditions
             return $"unknown condition kind '{c.Kind}'.";
         if (c.Kind == "orb_count_ge" && c.Value < 1)
             return "condition 'orb_count_ge' needs value >= 1.";
+        // Phase BQ (v68, gap #78): the orb filter belongs to orb_count_ge and names ONE orb (the class's own names are
+        // checked by ForgedCards.ValidateOrbExtras, which knows the class pool).
+        if (c.Orb != null && c.Kind != "orb_count_ge")
+            return $"a condition 'orb' filter only applies to orb_count_ge (got '{c.Kind}').";
+        if (c.Orb is "" or "random")
+            return "a condition 'orb' filter names one orb (a base orb or one of your class's orbs), never 'random'.";
         if ((c.Kind == "enemy_count_ge" || c.Kind == "turn_at_least" || c.Kind == "hand_size_ge"
              || c.Kind == "forged_ge"
              // Phase S (gap #1): light_ge/dark_ge are pole magnitude thresholds; centered N tests |gauge| <= N (a
@@ -117,6 +123,7 @@ public static class Conditions
                 return orbs.Count >= 2 && orbs.Select(o => o.GetType()).Distinct().Count() == 1;
             }
             case "orb_count_ge":
+                if (c.Orb != null) return OrbsOfType(player, c.Orb, c.Value); // Phase BQ (v68, gap #78): "2+ Frost orbs"
                 return player.PlayerCombatState.OrbQueue.Orbs.Count >= c.Value;
             case "target_has_status":
                 return target != null && TargetHasStatus(target, c.Status);
@@ -174,6 +181,21 @@ public static class Conditions
         }
     }
 
+    /// <summary>Phase BQ (v68, gap #78): orb_count_ge with an <c>orb</c> filter — count the channeled orbs of that ONE type
+    /// (a base name via EffectRunner.OrbTypeFor, a class pool name via ForgedCharacters.ResolveOrbType — the class is
+    /// read off the player, as add_card does) and log the [BQ] tag with the read.</summary>
+    private static bool OrbsOfType(Player player, string orb, int need)
+    {
+        int k = ForgedCharacters.ClassIndexOfPlayer(player);
+        System.Type? type = k > 0 ? ForgedCharacters.ResolveOrbType(k, orb) : null;
+        if (type == null && orb is "lightning" or "frost" or "dark") type = EffectRunner.OrbTypeFor(orb);
+        int n = type == null ? 0 : player.PlayerCombatState.OrbQueue.Orbs.Count(o => o.GetType() == type);
+        bool open = n >= need;
+        MainFile.Logger.Info($"[BQ] orb_count_ge[{orb}] -> {(open ? "true" : "false")} ({n} of {player.PlayerCombatState.OrbQueue.Orbs.Count} " +
+                             $"orbs; need {need}{(type == null ? "; unknown orb" : "")}).");
+        return open;
+    }
+
     private static bool TargetHasStatus(Creature t, string? status) => status switch
     {
         "poison"     => t.HasPower<PoisonPower>(),
@@ -189,7 +211,8 @@ public static class Conditions
     public static string Phrase(Condition c) => c.Kind switch
     {
         "orbs_match"         => "your orbs match",
-        "orb_count_ge"       => $"you have {c.Value}+ orbs",
+        "orb_count_ge"       => c.Orb != null ? $"you have {c.Value}+ {ForgedCards.OrbDisplay(c.Orb)} orbs" // Phase BQ (v68)
+                                                : $"you have {c.Value}+ orbs",
         "target_has_status"  => $"the enemy has {c.Status}",
         "no_block"           => "you have no Block",
         "hp_below_half"      => "your HP is below half",

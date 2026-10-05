@@ -240,6 +240,8 @@ public abstract class DataCard : ConstructedCardModel
                 case "gain_orb_slot":         // Phase G orbs: executed in OnPlay; counts shown via Describe (no var)
                 case "channel_orb":
                 case "evoke":
+                case "trigger_passive":       // Phase BQ (v68, gap #78): OrbCmd.Passive in OnPlay (literal count, no var)
+                case "lose_orb_slot":         // Phase BQ (v68, gap #78): OrbCmd.RemoveSlots in OnPlay (literal, no var)
                 case "forge":                 // Phase M (gap #36): stokes the Forge power in OnPlay (literal, no var)
                 case "balance_step":          // Phase S (gap #1): moves the Balance gauge in OnPlay (literal, no var)
                 case "add_trigger":           // Phase H3: grants a power in OnPlay; text via Describe (no card var)
@@ -356,6 +358,7 @@ public abstract class DataCard : ConstructedCardModel
                         case "lose_dexterity": WithVar("SelfDexterityLoss", e.Amount, up); break;
                         case "lose_focus":     WithVar("SelfFocusLoss", e.Amount, up); break;
                         case "echo_form":      Power<EchoFormPower>(vname, e.Amount, up); break;
+                        case "loop":           Power<LoopPower>(vname, e.Amount, up); break; // Phase BQ (v68, gap #78): the hover tip
                         default:
                             throw new NotSupportedException($"DataCard: unsupported status '{e.Status}'");
                     }

@@ -1,0 +1,6 @@
+{
+  "id": "loop",
+  "name": "Loop",
+  "kind": "buff",
+  "decay": "none"
+}

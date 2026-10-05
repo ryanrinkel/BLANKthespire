@@ -25,7 +25,11 @@ import sys
 import zlib
 from pathlib import Path
 
-VOCAB_VERSION = 67  # must be <= ForgedCards.VocabVersion (67: Phase BP — COST_DELTA + SMALL REACTIVE TRIGGERS: card-only op
+VOCAB_VERSION = 68  # must be <= ForgedCards.VocabVersion (68: Phase BQ — ORB EXTRAS (orb classes): evoke + keep (Dualcast)
+                    # / which newest; card-only ops trigger_passive {amount, orbs first|all} (Darkness / Tesla Coil) and
+                    # lose_orb_slot (Bulk Up, 3+ slots); status loop (LoopPower); scales orb_count / orb_types (Compile
+                    # Driver); orb_count_ge + an orb filter; channel_orb + per_enemy (Chill). No codec change.)
+                    # 67: Phase BP — COST_DELTA + SMALL REACTIVE TRIGGERS: card-only op
                     # cost_delta {on played|drawn|attack_played|skill_played|card_played|card_exhausted, signed amount
                     # -2..+1, scope this_turn|combat, set_zero?} (Stomp / Momentum Strike / Kingly Kick / Modded); trigger
                     # kinds on_card_generated (Arsenal), on_debuff_applied (+ status filter, payload target that_enemy —

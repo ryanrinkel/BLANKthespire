@@ -38,9 +38,11 @@ validator. (The vocabulary grows as the interpreter grows — more ops/statuses 
 | `put_back`     | `from` (hand/discard), `cards` choose | (v66, Thinking Ahead / Headbutt) Put a card you pick on top of your draw pile. Card-only, one per card. |
 | `shuffle_hand` | *(none)* | (v66, Reboot) Shuffle your hand and discard pile into your draw pile; add a `draw`. Fires `on_shuffle`. |
 | `grant_keyword`| `keyword` (retain/ethereal/sly), `cards` choose, optional `card_type` | (v66, Snap / Hand Trick) A hand card you pick gains Retain / Ethereal / Sly this turn. Card-only, one per card. |
-| `channel_orb`  | `orb` (lightning/frost/dark/**random**), optional `amount` (count) | Channel an orb into your next open slot. `orb:"random"` rolls one of lightning/frost/dark — **independently per orb** when `amount > 1`, so a multi-channel "pull" can come up all-matching (the slot-machine jackpot). **ORB-CLASS ONLY** — see Orbs below. |
-| `evoke`        | optional `amount` (count) | Evoke (trigger + consume) your oldest orb(s) now. **ORB-CLASS ONLY.** |
+| `channel_orb`  | `orb` (lightning/frost/dark/**random**), optional `amount` (count) | Channel an orb into your next open slot. `orb:"random"` rolls one of lightning/frost/dark — **independently per orb** when `amount > 1`, so a multi-channel "pull" can come up all-matching (the slot-machine jackpot). `per_enemy:true` (v68) = one per enemy (Chill). **ORB-CLASS ONLY** — see Orbs below. |
+| `evoke`        | optional `amount` (count) | Evoke (trigger + consume) your oldest orb(s) now. v68: `keep:true` = "Evoke your next orb twice." (Dualcast); `which:"newest"` = your newest orb. **ORB-CLASS ONLY.** |
 | `gain_orb_slot`| `amount` (int ≥1) | Gain `amount` orb slots this combat. **ORB-CLASS ONLY.** |
+| `trigger_passive` | optional `amount` (times, 1..3), `orbs` first/all (all: 1..2) | Fire your next orb's passive (or every orb's) now, without evoking it (v68, Darkness / Tesla Coil). Card-only. **ORB-CLASS ONLY.** |
+| `lose_orb_slot` | — (amount 1) | "Lose 1 Orb Slot." — the price of a big buff (v68, Bulk Up: +2 Strength +2 Dexterity). A Power or Exhaust card, class has 3+ slots. **ORB-CLASS ONLY.** |
 | `add_trigger`  | `trigger` (turn_end/turn_start/ripen/on_hp_lost/on_exhaust/on_card_played/on_card_drawn/on_damage_dealt/on_block_gained/attacked/on_discard/on_blade_played/on_poison_damage/on_shuffle/on_card_generated/on_debuff_applied/on_evoke), `effects` (1+), optional `when`, optional `once_per_turn` or `once_per_combat`, `amount` (ripen only), optional filters `card_type` / `every_n` / `scope:"this_turn"` (v61) / `status` (v67, on_debuff_applied; see Triggers) | Grant an ongoing power that runs its `effects` payload: every turn (turn_end/turn_start), ONCE after `amount` turns (ripen), or REACTIVELY on an event (on_hp_lost / on_exhaust / on_card_played / on_card_drawn / on_damage_dealt / on_block_gained / attacked / on_poison_damage — v59: an enemy takes Poison damage). Payload is SELF/orb-only unless an effect carries a `target` (see Triggers below). Best on `power`-type cards. **Exception — `on_discard`** is CARD-LATENT (Reflex, see Triggers): it grants NO power on play; its payload fires when THIS card is DISCARDED BY AN EFFECT. |
 | `apply_status_custom` | `status_name`, `amount` | Apply `amount` stacks of one of the class's OWN custom statuses (by name). Also legal inside `add_trigger` payloads (v42 — the signature status as a per-turn engine: "At the start of your turn, gain 1 Razor Focus"; a custom DEBUFF in a payload takes a `target`). **STATUS-CLASS ONLY** — see Forged Statuses below. |
 | `summon`       | `summon_name`, optional `amount` (HP) | Summon the class's OWN minion (by name) at `amount` HP, OR — if it's already out — raise its Max HP by `amount` (base-game Osty Summon keyword). One per class; passive bodyguard. **SUMMON-CLASS ONLY** — see Forged Summons below. |
@@ -231,6 +233,9 @@ never sprinkle them onto an ordinary class.
   `{"name":"Glass","passive_val":0,"evoke_val":12,"passive":[],"evoke":[{"op":"damage","amount":12,"target":"all_enemies"}]}`.
 - `channel_orb` fills your next open slot; channeling into full slots evokes the oldest first. `evoke` triggers +
   consumes your oldest orb now. `focus` (a `power`) raises the value of every orb — the orb-class scaling payoff.
+- **Orb extras (v68):** status `loop` on a Power (amount 1) = "At the start of your turn, trigger your next orb's
+  passive." (Loop); scales `orb_count` / `orb_types` (your orbs / their distinct types — Compile Driver) on
+  damage/block/draw; `orb_count_ge` + `orb:"frost"` counts one orb type ("if you have 2+ Frost orbs").
 - Design an orb class as a **channel-engine** (cards that channel orbs) + **payoffs** (evoke bursts, Focus
   scaling). Keep slot counts small (3–4). Custom orbs are how a class expresses a wholly invented element set.
 
@@ -244,7 +249,7 @@ condition. (v49: the same `when` is legal inside a custom orb's `passive` / `evo
 | condition `kind`    | extra param | true when |
 |---------------------|-------------|-----------|
 | `orbs_match`        | —           | you have ≥2 orbs and they are **all the same type** (the slot-machine **jackpot**). **ORB-CLASS ONLY.** |
-| `orb_count_ge`      | `value` (int ≥1) | you have at least `value` orbs channeled. **ORB-CLASS ONLY.** |
+| `orb_count_ge`      | `value` (int ≥1), optional `orb` (v68) | you have at least `value` orbs channeled (of that `orb` type, if given). **ORB-CLASS ONLY.** |
 | `target_has_status` | `status` (poison/vulnerable/weak/frail/doom) | the attacked enemy has that debuff (an exploit/follow-up payoff). |
 | `no_block`          | —           | you currently have 0 Block (a desperation/reward-for-aggression payoff). |
 | `hp_below_half`     | —           | your current HP is below 50% (an execute/last-stand payoff). |

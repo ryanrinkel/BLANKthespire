@@ -274,6 +274,17 @@ FEATURED_CLASS_KIND: dict[str, list[Featured]] = {
                  'REQUIRED: add a POWER that applies focus (apply_status focus, amount 1-2) so every orb the class '
                  'channels hits harder.',
                  lambda cc: "focus" in cc.statuses),
+        # Phase BQ (v68, gap #78): fire orb passives on demand (Darkness / Tesla Coil / Loop).
+        Featured("orb_passive_pump", 'an orb-class card that fires orb PASSIVES on demand (op "trigger_passive", or a Loop power)',
+                 'REQUIRED: add a cheap skill with op "trigger_passive" (amount 2 on your next orb - Darkness - or orbs "all" '
+                 'amount 1 - Tesla Coil) OR an uncommon POWER with apply_status loop amount 1 (at the start of your turn, '
+                 'trigger your next orb\'s passive).',
+                 lambda cc: "trigger_passive" in cc.ops or "loop" in cc.statuses),
+        # Phase BQ (v68, gap #78): pay off a full, varied rack (Compile Driver).
+        Featured("orb_census", 'an orb-class payoff that counts your orbs (scale "orb_count" / "orb_types")',
+                 'REQUIRED: add a card whose damage, block or draw scales "orb_count" (your orbs) or "orb_types" (your '
+                 'DIFFERENT orbs - Compile Driver: 7 damage + draw equal to the different orbs you have channeled).',
+                 lambda cc: bool({"orb_count", "orb_types"} & set(cc.scales))),
     ],
     "status": [
         Featured("custom_status_spread", 'the class\'s OWN status applied across at least three cards (apply_status_custom)',

@@ -1271,14 +1271,19 @@
           "temp_focus",
           "focus_decay",
           "lose_focus",
-          "on_evoke"
+          "on_evoke",
+          "trigger_passive",
+          "loop",
+          "lose_orb_slot",
+          "orb_types"
         ],
         "class_kind": "orb"
       },
       "buildable": true,
       "gap_refs": [
         "VOCABULARY_GAPS#68",
-        "VOCABULARY_GAPS#77"
+        "VOCABULARY_GAPS#77",
+        "VOCABULARY_GAPS#78"
       ],
       "base_synergies": {
         "hooks": [
@@ -1340,7 +1345,7 @@
           "Slot-limited"
         ]
       },
-      "build_notes": "Focus drawbacks (v65): `focus_decay` (Biased Cognition: big Focus now, less every turn) and `lose_focus` (Hyperbeam) price a burst. (v67) an `on_evoke` power pays off each orb you pop."
+      "build_notes": "Focus drawbacks (v65): `focus_decay` (Biased Cognition: big Focus now, less every turn) and `lose_focus` (Hyperbeam) price a burst. (v67) an `on_evoke` power pays off each orb you pop. (v68) `trigger_passive` / a `loop` Power pump passives (Darkness, Loop), evoke `keep` doubles one (Dualcast), `orb_types` pays a varied rack (Compile Driver) and `lose_orb_slot` buys stats (Bulk Up)."
     },
     {
       "id": "slot_machine",
@@ -1376,12 +1381,15 @@
           "channel_orb",
           "orbs_match",
           "orb_count_ge",
-          "evoke"
+          "evoke",
+          "orb_count"
         ],
         "class_kind": "orb"
       },
       "buildable": true,
-      "gap_refs": [],
+      "gap_refs": [
+        "VOCABULARY_GAPS#78"
+      ],
       "base_synergies": {
         "hooks": [
           "random_generation",
@@ -1426,7 +1434,8 @@
           "High variance",
           "Thin shared-pool support"
         ]
-      }
+      },
+      "build_notes": "(v68) `orb_count` scales a payoff on a full rack, `orb_count_ge` + `orb` checks one type, and a `per_enemy` channel (Chill) feeds the pull."
     },
     {
       "id": "summon_swarm",

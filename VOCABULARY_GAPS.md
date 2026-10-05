@@ -791,7 +791,7 @@ triaged against the live card contract (`mod/contract/card.schema.json`). HEAVY 
 - **Mechanic sketch:** `evoke` + `keep:true` ("Evoke your next orb twice.") and `which:"newest"`; `trigger_passive {amount, orbs: first|all}` ("Trigger the passive of your next orb 2 times."); self-buff `loop` (base `LoopPower`); card-only drawback `lose_orb_slot {amount:1}` (class must have ≥ 3 slots); scales `orb_count` / `orb_types` on damage/block/draw; `orb_count_ge` + an `orb` filter; `channel_orb` + `per_enemy:true`. Prerequisite: `ForgedOrb` must override `Passive` (today `LoopPower` / `OrbCmd.Passive` silently no-op on custom orbs). `on_evoke` ships with #77.
 - **Buildable today?** Partly — channel / evoke oldest / slots / Focus exist.
 - **Priority:** Medium (orb classes only).
-- **Status:** **planned (Wave 6, Phase BQ, vocab v69)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BQ.
+- **Status:** **done (2026-10-04, vocab v68, Phase BQ)** — `docs/plans/VOCAB_EXPANSION_6_PLAN.md` Phase BQ.
 
 ### 79. Discard your hand + `cards_removed` scale; growing turn-start damage
 - **Surfaced by:** base-game audit (2026-10-01), Partial row "Hand-wide discard / exhaust with a count" and "Growing per-turn damage power": `FiendFire`, `CalculatedGamble`, `StormOfSteel`, `Stoke`, `RollingBoulder`.

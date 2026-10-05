@@ -139,8 +139,9 @@ def _t_engine() -> None:
     m = re.search(r"HitsScaleSources =\s*\[(.*?)\];", fc, re.S)
     check(m is not None and set(re.findall(r'"(\w+)"', m.group(1))) == set(SOURCES), "HitsScaleSources == the nine sources")
     m = re.search(r"SupportedScales =\s*\[(.*?)\];", fc, re.S)
-    check(m is not None and not ({"attacks_played_this_turn", "skills_in_hand", "orb_count"} & set(re.findall(r'"(\w+)"', m.group(1)))),
-          "the three new reads are hits_scale-only (not `scale` sources)")
+    # Phase BQ (v68, gap #78): `orb_count` became a `scale` source too (damage/block/draw); the other two stay hits_scale-only.
+    check(m is not None and not ({"attacks_played_this_turn", "skills_in_hand"} & set(re.findall(r'"(\w+)"', m.group(1)))),
+          "the two new reads are hits_scale-only (not `scale` sources; orb_count is also a scale since Phase BQ)")
     for frag in ('bool anyX = effects.Any(e => e.ScaleX || e.HitsScale == "x");',
                  "if (effects.Count(e => e.Hits > 1 || e.HitsScale != null) > 1)",
                  "if (effects[i].HitsScale != upgrade[i].HitsScale)",

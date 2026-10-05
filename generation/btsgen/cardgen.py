@@ -50,6 +50,7 @@ STATUS_NAME = {
     "no_draw": "No Draw", "no_energy_gain": "No Energy Gain", "no_block_gain": "No Block", "dex_decay": "Wraith Form",
     "focus_decay": "Biased Cognition", "lose_strength": "Strength", "lose_dexterity": "Dexterity", "lose_focus": "Focus",
     "echo_form": "Echo Form",
+    "loop": "Loop",  # Phase BQ (v68, gap #78)
 }
 # Phase BM (v65, gaps #68/#69): the self-drawbacks + Echo Form read as their own sentences (the "Gain X." idiom would
 # misread a drawback). The {vars} are the names DataCard declares. Byte-lockstep with ForgedCards.BmStatusSentence.
@@ -63,6 +64,7 @@ _BM_SENTENCES = {
     "lose_dexterity": "Lose {SelfDexterityLoss} Dexterity.",
     "lose_focus": "Lose {SelfFocusLoss} Focus.",
     "echo_form": "The first card you play each turn is played twice.",
+    "loop": "At the start of your turn, trigger your next orb's passive.",  # Phase BQ (v68, gap #78): the base Loop
 }
 # Self-buffs are worded "Gain" and always land on the player; debuffs are "Apply"-ed to the target.
 # Keep in lockstep with EffectRunner.SelfBuffStatuses (the C# single source of truth for buff-vs-debuff side).
@@ -217,7 +219,10 @@ def condition_literal(w: dict) -> str:
     status = w.get("status")
     status_lit = f'"{status}"' if status else "null"
     negate = "true" if w.get("negate") else "false"
-    return f'new Condition("{w.get("kind", "")}", {int(w.get("value", 0) or 0)}, {status_lit}, {negate})'
+    lit = f'new Condition("{w.get("kind", "")}", {int(w.get("value", 0) or 0)}, {status_lit}, {negate})'
+    if w.get("orb"):  # Phase BQ (v68, gap #78): orb_count_ge's orb filter as a named arg (lockstep with ForgedCards.ParseEffects)
+        lit = f'{lit[:-1]}, Orb: "{str(w["orb"]).strip().lower()}")'
+    return lit
 
 
 def effect_literal(e: dict) -> str:
@@ -229,6 +234,20 @@ def effect_literal(e: dict) -> str:
     elif op == "channel_orb":
         # positional shape (Op, Amount, Status, Hits, Scale, Orb) — Scale is null here (F5: was ScaleX bool).
         lit = f'new EffectSpec("channel_orb", {e.get("amount", 0)}, null, 1, null, "{e["orb"]}")'
+        if e.get("per_enemy") is True:  # Phase BQ (v68, gap #78): Chill, named arg (lockstep with ForgedCards.ParseEffects)
+            lit = f"{lit[:-1]}, PerEnemy: true)"
+    elif op == "evoke" and (e.get("keep") is True or e.get("which")):
+        # Phase BQ (v68, gap #78): Dualcast (Keep) / the newest orb (Which), named args.
+        lit = f'new EffectSpec("evoke", {e.get("amount", 0)})'
+        if e.get("keep") is True:
+            lit = f"{lit[:-1]}, Keep: true)"
+        if e.get("which"):
+            lit = f'{lit[:-1]}, Which: "{str(e["which"]).strip().lower()}")'
+    elif op == "trigger_passive":
+        # Phase BQ (v68, gap #78): Amount = times; named Orbs (first|all) when given.
+        lit = f'new EffectSpec("trigger_passive", {e.get("amount", 0)})'
+        if e.get("orbs"):
+            lit = f'{lit[:-1]}, Orbs: "{str(e["orbs"]).strip().lower()}")'
     elif op == "add_trigger":
         # Phase H3: named Trigger/Triggered args; the nested payload reuses effect_literal. The optional
         # fire-time When is appended below by the shared When-append (named arg, order-independent in C#).
@@ -412,6 +431,9 @@ def _scale_phrase(scale: str) -> str:
         "hp_loss_events_this_combat": "the times you have lost HP this combat",
         "cards_generated_this_combat": "the cards you have created this combat",
         "total_enemy_poison": "the total Poison on ALL enemies",
+        # Phase BQ (v68, gap #78): the orb reads (Compile Driver). Mirrors ForgedCards.ScalePhrase.
+        "orb_count": "the orbs you have channeled",
+        "orb_types": "the different orbs you have channeled",
     }.get(scale, "X")
 
 
@@ -448,6 +470,8 @@ def cond_phrase(w: dict) -> str:
     if kind == "orbs_match":
         return "your orbs match"
     if kind == "orb_count_ge":
+        if w.get("orb"):  # Phase BQ (v68, gap #78): the orb filter ("you have 2+ Frost orbs"). Mirrors Conditions.Phrase.
+            return f"you have {int(w.get('value', 0) or 0)}+ {_orb_display(str(w['orb']).strip().lower())} orbs"
         return f"you have {int(w.get('value', 0) or 0)}+ orbs"
     if kind == "target_has_status":
         return f"the enemy has {w.get('status')}"
@@ -709,6 +733,14 @@ def _cost_delta_sentence(e: dict) -> str:
     return f"Costs {n} less {life} for each {noun} you {verb}."
 
 
+def _trigger_passive_sentence(e: dict) -> str:
+    """Phase BQ (v68, gap #78): "Trigger the passive of your next orb." / "… of your next orb 2 times." / "Trigger the passive
+    of all your orbs." Literal count (no var). Byte-lockstep with ForgedCards.TriggerPassiveSentence."""
+    n = max(1, int(e.get("amount", 1) or 1))
+    whose = "all your orbs" if str(e.get("orbs", "")).lower() == "all" else "your next orb"
+    return f"Trigger the passive of {whose} {n} times." if n > 1 else f"Trigger the passive of {whose}."
+
+
 def _replay_next_sentence(e: dict) -> str:
     """Phase BM (v65, gap #69): "This turn, your next Skill is played twice." / "This turn, your next 2 Attacks are played
     twice." / "Your next Power is played twice." (Signal Boost persists until used) / "This turn, your next card is played
@@ -887,10 +919,23 @@ def describe(effects: list[dict], target: str) -> str:
         elif op == "channel_orb":
             orb_name = _orb_display(e.get("orb"))
             oc = max(1, e.get("amount", 0))
-            parts.append(f"Channel {oc} {orb_name} orbs." if oc > 1 else f"Channel a {orb_name} orb.")
+            if e.get("per_enemy") is True:  # Phase BQ (v68, gap #78): Chill. Byte-match ForgedCards.Describe.
+                parts.append(f"Channel a {orb_name} orb for each enemy.")
+            else:
+                parts.append(f"Channel {oc} {orb_name} orbs." if oc > 1 else f"Channel a {orb_name} orb.")
         elif op == "evoke":
             ec = max(1, e.get("amount", 0))
-            parts.append(f"Evoke {ec} times." if ec > 1 else "Evoke your next orb.")
+            # Phase BQ (v68, gap #78): Dualcast (keep) / the newest orb. Byte-match ForgedCards.Describe.
+            if e.get("keep") is True:
+                parts.append("Evoke your next orb twice.")
+            elif str(e.get("which", "")).lower() == "newest":
+                parts.append(f"Evoke your {ec} newest orbs." if ec > 1 else "Evoke your newest orb.")
+            else:
+                parts.append(f"Evoke {ec} times." if ec > 1 else "Evoke your next orb.")
+        elif op == "trigger_passive":
+            parts.append(_trigger_passive_sentence(e))  # Phase BQ (v68, gap #78): Darkness / Tesla Coil
+        elif op == "lose_orb_slot":
+            parts.append("Lose 1 Orb Slot.")  # Phase BQ (v68, gap #78): Bulk Up. Byte-match ForgedCards.Describe.
         elif op == "gain_orb_slot":
             parts.append(f"Gain {e.get('amount', 0)} orb slot(s).")
         elif op == "forge":

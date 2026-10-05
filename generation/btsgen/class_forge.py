@@ -363,7 +363,8 @@ alchemist identity (storm-caller, elementalist, gambler, etc.), you MAY make thi
 "orb_slots" to 3, 4 or 5, declare an "orb_pool" (below), make ONE archetype the orb engine (briefs that \
 channel_orb + evoke + a `focus` payoff), and use the orb ops/`focus`/temp_focus freely in THAT archetype's briefs. For \
 every NON-orb concept, set "orb_slots": 0, OMIT "orb_pool", and do NOT use channel_orb / evoke / gain_orb_slot \
-/ focus anywhere — they do nothing without orb slots.
+/ focus anywhere — they do nothing without orb slots. v68 extras: evoke `keep` (Dualcast) / `which` newest, \
+`trigger_passive`, `loop`, `lose_orb_slot`, scales `orb_count` / `orb_types`, `per_enemy` channel (Chill).
 
 THE ORB POOL (orb classes only — this is how a class invents its OWN elements): an orb class declares \
 "orb_pool", an ORDERED list of the orbs it channels. Each entry is EITHER a base orb name string \
@@ -1074,7 +1075,8 @@ for a second signature under the card cap)."""
 # for archetypes actually chosen (the prompt shrinks by roughly a third, and examples the model must not use
 # are gone). Everything not listed here (triggers, scaled amounts, precision reads, strategic lines, the
 # format + rules) always stays.
-_ORB_TOKENS = frozenset({"channel_orb", "evoke", "gain_orb_slot", "focus", "temp_focus", "orbs_match", "orb_count_ge"})
+_ORB_TOKENS = frozenset({"channel_orb", "evoke", "gain_orb_slot", "focus", "temp_focus", "orbs_match", "orb_count_ge",
+                         "trigger_passive", "lose_orb_slot", "loop", "orb_types"})  # Phase BQ (v68, gap #78)
 # (heading prefix, keep-if-any-of-these-ops-selected, keep-if-class_kind, section KEY, one-phrase pitch).
 # The KEY is what a caller may pre-nominate under coverage_nominations.sections (coverage.SECTION_KEYS mirrors
 # the set) to force the section back in; the PITCH is what the ALSO-AVAILABLE line says when it is pruned.
@@ -2839,7 +2841,11 @@ def _card_uses_summons(card: dict) -> bool:
     return any(e.get("op") in ("summon", "summon_attack", "buff_summon", "sacrifice_summon") for e in effs)
 
 
-_ORB_OPS = {"channel_orb", "evoke", "gain_orb_slot"}
+_ORB_OPS = {"channel_orb", "evoke", "gain_orb_slot",
+            "trigger_passive", "lose_orb_slot"}  # Phase BQ (v68, gap #78): Darkness / Bulk Up are orb-class only
+# Phase BQ (v68, gap #78): a class needs this many starting orb slots before a card may lose one (at 0 a forged class
+# channels into nothing). Mirrors ForgedCards.LoseOrbSlotMinSlots.
+_LOSE_ORB_SLOT_MIN_SLOTS = 3
 _ORB_CONDITIONS = {"orbs_match", "orb_count_ge"}  # the orb-reading `when` kinds (orb-class only)
 
 
@@ -2863,7 +2869,19 @@ def _card_uses_orbs(card: dict) -> bool:
             return True
         if e.get("op") == "add_trigger" and e.get("trigger") == "on_evoke":  # Phase BP (v67): the evoke trigger needs orbs
             return True
+        # Phase BQ (v68, gap #78): Loop and the two orb reads are orb-class only too.
+        if e.get("op") == "apply_status" and e.get("status") == "loop":
+            return True
+        if str(e.get("scale", "")).strip().lower() in ("orb_count", "orb_types"):
+            return True
     return False
+
+
+def _card_loses_orb_slot(card: dict) -> bool:
+    """Phase BQ (v68, gap #78): the card carries `lose_orb_slot` (base or upgrade) — legal only on a class with
+    _LOSE_ORB_SLOT_MIN_SLOTS+ starting slots (ForgedCharacters rejects the import otherwise)."""
+    effs = list(card.get("effects") or []) + list((card.get("upgrade") or {}).get("effects") or [])
+    return any(isinstance(e, dict) and e.get("op") == "lose_orb_slot" for e in effs)
 
 
 def _synthesize_basic(plan: dict) -> dict:
@@ -3383,6 +3401,11 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
             res.skipped.append(plan.get("name_hint", f"card {i+1}"))
             note(f"card {i+1} ({plan.get('name_hint','?')}): orb op on a non-orb class — dropped")
             continue
+        # Phase BQ (v68, gap #78): a slot loss needs a 3+ slot rack (the importer rejects it otherwise).
+        if int(bp.get("orb_slots", 0) or 0) < _LOSE_ORB_SLOT_MIN_SLOTS and _card_loses_orb_slot(pres.card):
+            res.skipped.append(plan.get("name_hint", f"card {i+1}"))
+            note(f"card {i+1} ({plan.get('name_hint','?')}): lose_orb_slot on a class with < {_LOSE_ORB_SLOT_MIN_SLOTS} orb slots — dropped")
+            continue
         # Safety net (Phase J): apply_status_custom only belongs to a status class. Drop it off a class with
         # no status_pool (the validator's extra_statuses already rejects unknown names, but a class with NO
         # pool would have an empty allowed set, so this is the belt-and-braces drop).
@@ -3450,6 +3473,8 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
         # same class-kind guards as the per-card loop: a repaired card must not sneak orb / custom-status /
         # summon ops onto a class that has no such pool.
         if int(bp.get("orb_slots", 0) or 0) == 0 and _card_uses_orbs(new):
+            return None
+        if int(bp.get("orb_slots", 0) or 0) < _LOSE_ORB_SLOT_MIN_SLOTS and _card_loses_orb_slot(new):  # Phase BQ (v68)
             return None
         if not _status_pool_custom_names(bp) and _card_uses_custom_status(new):
             return None

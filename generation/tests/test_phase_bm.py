@@ -143,7 +143,7 @@ def _t_engine() -> None:
     check(not (set(NEW_STATUSES) & _set(er, "SelfBuffStatuses")),
           "none of them is in SelfBuffStatuses (relics / potions / orbs / summons / payloads never accept them)")
     for frag, why in (
-            ('internal static readonly HashSet<string> BmSelfStatuses = new(SelfDebuffStatuses) { "echo_form" };',
+            ('internal static readonly HashSet<string> BmSelfStatuses = new(SelfDebuffStatuses) { "echo_form",',  # BQ: + loop
              "self = SelfBuffStatuses ∪ SelfDebuffStatuses (+ the card-only echo_form)"),
             ("SelfBuffStatuses.Contains(status) || BmSelfStatuses.Contains(status)", "IsSelfStatus"),
             ("await ApplyBmSelfStatus(e.Status!, ctx, card.Owner.Creature, Math.Max(1, amt), spec.Title ?? spec.Id);",

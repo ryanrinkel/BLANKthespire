@@ -45,6 +45,7 @@ _STATUS_WEIGHT = {
     # of every turn — a rare Power's whole-combat engine.
     "no_draw": -7.0, "no_energy_gain": -4.0, "no_block_gain": -5.0, "dex_decay": -4.0, "focus_decay": -4.0,
     "lose_strength": -4.0, "lose_dexterity": -3.0, "lose_focus": -3.0, "echo_form": 26.0,
+    "loop": 10.0,           # Phase BQ (v68, gap #78): one free orb passive every turn for the combat (Loop, an uncommon Power)
     "thorns": 2.0,          # pays out per enemy hit taken
     "regen": 2.0,           # heal per turn, decaying
     "metallicize": 3.0,     # STS2 Plating: N + (N-1) + ... + 1 Block over N turns
@@ -91,7 +92,8 @@ _BUILD_AROUND_OPS = {"add_trigger", "apply_status_custom",
                      # Phase BO (v66, gaps #74/#75): recursion, put-back, the reshuffle and keyword grants are card-flow
                      # utilities, not stat lines
                      "return_to_hand", "to_draw_top", "return_next_turn", "put_back", "shuffle_hand", "grant_keyword",
-                     "cost_delta"}  # Phase BP (v67, gap #76): a self-cost rule is energy in disguise, not a stat line
+                     "cost_delta",  # Phase BP (v67, gap #76): a self-cost rule is energy in disguise, not a stat line
+                     "trigger_passive", "lose_orb_slot"}  # Phase BQ (v68, gap #78): orb pumps / a slot-for-stats trade
 # Phase BD (v58, gap #58): the held_discount band (mirrors ForgedCards.HeldDiscountMaxAmount + the schema clause).
 _HELD_DISCOUNT_MAX = 2
 # Phase BP (v67, gaps #76/#77): the cost_delta shape (its events, lifetimes, the counted events, the signed band) and the
@@ -119,7 +121,13 @@ _SUPPORTED_SCALES = {"x", "cards_in_hand", "cards_retained", "unspent_energy_las
                      # + to_hand_size (draw only). Mirrors ForgedCards.SupportedScales.
                      "exhaust_pile_size", "discard_pile_size", "discards_this_turn", "cards_drawn_this_turn",
                      "cards_drawn_this_combat", "energy_spent_this_turn", "hp_loss_events_this_combat",
-                     "cards_generated_this_combat", "total_enemy_poison", "target_status_stacks", "to_hand_size"}
+                     "cards_generated_this_combat", "total_enemy_poison", "target_status_stacks", "to_hand_size",
+                     "orb_count", "orb_types"}  # Phase BQ (v68, gap #78): your orbs / their distinct types (orb classes)
+# Phase BQ (v68, gap #78): the orb-extras shape. Mirrors ForgedCards.EvokeWhich / TriggerPassiveReach / the caps + the schema.
+_EVOKE_WHICH = {"next", "newest"}
+_TRIGGER_PASSIVE_REACH = {"first", "all"}
+_TRIGGER_PASSIVE_MAX = {"first": 3, "all": 2}
+_TRIGGER_PASSIVE_VALUE = {"first": 3.0, "all": 7.0}  # one passive ~ a Lightning tick; `all` ~ a 2-3 orb rack
 _DAMAGE_BLOCK_ONLY_SCALES = {"block", "hp_lost_this_turn", "draw_pile_count", "plays_this_combat",
                              # Phase BJ (v62): mirrors ForgedCards.DamageBlockOnlyScales
                              "discard_pile_size", "discards_this_turn", "cards_drawn_this_turn", "energy_spent_this_turn",
@@ -186,9 +194,9 @@ _STRIP_OPS = ("strip_block", "strip_artifact")
 # and the replay pricing (per replayed card: a Skill ~ a cheap Skill, a Power more, `all` the most).
 _SELF_DEBUFF_STATUSES = {"no_draw", "no_energy_gain", "no_block_gain", "dex_decay", "focus_decay",
                          "lose_strength", "lose_dexterity", "lose_focus"}
-_BM_SELF_STATUSES = _SELF_DEBUFF_STATUSES | {"echo_form"}
+_BM_SELF_STATUSES = _SELF_DEBUFF_STATUSES | {"echo_form", "loop"}  # Phase BQ (v68): + Loop (card-only, like Echo Form)
 _BM_STATUS_CAPS = {"no_draw": 1, "no_energy_gain": 1, "no_block_gain": 3, "dex_decay": 2, "focus_decay": 2,
-                   "lose_strength": 5, "lose_dexterity": 5, "lose_focus": 5, "echo_form": 1}
+                   "lose_strength": 5, "lose_dexterity": 5, "lose_focus": 5, "echo_form": 1, "loop": 1}
 _BM_STATUS_MIN = {"no_block_gain": 2}
 _REPLAY_KINDS = {"skill", "attack", "power", "all"}
 _REPLAY_MAX_COUNT = 2
@@ -562,6 +570,49 @@ class CardValidator:
         if op == "apply_status":
             return "status:" + str(eff.get("status"))
         return None  # channel_orb / evoke / gain_orb_slot / exhaust / innate / retain / ethereal: no var
+
+    def _orb_extra_errors(self, e: dict, op, scale, hits) -> list[str]:
+        """Phase BQ (v68, gap #78): the orb extras' per-effect rules. Mirrors ForgedCards.ValidateOrbExtras."""
+        out: list[str] = []
+        if (e.get("keep") is not None or e.get("which") is not None) and op != "evoke":
+            out.append(f"'keep' / 'which' only apply to evoke (op '{op}').")
+        if e.get("orbs") is not None and op != "trigger_passive":
+            out.append(f"'orbs' only applies to trigger_passive (op '{op}').")
+        if e.get("per_enemy") and op != "channel_orb":
+            out.append(f"'per_enemy' only applies to channel_orb (op '{op}').")
+        amt = e.get("amount")
+        amt = amt if isinstance(amt, int) and not isinstance(amt, bool) else 0
+        if op == "evoke":
+            wh = e.get("which")
+            if wh is not None and str(wh).strip().lower() not in _EVOKE_WHICH:
+                out.append(f"evoke 'which' must be one of {'/'.join(sorted(_EVOKE_WHICH))}; got '{wh}'.")
+            if e.get("keep") is True and (amt > 1 or str(wh or "").strip().lower() == "newest"):
+                out.append("evoke 'keep' evokes your NEXT orb twice (Dualcast) — no amount above 1, never with which 'newest'.")
+        if op == "trigger_passive":
+            reach = str(e.get("orbs") or "first").strip().lower()
+            if reach not in _TRIGGER_PASSIVE_REACH:
+                out.append(f"trigger_passive 'orbs' must be one of {'/'.join(sorted(_TRIGGER_PASSIVE_REACH))}; got '{e.get('orbs')}'.")
+            else:
+                cap = _TRIGGER_PASSIVE_MAX[reach]
+                if amt < 0 or amt > cap:
+                    out.append(f"trigger_passive 'amount' (times) must be 1..{cap} for orbs '{reach}'; got {e.get('amount')!r}.")
+            if e.get("status") is not None or scale or (isinstance(hits, int) and hits > 1):
+                out.append("trigger_passive carries only 'amount' (times) + 'orbs'.")
+        if op == "lose_orb_slot" and (amt > 1 or e.get("status") is not None or scale or (isinstance(hits, int) and hits > 1)):
+            out.append("lose_orb_slot loses ONE orb slot (amount 1; no status / scale / hits).")
+        if e.get("per_enemy") and amt > 1:
+            out.append("channel_orb 'per_enemy' channels ONE orb per enemy (amount 1).")
+        w = e.get("when")
+        if isinstance(w, dict) and w.get("orb") is not None:
+            wo = str(w.get("orb")).strip().lower()
+            if w.get("kind") != "orb_count_ge":
+                out.append(f"a condition 'orb' filter only applies to orb_count_ge (got '{w.get('kind')}').")
+            if wo in ("", "random"):
+                out.append("a condition 'orb' filter names one orb (a base orb or one of your class's orbs), never 'random'.")
+            elif wo not in self._allowed_orbs:
+                out.append(f"the orb_count_ge 'orb' filter '{wo}' is not a valid orb here "
+                           f"(base lightning/frost/dark or a custom orb in this class's pool).")
+        return out
 
     def _engine_structural_errors(self, card: dict) -> list[str]:
         effects = [e for e in (card.get("effects") or []) if isinstance(e, dict)]
@@ -1012,6 +1063,7 @@ class CardValidator:
                     out.append(f"'grow' ({grow}) can't exceed the base damage ({e.get('amount', 0)}) — a card growing faster than its base reads as degenerate.")
             if e.get("orb") is not None and op != "channel_orb":
                 out.append(f"'orb' only applies to channel_orb (op '{op}').")
+            out.extend(self._orb_extra_errors(e, op, scale, hits))
             # Phase BD (v58, gap #57): `grow_held` — damage/block only, ⊥ scale, ⊥ grow, 1..9, <= amount. Mirrors ForgedCards.
             gh = e.get("grow_held", 0)
             if gh:
@@ -1108,6 +1160,21 @@ class CardValidator:
             out.append("replay_next card_type 'all' (your next card of ANY type plays twice) is RARE-only.")
         if any(ef.get("op") == "replay_next" for ef in bm_all) and bm_rarity == "basic":
             out.append("replay_next is not allowed on a BASIC card.")
+        # Phase BQ (v68, gap #78): Loop is the base Power; a slot loss is a one-shot drawback (Bulk Up is a Power) — on a
+        # Power or an Exhaust card (base AND upgrade), never a Basic, one per list. Mirrors ForgedCards.TryParseCardJson.
+        bq_type = str(card.get("type", "")).strip().lower()
+        if any(ef.get("op") == "apply_status" and str(ef.get("status", "")).strip().lower() == "loop" for ef in bm_all) \
+                and (bq_type != "power" or bm_rarity == "basic"):
+            out.append("'loop' belongs on a POWER card (the base Loop), never a Basic.")
+        if any(ef.get("op") == "lose_orb_slot" for ef in bm_all):
+            if bm_rarity == "basic":
+                out.append("lose_orb_slot is not allowed on a BASIC card.")
+            if bq_type != "power" and (not any(ef.get("op") == "exhaust" for ef in effects)
+                                       or (up_effects and not any(ef.get("op") == "exhaust" for ef in up_effects))):
+                out.append("lose_orb_slot needs a Power or an Exhaust card (a slot lost on every replay drains the rack).")
+            for lst in (effects, up_effects):
+                if sum(1 for ef in lst if ef.get("op") == "lose_orb_slot") > 1:
+                    out.append("at most one lose_orb_slot per card.")
         # Phase BO (v66, gaps #74/#75): one of each new op per effect list; ONE self-routing flag-op per card (base +
         # upgrade together), never with exhaust / purge, never on a Power; return_to_hand costs 1+ (base and upgrade) and
         # carries no draw / gain_energy (it comes straight back: an infinite loop for a human player); to_draw_top never
@@ -1718,6 +1785,13 @@ class CardValidator:
         if op == "held_discount":
             # Phase BD (v58, gap #58): energy in disguise, paid for with the held turns — ~a third of gain_energy per point.
             return max(1.0, self._amt(eff.get("amount", 1))) * 2.0
+        if op == "trigger_passive":
+            # Phase BQ (v68, gap #78): a free orb passive (~ a Lightning tick) per time; `all` fires the whole rack.
+            reach = str(eff.get("orbs") or "first").strip().lower()
+            return max(1.0, amt) * _TRIGGER_PASSIVE_VALUE.get(reach, 3.0)
+        if op == "lose_orb_slot":
+            # Phase BQ (v68, gap #78): a slot for the rest of combat is a real price (every later orb has less room).
+            return -5.0
         if op == "cost_delta":
             # Phase BP (v67, gap #76): energy in disguise. Momentum Strike's free-for-the-combat ~ a third of its replays;
             # a whole-combat step pays every later play; a this-turn step ~ one cheaper play; the +1 tax (Modded) is a price.

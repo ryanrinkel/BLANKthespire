@@ -138,6 +138,8 @@ public static class EffectRunner
                         MainFile.Logger.Info($"[AM] scale {e.Scale} -> {ScaleValue(e.Scale, card)} (damage, '{card.Id}').");
                     if (PhaseBjScales.Contains(e.Scale ?? "")) // Phase BJ (v62, gap #63): prove the live history read at resolution
                         MainFile.Logger.Info($"[BJ] scale {e.Scale} -> {BjScaleRead(e, card, play)} (damage) ('{spec.Title ?? spec.Id}').");
+                    if (e.Scale is "orb_count" or "orb_types") // Phase BQ (v68, gap #78): prove the orb read at resolution
+                        MainFile.Logger.Info($"[BQ] {e.Scale} -> {ScaleValue(e.Scale, card)} ('{spec.Title ?? spec.Id}') (damage).");
                     if (e.HasGrow) // Phase U (gap #23) smoke logging: prove per-play growth (plays so far = count)
                     {
                         int plays = PlaysThisCombat(card);
@@ -172,6 +174,8 @@ public static class EffectRunner
                         MainFile.Logger.Info($"[AM] scale {e.Scale} -> {ScaleValue(e.Scale, card)} (block, '{card.Id}').");
                     if (PhaseBjScales.Contains(e.Scale ?? "")) // Phase BJ (v62, gap #63)
                         MainFile.Logger.Info($"[BJ] scale {e.Scale} -> {BjScaleRead(e, card, play)} (block) ('{spec.Title ?? spec.Id}').");
+                    if (e.Scale is "orb_count" or "orb_types") // Phase BQ (v68, gap #78)
+                        MainFile.Logger.Info($"[BQ] {e.Scale} -> {ScaleValue(e.Scale, card)} ('{spec.Title ?? spec.Id}') (block).");
                     await CommonActions.CardBlock(card, play);
                     break;
                 case "draw":
@@ -192,6 +196,8 @@ public static class EffectRunner
                         int n = ResolveScaleAmount(e, card);
                         if (PhaseAmScales.Contains(e.Scale ?? "")) // Phase AM (v43): only `energy` is draw-legal
                             MainFile.Logger.Info($"[AM] scale {e.Scale} -> {n} (draw, '{card.Id}').");
+                        if (e.Scale is "orb_count" or "orb_types") // Phase BQ (v68, gap #78): Compile Driver
+                            MainFile.Logger.Info($"[BQ] {e.Scale} -> {n} ('{spec.Title ?? spec.Id}') (draw).");
                         await CardPileCmd.Draw(ctx, n, card.Owner);
                     }
                     else await CommonActions.Draw(card, ctx);
@@ -492,6 +498,13 @@ public static class EffectRunner
                     // Channel max(1, amount) orbs: canonical model → mutable instance → channel. "random" rolls
                     // independently per orb (so a multi-channel "pull" can come up matched — the slot machine).
                     int count = Math.Max(1, amt);
+                    // Phase BQ (v68, gap #78): Chill — one orb per hittable enemy (the base card's count, read at play time).
+                    if (e.PerEnemy)
+                    {
+                        count = card.Owner.Creature.CombatState.HittableEnemies.Count;
+                        MainFile.Logger.Info($"[BQ] channel per_enemy x{count} ('{e.Orb}') ('{spec.Title ?? spec.Id}').");
+                        if (count <= 0) break;
+                    }
                     // Phase I: a forged-orb class card resolves the orb name against ITS class's pool (base or custom),
                     // and "random" rolls only within that pool (shared with the relic channel_orb op). Non-orb-class
                     // cards keep the literal base lightning/frost/dark (+ random-among-base) behaviour unchanged.
@@ -509,8 +522,65 @@ public static class EffectRunner
                 {
                     // Evoke max(1, amount) of the oldest orb(s).
                     int count = Math.Max(1, amt);
+                    var eq = card.Owner.PlayerCombatState.OrbQueue;
+                    // Phase BQ (v68, gap #78): Dualcast — evoke the next orb WITHOUT consuming it, then evoke (and consume) it.
+                    if (e.Keep)
+                    {
+                        MainFile.Logger.Info($"[BQ] evoke next keep=true -> '{OrbName(eq.Orbs.FirstOrDefault())}' ('{spec.Title ?? spec.Id}').");
+                        if (eq.Orbs.Count > 0)
+                        {
+                            await OrbCmd.EvokeNext(ctx, card.Owner, dequeue: false);
+                            await OrbCmd.EvokeNext(ctx, card.Owner, dequeue: true);
+                        }
+                        break;
+                    }
+                    // Phase BQ (v68, gap #78): the newest orb (OrbCmd.EvokeLast), once per count.
+                    if (e.Which == "newest")
+                    {
+                        for (int n = 0; n < count; n++)
+                        {
+                            MainFile.Logger.Info($"[BQ] evoke newest keep=false -> '{OrbName(eq.Orbs.LastOrDefault())}' ('{spec.Title ?? spec.Id}').");
+                            await OrbCmd.EvokeLast(ctx, card.Owner, dequeue: true);
+                        }
+                        break;
+                    }
                     for (int n = 0; n < count; n++)
                         await OrbCmd.EvokeNext(ctx, card.Owner, dequeue: true);
+                    break;
+                }
+                case "trigger_passive":
+                {
+                    // Phase BQ (v68, gap #78): Darkness / Tesla Coil — OrbCmd.Passive on your next orb (or every orb), `amount`
+                    // times each. A custom orb answers through ForgedOrb.Passive (-> OrbRunner.RunPassive). The rack is
+                    // snapshotted; an orb an earlier passive evoked / pushed out is skipped.
+                    int times = Math.Max(1, amt);
+                    var pq = card.Owner.PlayerCombatState.OrbQueue;
+                    var orbs = e.Orbs == "all" ? pq.Orbs.ToList() : pq.Orbs.Take(1).ToList();
+                    if (orbs.Count == 0)
+                        MainFile.Logger.Info($"[BQ] trigger_passive x{times}: no orbs (orbs={e.Orbs ?? "first"}) ('{spec.Title ?? spec.Id}').");
+                    foreach (var o in orbs)
+                    {
+                        if (!pq.Orbs.Contains(o)) continue;
+                        MainFile.Logger.Info($"[BQ] trigger_passive x{times} on '{OrbName(o)}' (orbs={e.Orbs ?? "first"}) ('{spec.Title ?? spec.Id}').");
+                        for (int t = 0; t < times; t++)
+                            await OrbCmd.Passive(ctx, o, play?.Target);
+                    }
+                    break;
+                }
+                case "lose_orb_slot":
+                {
+                    // Phase BQ (v68, gap #78): Bulk Up — OrbCmd.RemoveSlots (sync; an orb in the lost slot is dropped without
+                    // evoking). Never below 1 slot: at 0 a forged class channels into nothing (OrbCmd.Channel re-adds a slot
+                    // only when BaseOrbSlotCount == 0).
+                    var sq = card.Owner.PlayerCombatState.OrbQueue;
+                    int capBefore = sq.Capacity;
+                    if (capBefore <= 1)
+                    {
+                        MainFile.Logger.Info($"[BQ] lose_orb_slot skipped (capacity {capBefore}; never below 1) ('{spec.Title ?? spec.Id}').");
+                        break;
+                    }
+                    OrbCmd.RemoveSlots(card.Owner, 1);
+                    MainFile.Logger.Info($"[BQ] lose_orb_slot -> {sq.Capacity} (was {capBefore}; {sq.Orbs.Count} orbs) ('{spec.Title ?? spec.Id}').");
                     break;
                 }
                 case "add_trigger":
@@ -1320,7 +1390,8 @@ public static class EffectRunner
     /// <summary>Phase BM (v65, gaps #68/#69): every card-only status that lands on the player through
     /// <see cref="ApplyBmSelfStatus"/> — the self-drawbacks plus Echo Form (a card-only self-buff, likewise kept out of
     /// SelfBuffStatuses).</summary>
-    internal static readonly HashSet<string> BmSelfStatuses = new(SelfDebuffStatuses) { "echo_form" };
+    internal static readonly HashSet<string> BmSelfStatuses = new(SelfDebuffStatuses) { "echo_form",
+        "loop" }; // Phase BQ (v68, gap #78): the base LoopPower, card-only like Echo Form
 
     /// <summary>Phase BM (v65): does this status land on the PLAYER (a self-buff, a self-drawback or Echo Form)?</summary>
     public static bool IsSelfStatus(string? status) =>
@@ -1340,6 +1411,11 @@ public static class EffectRunner
     };
 
     private static readonly Type[] _randomOrbs = [typeof(LightningOrb), typeof(FrostOrb), typeof(DarkOrb)];
+
+    /// <summary>Phase BQ (v68, gap #78): an orb's display name for the [BQ] tags — a forged orb's spec name, a base orb's
+    /// type name without the "Orb" suffix ("Lightning"), "none" for an empty rack.</summary>
+    internal static string OrbName(OrbModel? o) =>
+        o == null ? "none" : o is ForgedOrb fo ? fo.DisplayName : o.GetType().Name.Replace("Orb", "");
 
     /// <summary>A random orb type from the tested MVP set, via the run's dedicated orb-generation RNG stream
     /// (so it doesn't desync card/other RNG and stays seed-correct).</summary>
@@ -1383,7 +1459,9 @@ public static class EffectRunner
         // Phase BK (v63, gap #65): the hits_scale-only reads (never a `scale` source — SupportedScales omits them).
         "attacks_played_this_turn"   => AttacksPlayedThisTurn(card.Owner),                 // Finisher
         "skills_in_hand"             => SkillsInHand(card.Owner),                          // Flechettes
-        "orb_count"                  => card.Owner?.PlayerCombatState?.OrbQueue?.Orbs?.Count ?? 0, // orb classes
+        "orb_count"                  => card.Owner?.PlayerCombatState?.OrbQueue?.Orbs?.Count ?? 0, // orb classes (BQ: also a `scale`)
+        // Phase BQ (v68, gap #78): Compile Driver — the DISTINCT orb types you hold (the Conditions.orbs_match read).
+        "orb_types"                  => card.Owner?.PlayerCombatState?.OrbQueue?.Orbs?.Select(o => o.GetType()).Distinct().Count() ?? 0,
         _ => 0,
     };
 
@@ -2054,6 +2132,7 @@ public static class EffectRunner
             "lose_dexterity" => RelicApplyT<DexterityPower>(ctx, target, source, -amount),
             "lose_focus"     => RelicApplyT<FocusPower>(ctx, target, source, -amount),
             "echo_form"      => RelicApplyT<EchoFormPower>(ctx, target, source, amount),
+            "loop"           => RelicApplyT<LoopPower>(ctx, target, source, amount), // Phase BQ (v68, gap #78)
             _ => Task.CompletedTask,
         };
 
@@ -2065,6 +2144,11 @@ public static class EffectRunner
         int art0 = me.GetPowerAmount<ArtifactPower>();
         await RelicApply(status, ctx, me, me, n);
         int art1 = me.GetPowerAmount<ArtifactPower>();
+        if (status == "loop") // Phase BQ (v68, gap #78): LoopPower ticks are tagged by LoopTickTagPatch
+        {
+            MainFile.Logger.Info($"[BQ] loop applied by '{src}': Loop now {me.GetPowerAmount<LoopPower>()}.");
+            return;
+        }
         if (status == "echo_form")
         {
             MainFile.Logger.Info($"[BM] echo_form applied by '{src}': Echo Form now {me.GetPowerAmount<EchoFormPower>()}.");

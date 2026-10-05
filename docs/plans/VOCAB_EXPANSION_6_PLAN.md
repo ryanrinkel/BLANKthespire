@@ -836,7 +836,7 @@ BlankTheSpire frames, 0 localization errors (the remaining exception lines are B
 and AutoSlay's post-completion "Options NButton not found"). `on_evoke` is not provable on this normal-class tester (BQ).
 AutoSlay never pays energy: every cost_delta is proven as a cost READ only. No freeze.
 
-### Phase BQ — Orb extras (v69; gap #78; ~1 day) — 17 base cards, orb classes only
+### Phase BQ — Orb extras (v68 — third of the stretch phases, Ryan's order BO → BP → BQ → BN; gap #78; ~1 day) — 17 base cards, orb classes only
 
 **Blocker first:** `ForgedOrb` (`Powers/ForgedOrb.cs:139-156`) does NOT override `OrbModel.Passive` (an empty virtual,
 `OrbModel.cs:235`), so `OrbCmd.Passive` / `LoopPower` silently no-op on custom orbs. Add `public override Task
@@ -856,6 +856,42 @@ damage/block/draw; `orb_count_ge` + an `orb` filter (base names via `EffectRunne
 **Test:** `tests/test_phase_bq.py`. **Tester** `gaptest-bq` (orb class): Dualcast, Multi-Cast-lite, Darkness, Loop
 power, Bulk Up, Compile Driver, Chill. **Tags:** `[BQ] evoke <which> keep=<b>`, `[BQ] trigger_passive x<n> on '<orb>'`,
 `[BQ] lose_orb_slot -> <cap>`, `[BQ] orb_count/orb_types -> <n>`, `[BQ] channel per_enemy x<n>`.
+
+**Findings (BQ, built 2026-10-04 on `wave6`, vocab v68, smoke pending — the BN agent runs it with BN's, Ryan pre-approved):**
+(1) Verify-first held: `OrbModel.Passive(PlayerChoiceContext, Creature?)` is an empty virtual and **only `OrbCmd.Passive` calls
+it** (the base orbs' own ticks call their override from `BeforeTurnEndOrbTrigger`; ForgedOrb's ticks call
+`OrbRunner.RunPassive` directly), so the new `ForgedOrb.Passive` override cannot double-fire: every `[BQ] passive override` line
+is one `OrbCmd.Passive` call (Loop / trigger_passive) — the tester's pass bar checks it against the `trigger_passive` / `loop
+tick` lines. `OrbCmd.EvokeNext/EvokeLast(ctx, player, dequeue)`, `Passive(ctx, orb, target)`, sync `RemoveSlots`, `LoopPower`
+(Counter; `OrbCmd.Passive(Orbs[0], null)` × Amount in `AfterPlayerTurnStart`) and the Dualcast / Darkness / Tesla Coil / Chill /
+Compile Driver / Bulk Up recipes all match the scout. (2) **The Loop tag:** `LoopPower` is sealed base code, so its tick is
+tagged by a LOG-ONLY Harmony prefix (`Engine/LoopTickTagPatch.cs`, `[BQ] loop tick -> '<front orb>' x<n>`; never skips the
+original); `loop` rides the BM card-only self-status pipe (`BmSelfStatuses` + `ApplyBmSelfStatus`, `[BQ] loop applied by`),
+amount 1 on a non-Basic Power, literal text "At the start of your turn, trigger your next orb's passive." (a second Loop stacks
+the Counter). Its VOCABULARY line lives in `## Orbs` (orb forges only), not the core Statuses table. (3) Shapes: `evoke` +
+`keep:true` = "Evoke your next orb twice." (amount ≤ 1, never with `which:"newest"`); `which:"newest"` × amount = "Evoke your
+newest orb." / "Evoke your N newest orbs."; `trigger_passive` amount = times (1..3 on `orbs` first, 1..2 on all), passes the
+played target (Tesla Coil) and snapshots the rack (an orb an earlier passive evoked is skipped); `lose_orb_slot` amount 1 on a
+Power or an Exhaust card (base AND upgrade), never Basic, one per list, and the runtime never drops below 1 slot (logged skip);
+the **3-slot rule is class-level**: `class_forge` drops the card on a < 3-slot class and the C# importer
+(`TryImportClassBundle`) rejects it — the card validators cannot see the class. `channel_orb` + `per_enemy` (amount 1) counts
+`HittableEnemies` at play time; `orb_count_ge` + `orb` resolves a class pool name via `ResolveOrbType` (the class read off the
+player, the add_card idiom), else a base name via `OrbTypeFor`, and logs `[BQ] orb_count_ge[<orb>] -> <bool>` from
+`Conditions` itself (so card, trigger and orb gates all tag); `orb_types` = distinct `GetType()` (the `orbs_match` read; the base
+card groups by `Id`, equivalent per type). All new fields are card-only (schema payload def omits them; ValidateTrigger
+rejects them). (4) Harness: gate `FAMILY_OPS["orbs"]` += the two ops and FIELD_UNITS keep/which/orbs/per_enemy → the orb
+units, so a normal-class card prompt pays nothing but the `loop` / `orb_count` / `orb_types` enum words and the condition's short
+`orb` field; coverage `SCALE_MENU_KIND` += orb_count / orb_types (kind orb); featured `orb_passive_pump` + `orb_census`;
+`_CLASS_ONLY_TOKENS` / `_card_uses_orbs` / `_ORB_TOKENS`; 9 exemplars (191 -> 200: the harness sanity ceiling 200 is unchanged —
+the evoke-newest exemplar was folded into Rack Slam); `orb_channel` claims trigger_passive / loop / lose_orb_slot / orb_types,
+`slot_machine` claims orb_count (both gap_refs #78); one ORB pitch sentence (`full` scaffold snapshot 47,371 -> 47,532, +161).
+Stale pins updated: test_coverage (the orb scale keys + KEY_KIND + samples), test_exemplars (orb class-only tokens),
+test_featured (two samples), test_harness_v2 (scaffold snapshot), test_phase_bk (`orb_count` is now also a `scale` source),
+test_phase_bm (the BmSelfStatuses line), test_phase_bp (the EffectSpec tail). (5) Readings: index 9,392 (cap 72) ·
+per-archetype max **76,654 (`slot_machine`** — its new `orb_count` scale claim pulls the scaling rows into its detail; was
+`exhaust_pyre` 74,247) · per-archetype scaffold max 27,042 · triads 68,129 / 78,468 / 84,213 · all-ops 127,834 · `full` 119,205.
+(6) Tester `tests/gaptest-bq/` (slot 04, `--character class4`, orb_slots 4, pool lightning/frost/dark + custom Ember / Bulwark;
+the BP `on_evoke` proof rides it as Arc Recoil); the docstring is the full smoke recipe.
 
 ### Phase BR — Stun (re-open #11), discard-all + `cards_removed`, growing turn-start damage (v70; gaps #11, #79; ~1 day)
 
@@ -924,7 +960,7 @@ as every merged phase passed its smoke.
 | BN | #71–#73 | v66 | 1½ days | 38 | Feed / Sunder on-kill; Discovery / Infernal Blade; Havoc / Uproar / Mayhem |
 | BO | #74, #75 | v66 | 1½ days | 29 | Particle Wall, Bolas, Headbutt, Secret Weapon, Reboot; Snap / Hand Trick |
 | BP | #76, #77 | v67 | 1 day | 24 | Stomp / Momentum Strike / Kingly Kick; Arsenal, Vicious, Sleight of Flesh |
-| BQ | #78 | v69 | 1 day | 17 | Dualcast, Darkness, Loop, Compile Driver, Chill — the orb class catches up |
+| BQ | #78 | v68 | 1 day | 17 | Dualcast, Darkness, Loop, Compile Driver, Chill — the orb class catches up |
 | BR | #11, #79 | v70 | 1 day | 5 | Whistle; Fiend Fire / Calculated Gamble; Rolling Boulder |
 
 **Recommended order:** BH → BI (cheapest high-count win, proves the lockstep on this tree) → BJ → BK → BL → BM, then
@@ -1041,3 +1077,9 @@ localization errors, after one engine fix (an amount-less `retrieve_card` retrie
 tester + tags in `generation/tests/gaptest-bp/`). Merged suite: generation **602**, web **293**, `test_phase_bp` 320/320. Readings: index 9,250 (cap 72) · per-archetype max 74,247 (`exhaust_pyre`) ·
 per-archetype scaffold max 27,042 · triads 67,987 / 77,235 / 82,980 · all-ops 126,601 · `full` 118,114 (scaffold snapshot
 47,371, +193). See Findings (BP).
+
+**Phase BQ BUILT 2026-10-04** (on `wave6`, vocab v68 — renumbered from v69 by Ryan's stretch order BO → BP → BQ → BN; gap #78
+done; smoke pending — the BN agent runs GAPTESTBQ1/BQ2 with BN's, Ryan pre-approved; tester `generation/tests/gaptest-bq/`,
+`--validate-only` green; DLL built + deployed). Merged suite: generation **604**, web **293**, `test_phase_bq` 240/240 (smoke record
+pending). Readings: index 9,392 (cap 72) · per-archetype max 76,654 (`slot_machine`) · per-archetype scaffold max 27,042 · triads
+68,129 / 78,468 / 84,213 · all-ops 127,834 · `full` 119,205 (scaffold snapshot 47,532, +161). See Findings (BQ).

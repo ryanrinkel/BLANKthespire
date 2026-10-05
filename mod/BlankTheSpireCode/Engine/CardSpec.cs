@@ -98,7 +98,11 @@ public sealed record EffectSpec(string Op, int Amount = 0, string? Status = null
     string? From = null, // Phase BO (v66, gap #74): put_back's source pile (hand / discard) — Thinking Ahead / Headbutt
     string? Keyword = null, // Phase BO (v66, gap #75): grant_keyword's keyword (retain / ethereal / sly) — Snap / Hand Trick
     string? On = null, // Phase BP (v67, gap #76): cost_delta's event (played / drawn / attack_played / skill_played / card_played / card_exhausted)
-    bool SetZero = false) // Phase BP (v67, gap #76): cost_delta on:"played" set_zero — it costs 0 for the rest of combat (Momentum Strike)
+    bool SetZero = false, // Phase BP (v67, gap #76): cost_delta on:"played" set_zero — it costs 0 for the rest of combat (Momentum Strike)
+    bool Keep = false, // Phase BQ (v68, gap #78): evoke keep — evoke the next orb WITHOUT consuming it, then evoke it again (Dualcast)
+    string? Which = null, // Phase BQ (v68, gap #78): evoke which — "next" (oldest, the default) | "newest" (OrbCmd.EvokeLast)
+    string? Orbs = null, // Phase BQ (v68, gap #78): trigger_passive's reach — "first" (your next orb, the default) | "all" (every orb)
+    bool PerEnemy = false) // Phase BQ (v68, gap #78): channel_orb per_enemy — channel one orb per hittable enemy (Chill)
 {
     /// <summary>Phase BP (v67, gap #76): a <c>cost_delta</c> whose event is ANOTHER card of yours being played (Stomp /
     /// Pinpoint) — the STATELESS form: <see cref="DataCard"/>.TryModifyEnergyCostInCombat counts the matching plays in the
@@ -133,7 +137,8 @@ public sealed record EffectSpec(string Op, int Amount = 0, string? Status = null
 /// <summary>A combat-state predicate gating an effect (Phase H per-effect <c>when</c>). <paramref name="Kind"/>
 /// selects the check (see <c>Conditions.Kinds</c>); <paramref name="Value"/>/<paramref name="Status"/> are its
 /// params; <paramref name="Negate"/> inverts the result (the "else" lever).</summary>
-public sealed record Condition(string Kind, int Value = 0, string? Status = null, bool Negate = false);
+public sealed record Condition(string Kind, int Value = 0, string? Status = null, bool Negate = false,
+    string? Orb = null); // Phase BQ (v68, gap #78): orb_count_ge's optional orb filter ("you have 2+ Frost orbs")
 
 /// <summary>
 /// The full data definition of a card. Two sources produce a CardSpec:

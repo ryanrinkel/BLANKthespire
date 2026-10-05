@@ -91,7 +91,8 @@ CARD_FAMILIES = ("triggers", "conditions", "scaling", "forge")
 LOOSE_FAMILIES = CARD_FAMILIES + ("orbs", "custom_status", "summons")
 
 FAMILY_OPS = {
-    "orbs": ("channel_orb", "evoke", "gain_orb_slot"),
+    "orbs": ("channel_orb", "evoke", "gain_orb_slot",
+             "trigger_passive", "lose_orb_slot"),  # Phase BQ (v68, gap #78): card-only orb extras, orb classes only
     "custom_status": ("apply_status_custom",),
     "summons": ("summon", "summon_attack", "buff_summon", "shield_summon", "heal_summon", "sacrifice_summon"),
     "forge": ("spend_forge", "summon_blade", "blade_empower"),
@@ -140,6 +141,8 @@ FIELD_UNITS = {
     "card": ("add_status_card",),
     "from": ("put_back",), "keyword": ("grant_keyword",),  # Phase BO (v66, gaps #74/#75)
     "on": ("cost_delta",), "set_zero": ("cost_delta",),  # Phase BP (v67, gap #76)
+    # Phase BQ (v68, gap #78): the orb-extras fields ride the orb family's ops (never the card core).
+    "keep": ("evoke",), "which": ("evoke",), "orbs": ("trigger_passive",), "per_enemy": ("channel_orb",),
 }
 DEF_UNITS = {"triggerEffect": ("add_trigger",)}
 # One vocabulary table row: `| \`token\` | ...`. Shared by the card gate's op-table split and the blueprint tree.

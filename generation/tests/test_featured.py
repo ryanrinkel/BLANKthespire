@@ -310,6 +310,9 @@ def test_class_kind_detectors_and_presence() -> None:
         "orb_flash_focus": _card([{"op": "apply_status", "status": "temp_focus", "amount": 2}]),  # Phase AN (v44)
         "orb_slot_growth": _card([{"op": "gain_orb_slot", "amount": 1}]),
         "orb_focus_power": _card([{"op": "apply_status", "status": "focus", "amount": 1}]),
+        # Phase BQ (v68): the passive pump (Darkness / Loop) and the orb census (Compile Driver)
+        "orb_passive_pump": _card([{"op": "trigger_passive", "amount": 2}]),
+        "orb_census": _card([{"op": "damage", "amount": 7}, {"op": "draw", "amount": 1, "scale": "orb_types"}]),
         "custom_status_spread": _card([{"op": "apply_status_custom", "status_name": "Rust", "amount": 2}]),
         "summon_medic": _card([{"op": "heal_summon", "amount": 4}]),
         "summon_drill": _card([{"op": "buff_summon", "amount": 2}]),

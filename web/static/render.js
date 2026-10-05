@@ -485,6 +485,7 @@ const STATUS_NAMES = {
   no_draw: "No Draw", no_energy_gain: "No Energy Gain", no_block_gain: "No Block", dex_decay: "Wraith Form",
   focus_decay: "Biased Cognition", lose_strength: "Strength", lose_dexterity: "Dexterity", lose_focus: "Focus",
   echo_form: "Echo Form",
+  loop: "Loop", // Phase BQ (v68, gap #78)
 };
 // Phase BM (v65, gaps #68/#69): the self-drawbacks + Echo Form read like the card text (lockstep with cardgen._BM_SENTENCES).
 const BM_PHRASES = {
@@ -497,6 +498,7 @@ const BM_PHRASES = {
   lose_dexterity: (a) => `Lose ${a ?? ""} Dexterity`,
   lose_focus: (a) => `Lose ${a ?? ""} Focus`,
   echo_form: () => "The first card you play each turn is played twice",
+  loop: () => "At the start of your turn, trigger your next orb's passive", // Phase BQ (v68, gap #78): the base Loop
 };
 const TRIGGER_PREFIX = {
   turn_start: "At the start of each turn", turn_end: "At the end of each turn",
@@ -566,6 +568,9 @@ const SCALE_NOUN = {
   hp_loss_events_this_combat: "the times you have lost HP this combat",
   cards_generated_this_combat: "the cards you have created this combat",
   total_enemy_poison: "the total Poison on ALL enemies",
+  // Phase BQ (v68, gap #78): the orb reads (Compile Driver), lockstep with cardgen._scale_phrase
+  orb_count: "the orbs you have channeled",
+  orb_types: "the different orbs you have channeled",
 };
 const scaleNoun = (e) => e.scale === "target_status_stacks" ? `the enemy's ${statusName(e.status)}` : SCALE_NOUN[e.scale];
 // Phase BK (v63, gap #65): the singular noun a `hits_scale` damage counts — lockstep with cardgen._HITS_PHRASE /
@@ -586,7 +591,8 @@ const statusName = (s) => STATUS_NAMES[s] || titleCase(s);
 function condCore(c) {
   const v = c.value;
   switch (c.kind) {
-    case "orb_count_ge": return `you have ${v ?? "enough"}+ orbs`;
+    case "orb_count_ge": return c.orb ? `you have ${v ?? "enough"}+ ${titleCase(c.orb)} orbs` // Phase BQ (v68): the orb filter
+                                      : `you have ${v ?? "enough"}+ orbs`;
     case "orbs_match": return "your channeled orbs match";
     case "target_has_status": return `the enemy has ${statusName(c.status)}`;
     case "no_block": return "you have no Block";
@@ -703,8 +709,17 @@ function effPhrase(e, target) {
     case "retain": return "Retain";
     case "ethereal": return "Ethereal";
     case "sly": return "Sly"; // Phase BB (v56, gap #55): discarded from hand by an effect = played for free
-    case "evoke": return "Evoke your next orb";
-    case "channel_orb": return `Channel ${titleCase(e.orb || "an orb")}${a > 1 ? ` ×${a}` : ""}`;
+    case "evoke": // Phase BQ (v68, gap #78): Dualcast (keep) / the newest orb, lockstep with cardgen.describe
+      if (e.keep) return "Evoke your next orb twice";
+      if (e.which === "newest") return a > 1 ? `Evoke your ${a} newest orbs` : "Evoke your newest orb";
+      return "Evoke your next orb";
+    case "channel_orb": return e.per_enemy ? `Channel ${titleCase(e.orb || "an orb")} for each enemy` // Phase BQ (v68): Chill
+                                           : `Channel ${titleCase(e.orb || "an orb")}${a > 1 ? ` ×${a}` : ""}`;
+    case "trigger_passive": { // Phase BQ (v68, gap #78): Darkness / Tesla Coil, lockstep with cardgen._trigger_passive_sentence
+      const whose = e.orbs === "all" ? "all your orbs" : "your next orb";
+      return (a ?? 1) > 1 ? `Trigger the passive of ${whose} ${a} times` : `Trigger the passive of ${whose}`;
+    }
+    case "lose_orb_slot": return "Lose 1 Orb Slot"; // Phase BQ (v68, gap #78): Bulk Up
     case "apply_status":
       // Phase BL (v64, gaps #66/#67): the permanent Strength loss + Blight Strike's Doom read like the card text.
       if (e.status === "strength_down")

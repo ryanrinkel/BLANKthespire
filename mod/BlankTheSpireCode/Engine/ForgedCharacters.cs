@@ -1401,8 +1401,13 @@ public static class ForgedCharacters
             if (cardsArr[i].VariantType != Godot.Variant.Type.Dictionary)
             { error = $"card {i + 1} is not a JSON object."; return false; }
             string cj = Godot.Json.Stringify(cardsArr[i]);
-            if (!ForgedCards.TryParseCardJson(cj, i + 1, out _, out var cerr, allowBasic: true, allowCustomOrbs: true, orbNames: poolOrbNames))
+            if (!ForgedCards.TryParseCardJson(cj, i + 1, out var cspecCard, out var cerr, allowBasic: true, allowCustomOrbs: true, orbNames: poolOrbNames))
             { error = $"card {i + 1}: {cerr}"; return false; }
+            // Phase BQ (v68, gap #78): a slot loss needs a rack to lose it from (3+ starting slots — at 0 a forged class
+            // channels into nothing). Lockstep with class_forge._LOSE_ORB_SLOT_MIN_SLOTS.
+            if (cspecCard != null && cspecCard.Effects.Concat(cspecCard.Upgrade ?? []).Any(e => e.Op == "lose_orb_slot")
+                && cspec.OrbSlots < ForgedCards.LoseOrbSlotMinSlots)
+            { error = $"card {i + 1}: lose_orb_slot needs a class with {ForgedCards.LoseOrbSlotMinSlots}+ orb slots (has {cspec.OrbSlots})."; return false; }
             cardJsons.Add(cj);
         }
 

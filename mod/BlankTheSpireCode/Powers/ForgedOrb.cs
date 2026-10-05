@@ -148,6 +148,22 @@ public abstract class ForgedOrb : CustomOrbModel
         return s == null || !s.PassiveAtTurnStart ? Task.CompletedTask : OrbRunner.RunPassive(s, this, ctx, null);
     }
 
+    /// <summary>Phase BQ (v68, gap #78): the ON-DEMAND passive. <c>OrbModel.Passive</c> is an empty virtual that the base
+    /// orbs fill and that only <c>OrbCmd.Passive</c> calls (LoopPower, Darkness, Tesla Coil — our trigger_passive op and
+    /// the `loop` status). Without this override those silently no-op'd on a custom orb. No double-fire: the per-turn tick
+    /// above calls <see cref="OrbRunner.RunPassive"/> directly, never <c>Passive</c> — so every "[BQ] passive override"
+    /// line in a smoke is one OrbCmd.Passive call, and a plain turn-end tick logs none.</summary>
+    public override Task Passive(PlayerChoiceContext choiceContext, Creature? target)
+    {
+        var s = Source;
+        if (s == null) return Task.CompletedTask;
+        MainFile.Logger.Info($"[BQ] passive override: '{s.Name}' passive via OrbRunner ({s.Passive.Length} effect(s)).");
+        return OrbRunner.RunPassive(s, this, choiceContext, target);
+    }
+
+    /// <summary>Phase BQ (v68, gap #78): the orb's name for the [BQ] tags (its spec name; "Forged Orb" on an unfilled shell).</summary>
+    public string DisplayName => Source?.Name ?? "Forged Orb";
+
     public override async Task<IEnumerable<Creature>> Evoke(PlayerChoiceContext ctx)
     {
         var s = Source;

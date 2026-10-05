@@ -184,6 +184,10 @@ SCALE_MENU_KIND = [
     ("tag_cards_owned", 'REQUIRED: make one damage or block amount scale "tag_cards_owned" with a matching "tag" '
                         '(printed amount PLUS 1 per card you own carrying that tag; the tag must sit on 3-5 cards).', "tags"),
     ("forged", 'REQUIRED: make one damage or block amount scale "forged" (its printed amount PLUS your Forge counter).', "forge"),
+    # Phase BQ (v68, gap #78): the orb reads — dealt to orb classes only.
+    ("orb_count", 'REQUIRED: make one damage or block amount scale "orb_count" (equal to the orbs you have channeled).', "orb"),
+    ("orb_types", 'REQUIRED: make one draw or damage amount scale "orb_types" (equal to the DIFFERENT orbs you have '
+                  'channeled - Compile Driver).', "orb"),
 ]
 # W2.2: NOMINATE-ONLY rare-tier exotics — repair never injects them off the shuffled menu; the blueprint may
 # nominate one (coverage_nominations.exotic) and then the repair round can reach it.
