@@ -587,8 +587,12 @@ public static class EffectRunner
                     {
                         if (!pq.Orbs.Contains(o)) continue;
                         MainFile.Logger.Info($"[BQ] trigger_passive x{times} on '{OrbName(o)}' (orbs={e.Orbs ?? "first"}) ('{spec.Title ?? spec.Id}').");
+                        // BQ smoke fix (2026-10-04): only a Lightning orb (Tesla Coil) or one of our ForgedOrbs takes the played
+                        // target — the base Frost / Dark / Plasma Passive THROW on a non-null target ("Frost orbs cannot target
+                        // creatures"; GAPTESTBQ1 pass 2). Everything else gets null, as Darkness passes.
+                        var ptarget = o is LightningOrb or ForgedOrb ? play?.Target : null;
                         for (int t = 0; t < times; t++)
-                            await OrbCmd.Passive(ctx, o, play?.Target);
+                            await OrbCmd.Passive(ctx, o, ptarget);
                     }
                     break;
                 }

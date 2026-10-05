@@ -935,6 +935,26 @@ per-archetype max **76,654 (`slot_machine`** — its new `orb_count` scale claim
 `exhaust_pyre` 74,247) · per-archetype scaffold max 27,042 · triads 68,129 / 78,468 / 84,213 · all-ops 127,834 · `full` 119,205.
 (6) Tester `tests/gaptest-bq/` (slot 04, `--character class4`, orb_slots 4, pool lightning/frost/dark + custom Ember / Bulwark;
 the BP `on_evoke` proof rides it as Arc Recoil); the docstring is the full smoke recipe.
+(7) **Smoke (tests/gaptest-bq, 2026-10-04, run by the BN agent, three passes, two engine fixes):** pass 1 — both seeds died at
+run start: `DynamicVarSet contains duplicate key 'BurstPower'` (Player.PopulateStartingDeck). **Root cause: a Phase BM bug** —
+BM inserted `case "replay_next":` (with its own switch) right after the stacked no-var labels in `DataCard.DeclareEffects`
+without a `break` after `gaptest_enemy_artifact`, so EVERY op in that stack (gain_orb_slot / channel_orb / evoke /
+trigger_passive / lose_orb_slot / forge / balance_step / add_trigger / apply_status_custom / the summon ops / spend_forge /
+spread_debuffs / strip_*) fell through and declared a `BurstPower` var: a stray Burst hover tip on every such card since v65,
+and a run-start crash for any card with two of them (Night Pulse: channel_orb + trigger_passive). The BM..BP testers never
+combined two. **Fix: the missing `break`.** Pass 2 — both seeds died on turn 4 of the first fight: `Frost orbs cannot target
+creatures.` from `FrostOrb.Passive` via `trigger_passive` (Coil Lash, orbs all, passed the played target to every orb; the base
+Frost / Dark / Plasma `Passive` THROW on a non-null target — Tesla Coil only ever targets its Lightning orbs). **Fix: the played
+target goes only to a `LightningOrb` or a `ForgedOrb`; every other orb gets null (as Darkness passes).** Pass 3 (the v69 build,
+BN code included): GAPTESTBQ1 **completed the run** (507 [BQ] lines); GAPTESTBQ2's first launch hit the relaunch race ("already
+running"), and re-run alone **completed the run** (475 [BQ] lines). Every tag fired on both seeds: evoke keep=true 17 / 21, evoke
+newest 63 / 16, trigger_passive (orbs=first) 33 / 26 and (orbs=all) 86 / 59, loop applied 12 / 32, loop tick 28 / 46, passive
+override (Ember + Bulwark) 99 / 124, lose_orb_slot 4 -> 3 20 / 16 (3 -> 2 when a second Overclock lands), orb_types 34 / 39, orb_count 37 / 31,
+orb_count_ge[frost] true 1 / 2 and false 24 / 41, orb_count_ge[ember] true 15 / 6 and false 17 / 8, channel per_enemy x1..x4,
+`[BP] on_evoke fired` 75 / 55 (BP's on_evoke proof). **No double-fire:** the passive-override count equals trigger_passive ×
+times + loop ticks on the custom orbs exactly on BQ2 (Ember 84, Bulwark 40) and is 4 BELOW it on BQ1 (Ember 59 of 63 — a passive
+queued after the fight ended is a no-op), never above. 0 mod exceptions, 0 BlankTheSpire frames, 0 localization errors (the
+exception lines are BaseLib's two startup Harmony patch failures). Tags in `generation/tests/gaptest-bq/godot_BQ_tags_<SEED>.txt`.
 
 ### Phase BR — Stun (re-open #11), discard-all + `cards_removed`, growing turn-start damage (v70; gaps #11, #79; ~1 day)
 
@@ -1126,6 +1146,10 @@ done; smoke pending — the BN agent runs GAPTESTBQ1/BQ2 with BN's, Ryan pre-app
 `--validate-only` green; DLL built + deployed). Merged suite: generation **604**, web **293**, `test_phase_bq` 240/240 (smoke record
 pending). Readings: index 9,392 (cap 72) · per-archetype max 76,654 (`slot_machine`) · per-archetype scaffold max 27,042 · triads
 68,129 / 78,468 / 84,213 · all-ops 127,834 · `full` 119,205 (scaffold snapshot 47,532, +161). See Findings (BQ).
+**Phase BQ DONE 2026-10-04** — smokes GAPTESTBQ1 / BQ2 completed the run, every `[BQ]` tag + `[BP] on_evoke fired`, no double-fire,
+0 mod exceptions, 0 localization errors, after two engine fixes (a Phase BM `DataCard` fall-through that gave every orb / trigger /
+forge / summon card a stray BurstPower var, and trigger_passive passing a target to orbs that throw on one — Findings (BQ) 7).
+Tags in `generation/tests/gaptest-bq/`; `test_phase_bq` reads them.
 
 **Phase BN BUILT 2026-10-04** (on `wave6`, vocab v69 — the last stretch phase built, Ryan's order BO → BP → BQ → BN; gaps
 #71–#73 done; tester `generation/tests/gaptest-bn/`, `--validate-only` green; DLL built + deployed; smoke next, with BQ's).

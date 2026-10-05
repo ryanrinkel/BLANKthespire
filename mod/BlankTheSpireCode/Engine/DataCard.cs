@@ -262,6 +262,11 @@ public abstract class DataCard : ConstructedCardModel
                 case "strip_block":           // Phase BL (v64, gap #66): Expose — the target loses all Block in OnPlay (flag-op, no var)
                 case "strip_artifact":        // Phase BL (v64, gap #66): Expose — the target's Artifact is removed in OnPlay (flag-op, no var)
                 case "gaptest_enemy_artifact": // PHASE BL GAPTEST (not in the LLM contract): Artifact on the target(s) in OnPlay
+                    // BQ smoke fix (2026-10-04): this `break` was missing since Phase BM inserted replay_next below, so every
+                    // op above FELL THROUGH into replay_next's switch and declared a BurstPower var (a stray Burst hover tip on
+                    // every orb / trigger / forge / summon card; two such ops on one card = "DynamicVarSet contains duplicate key
+                    // 'BurstPower'" at run start — the BQ tester's Night Pulse, channel_orb + trigger_passive).
+                    break;
                 // Phase BM (v65, gaps #69/#70): sugar over sealed base powers, applied literally in OnPlay. The PowerVars give the
                 // hover tips only (replay_next's count is printed literally; Prolong's scaled form has no fixed number).
                 case "replay_next":

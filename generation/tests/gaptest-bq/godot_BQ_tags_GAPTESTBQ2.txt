@@ -1,0 +1,573 @@
+# Phase BQ AutoSlay smoke — seed GAPTESTBQ2 (godot.log grep, 8957 lines)
+# [BQ] lines: 475
+# mod exceptions: 0
+# BlankTheSpire stack frames: 0
+# BlankTheSpire frames in non-exception [ERROR] traces (logged, non-fatal): 0
+# Localization formatting errors: 0
+# exception lines (any source): 5
+# Auto-selected (picker) lines: 13
+# run end: [INFO] [AutoSlay] Action: Run completed (max floor reached). Abandoning
+# --- per-tag counts ---
+  [BP] on_evoke fired                                                       55
+  channel per_enemy x1                                                       4
+  channel per_enemy x2                                                       3
+  channel per_enemy x3                                                       1
+  evoke newest keep=false ->                                                16
+  evoke next keep=true ->                                                   21
+  loop applied by 'Feedback Loop': Loop now N.                              32
+  loop tick ->                                                              46
+  lose_orb_slot ->                                                          16
+  orb_count ->                                                              31
+  orb_count_ge[ember] ->                                                    14
+  orb_count_ge[frost] ->                                                    43
+  orb_types ->                                                              39
+  passive override: 'Bulwark' passive via OrbRunner                         40
+  passive override: 'Ember' passive via OrbRunner                           84
+  trigger_passive x1 on 'Bulwark'                                           14
+  trigger_passive x1 on 'Dark'                                               4
+  trigger_passive x1 on 'Ember'                                             18
+  trigger_passive x1 on 'Frost'                                              5
+  trigger_passive x1 on 'Lightning'                                         12
+  trigger_passive x1: no orbs                                                6
+  trigger_passive x2 on 'Bulwark'                                            5
+  trigger_passive x2 on 'Dark'                                               1
+  trigger_passive x2 on 'Ember'                                             18
+  trigger_passive x2 on 'Frost'                                              1
+  trigger_passive x2 on 'Lightning'                                          1
+# --- exception lines (any source) ---
+[ERROR] [BaseLib] HarmonyLib.HarmonyException: Patching exception in method null
+ ---> System.ArgumentException: Undefined target method for patch method static System.Void BaseLib.Patches.Networking.AdjustCustomMessageKeys::Fuckery()
+[ERROR] [BaseLib] HarmonyLib.HarmonyException: Patching exception in method System.Void MegaCrit.Sts2.Core.Nodes.Screens.RelicCollection.NRelicCollectionCategory::LoadRelics(MegaCrit.Sts2.Core.Entities.Relics.RelicRarity relicRarity, MegaCrit.Sts2.Core.Nodes.Screens.RelicCollection.NRelicCollection collection, MegaCrit.Sts2.Core.Localization.LocString header, System.Collections.Generic.HashSet`1<MegaCrit.Sts2.Core.Models.RelicModel> seenRelics, MegaCrit.Sts2.Core.Unlocks.UnlockState unlockState, System.Collections.Generic.HashSet`1<MegaCrit.Sts2.Core.Models.RelicModel> allUnlockedRelics)
+ ---> System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation.
+ ---> System.Exception: Failed to find match:
+# --- every [BQ] line (+ [BP] on_evoke fired) ---
+[INFO] [BlankTheSpire] [BQ] lose_orb_slot -> 3 (was 4; 1 orbs) ('Overclock').
+[INFO] [BlankTheSpire] [BQ] loop applied by 'Feedback Loop': Loop now 1.
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Lightning' x1 (1 orbs).
+[INFO] [BlankTheSpire] [BQ] orb_types -> 1 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x2 on 'Ember' (orbs=first) ('Night Pulse').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] channel per_enemy x3 ('frost') ('Cold Snap').
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb1).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> true (3 of 4 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] orb_count -> 4 ('Rack Slam') (damage).
+[INFO] [BlankTheSpire] [BQ] loop applied by 'Feedback Loop': Loop now 1.
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (1 of 2 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Frost' x1 (2 orbs).
+[INFO] [BlankTheSpire] [BQ] orb_count -> 2 ('Rack Slam') (damage).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[ember] -> true (1 of 2 orbs; need 1).
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Frost' x1 (2 orbs).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (1 of 2 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Frost' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Ember' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 0 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] evoke newest keep=false -> 'none' ('Last Spark').
+[INFO] [BlankTheSpire] [BQ] orb_count -> 0 ('Rack Slam') (damage).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x2 on 'Ember' (orbs=first) ('Night Pulse').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 1 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] orb_types -> 1 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BQ] channel per_enemy x1 ('frost') ('Cold Snap').
+[INFO] [BlankTheSpire] [BQ] lose_orb_slot -> 3 (was 4; 2 orbs) ('Overclock').
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Ember' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Frost' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] orb_count -> 1 ('Rack Slam') (damage).
+[INFO] [BlankTheSpire] [BQ] loop applied by 'Feedback Loop': Loop now 1.
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Lightning' x1 (3 orbs).
+[INFO] [BlankTheSpire] [BQ] orb_types -> 2 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BQ] orb_count -> 3 ('Rack Slam') (damage).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Lightning' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Dark' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Dark' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 3 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Lightning' x1 (3 orbs).
+[INFO] [BlankTheSpire] [BQ] evoke next keep=true -> 'Lightning' ('Twin Cast').
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': LightningOrb).
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': LightningOrb).
+[INFO] [BlankTheSpire] [BQ] lose_orb_slot -> 3 (was 4; 2 orbs) ('Overclock').
+[INFO] [BlankTheSpire] [BQ] loop applied by 'Feedback Loop': Loop now 2.
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 2 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Dark' x2 (2 orbs).
+[INFO] [BlankTheSpire] [BQ] evoke newest keep=false -> 'Dark' ('Last Spark').
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': DarkOrb).
+[INFO] [BlankTheSpire] [BQ] orb_count -> 1 ('Rack Slam') (damage).
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Dark' x2 (1 orbs).
+[INFO] [BlankTheSpire] [BQ] channel per_enemy x2 ('frost') ('Cold Snap').
+[INFO] [BlankTheSpire] [BQ] loop applied by 'Feedback Loop': Loop now 1.
+[INFO] [BlankTheSpire] [BQ] channel per_enemy x2 ('frost') ('Cold Snap').
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Frost' x1 (2 orbs).
+[INFO] [BlankTheSpire] [BQ] lose_orb_slot -> 3 (was 4; 2 orbs) ('Overclock').
+[INFO] [BlankTheSpire] [BQ] orb_count -> 2 ('Rack Slam') (damage).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[ember] -> false (0 of 3 orbs; need 1).
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Frost' x1 (3 orbs).
+[INFO] [BlankTheSpire] [BQ] evoke newest keep=false -> 'Lightning' ('Last Spark').
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': LightningOrb).
+[INFO] [BlankTheSpire] [BQ] orb_types -> 2 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BQ] evoke next keep=true -> 'Frost' ('Twin Cast').
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': FrostOrb).
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': FrostOrb).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 0 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] evoke newest keep=false -> 'none' ('Last Spark').
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 0 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] evoke next keep=true -> 'none' ('Twin Cast').
+[INFO] [BlankTheSpire] [BQ] orb_count -> 0 ('Rack Slam') (damage).
+[INFO] [BlankTheSpire] [BQ] lose_orb_slot -> 3 (was 4; 0 orbs) ('Overclock').
+[INFO] [BlankTheSpire] [BQ] orb_types -> 0 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1: no orbs (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] channel per_enemy x1 ('frost') ('Cold Snap').
+[INFO] [BlankTheSpire] [BQ] orb_count -> 3 ('Rack Slam') (damage).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[ember] -> true (1 of 3 orbs; need 1).
+[INFO] [BlankTheSpire] [BQ] loop applied by 'Feedback Loop': Loop now 1.
+[INFO] [BlankTheSpire] [BQ] evoke next keep=true -> 'Bulwark' ('Twin Cast').
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb2).
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb2).
+[INFO] [BlankTheSpire] [BQ] loop applied by 'Feedback Loop': Loop now 2.
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1: no orbs (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[ember] -> false (0 of 0 orbs; need 1).
+[INFO] [BlankTheSpire] [BQ] orb_count -> 0 ('Rack Slam') (damage).
+[INFO] [BlankTheSpire] [BQ] orb_types -> 0 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BQ] orb_types -> 0 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BQ] evoke next keep=true -> 'Ember' ('Twin Cast').
+[INFO] [BlankTheSpire] [BQ] lose_orb_slot -> 3 (was 4; 0 orbs) ('Overclock').
+[INFO] [BlankTheSpire] [BQ] loop applied by 'Feedback Loop': Loop now 1.
+[INFO] [BlankTheSpire] [BQ] trigger_passive x2 on 'Ember' (orbs=first) ('Night Pulse').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] evoke newest keep=false -> 'Ember' ('Last Spark').
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Frost' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Ember' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] evoke newest keep=false -> 'Ember' ('Last Spark').
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[ember] -> false (0 of 1 orbs; need 1).
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Frost' x1 (1 orbs).
+[INFO] [BlankTheSpire] [BQ] orb_count -> 2 ('Rack Slam') (damage).
+[INFO] [BlankTheSpire] [BQ] loop applied by 'Feedback Loop': Loop now 2.
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Frost' x2 (2 orbs).
+[INFO] [BlankTheSpire] [BQ] orb_count -> 2 ('Rack Slam') (damage).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (1 of 3 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] loop applied by 'Feedback Loop': Loop now 1.
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 0 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] orb_count -> 0 ('Rack Slam') (damage).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Ember' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Ember' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Ember' x1 (2 orbs).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] evoke next keep=true -> 'Ember' ('Twin Cast').
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb1).
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb1).
+[INFO] [BlankTheSpire] [BQ] lose_orb_slot -> 3 (was 4; 2 orbs) ('Overclock').
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Ember' x1 (2 orbs).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] loop applied by 'Feedback Loop': Loop now 2.
+[INFO] [BlankTheSpire] [BQ] trigger_passive x2 on 'Ember' (orbs=first) ('Night Pulse').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Ember' x2 (3 orbs).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] evoke newest keep=false -> 'Ember' ('Last Spark').
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb1).
+[INFO] [BlankTheSpire] [BQ] orb_types -> 2 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BQ] orb_count -> 2 ('Rack Slam') (damage).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 2 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] orb_types -> 2 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BQ] channel per_enemy x1 ('frost') ('Cold Snap').
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb1).
+[INFO] [BlankTheSpire] [BQ] evoke newest keep=false -> 'Bulwark' ('Last Spark').
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb2).
+[INFO] [BlankTheSpire] [BQ] orb_count -> 2 ('Rack Slam') (damage).
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Lightning' x2 (2 orbs).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[ember] -> false (0 of 2 orbs; need 1).
+[INFO] [BlankTheSpire] [BQ] evoke next keep=true -> 'Lightning' ('Twin Cast').
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': LightningOrb).
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': LightningOrb).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x2 on 'Ember' (orbs=first) ('Night Pulse').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 1 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] loop applied by 'Feedback Loop': Loop now 1.
+[INFO] [BlankTheSpire] [BQ] orb_types -> 2 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Ember' x1 (4 orbs).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] evoke next keep=true -> 'none' ('Twin Cast').
+[INFO] [BlankTheSpire] [BQ] loop applied by 'Feedback Loop': Loop now 1.
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Bulwark' x1 (2 orbs).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x2 on 'Bulwark' (orbs=first) ('Night Pulse').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] evoke next keep=true -> 'Bulwark' ('Twin Cast').
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb2).
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb2).
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Ember' x1 (2 orbs).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 2 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] orb_count -> 2 ('Rack Slam') (damage).
+[INFO] [BlankTheSpire] [BQ] lose_orb_slot -> 3 (was 4; 2 orbs) ('Overclock').
+[INFO] [BlankTheSpire] [BQ] trigger_passive x2 on 'Ember' (orbs=first) ('Night Pulse').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Ember' x1 (3 orbs).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb1).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 3 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] orb_types -> 2 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x2 on 'Bulwark' (orbs=first) ('Night Pulse').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] evoke next keep=true -> 'Bulwark' ('Twin Cast').
+[INFO] [BlankTheSpire] [BQ] loop applied by 'Feedback Loop': Loop now 1.
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[ember] -> true (1 of 2 orbs; need 1).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 3 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Bulwark' x1 (3 orbs).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] loop applied by 'Feedback Loop': Loop now 2.
+[INFO] [BlankTheSpire] [BQ] evoke next keep=true -> 'Bulwark' ('Twin Cast').
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 3 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Ember' x2 (3 orbs).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] lose_orb_slot -> 3 (was 4; 3 orbs) ('Overclock').
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Bulwark' x2 (3 orbs).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] orb_count -> 3 ('Rack Slam') (damage).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Bulwark' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Lightning' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Ember' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] orb_types -> 3 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BQ] orb_types -> 3 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb2).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 1 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] orb_types -> 1 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BQ] loop applied by 'Feedback Loop': Loop now 1.
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Dark' x1 (4 orbs).
+[INFO] [BlankTheSpire] [BQ] lose_orb_slot -> 3 (was 4; 3 orbs) ('Overclock').
+[INFO] [BlankTheSpire] [BQ] evoke next keep=true -> 'Ember' ('Twin Cast').
+[INFO] [BlankTheSpire] [BQ] orb_count -> 2 ('Rack Slam') (damage).
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Frost' x1 (2 orbs).
+[INFO] [BlankTheSpire] [BQ] evoke newest keep=false -> 'Bulwark' ('Last Spark').
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (1 of 1 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] orb_count -> 2 ('Rack Slam') (damage).
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Frost' x1 (2 orbs).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x2 on 'Frost' (orbs=first) ('Night Pulse').
+[INFO] [BlankTheSpire] [BQ] orb_count -> 0 ('Rack Slam') (damage).
+[INFO] [BlankTheSpire] [BQ] evoke next keep=true -> 'none' ('Twin Cast').
+[INFO] [BlankTheSpire] [BQ] loop applied by 'Feedback Loop': Loop now 1.
+[INFO] [BlankTheSpire] [BQ] evoke newest keep=false -> 'none' ('Last Spark').
+[INFO] [BlankTheSpire] [BQ] trigger_passive x2 on 'Ember' (orbs=first) ('Night Pulse').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] loop applied by 'Feedback Loop': Loop now 2.
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Ember' x2 (2 orbs).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Ember' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Ember' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Ember' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Lightning' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 4 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Ember' x2 (4 orbs).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x2 on 'Ember' (orbs=first) ('Night Pulse').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] orb_count -> 4 ('Rack Slam') (damage).
+[INFO] [BlankTheSpire] [BQ] loop applied by 'Feedback Loop': Loop now 1.
+[INFO] [BlankTheSpire] [BQ] orb_types -> 0 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BQ] orb_count -> 0 ('Rack Slam') (damage).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x2 on 'Ember' (orbs=first) ('Night Pulse').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[ember] -> true (2 of 2 orbs; need 1).
+[INFO] [BlankTheSpire] [BQ] orb_count -> 2 ('Rack Slam') (damage).
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Ember' x1 (2 orbs).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] lose_orb_slot -> 3 (was 4; 2 orbs) ('Overclock').
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 2 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] loop applied by 'Feedback Loop': Loop now 2.
+[INFO] [BlankTheSpire] [BQ] loop applied by 'Feedback Loop': Loop now 3.
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Ember' x3 (2 orbs).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] evoke newest keep=false -> 'Ember' ('Last Spark').
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb1).
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Ember' x3 (2 orbs).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Ember' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Bulwark' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Lightning' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 3 orbs; need 2).
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb1).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x2 on 'Bulwark' (orbs=first) ('Night Pulse').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 3 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Bulwark' x3 (3 orbs).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb2).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x2 on 'Ember' (orbs=first) ('Night Pulse').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 1 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] lose_orb_slot -> 3 (was 4; 1 orbs) ('Overclock').
+[INFO] [BlankTheSpire] [BQ] trigger_passive x2 on 'Ember' (orbs=first) ('Night Pulse').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Ember' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Ember' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] evoke newest keep=false -> 'Bulwark' ('Last Spark').
+[INFO] [BlankTheSpire] [BQ] evoke next keep=true -> 'Bulwark' ('Twin Cast').
+[INFO] [BlankTheSpire] [BQ] evoke next keep=true -> 'Bulwark' ('Twin Cast').
+[INFO] [BlankTheSpire] [BQ] orb_types -> 0 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BQ] evoke next keep=true -> 'none' ('Twin Cast').
+[INFO] [BlankTheSpire] [BQ] trigger_passive x2 on 'Ember' (orbs=first) ('Night Pulse').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] loop applied by 'Feedback Loop': Loop now 1.
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Ember' x1 (1 orbs).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x2 on 'Ember' (orbs=first) ('Night Pulse').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 2 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Ember' x1 (2 orbs).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Ember' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Ember' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 2 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] loop applied by 'Feedback Loop': Loop now 2.
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Ember' x2 (3 orbs).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] evoke next keep=true -> 'none' ('Twin Cast').
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1: no orbs (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] trigger_passive x2 on 'Ember' (orbs=first) ('Night Pulse').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 3 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] loop applied by 'Feedback Loop': Loop now 1.
+[INFO] [BlankTheSpire] [BQ] orb_types -> 2 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BQ] orb_types -> 2 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BQ] loop applied by 'Feedback Loop': Loop now 2.
+[INFO] [BlankTheSpire] [BQ] evoke newest keep=false -> 'Ember' ('Last Spark').
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb1).
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Ember' x2 (2 orbs).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x2 on 'Ember' (orbs=first) ('Night Pulse').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 3 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 4 orbs; need 2).
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb1).
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': LightningOrb).
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Ember' x2 (4 orbs).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] lose_orb_slot -> 3 (was 4; 3 orbs) ('Overclock').
+[INFO] [BlankTheSpire] [BQ] orb_types -> 3 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (1 of 3 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] orb_types -> 3 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BQ] evoke next keep=true -> 'Ember' ('Twin Cast').
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb1).
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb1).
+[INFO] [BlankTheSpire] [BQ] loop applied by 'Feedback Loop': Loop now 3.
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Bulwark' x3 (3 orbs).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb2).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Frost' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Bulwark' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Bulwark' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] orb_count -> 3 ('Rack Slam') (damage).
+[INFO] [BlankTheSpire] [BQ] orb_count -> 3 ('Rack Slam') (damage).
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Frost' x3 (3 orbs).
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': FrostOrb).
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb2).
+[INFO] [BlankTheSpire] [BQ] orb_types -> 2 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 0 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] orb_types -> 0 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 2 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] loop applied by 'Feedback Loop': Loop now 1.
+[INFO] [BlankTheSpire] [BQ] lose_orb_slot -> 3 (was 4; 0 orbs) ('Overclock').
+[INFO] [BlankTheSpire] [BQ] orb_count -> 0 ('Rack Slam') (damage).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 0 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 0 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] loop applied by 'Feedback Loop': Loop now 2.
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1: no orbs (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] trigger_passive x2 on 'Ember' (orbs=first) ('Night Pulse').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] orb_types -> 1 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BQ] orb_types -> 2 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[ember] -> true (2 of 3 orbs; need 1).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 3 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 4 orbs; need 2).
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb1).
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb2).
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb1).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x2 on 'Bulwark' (orbs=first) ('Night Pulse').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] loop applied by 'Feedback Loop': Loop now 1.
+[INFO] [BlankTheSpire] [BQ] trigger_passive x2 on 'Ember' (orbs=first) ('Night Pulse').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] orb_count -> 1 ('Rack Slam') (damage).
+[INFO] [BlankTheSpire] [BQ] orb_types -> 1 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Ember' x1 (2 orbs).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 4 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Bulwark' x1 (4 orbs).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 4 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] orb_types -> 2 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BQ] loop applied by 'Feedback Loop': Loop now 2.
+[INFO] [BlankTheSpire] [BQ] orb_types -> 2 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Bulwark' x2 (4 orbs).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Bulwark' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Lightning' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Bulwark' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Bulwark' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] orb_count -> 4 ('Rack Slam') (damage).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[ember] -> false (0 of 4 orbs; need 1).
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Bulwark' x2 (4 orbs).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] evoke next keep=true -> 'Bulwark' ('Twin Cast').
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb2).
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb2).
+[INFO] [BlankTheSpire] [BQ] loop applied by 'Feedback Loop': Loop now 3.
+[INFO] [BlankTheSpire] [BQ] orb_types -> 2 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BQ] lose_orb_slot -> 3 (was 4; 3 orbs) ('Overclock').
+[INFO] [BlankTheSpire] [BQ] orb_types -> 2 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1: no orbs (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] evoke next keep=true -> 'Ember' ('Twin Cast').
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb1).
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb1).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 1 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Dark' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 1 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] evoke newest keep=false -> 'Dark' ('Last Spark').
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': DarkOrb).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 0 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x2 on 'Ember' (orbs=first) ('Night Pulse').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] orb_types -> 1 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BQ] lose_orb_slot -> 3 (was 4; 1 orbs) ('Overclock').
+[INFO] [BlankTheSpire] [BQ] orb_types -> 1 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[ember] -> true (1 of 1 orbs; need 1).
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb1).
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb2).
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb2).
+[INFO] [BlankTheSpire] [BQ] orb_types -> 3 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x2 on 'Dark' (orbs=first) ('Night Pulse').
+[INFO] [BlankTheSpire] [BQ] evoke newest keep=false -> 'none' ('Last Spark').
+[INFO] [BlankTheSpire] [BQ] orb_types -> 3 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BQ] evoke newest keep=false -> 'Ember' ('Last Spark').
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[ember] -> false (0 of 4 orbs; need 1).
+[INFO] [BlankTheSpire] [BQ] orb_types -> 3 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Lightning' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Lightning' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Dark' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Bulwark' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1: no orbs (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] orb_types -> 1 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[ember] -> false (0 of 3 orbs; need 1).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> false (0 of 4 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Bulwark' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Bulwark' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Bulwark' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Bulwark' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] evoke next keep=true -> 'Bulwark' ('Twin Cast').
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[ember] -> false (0 of 4 orbs; need 1).
+[INFO] [BlankTheSpire] [BQ] orb_count -> 4 ('Rack Slam') (damage).
+[INFO] [BlankTheSpire] [BQ] orb_types -> 2 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb2).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x2 on 'Bulwark' (orbs=first) ('Night Pulse').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] orb_types -> 3 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb2).
+[INFO] [BlankTheSpire] [BQ] channel per_enemy x2 ('frost') ('Cold Snap').
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': LightningOrb).
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': LightningOrb).
+[INFO] [BlankTheSpire] [BQ] orb_types -> 3 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb1).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x2 on 'Lightning' (orbs=first) ('Night Pulse').
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': LightningOrb).
+[INFO] [BlankTheSpire] [BQ] loop applied by 'Feedback Loop': Loop now 1.
+[INFO] [BlankTheSpire] [BQ] orb_count -> 4 ('Rack Slam') (damage).
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Frost' x1 (4 orbs).
+[INFO] [BlankTheSpire] [BQ] orb_count_ge[frost] -> true (2 of 4 orbs; need 2).
+[INFO] [BlankTheSpire] [BQ] orb_count -> 4 ('Rack Slam') (damage).
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': FrostOrb).
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Frost' x1 (4 orbs).
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': FrostOrb).
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb1).
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb2).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Bulwark' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Ember' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Lightning' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Lightning' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Bulwark' x1 (4 orbs).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb2).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Ember' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Lightning' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Lightning' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Ember' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] loop tick -> 'Ember' x1 (4 orbs).
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] orb_types -> 2 ('Compile Driver') (draw).
+[INFO] [BlankTheSpire] [BQ] channel per_enemy x1 ('frost') ('Cold Snap').
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': ForgedClass04Orb1).
+[INFO] [BlankTheSpire] [BP] on_evoke fired ('Arc Recoil': LightningOrb).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Lightning' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Ember' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Ember' passive via OrbRunner (1 effect(s)).
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Frost' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] trigger_passive x1 on 'Bulwark' (orbs=all) ('Coil Lash').
+[INFO] [BlankTheSpire] [BQ] passive override: 'Bulwark' passive via OrbRunner (1 effect(s)).
