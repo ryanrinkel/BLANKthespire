@@ -1,0 +1,913 @@
+# Phase BN AutoSlay smoke — seed GAPTESTBN1 (godot.log grep, 10833 lines)
+# [BN] lines: 611
+# mod exceptions: 0
+# BlankTheSpire stack frames: 0
+# BlankTheSpire frames in non-exception [ERROR] traces (logged, non-fatal): 0
+# Localization formatting errors: 0
+# exception lines (any source): 5
+# Auto-selected (picker) lines: 58
+# run end: [INFO] [AutoSlay] Action: Run completed (max floor reached). Abandoning
+# --- per-tag counts ---
+  Auto-selected N card                                                      58
+  [BP] on_card_generated fired                                             186
+  add_random_card any x2 ->                                                 59
+  add_random_card attack x1 ->                                              41
+  add_random_card power x1 ->                                               37
+  add_random_card skill x1 ->                                               43
+  autoplay draw_random 'Feed' ->                                             1
+  autoplay draw_random 'Mercy Cut' ->                                        6
+  autoplay draw_random 'Reaping Strike' ->                                  13
+  autoplay draw_random 'Reaping Strike+' ->                                  2
+  autoplay draw_random 'Strike' ->                                           4
+  autoplay draw_random 'Sunder' ->                                           4
+  autoplay draw_random 'Sunder+' ->                                          1
+  autoplay draw_random: no playable attack in the draw pile                  1
+  autoplay draw_top 'Arsenal' ->                                            13
+  autoplay draw_top 'Arsenal+' ->                                            1
+  autoplay draw_top 'Ascender's Bane' ->                                     3
+  autoplay draw_top 'Creative Spark' ->                                      3
+  autoplay draw_top 'Defend' ->                                              4
+  autoplay draw_top 'Discovery' ->                                           7
+  autoplay draw_top 'Feed' ->                                                2
+  autoplay draw_top 'Infernal Blade' ->                                      6
+  autoplay draw_top 'Infernal Blade+' ->                                     6
+  autoplay draw_top 'Mercy Cut' ->                                          10
+  autoplay draw_top 'Reaping Strike' ->                                     12
+  autoplay draw_top 'Reaping Strike+' ->                                     2
+  autoplay draw_top 'Scatter Notes' ->                                      10
+  autoplay draw_top 'Scatter Notes+' ->                                      2
+  autoplay draw_top 'Strike' ->                                              7
+  autoplay draw_top 'Strike+' ->                                             1
+  autoplay draw_top 'Sunder' ->                                              4
+  autoplay draw_top 'War Drum' ->                                            5
+  autoplay draw_top 'Wither+N' ->                                            2
+  autoplay draw_top: 'Havoc' is an autoplay card — never auto-played        19
+  autoplay draw_top: 'Havoc+' is an autoplay card — never auto-played        4
+  autoplay draw_top: 'Mayhem' is an autoplay card — never auto-played        4
+  autoplay draw_top: 'Uproar' is an autoplay card — never auto-played        4
+  autoplay draw_top: 'Uproar+' is an autoplay card — never auto-played       3
+  mayhem payload from AfterAutoPrePlayPhaseEntered                          37
+  target_killed gate OPEN                                                   74
+  target_killed gate closed                                                154
+# --- exception lines (any source) ---
+[ERROR] [BaseLib] HarmonyLib.HarmonyException: Patching exception in method null
+ ---> System.ArgumentException: Undefined target method for patch method static System.Void BaseLib.Patches.Networking.AdjustCustomMessageKeys::Fuckery()
+[ERROR] [BaseLib] HarmonyLib.HarmonyException: Patching exception in method System.Void MegaCrit.Sts2.Core.Nodes.Screens.RelicCollection.NRelicCollectionCategory::LoadRelics(MegaCrit.Sts2.Core.Entities.Relics.RelicRarity relicRarity, MegaCrit.Sts2.Core.Nodes.Screens.RelicCollection.NRelicCollection collection, MegaCrit.Sts2.Core.Localization.LocString header, System.Collections.Generic.HashSet`1<MegaCrit.Sts2.Core.Models.RelicModel> seenRelics, MegaCrit.Sts2.Core.Unlocks.UnlockState unlockState, System.Collections.Generic.HashSet`1<MegaCrit.Sts2.Core.Models.RelicModel> allUnlockedRelics)
+ ---> System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation.
+ ---> System.Exception: Failed to find match:
+# --- every [BN] line (+ [BP] on_card_generated fired, Auto-selected 1 card(s)) ---
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Sunder'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Sunder', 'Uproar'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Strike' -> Nibbit (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('Arsenal'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (killed=True, fatal=True) ('Sunder').
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Mercy Cut'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Ascender's Bane' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Defend' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mercy Cut' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mayhem' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Mercy Cut', 'Mayhem'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Arsenal' created).
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('Arsenal'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'War Drum' -> none (depth 1) ('payload').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Mercy Cut' -> ShrinkerBeetle (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (negated) (killed=True, fatal=True) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Feed'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Feed').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top: 'Mayhem' is an autoplay card — never auto-played ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] autoplay draw_random 'Reaping Strike' -> Nibbit (depth 1) ('Uproar').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (killed=True, fatal=True) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Ascender's Bane' -> none (depth 1) ('payload').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (killed=True, fatal=True) ('Feed').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Reaping Strike', 'War Drum'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Havoc', 'War Drum'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('Arsenal'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Sunder'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Feed'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Feed').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Arsenal' created).
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('Arsenal'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Havoc' created).
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Feed' -> CubexConstruct (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (killed=True, fatal=True) ('Feed').
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Mercy Cut'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Reaping Strike'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Havoc', 'Sunder'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] autoplay draw_random 'Reaping Strike' -> Wriggler (depth 1) ('Uproar').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (killed=True, fatal=True) ('Sunder').
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Uproar', 'Sunder'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top: 'Mayhem' is an autoplay card — never auto-played ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (killed=True, fatal=True) ('Feed').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Strike' -> Wriggler (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Reaping Strike' -> Wriggler (depth 1) ('payload').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (killed=True, fatal=True) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Reaping Strike'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Reaping Strike', 'Arsenal'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('Mayhem'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Discovery' -> none (depth 1) ('payload').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Mercy Cut'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Reaping Strike' -> VineShambler (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (negated) (killed=True, fatal=True) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Feed').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] autoplay draw_random 'Sunder' -> none (depth 1) ('Uproar').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Strike' -> BygoneEffigy (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('War Drum', 'Reaping Strike'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('Arsenal'; free=False; choose_of=0) ('payload').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Scatter Notes' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Arsenal' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Feed' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Arsenal', 'Feed'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mayhem' created).
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('Mayhem'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mayhem' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Havoc' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Mayhem', 'Havoc'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (killed=True, fatal=True) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Creative Spark' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'War Drum' created).
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('War Drum'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Defend' -> none (depth 1) ('payload').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Reaping Strike' created).
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Reaping Strike'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (killed=True, fatal=True) ('Sunder').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'War Drum' created).
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('War Drum'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top: 'Uproar' is an autoplay card — never auto-played ('payload').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Feed' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Sunder' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Feed', 'Sunder'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Feed').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (killed=True, fatal=True) ('Reaping Strike').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Feed' -> KinPriest (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Feed').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Mercy Cut' -> KinFollower (depth 1) ('payload').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Sunder', 'War Drum'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Sunder', 'Uproar'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Strike' -> KinPriest (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Infernal Blade' -> none (depth 1) ('payload').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Sunder' created).
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Sunder'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] autoplay draw_random 'Reaping Strike' -> KinFollower (depth 1) ('Uproar').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'War Drum' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Reaping Strike' -> KinPriest (depth 1) ('payload').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'War Drum' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mercy Cut' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('War Drum', 'Mercy Cut'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Havoc' created).
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Sunder' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=True, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Reaping Strike' created).
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Reaping Strike'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Mercy Cut' -> KinPriest (depth 1) ('payload').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Uproar' created).
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Uproar'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] autoplay draw_random 'Sunder' -> none (depth 1) ('Uproar').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Reaping Strike' -> KinPriest (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Havoc' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mayhem' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Havoc', 'Mayhem'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] autoplay draw_random 'Sunder' -> none (depth 1) ('Uproar').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('War Drum'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top: 'Uproar' is an autoplay card — never auto-played ('Havoc').
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('Arsenal'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BN] autoplay draw_random 'Reaping Strike' -> BowlbugRock (depth 1) ('Uproar').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (killed=True, fatal=True) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Infernal Blade+' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Uproar'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Uproar', 'Mayhem'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'War Drum' -> none (depth 1) ('Havoc').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('War Drum', 'Reaping Strike'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Defend' -> none (depth 1) ('Havoc').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mayhem' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mercy Cut' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Mayhem', 'Mercy Cut'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Feed' created).
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Feed'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Feed').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Reaping Strike' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Arsenal' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Reaping Strike', 'Arsenal'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Sunder' created).
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Sunder'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Reaping Strike' created).
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Reaping Strike'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (killed=True, fatal=True) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Arsenal', 'Sunder'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Arsenal' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] autoplay draw_random 'Mercy Cut' -> HunterKiller (depth 1) ('Uproar').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Feed' created).
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Feed'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mercy Cut' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Sunder' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Mercy Cut', 'Sunder'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Sunder' created).
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Sunder'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Feed').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] autoplay draw_random 'Reaping Strike' -> HunterKiller (depth 1) ('Uproar').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Feed' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mercy Cut' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Feed', 'Mercy Cut'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mercy Cut' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Uproar' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Mercy Cut', 'Uproar'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top: 'Mayhem' is an autoplay card — never auto-played ('Havoc').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Havoc' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Arsenal' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Havoc', 'Arsenal'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (killed=True, fatal=True) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Feed').
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Sunder'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] autoplay draw_random 'Reaping Strike' -> SlumberingBeetle (depth 1) ('Uproar').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (killed=True, fatal=True) ('Sunder').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Infernal Blade' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Sunder' created).
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Sunder'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Arsenal' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (killed=True, fatal=True) ('Sunder').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top: 'Havoc' is an autoplay card — never auto-played ('Havoc').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mercy Cut' created).
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Mercy Cut'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'War Drum' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Uproar' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('War Drum', 'Uproar'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (killed=True, fatal=True) ('Reaping Strike').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Discovery' -> none (depth 1) ('Havoc').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Havoc' created).
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Havoc' created).
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top: 'Havoc' is an autoplay card — never auto-played ('Havoc').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top: 'Havoc' is an autoplay card — never auto-played ('Havoc').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Scatter Notes' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mayhem' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Reaping Strike' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Mayhem', 'Reaping Strike'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top: 'Havoc' is an autoplay card — never auto-played ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top: 'Uproar' is an autoplay card — never auto-played ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Sunder' created).
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Sunder'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] autoplay draw_random 'Mercy Cut' -> InfestedPrism (depth 1) ('Uproar').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Sunder' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Feed' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Sunder', 'Feed'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Feed').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Arsenal' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Havoc' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Arsenal', 'Havoc'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Uproar' created).
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Uproar'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] autoplay draw_random: no playable attack in the draw pile ('Uproar').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Sunder' created).
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Sunder'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Feed').
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Uproar'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] autoplay draw_random 'Reaping Strike' -> Chomper (depth 1) ('Uproar').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (killed=True, fatal=True) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Discovery' -> none (depth 1) ('Havoc').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Scatter Notes' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('War Drum', 'Reaping Strike'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Mercy Cut' -> Chomper (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Sunder', 'Feed'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Discovery' -> none (depth 1) ('Havoc').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Havoc' created).
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Infernal Blade+' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mercy Cut' created).
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Mercy Cut'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Havoc' created).
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top: 'Mayhem' is an autoplay card — never auto-played ('Havoc').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Reaping Strike' -> KnowledgeDemon (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Reaping Strike'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Scatter Notes' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Arsenal', 'War Drum'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Mercy Cut'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top: 'Havoc' is an autoplay card — never auto-played ('Havoc').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('Mayhem'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Arsenal' -> none (depth 1) ('payload').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Havoc' created).
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Mercy Cut' -> KnowledgeDemon (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top: 'Havoc' is an autoplay card — never auto-played ('Havoc').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mayhem' created).
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('Mayhem'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'War Drum' -> none (depth 1) ('payload').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Feed').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mayhem' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Arsenal' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Mayhem', 'Arsenal'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Ascender's Bane' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mayhem' created).
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('Mayhem'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Strike' -> KnowledgeDemon (depth 1) ('payload').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'War Drum' created).
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('War Drum'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Infernal Blade' -> none (depth 1) ('payload').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Reaping Strike' created).
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Reaping Strike'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Havoc' created).
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Arsenal' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Uproar' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Sunder' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Uproar', 'Sunder'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] autoplay draw_random 'Strike' -> KnowledgeDemon (depth 1) ('Uproar').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'War Drum' created).
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('War Drum'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top: 'Havoc' is an autoplay card — never auto-played ('payload').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'War Drum' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Havoc' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('War Drum', 'Havoc'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] autoplay draw_random 'Sunder+' -> none (depth 1) ('Uproar').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'War Drum' created).
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('War Drum'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Scatter Notes' -> none (depth 1) ('payload').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mayhem' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Arsenal' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Mayhem', 'Arsenal'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top: 'Havoc' is an autoplay card — never auto-played ('Havoc').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Havoc' created).
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top: 'Havoc' is an autoplay card — never auto-played ('Havoc').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'War Drum' created).
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('War Drum'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top: 'Havoc' is an autoplay card — never auto-played ('payload').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top: 'Havoc' is an autoplay card — never auto-played ('Havoc').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top: 'Havoc' is an autoplay card — never auto-played ('Havoc').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Arsenal' created).
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('Arsenal'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top: 'Havoc' is an autoplay card — never auto-played ('payload').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top: 'Havoc' is an autoplay card — never auto-played ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Arsenal' created).
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('Arsenal'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Scatter Notes' -> none (depth 1) ('payload').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Uproar' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Sunder' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Uproar', 'Sunder'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Sunder' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mayhem' created).
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('Mayhem'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'War Drum' -> none (depth 1) ('payload').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] autoplay draw_random 'Reaping Strike' -> ScrollOfBiting (depth 1) ('Uproar').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Reaping Strike', 'War Drum'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Mayhem', 'Feed'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Feed').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Sunder' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (killed=True, fatal=True) ('Sunder').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Strike' -> ScrollOfBiting (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Reaping Strike'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Infernal Blade+' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Uproar' created).
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Uproar'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] autoplay draw_random 'Reaping Strike' -> LivingShield (depth 1) ('Uproar').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Uproar' created).
+[INFO] [BlankTheSpire] [BN] autoplay draw_random 'Mercy Cut' -> TurretOperator (depth 1) ('Uproar').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Feed').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Havoc' created).
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Strike' -> TurretOperator (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Sunder'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Infernal Blade+' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Feed'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Havoc' created).
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Feed').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Reaping Strike' -> TheForgotten (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Feed').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Sunder' created).
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Arsenal' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Havoc' created).
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Discovery' -> none (depth 1) ('Havoc').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Havoc' created).
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Scatter Notes' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Havoc' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Feed' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Havoc', 'Feed'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Feed' created).
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Mercy Cut' -> TheForgotten (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Feed').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'War Drum' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mayhem' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('War Drum', 'Mayhem'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mayhem' created).
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('Mayhem'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Sunder' created).
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (killed=True, fatal=True) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Reaping Strike' -> TheLost (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (killed=True, fatal=True) ('Reaping Strike').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] autoplay draw_random 'Reaping Strike' -> Fabricator (depth 1) ('Uproar').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top: 'Havoc' is an autoplay card — never auto-played ('Havoc').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top: 'Havoc' is an autoplay card — never auto-played ('Havoc').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Uproar' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mayhem' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Uproar', 'Mayhem'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mercy Cut' created).
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Reaping Strike' -> Fabricator (depth 1) ('payload').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Mercy Cut' -> Fabricator (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Havoc' created).
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Reaping Strike' -> Fabricator (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Reaping Strike' created).
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top: 'Havoc' is an autoplay card — never auto-played ('payload').
+[INFO] [BlankTheSpire] [BN] autoplay draw_random 'Sunder' -> none (depth 1) ('Uproar').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=True, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'War Drum' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Sunder' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('War Drum', 'Sunder'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mayhem' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Feed' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Mayhem', 'Feed'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Reaping Strike' created).
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Arsenal' -> none (depth 1) ('payload').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Creative Spark' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=True, fatal=False) ('Sunder').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Havoc' created).
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top: 'Havoc+' is an autoplay card — never auto-played ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Arsenal' created).
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('Arsenal'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Uproar' created).
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Arsenal' -> none (depth 1) ('payload').
+[INFO] [BlankTheSpire] [BN] autoplay draw_random 'Strike' -> Noisebot (depth 1) ('Uproar').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'War Drum' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Feed' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('War Drum', 'Feed'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top: 'Havoc' is an autoplay card — never auto-played ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Arsenal' created).
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('Arsenal'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mercy Cut' created).
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Arsenal' -> none (depth 1) ('payload').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Discovery' -> none (depth 1) ('Havoc').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Havoc' created).
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Infernal Blade' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Uproar' created).
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Uproar'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (killed=True, fatal=True) ('Sunder').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Arsenal' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Reaping Strike+' -> FlailKnight (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mayhem' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mercy Cut' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Mayhem', 'Mercy Cut'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Uproar' created).
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Creative Spark' -> none (depth 1) ('payload').
+[INFO] [BlankTheSpire] [BN] autoplay draw_random 'Mercy Cut' -> FlailKnight (depth 1) ('Uproar').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mercy Cut' created).
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Mercy Cut'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Feed').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Scatter Notes' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Sunder' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mercy Cut' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Sunder', 'Mercy Cut'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mayhem' created).
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('Mayhem'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Sunder' created).
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Scatter Notes' -> none (depth 1) ('payload').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'War Drum' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Arsenal' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('War Drum', 'Arsenal'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (killed=True, fatal=True) ('Sunder').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top: 'Havoc+' is an autoplay card — never auto-played ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Havoc' created).
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top: 'Havoc+' is an autoplay card — never auto-played ('Havoc').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mayhem' created).
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('Mayhem'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Reaping Strike' created).
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Reaping Strike' -> MagiKnight (depth 1) ('payload').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Discovery' -> none (depth 1) ('Havoc').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Havoc' created).
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Havoc' created).
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Reaping Strike' -> MagiKnight (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (killed=True, fatal=True) ('Sunder').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Arsenal' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Arsenal' created).
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('Arsenal'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Feed' created).
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Mercy Cut' -> SpectralKnight (depth 1) ('payload').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (killed=True, fatal=True) ('Sunder').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Reaping Strike+' -> SoulNexus (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Arsenal' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Uproar' created).
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Uproar'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] autoplay draw_random 'Mercy Cut' -> SoulNexus (depth 1) ('Uproar').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] autoplay draw_random 'Reaping Strike' -> SoulNexus (depth 1) ('Uproar').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Scatter Notes' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'War Drum' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mercy Cut' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('War Drum', 'Mercy Cut'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Uproar' created).
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'War Drum' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Arsenal' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('War Drum', 'Arsenal'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Feed').
+[INFO] [BlankTheSpire] [BN] autoplay draw_random 'Strike' -> SoulNexus (depth 1) ('Uproar').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Uproar' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'War Drum' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Sunder' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('War Drum', 'Sunder'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] autoplay draw_random 'Mercy Cut' -> SoulNexus (depth 1) ('Uproar').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top: 'Uproar' is an autoplay card — never auto-played ('Havoc').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'War Drum' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mercy Cut' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('War Drum', 'Mercy Cut'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Feed').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Sunder' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'War Drum' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Sunder', 'War Drum'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Arsenal' created).
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('Arsenal'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Uproar' created).
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Infernal Blade+' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Reaping Strike' created).
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Reaping Strike'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Sunder' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] autoplay draw_random 'Strike' -> Aeonglass (depth 1) ('Uproar').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mayhem' created).
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('Mayhem'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Sunder' created).
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Havoc' created).
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Havoc' created).
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Infernal Blade' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Reaping Strike' created).
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Reaping Strike'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Havoc' created).
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Defend' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Arsenal' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'War Drum' created).
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('War Drum'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Uproar' created).
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Infernal Blade+' -> none (depth 1) ('payload').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Feed' created).
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Feed'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] autoplay draw_random 'Reaping Strike' -> Aeonglass (depth 1) ('Uproar').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Mercy Cut' -> Aeonglass (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Feed').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Strike+' -> Aeonglass (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Arsenal+' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'War Drum' created).
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('War Drum'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Uproar' created).
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top: 'Havoc' is an autoplay card — never auto-played ('payload').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] autoplay draw_random 'Feed' -> Aeonglass (depth 1) ('Uproar').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Feed').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Uproar' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Havoc' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Uproar', 'Havoc'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] autoplay draw_random 'Reaping Strike' -> Aeonglass (depth 1) ('Uproar').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mercy Cut' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Reaping Strike' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Mercy Cut', 'Reaping Strike'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Arsenal' created).
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('Arsenal'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Sunder' created).
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Mercy Cut' -> Aeonglass (depth 1) ('payload').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Arsenal' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mayhem' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Havoc' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Mayhem', 'Havoc'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'War Drum' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mayhem' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('War Drum', 'Mayhem'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Arsenal' created).
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('Arsenal'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Sunder' created).
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Reaping Strike' -> Aeonglass (depth 1) ('payload').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Scatter Notes+' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Sunder' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Feed' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Sunder', 'Feed'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Havoc' created).
+[INFO] [BlankTheSpire] [BN] add_random_card skill x1 -> Hand ('Havoc'; free=True; choose_of=3) ('Discovery').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Wither+1' -> none (depth 1) ('Havoc').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top: 'Havoc+' is an autoplay card — never auto-played ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'War Drum' created).
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('War Drum'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Reaping Strike' created).
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top: 'Uproar+' is an autoplay card — never auto-played ('payload').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top: 'Uproar+' is an autoplay card — never auto-played ('Havoc').
+[INFO] [BlankTheSpire] [BN] autoplay draw_random 'Reaping Strike+' -> Aeonglass (depth 1) ('Uproar').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top: 'Uproar+' is an autoplay card — never auto-played ('Havoc').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mayhem' created).
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('Mayhem'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Reaping Strike' created).
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Scatter Notes+' -> none (depth 1) ('payload').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'War Drum' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Reaping Strike' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('War Drum', 'Reaping Strike'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BN] autoplay draw_random 'Reaping Strike+' -> Aeonglass (depth 1) ('Uproar').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Reaping Strike').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'War Drum' created).
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('War Drum'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mercy Cut' created).
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Infernal Blade' -> none (depth 1) ('payload').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Sunder' created).
+[INFO] [BlankTheSpire] [BN] add_random_card attack x1 -> Hand ('Sunder'; free=True; choose_of=0) ('Infernal Blade').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Arsenal' created).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Sunder' created).
+[INFO] [BlankTheSpire] [BN] add_random_card any x2 -> Discard ('Arsenal', 'Sunder'; free=False; choose_of=0) ('Scatter Notes').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (killed=False, fatal=False) ('Sunder').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mayhem' created).
+[INFO] [BlankTheSpire] [BN] add_random_card power x1 -> Hand ('Mayhem'; free=False; choose_of=0) ('payload').
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Mercy Cut' created).
+[INFO] [BlankTheSpire] [BN] mayhem payload from AfterAutoPrePlayPhaseEntered ('Mayhem').
+[INFO] [BlankTheSpire] [BN] autoplay draw_top 'Wither+3' -> none (depth 1) ('payload').
+[INFO] [BlankTheSpire] [BN] target_killed gate OPEN (negated) (killed=False, fatal=False) ('Mercy Cut').
+[INFO] [BlankTheSpire] [BN] target_killed gate closed (negated) (killed=True, fatal=True) ('Mercy Cut').

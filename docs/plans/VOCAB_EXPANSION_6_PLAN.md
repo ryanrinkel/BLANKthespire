@@ -701,6 +701,18 @@ vs gap #37 on madness_discard / big_energy). Stale pins updated: test_phase_ar (
 tail), test_coverage (when key + sample), test_featured (three samples), test_harness_v2 (scaffold snapshot, exemplar ceiling).
 (7) Readings: index 9,603 (cap 72) · per-archetype max 76,948 (`slot_machine`) · per-archetype scaffold max 27,220
 (`exhaust_pyre`) · triads 68,486 / 78,762 / 84,507 · all-ops 129,302 · `full` 120,462.
+(8) **Smoke (tests/gaptest-bn, 2026-10-04, one build, no engine or tester iteration):** GAPTESTBN1 and GAPTESTBN2 both
+**completed the run** (611 / 506 [BN] lines; the build also carried BQ's two smoke fixes). Every required tag fired on both
+seeds: target_killed gate OPEN (killed=True, fatal=True) 24 / 28 and closed, the negated Mercy Cut gate both ways, and
+`closed (killed=True, fatal=False)` 3 / 2 — a minion kill correctly paying nothing (the snapshot of finding 1, proven live);
+add_random_card choose_of=3 (Discovery) 43 / 25 with AutoSlay's "Auto-selected 1 card(s)" 58 / 34, the free Attack
+(Infernal Blade) 41 / 20, any x2 -> Discard (Scatter Notes) 59 / 38, the Creative Spark payload 37 / 30; autoplay draw_top
+~119 / 96 and draw_random 38 / 33 (incl. a "no playable attack" skip); "[BN] mayhem payload from AfterAutoPrePlayPhaseEntered"
+38 / 42; `[BP] on_card_generated fired` 186 / 61, naming add_random_card cards (BP's hook sees them). The candidate rule fired
+live ("'Havoc' / 'Uproar' / 'Mayhem' is an autoplay card — never auto-played" 39 / 43), so the depth guard and the empty-pool
+skip never fired (both pinned offline). A draw_top on an unplayable card (Ascender's Bane, Dazed) exhausts it without playing
+— base Havoc parity. 0 mod exceptions, 0 BlankTheSpire frames, 0 localization errors (the five exception lines are BaseLib's
+two startup Harmony patch failures). No freeze, no relaunch race. Tags in `generation/tests/gaptest-bn/godot_BN_tags_<SEED>.txt`.
 
 ### Phase BO — Recursion, put-back, draw-pile tutor, `on_shuffle`, `grant_keyword` (v66 — built first of the stretch phases, Ryan's order BO → BP → BQ → BN, rule 0.8; gaps #74, #75; ~1½ days) — 29 base cards
 
@@ -1155,3 +1167,8 @@ Tags in `generation/tests/gaptest-bq/`; `test_phase_bq` reads them.
 #71–#73 done; tester `generation/tests/gaptest-bn/`, `--validate-only` green; DLL built + deployed; smoke next, with BQ's).
 Readings: index 9,603 (cap 72) · per-archetype max 76,948 (`slot_machine`) · per-archetype scaffold max 27,220 · triads
 68,486 / 78,762 / 84,507 · all-ops 129,302 · `full` 120,462 (scaffold snapshot 47,751, +219). See Findings (BN).
+**Phase BN DONE 2026-10-04** — smokes GAPTESTBN1 / BN2 completed the run, every `[BN]` tag (gate OPEN + closed + negated + a
+non-fatal minion kill closed, all four add_random_card forms + "Auto-selected 1 card(s)", both autoplay forms, the Mayhem
+line) and `[BP] on_card_generated fired` for generated cards; 0 mod exceptions, 0 localization errors; no iteration
+(Findings (BN) 8). `test_phase_bn` reads the tags. **The stretch BO..BQ + BN is complete; next: Phase BR (v70), then the v0.4.0
+release (§4).**
