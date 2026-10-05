@@ -4,6 +4,7 @@
     uv run python tests/gaptest-bl/build_tester.py --validate-only   # validate the cards only (no game dir touched)
     uv run python tests/gaptest-bl/build_tester.py                   # validates, backs up slot 04, stages the tester there
     uv run python tests/gaptest-bl/build_tester.py --remove          # restores whatever slot 04 held before
+    uv run python tests/gaptest-bl/build_tester.py --with-artifact-op   # ALSO stage Warding Gift (needs an OLD DLL, below)
     uv run btsgen-autoslay-smoke --seeds GAPTESTBL1 GAPTESTBL2 --character class4 --relic auto --timeout 900
 
 The deck (slot 04, an all-aggression class, 16 cards):
@@ -18,10 +19,15 @@ The deck (slot 04, an all-aggression class, 16 cards):
   * Plague Kiss         — Doom 3 then spread_debuffs (Doom + Strength Down are debuffs: decision 12)
   * Doom Bell (Power)   — turn_start: apply 3 Doom to ALL enemies (the payload path; also the merchant's Power)
   * Warding Gift (TEST) — innate 0-cost: gaptest_enemy_artifact 2 on ALL enemies   [BL] gaptest: '<m>' gains Artifact
-                          A GAPTEST-ONLY op (not in the LLM contract, like apply_custom): it is skipped by the
-                          Python validator here; the in-game importer accepts it (ForgedCards.SupportedOps).
+                          ONLY with --with-artifact-op (default OFF). A GAPTEST-ONLY op (not in the LLM contract, like
+                          apply_custom), skipped by the Python validator here. **The op was STRIPPED from the engine
+                          for the v0.4.0 release** (DataCard / EffectRunner / ForgedCards, 2026-10-05): the sign-flip
+                          proof lives in godot_BL_tags_GAPTESTBL1/2.txt, which test_phase_bl asserts. A shipped DLL
+                          rejects the card, so --with-artifact-op needs a DLL built from a commit that still has the
+                          op (0792e7a or earlier on `wave6`). Without it the deck is 15 cards and the artifact check
+                          only fires if a later-act Artifact monster (Chomper / Punch Construct) shows up.
 
-THE ARTIFACT CHECK (the wave's sign-flip risk). Warding Gift is Innate, so every combat opens with 2 Artifact on
+THE ARTIFACT CHECK (the wave's sign-flip risk; as run for the saved tag files, WITH the op). Warding Gift is Innate, so every combat opens with 2 Artifact on
 every enemy; the debuffs played after it in the same turn eat those stacks first. When a Strength Down is the one
 eaten, the engine logs
     [BL] artifact check: '<monster>' Artifact <a> blocked temp_strength_down, Str now <s> (shell 0->0).
@@ -103,9 +109,17 @@ CARDS = [
          [st("doom", 3), {"op": "spread_debuffs"}], [st("doom", 5), {"op": "spread_debuffs"}]),
     card("bl_doom_bell", "Doom Bell", "power", "rare", 1, "self",
          [{"op": "add_trigger", "trigger": "turn_start", "effects": [st("doom", 3, target="all_enemies")]}], up_cost=0),
-    card("bl_warding_gift", "Warding Gift", "skill", "common", 0, "all_enemies",
-         [{"op": "gaptest_enemy_artifact", "amount": 2}, {"op": "innate"}]),
 ]
+# The Artifact injection card (GAPTEST-only op, stripped from the engine for v0.4.0) — staged only with
+# --with-artifact-op, on a DLL that still carries the op (see the docstring).
+ARTIFACT_OP_CARD = card("bl_warding_gift", "Warding Gift", "skill", "common", 0, "all_enemies",
+                        [{"op": "gaptest_enemy_artifact", "amount": 2}, {"op": "innate"}])
+
+
+def cards_for(with_artifact_op: bool = False) -> list[dict]:
+    return CARDS + [ARTIFACT_OP_CARD] if with_artifact_op else list(CARDS)
+
+
 # slot -> count (1-based card order). 16 cards; every BL card at least once, the Piercing Wail form doubled.
 DECK = {"bl_strike": 2, "bl_defend": 2, "bl_shrill_keening": 2}
 
@@ -117,6 +131,12 @@ CHARACTER = {
     "max_hp": 80, "max_energy": 3,
     "starting_deck": [{"slot": n, "count": DECK.get(c["id"], 1)} for n, c in enumerate(CARDS, start=1)],
 }
+
+
+def character_for(cards: list[dict]) -> dict:
+    ch = dict(CHARACTER)
+    ch["starting_deck"] = [{"slot": n, "count": DECK.get(c["id"], 1)} for n, c in enumerate(cards, start=1)]
+    return ch
 
 
 def _unstage() -> None:
@@ -136,11 +156,12 @@ def _unstage() -> None:
         print(f"  slot {SLOT:02d}: restored the backed-up cards")
 
 
-def validate(verbose: bool = True) -> int:
+def validate(verbose: bool = True, cards: list[dict] | None = None) -> int:
+    cards = CARDS if cards is None else cards
     v = CardValidator()
-    v.known_cards |= {c["id"] for c in CARDS}
+    v.known_cards |= {c["id"] for c in cards}
     bad = 0
-    for c in CARDS:
+    for c in cards:
         if c["id"] in GAPTEST_ONLY:
             continue
         r = v.validate(dict(c))
@@ -156,10 +177,13 @@ def main(argv: list[str]) -> int:
         _unstage()
         print(f"unstaged slot {SLOT:02d}")
         return 0
-    if validate():
+    cards = cards_for("--with-artifact-op" in argv)
+    character = character_for(cards)
+    gaptest = sum(1 for c in cards if c["id"] in GAPTEST_ONLY)
+    if validate(cards=cards):
         return 1
     if "--validate-only" in argv or "--check" in argv:  # validate only (no game dir touched)
-        print(f"{len(CARDS) - len(GAPTEST_ONLY)} cards valid (+{len(GAPTEST_ONLY)} gaptest-only card checked in game)")
+        print(f"{len(cards) - gaptest} cards valid (+{gaptest} gaptest-only card, needs a pre-v0.4.0 DLL)")
         return 0
     char_json = ROOT / f"{SLOT:02d}.json"
     cdir = ROOT / f"{SLOT:02d}"
@@ -173,11 +197,11 @@ def main(argv: list[str]) -> int:
         cdir.replace(ROOT / f"{SLOT:02d}{BAK_SUFFIX}")
     cards_dir = cdir / "cards"
     cards_dir.mkdir(parents=True, exist_ok=True)
-    char_json.write_text(json.dumps(CHARACTER, indent=2, ensure_ascii=False), encoding="utf-8")
-    for n, c in enumerate(CARDS, start=1):
+    char_json.write_text(json.dumps(character, indent=2, ensure_ascii=False), encoding="utf-8")
+    for n, c in enumerate(cards, start=1):
         (cards_dir / f"{n:02d}.json").write_text(json.dumps(c, indent=2, ensure_ascii=False), encoding="utf-8")
-    print(f"staged slot {SLOT:02d}: {CHARACTER['name']} + {len(CARDS)} cards "
-          f"({sum(s['count'] for s in CHARACTER['starting_deck'])} in the starting deck)")
+    print(f"staged slot {SLOT:02d}: {character['name']} + {len(cards)} cards "
+          f"({sum(s['count'] for s in character['starting_deck'])} in the starting deck)")
     print("\nnow:  uv run btsgen-autoslay-smoke --seeds GAPTESTBL1 GAPTESTBL2 --character class4 --relic auto --timeout 900")
     print("then: uv run python tests/gaptest-bl/build_tester.py --remove")
     return 0

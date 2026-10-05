@@ -571,7 +571,6 @@ public static class ForgedCards
          "add_random_card", "autoplay", // Phase BN (v69, gaps #72/#73): Discovery / Infernal Blade, Havoc / Uproar. Payload on turn_start only.
          "stun", // Phase BR (v70, gap #11): Whistle — stun the chosen enemy (CreatureCmd.Stun). Card-only flag-op with guard rails.
          "apply_custom", // EXPLORE SPIKE: apply a hardcoded modifier-family custom status (not in LLM contract)
-         "gaptest_enemy_artifact", // PHASE BL GAPTEST (not in the LLM contract): N Artifact on the card's target(s) — the sign-flip smoke
          "summon_spike"]; // PHASE K SPIKE: summon a hardcoded player pet (not in LLM contract)
     // Phase H3/H4: the trigger kinds. turn_start/turn_end fire every turn; ripen is a one-shot countdown; the rest
     // are REACTIVE (H4) — they mirror the ForgedRelic hooks and can fire many times a turn (see ForgedTriggerPower).
@@ -2952,7 +2951,6 @@ public static class ForgedCards
                 case "add_random_card":  parts.Add(AddRandomCardSentence(e, capitalize: true)); break;
                 case "autoplay":         parts.Add(AutoplaySentence(e, capitalize: true)); break;
                 case "stun":             parts.Add("Stun the enemy."); break; // Phase BR (v70, gap #11): Whistle. Byte-lockstep with cardgen.describe
-                case "gaptest_enemy_artifact": parts.Add($"Enemies gain {Math.Max(1, e.Amount)} Artifact (gap test)."); break; // PHASE BL GAPTEST only
                 case "corruption":  parts.Add("Your Skills cost 0."); parts.Add("Your Skills Exhaust when played."); break; // Phase AB (gap #20)
                 case "cost_shift":  parts.Add(CostShiftSentence(e)); break; // Phase AO (v45): the discount sentence (literal, no var)
                 case "blade_empower": parts.Add($"Your blade deals {Math.Max(2, e.Amount)}x damage this turn."); break; // Phase AF (gap #41)

@@ -165,9 +165,13 @@ def _t_engine() -> None:
             ('$"[BL] strength_down -{n} on \'{m}\' (Str now {str1})."', "the [BL] strength_down tag"),
             ('$"[BL] strip_block {had}->{(int)t.Block} on \'{MonsterName(t)}\'', "the [BL] strip_block tag"),
             ('$"[BL] strip_artifact (had {had}) on \'{MonsterName(t)}\'', "the [BL] strip_artifact tag"),
-            ('$"[BL] doom from unblocked {n}', "the [BL] Blight Strike tag"),
-            ('case "gaptest_enemy_artifact":', "the GAPTEST-only Artifact injection op")):
+            ('$"[BL] doom from unblocked {n}', "the [BL] Blight Strike tag")):
         check(frag in er, f"EffectRunner: {why}")
+    # v0.4.0 release prep (2026-10-05): the GAPTEST-only Artifact injection op is STRIPPED from the engine; the
+    # sign-flip proof it enabled lives in the saved BL tag files (_t_smoke_record below).
+    engine = pathlib.Path(__file__).resolve().parents[2] / "mod" / "BlankTheSpireCode"
+    left = [p.name for p in engine.rglob("*.cs") if "gaptest_enemy_artifact" in p.read_text(encoding="utf-8-sig")]
+    check(not left, f"the gaptest_enemy_artifact op is GONE from the C# (still in: {left})")
     dc = _cs("Engine", "DataCard.cs")
     check('case "doom":           if (!e.IsScaled) Power<DoomPower>(vname, e.Amount, up); break;' in dc, "DataCard: Power<DoomPower>")
     check('case "temp_strength_down": Power<ForgedTempStrengthDownPower>(vname, e.Amount, up); break;' in dc, "DataCard: the temp shell var")
@@ -175,7 +179,7 @@ def _t_engine() -> None:
           "DataCard: the permanent form declares StrengthLoss (NOT Power<StrengthPower>)")
     check("Power<StrengthPower>(vname, e.Amount, up); break;" in dc and dc.count("Power<StrengthPower>(") == 1,
           "Power<StrengthPower> stays the self-buff `strength` only")
-    for d in ('case "strip_block":', 'case "strip_artifact":', 'case "gaptest_enemy_artifact":'):
+    for d in ('case "strip_block":', 'case "strip_artifact":'):
         check(d in dc, f"DataCard declares nothing for {d}")
     co = _cs("Engine", "Conditions.cs")
     check("doom" in _set(co, "StatusChecks") and '"doom"       => t.HasPower<DoomPower>(),' in co,
@@ -189,7 +193,8 @@ def _t_engine() -> None:
     check({"temp_strength_down", "doom"} <= _set(fc, "EnemyDebuffStatuses") and "strength_down" not in _set(fc, "EnemyDebuffStatuses"),
           "EnemyDebuffStatuses += temp_strength_down / doom (strength_down is card-only)")
     check("doom" in _set(fc, "StatusStackStatuses"), "StatusStackStatuses += doom (BJ's target_status_stacks)")
-    check(set(NEW_OPS) | {"gaptest_enemy_artifact"} <= _set(fc, "SupportedOps"), "SupportedOps += the strip ops (+ the gaptest op)")
+    check(set(NEW_OPS) <= _set(fc, "SupportedOps") and "gaptest_enemy_artifact" not in _set(fc, "SupportedOps"),
+          "SupportedOps += the strip ops (the gaptest op is stripped for v0.4.0)")
     check(not (set(NEW_OPS) & _set(fc, "TriggerOps")), "the strip ops are card-only (not in TriggerOps)")
     check('new() { ["temp_strength_down"] = 9, ["strength_down"] = 3, ["doom"] = 12 };' in fc and "PayloadDoomMax = 5;" in fc,
           "the caps (temp 9 / permanent 3 / Doom 12, payload Doom 5)")
@@ -387,10 +392,12 @@ def _t_tester() -> None:
     types = [c["type"] for c in mod.CARDS if c["rarity"] != "basic"]
     check(types.count("attack") >= 3 and types.count("skill") >= 3 and types.count("power") >= 1,
           "pool: >= 3 non-basic Attacks + Skills and >= 1 Power (the merchant stall)")
-    check(mod.GAPTEST_ONLY == {"bl_warding_gift"} and "bl_warding_gift" in ids, "the Artifact injection card is the one gaptest card")
-    gift = next(c for c in mod.CARDS if c["id"] == "bl_warding_gift")
-    check({"op": "innate"} in gift["effects"] and gift["effects"][0]["op"] == "gaptest_enemy_artifact",
-          "the injection is Innate (every combat opens with Artifact on the enemies)")
+    check(mod.GAPTEST_ONLY == {"bl_warding_gift"} and "bl_warding_gift" not in ids,
+          "the Artifact injection card is the one gaptest card, OFF by default (the op is stripped from the engine)")
+    gift = mod.ARTIFACT_OP_CARD
+    check({"op": "innate"} in gift["effects"] and gift["effects"][0]["op"] == "gaptest_enemy_artifact"
+          and gift in mod.cards_for(with_artifact_op=True) and "--with-artifact-op" in p.read_text(encoding="utf-8"),
+          "--with-artifact-op still stages the Innate injection (for a pre-v0.4.0 DLL)")
     flat = json.dumps(mod.CARDS)
     for need in ('"temp_strength_down"', '"strength_down"', '"strip_block"', '"strip_artifact"', '"damage_dealt_unblocked"',
                  '"target_status_stacks", "status": "doom"', '"spread_debuffs"', '"target": "all_enemies"'):

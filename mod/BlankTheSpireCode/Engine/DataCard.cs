@@ -267,7 +267,6 @@ public abstract class DataCard : ConstructedCardModel
                 case "spread_debuffs":        // Phase AX (v53, gaps #45-#47): copies the target's debuffs in OnPlay (flag-op, no var); text via Describe
                 case "strip_block":           // Phase BL (v64, gap #66): Expose — the target loses all Block in OnPlay (flag-op, no var)
                 case "strip_artifact":        // Phase BL (v64, gap #66): Expose — the target's Artifact is removed in OnPlay (flag-op, no var)
-                case "gaptest_enemy_artifact": // PHASE BL GAPTEST (not in the LLM contract): Artifact on the target(s) in OnPlay
                 case "stun":                  // Phase BR (v70, gap #11): CreatureCmd.Stun on the chosen enemy in OnPlay (flag-op, no var)
                     // BQ smoke fix (2026-10-04): this `break` was missing since Phase BM inserted replay_next below, so every
                     // op above FELL THROUGH into replay_next's switch and declared a BurstPower var (a stray Burst hover tip on

@@ -439,16 +439,6 @@ public static class EffectRunner
                     // Ethereal / single-turn Sly.
                     await GrantKeyword(e, ctx, card.Owner, card);
                     break;
-                case "gaptest_enemy_artifact":
-                    // PHASE BL GAPTEST (not in the LLM contract — like apply_custom / summon_spike): give the card's
-                    // target(s) N Artifact, so the smoke can prove an Artifact enemy does NOT gain Strength from a
-                    // blocked (temp_)strength_down (the sign-flip risk). Only the tests/gaptest-bl tester carries it.
-                    foreach (var t in CustomStatusTargets(card, play))
-                    {
-                        await RelicApplyT<ArtifactPower>(ctx, t, card.Owner.Creature, Math.Max(1, amt));
-                        MainFile.Logger.Info($"[BL] gaptest: '{MonsterName(t)}' gains Artifact {Math.Max(1, amt)} (now {t.GetPowerAmount<ArtifactPower>()}).");
-                    }
-                    break;
                 case "balance_step":
                     // Phase S (gap #1): move the signed Balance gauge toward a pole (light/dark). Shared executor
                     // owns the arithmetic + display; the light_ge/dark_ge/centered conditions read it, and the gauge
