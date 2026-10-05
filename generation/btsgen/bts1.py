@@ -25,7 +25,11 @@ import sys
 import zlib
 from pathlib import Path
 
-VOCAB_VERSION = 69  # must be <= ForgedCards.VocabVersion (69: Phase BN — ON-KILL, RANDOM GENERATION, AUTOPLAY: condition
+VOCAB_VERSION = 70  # must be <= ForgedCards.VocabVersion (70: Phase BR — STUN, DISCARD-ALL + CARDS_REMOVED, GROWING TURN-START
+                    # DAMAGE: card-only flag-op stun (Whistle; target enemy, exhaust, cost 2+, uncommon/rare, one stun card per
+                    # class, never re-bought); discard cards:"all" ("Discard your hand."); scale + hits_scale cards_removed
+                    # (Calculated Gamble / Fiend Fire); grow on a turn_start payload damage (Rolling Boulder). No codec change.)
+                    # 69: Phase BN — ON-KILL, RANDOM GENERATION, AUTOPLAY: condition
                     # target_killed (Feed / Sunder; play-local, after a damage op, AoE = any kill); op add_random_card
                     # {card_type?, pile, amount 1..2, choose_of 2..3, free_this_turn} (Discovery / Infernal Blade; payload =
                     # Creative AI); op autoplay {from draw_top|draw_random, amount 1..2, card_type?} (Havoc / Uproar; payload =

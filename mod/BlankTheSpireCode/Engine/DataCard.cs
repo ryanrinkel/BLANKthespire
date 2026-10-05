@@ -53,6 +53,12 @@ public abstract class DataCard : ConstructedCardModel
     /// autoplay card is never auto-played by autoplay) — Spec is protected, so the pool / draw-pile scans read it here.</summary>
     internal bool HasOp(string op) => Spec.HasOp(op);
 
+    /// <summary>Phase BR (v70, gap #79): the per-play <c>cards_removed</c> stash — how many cards this play's LAST discard /
+    /// exhaust_card removed. Set by <see cref="EffectRunner.Execute"/> (reset to null at the start of every play, a replay
+    /// included), read by <c>EffectRunner.ScaleValue("cards_removed")</c> — so a later scaled damage / block / draw or a
+    /// <c>hits_scale</c> resolves the real count; null (the in-hand preview) falls back to the other cards in hand.</summary>
+    internal int? RemovedThisPlay;
+
     /// <summary>Phase T: the signature blade is never Attack-Potion/Discovery-generated in combat (it only ever
     /// enters play via the first-Forge summon or the <c>summon_blade</c> op). Closes CardFactory.FilterForCombat,
     /// which excludes Basic/Ancient/Event but NOT Token — see the token-rarity note in the ctor.</summary>
@@ -228,7 +234,7 @@ public abstract class DataCard : ConstructedCardModel
                 case "heal":        if (!e.IsScaled) WithHeal(e.Amount, up); break;     // var "Heal"
                 case "lose_hp":     WithVar("Loss", e.Amount, up); break; // generic var "Loss"
                 case "gain_max_hp": WithVar(new MaxHpVar(e.Amount).WithUpgrade(up)); break; // Phase AN (v44): the base-game MaxHpVar ({MaxHp})
-                case "discard":     WithVar("Discard", e.Amount, up); break; // Phase R (gap #17): random-discard count
+                case "discard":     if (e.Cards != "all") WithVar("Discard", e.Amount, up); break; // Phase R (gap #17): random-discard count (BR v70: "Discard your hand." has none)
                 case "scry":        WithVar("Scry", e.Amount, up); break;    // Phase AA (gap #17 R-2): top-of-draw look count
                 // Phase AX (v53): a keyword the UPGRADE drops (only a trailing `exhaust`, validator-gated) is
                 // declared with UpgradeType.Remove so BaseLib strips it on upgrade; everything else is unchanged.
@@ -262,6 +268,7 @@ public abstract class DataCard : ConstructedCardModel
                 case "strip_block":           // Phase BL (v64, gap #66): Expose — the target loses all Block in OnPlay (flag-op, no var)
                 case "strip_artifact":        // Phase BL (v64, gap #66): Expose — the target's Artifact is removed in OnPlay (flag-op, no var)
                 case "gaptest_enemy_artifact": // PHASE BL GAPTEST (not in the LLM contract): Artifact on the target(s) in OnPlay
+                case "stun":                  // Phase BR (v70, gap #11): CreatureCmd.Stun on the chosen enemy in OnPlay (flag-op, no var)
                     // BQ smoke fix (2026-10-04): this `break` was missing since Phase BM inserted replay_next below, so every
                     // op above FELL THROUGH into replay_next's switch and declared a BurstPower var (a stray Burst hover tip on
                     // every orb / trigger / forge / summon card; two such ops on one card = "DynamicVarSet contains duplicate key

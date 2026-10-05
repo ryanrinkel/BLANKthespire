@@ -71,6 +71,10 @@ public static class EffectRunner
         // receiver; killedThisPlay = a killed receiver whose powers ALL said ShouldOwnerDeathTriggerFatal BEFORE the hit (a
         // minion / a reattaching part never pays out, as Feed snapshots before its attack — the powers are gone after death).
         bool killedAny = false, killedThisPlay = false;
+        // Phase BR (v70, gap #79): the per-play `cards_removed` stash lives on the DataCard (the calc-vars read it through
+        // ScaleValue at attack time). Null = "not set this play" (the preview falls back to the other cards in hand).
+        var brCard = card as DataCard;
+        if (brCard != null) brCard.RemovedThisPlay = null;
         for (int i = 0; i < spec.Effects.Length; i++)
         {
             var e = spec.Effects[i];
@@ -121,6 +125,8 @@ public static class EffectRunner
                     // Finisher recipe: Calculate(target)), capped at HitsScaleCap (logged). 0 hits = no swing at all.
                     if (e.HitsScale != null)
                     {
+                        if (e.HitsScale == "cards_removed") // Phase BR (v70, gap #79): Fiend Fire — the stash the exhaust_card set
+                            MainFile.Logger.Info($"[BR] cards_removed -> {ScaleValue(e.HitsScale, card)} ('{spec.Title ?? spec.Id}') (hits).");
                         int raw = HitsScaleRead(card, e, play);
                         hits = Math.Min(HitsScaleCap, raw);
                         if (hits <= 0)
@@ -154,6 +160,8 @@ public static class EffectRunner
                         MainFile.Logger.Info($"[BJ] scale {e.Scale} -> {BjScaleRead(e, card, play)} (damage) ('{spec.Title ?? spec.Id}').");
                     if (e.Scale is "orb_count" or "orb_types") // Phase BQ (v68, gap #78): prove the orb read at resolution
                         MainFile.Logger.Info($"[BQ] {e.Scale} -> {ScaleValue(e.Scale, card)} ('{spec.Title ?? spec.Id}') (damage).");
+                    if (e.Scale == "cards_removed") // Phase BR (v70, gap #79): prove the per-play stash at resolution
+                        MainFile.Logger.Info($"[BR] cards_removed -> {ScaleValue(e.Scale, card)} ('{spec.Title ?? spec.Id}') (damage).");
                     if (e.HasGrow) // Phase U (gap #23) smoke logging: prove per-play growth (plays so far = count)
                     {
                         int plays = PlaysThisCombat(card);
@@ -201,6 +209,8 @@ public static class EffectRunner
                         MainFile.Logger.Info($"[BJ] scale {e.Scale} -> {BjScaleRead(e, card, play)} (block) ('{spec.Title ?? spec.Id}').");
                     if (e.Scale is "orb_count" or "orb_types") // Phase BQ (v68, gap #78)
                         MainFile.Logger.Info($"[BQ] {e.Scale} -> {ScaleValue(e.Scale, card)} ('{spec.Title ?? spec.Id}') (block).");
+                    if (e.Scale == "cards_removed") // Phase BR (v70, gap #79)
+                        MainFile.Logger.Info($"[BR] cards_removed -> {ScaleValue(e.Scale, card)} ('{spec.Title ?? spec.Id}') (block).");
                     await CommonActions.CardBlock(card, play);
                     break;
                 case "draw":
@@ -223,6 +233,8 @@ public static class EffectRunner
                             MainFile.Logger.Info($"[AM] scale {e.Scale} -> {n} (draw, '{card.Id}').");
                         if (e.Scale is "orb_count" or "orb_types") // Phase BQ (v68, gap #78): Compile Driver
                             MainFile.Logger.Info($"[BQ] {e.Scale} -> {n} ('{spec.Title ?? spec.Id}') (draw).");
+                        if (e.Scale == "cards_removed") // Phase BR (v70, gap #79): Calculated Gamble
+                            MainFile.Logger.Info($"[BR] cards_removed -> {n} ('{spec.Title ?? spec.Id}') (draw).");
                         await CardPileCmd.Draw(ctx, n, card.Owner);
                     }
                     else await CommonActions.Draw(card, ctx);
@@ -354,6 +366,10 @@ public static class EffectRunner
                         if (t.HasPower<ArtifactPower>()) await PowerCmd.Remove<ArtifactPower>(t);
                         MainFile.Logger.Info($"[BL] strip_artifact (had {had}) on '{MonsterName(t)}' ('{spec.Title ?? spec.Id}').");
                     }
+                    break;
+                case "stun":
+                    // Phase BR (v70, gap #11): Whistle — CreatureCmd.Stun on the chosen enemy (single-enemy card, validator-gated).
+                    await StunTarget(play?.Target, spec.Title ?? spec.Id);
                     break;
                 case "replay_next":
                 {
@@ -628,10 +644,22 @@ public static class EffectRunner
                     // cleanup (CardPileCmd.Add + Hook.AfterFlush) still never triggers it.
                     // Phase AP (v46): `cards:"choose"` opens the base-game hand picker instead (the player picks which
                     // cards to pitch — the true discard-fuel feel); under AutoSlay the selector auto-picks (no hang).
-                    if (e.Cards == "choose")
-                        await DiscardChoose(amt, ctx, card.Owner, card);
-                    else
-                        await DiscardRandom(amt, card.Owner, ctx);
+                    // Phase BR (v70, gap #79): `cards:"all"` = the whole hand through the same batch CardCmd.Discard (Sly still
+                    // fires). Every form records how many cards it removed (the `cards_removed` stash).
+                    {
+                        int removedN;
+                        if (e.Cards == "all")
+                        {
+                            int hand = card.Owner.PlayerCombatState.Hand.Cards.Count;
+                            removedN = await DiscardRandom(hand, card.Owner, ctx);
+                            MainFile.Logger.Info($"[BR] discard all x{removedN} ('{spec.Title ?? spec.Id}').");
+                        }
+                        else if (e.Cards == "choose")
+                            removedN = await DiscardChoose(amt, ctx, card.Owner, card);
+                        else
+                            removedN = await DiscardRandom(amt, card.Owner, ctx);
+                        if (brCard != null) brCard.RemovedThisPlay = removedN;
+                    }
                     break;
                 case "retrieve_card":
                     // Phase AP (v46): return `amt` card(s) from the discard/exhaust pile to hand — random (the Exhume-
@@ -646,7 +674,10 @@ public static class EffectRunner
                     // a random one (True Grit) or every matching card (Second Wind / Fiend Fire). The playing card is in
                     // the Play pile by now, so it is never in the candidate set. Each card goes through CardCmd.Exhaust on
                     // its own, so every on_exhaust payoff fires per card. Under AutoSlay the picker auto-picks (no hang).
-                    await ExhaustCards(e, amt, ctx, card.Owner, card);
+                    {
+                        int removedN = await ExhaustCards(e, amt, ctx, card.Owner, card);
+                        if (brCard != null) brCard.RemovedThisPlay = removedN; // Phase BR (v70, gap #79): the cards_removed stash
+                    }
                     break;
                 case "draw_until":
                     // Phase BC (v57, gap #53): draw one card at a time until you draw a card of `card_type` (Pillage =
@@ -855,7 +886,8 @@ public static class EffectRunner
         string type = e.CardKind ?? "any";
         var pool = owner.Character.CardPool.GetUnlockedCards(owner.UnlockState, owner.RunState.CardMultiplayerConstraint)
             .Where(c => (e.CardKind == null || HandKindMatches(c, e.CardKind)) && c.CanBeGeneratedInCombat
-                        && !(c is DataCard dc && dc.HasOp("add_random_card")))
+                        && !(c is DataCard dc && dc.HasOp("add_random_card"))
+                        && !(c is DataCard sdc && sdc.HasOp("stun"))) // Phase BR (v70, gap #11): never generate a fresh stun card
             .ToList();
         if (pool.Count == 0)
         {
@@ -984,10 +1016,10 @@ public static class EffectRunner
     /// Hook.AfterFlush, which is not that hook. A discard nested inside an on_discard payload is suppressed (no
     /// cascade — DataCard's guard). Random picks use the run's card-selection RNG stream (seed-correct; no desync
     /// with card/other RNG).</summary>
-    internal static async Task DiscardRandom(int n, Player owner, PlayerChoiceContext ctx)
+    internal static async Task<int> DiscardRandom(int n, Player owner, PlayerChoiceContext ctx)
     {
         var hand = owner.PlayerCombatState.Hand.Cards;
-        if (n < 1 || hand.Count == 0) return;
+        if (n < 1 || hand.Count == 0) return 0;
         var pool = new List<CardModel>(hand);
         var rng = owner.RunState.Rng.CombatCardSelection;
         int take = Math.Min(n, pool.Count);
@@ -1002,6 +1034,7 @@ public static class EffectRunner
         try { await CardCmd.Discard(ctx, chosen); }         // → Hook.AfterCardDiscarded → each card's on_discard
         finally { ModDiscardDepth--; }
         MainFile.Logger.Info($"[R] discard x{chosen.Count} (random from hand).");
+        return chosen.Count; // Phase BR (v70): the cards_removed count
     }
 
     /// <summary>Phase AP (v46): the CHOOSE form of <c>discard</c> — the player picks <paramref name="n"/> cards in hand
@@ -1011,18 +1044,19 @@ public static class EffectRunner
     /// discarded through the same effect-discard path as the random form (<c>CardCmd.Discard</c> → <c>on_discard</c>
     /// payoffs), so a chosen discard fuels Reflex cards exactly like a random one. The playing card is the choice
     /// <paramref name="source"/> (as base-game Brand passes <c>this</c>).</summary>
-    internal static async Task DiscardChoose(int n, PlayerChoiceContext ctx, Player owner, AbstractModel source)
+    internal static async Task<int> DiscardChoose(int n, PlayerChoiceContext ctx, Player owner, AbstractModel source)
     {
         var hand = owner.PlayerCombatState.Hand.Cards;
-        if (n < 1 || hand.Count == 0) { MainFile.Logger.Info("[AP] discard choose: empty hand (no-op)."); return; }
+        if (n < 1 || hand.Count == 0) { MainFile.Logger.Info("[AP] discard choose: empty hand (no-op)."); return 0; }
         int take = Math.Min(n, hand.Count);
         var chosen = (await CardSelectCmd.FromHandForDiscard(ctx, owner,
             new CardSelectorPrefs(CardSelectorPrefs.DiscardSelectionPrompt, take), filter: null, source)).ToList();
-        if (chosen.Count == 0) { MainFile.Logger.Info("[AP] discard choose: no selection (no-op)."); return; }
+        if (chosen.Count == 0) { MainFile.Logger.Info("[AP] discard choose: no selection (no-op)."); return 0; }
         ModDiscardDepth++;                                  // AU: tag attribution only (source=mod-op)
         try { await CardCmd.Discard(ctx, chosen); }         // → Hook.AfterCardDiscarded → each card's on_discard
         finally { ModDiscardDepth--; }
         MainFile.Logger.Info($"[AP] discard choose x{chosen.Count} ({string.Join(", ", chosen.Select(c => $"'{c.Title}'"))}).");
+        return chosen.Count; // Phase BR (v70): the cards_removed count
     }
 
     /// <summary>Phase AP (v46): is this pile card RETRIEVABLE — i.e. not a base-game Status / Curse card (a random
@@ -1177,11 +1211,11 @@ public static class EffectRunner
     /// version": one card's exhaust hooks run fully before the next starts), which is also what makes every
     /// <c>on_exhaust</c> payoff fire per card. An empty (filtered) hand / no selection is a logged no-op. Under AutoSlay
     /// the run-scoped <c>AutoSlayCardSelector</c> auto-picks, so the picker never blocks the bot.</summary>
-    internal static async Task ExhaustCards(EffectSpec e, int n, PlayerChoiceContext ctx, Player owner, AbstractModel source)
+    internal static async Task<int> ExhaustCards(EffectSpec e, int n, PlayerChoiceContext ctx, Player owner, AbstractModel source)
     {
-        if (e.Pile == "draw") { await ExhaustFromDraw(e, n, ctx, owner); return; } // Phase BO (v66, gap #74)
+        if (e.Pile == "draw") return await ExhaustFromDraw(e, n, ctx, owner); // Phase BO (v66, gap #74)
         var pool = owner.PlayerCombatState.Hand.Cards.Where(c => HandKindMatches(c, e.CardKind)).ToList();
-        if (pool.Count == 0) { MainFile.Logger.Info($"[BC] exhaust_card {e.Cards}: no matching card in hand (no-op)."); return; }
+        if (pool.Count == 0) { MainFile.Logger.Info($"[BC] exhaust_card {e.Cards}: no matching card in hand (no-op)."); return 0; }
         List<CardModel> chosen;
         Func<CardModel, bool>? filter = e.CardKind == null ? null : c => HandKindMatches(c, e.CardKind);
         switch (e.Cards)
@@ -1217,23 +1251,24 @@ public static class EffectRunner
                 break;
             }
         }
-        if (chosen.Count == 0) { MainFile.Logger.Info($"[BC] exhaust_card {e.Cards}: no selection (no-op)."); return; }
+        if (chosen.Count == 0) { MainFile.Logger.Info($"[BC] exhaust_card {e.Cards}: no selection (no-op)."); return 0; }
         foreach (var c in chosen)
             await CardCmd.Exhaust(ctx, c);   // one at a time (the game's own rule) → Hook.AfterCardExhausted per card
         MainFile.Logger.Info($"[BC] exhaust_card {e.Cards}{(e.CardKind != null ? $" [{e.CardKind}]" : "")} x{chosen.Count} " +
                              $"({string.Join(", ", chosen.Select(c => $"'{c.Title}'"))}).");
+        return chosen.Count; // Phase BR (v70): the cards_removed count
     }
 
     /// <summary>Phase BO (v66, gap #74): EXHAUST FROM THE DRAW PILE — the player's pick (<c>CardSelectCmd.FromCombatPile</c> over
     /// the draw pile, the stock exhaust prompt fits) or a random one (CombatCardSelection), optionally filtered by
     /// <c>e.CardKind</c>. <c>CardCmd.Exhaust</c> moves a card from ANY pile and raises AfterCardExhausted, so every on_exhaust
     /// payoff fires per card. Empty (filtered) pile is a logged no-op.</summary>
-    private static async Task ExhaustFromDraw(EffectSpec e, int n, PlayerChoiceContext ctx, Player owner)
+    private static async Task<int> ExhaustFromDraw(EffectSpec e, int n, PlayerChoiceContext ctx, Player owner)
     {
         var pile = PileType.Draw.GetPile(owner);
         Func<CardModel, bool> ok = c => HandKindMatches(c, e.CardKind);
         var pool = pile.Cards.Where(ok).ToList();
-        if (pool.Count == 0) { MainFile.Logger.Info($"[BO] exhaust_card draw {e.Cards}: no matching card in the draw pile (no-op)."); return; }
+        if (pool.Count == 0) { MainFile.Logger.Info($"[BO] exhaust_card draw {e.Cards}: no matching card in the draw pile (no-op)."); return 0; }
         int take = Math.Min(Math.Max(1, n), pool.Count);
         List<CardModel> chosen;
         if (e.Cards == "random")
@@ -1250,12 +1285,13 @@ public static class EffectRunner
         else
             chosen = (await CardSelectCmd.FromCombatPile(ctx, pile, owner,
                 new CardSelectorPrefs(CardSelectorPrefs.ExhaustSelectionPrompt, take), ok)).ToList();
-        if (chosen.Count == 0) { MainFile.Logger.Info($"[BO] exhaust_card draw {e.Cards}: no selection (no-op)."); return; }
+        if (chosen.Count == 0) { MainFile.Logger.Info($"[BO] exhaust_card draw {e.Cards}: no selection (no-op)."); return 0; }
         foreach (var c in chosen)
         {
             await CardCmd.Exhaust(ctx, c);   // one at a time (the game's own rule) -> Hook.AfterCardExhausted per card
             MainFile.Logger.Info($"[BO] exhaust_card draw '{c.Title}' ({e.Cards}{(e.CardKind != null ? $", {e.CardKind}" : "")}).");
         }
+        return chosen.Count; // Phase BR (v70): the cards_removed count
     }
 
     /// <summary>Phase BC (v57, gap #53): the draw_until loop cap — a safety net, not a design number. A deck with NO
@@ -1633,6 +1669,9 @@ public static class EffectRunner
         "orb_count"                  => card.Owner?.PlayerCombatState?.OrbQueue?.Orbs?.Count ?? 0, // orb classes (BQ: also a `scale`)
         // Phase BQ (v68, gap #78): Compile Driver — the DISTINCT orb types you hold (the Conditions.orbs_match read).
         "orb_types"                  => card.Owner?.PlayerCombatState?.OrbQueue?.Orbs?.Select(o => o.GetType()).Distinct().Count() ?? 0,
+        // Phase BR (v70, gap #79): the cards THIS play's last discard / exhaust_card removed (the DataCard stash, set in Execute);
+        // before it is set (the in-hand preview) the other cards in hand — what a whole-hand discard / exhaust would remove.
+        "cards_removed"              => (card as DataCard)?.RemovedThisPlay ?? OtherCardsInHand(card),
         _ => 0,
     };
 
@@ -2344,6 +2383,45 @@ public static class EffectRunner
     internal static readonly HashSet<string> BlStatuses = ["temp_strength_down", "strength_down", "doom"];
 
     private static string MonsterName(Creature t) => t.Monster?.GetType().Name ?? "creature";
+
+    /// <summary>Phase BR (v70, gap #11): STUN the chosen enemy — the base Whistle call, <c>CreatureCmd.Stun</c>, which builds a
+    /// STUNNED MoveState (FollowUpStateId = the last logged move, MustPerformOnceBeforeTransitioning) and hands it to
+    /// <c>MonsterModel.SetMoveImmediate</c>. That only replaces the move when <c>NextMove.CanTransitionAway</c>: a locked boss
+    /// move / phase transition and an already-STUNNED enemy are naturally immune (the call is a no-op, logged applied=False).
+    /// <c>Creature.StunInternal</c> THROWS for a player and on an empty StateLog, so both are guarded (and the call is in a
+    /// try/catch). The stunned turn is observed through the Func overload: the stunMove runs when the STUNNED move is
+    /// performed (base default = nothing), so the "[BR] stunned turn performed" tag is the enemy actually losing its turn.</summary>
+    internal static async Task StunTarget(Creature? t, string cardName)
+    {
+        if (t?.Monster == null) { MainFile.Logger.Info($"[BR] stun skipped: no enemy target ('{cardName}')."); return; }
+        string name = MonsterName(t);
+        if (t.IsDead) { MainFile.Logger.Info($"[BR] stun skipped: '{name}' is dead ('{cardName}')."); return; }
+        var m = t.Monster;
+        if (m.MoveStateMachine == null || m.MoveStateMachine.StateLog.Count == 0)
+        { MainFile.Logger.Info($"[BR] stun skipped: empty move log on '{name}' ('{cardName}')."); return; }
+        string old = m.NextMove?.Id ?? "none";
+        bool canTransition = m.NextMove?.CanTransitionAway ?? true;
+        try
+        {
+            await CreatureCmd.Stun(t, _ =>
+            {
+                MainFile.Logger.Info($"[BR] stunned turn performed '{name}' (lost its turn; repeats '{old}' next).");
+                return Task.CompletedTask;
+            });
+        }
+        catch (Exception ex)
+        {
+            MainFile.Logger.Info($"[BR] stun skipped: {ex.GetType().Name} on '{name}' ({ex.Message}) ('{cardName}').");
+            return;
+        }
+        string now = m.NextMove?.Id ?? "none";
+        bool applied = now == "STUNNED" && old != "STUNNED";
+        MainFile.Logger.Info($"[BR] stun '{name}': next move {old} -> {now} (applied={applied}) ('{cardName}').");
+        if (!applied)
+            MainFile.Logger.Info(old == "STUNNED"
+                ? $"[BR] stun skipped: already stunned '{name}' (STUNNED must be performed first)."
+                : $"[BR] stun skipped: cannot transition '{name}' (locked move '{old}', CanTransitionAway={canTransition}).");
+    }
 
     /// <summary>Phase BL (v64): apply one of <see cref="BlStatuses"/> to <paramref name="t"/> with a literal amount and log
     /// the smoke tags. A Strength-down that leaves Strength unchanged while an Artifact stack was spent is the ARTIFACT

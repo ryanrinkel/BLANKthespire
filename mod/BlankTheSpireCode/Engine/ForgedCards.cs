@@ -42,7 +42,17 @@ public static class ForgedCards
     /// v10 (forged statuses, Phase J): + CharacterSpec.StatusPool (a class's ≤4 custom modifier-family statuses
     /// read from `status_pool`; see ForgedCharacters / ForgedStatusPower). Class cards may apply a custom status
     /// by pool name via the `apply_status_custom` op (class-only, like custom-orb channels).</summary>
-    public const int VocabVersion = 69; // 69: Phase BN (VOCAB_EXPANSION_6, gaps #71-#73) — ON-KILL, RANDOM GENERATION, AUTOPLAY:
+    public const int VocabVersion = 70; // 70: Phase BR (VOCAB_EXPANSION_6, gaps #11/#79) — STUN, DISCARD-ALL + CARDS_REMOVED, GROWING
+                                        //     TURN-START DAMAGE: card-only flag-op `stun` (Whistle — CreatureCmd.Stun on the
+                                        //     chosen enemy; guard rails: target enemy, needs exhaust, cost 2+, uncommon/rare,
+                                        //     never a payload / with a self-routing flag-op; class-level: one stun card per class
+                                        //     and no exhaust-pile recursion / add_card / transform / graft into it); `discard`
+                                        //     `cards:"all"` ("Discard your hand." — the batch CardCmd.Discard, Sly still fires);
+                                        //     scale + hits_scale `cards_removed` (the cards this play's last discard /
+                                        //     exhaust_card removed — Calculated Gamble / Fiend Fire; only after one in the list);
+                                        //     `grow` in a turn_start payload damage (Rolling Boulder, mod-native fire counter on
+                                        //     ForgedTriggerPower, ticks on AfterSideTurnStart). No codec change.
+                                        // 69: Phase BN (VOCAB_EXPANSION_6, gaps #71-#73) — ON-KILL, RANDOM GENERATION, AUTOPLAY:
                                         //     condition `target_killed` (Feed / Sunder — play-local: EffectRunner.Execute ORs
                                         //     every damage op's WasTargetKilled over the targets whose powers were fatal BEFORE
                                         //     the hit; AoE = any kill; only after a damage op, never a trigger / orb gate);
@@ -559,6 +569,7 @@ public static class ForgedCards
          "cost_delta", // Phase BP (v67, gap #76): this card's own cost moves on an event (Stomp / Momentum Strike / Kingly Kick / Modded). Card-only.
          "trigger_passive", "lose_orb_slot", // Phase BQ (v68, gap #78): Darkness / Tesla Coil (OrbCmd.Passive), Bulk Up (OrbCmd.RemoveSlots). Card-only, orb classes.
          "add_random_card", "autoplay", // Phase BN (v69, gaps #72/#73): Discovery / Infernal Blade, Havoc / Uproar. Payload on turn_start only.
+         "stun", // Phase BR (v70, gap #11): Whistle — stun the chosen enemy (CreatureCmd.Stun). Card-only flag-op with guard rails.
          "apply_custom", // EXPLORE SPIKE: apply a hardcoded modifier-family custom status (not in LLM contract)
          "gaptest_enemy_artifact", // PHASE BL GAPTEST (not in the LLM contract): N Artifact on the card's target(s) — the sign-flip smoke
          "summon_spike"]; // PHASE K SPIKE: summon a hardcoded player pet (not in LLM contract)
@@ -846,6 +857,37 @@ public static class ForgedCards
     private static readonly HashSet<string> ExhaustPiles = ["hand", "draw"];
     internal static readonly HashSet<string> PileFlagOps = ["return_to_hand", "to_draw_top", "return_next_turn"];
     private static readonly HashSet<string> PickModes = ["random", "choose"];
+    // Phase BR (v70, gap #79): discard's pick modes = the shared random / choose + `all` ("Discard your hand." — no amount;
+    // card-only). retrieve_card keeps PickModes. Lockstep with validator._DISCARD_PICK_MODES + the schema clause.
+    private static readonly HashSet<string> DiscardPickModes = ["random", "choose", "all"];
+    // Phase BR (v70, gap #11): the stun guard rails (plan §7 decision 7 — a stun is a hard lock if it is ever repeatable).
+    // Card-level here (target enemy, exhaust on base + upgrade, cost 2+, uncommon/rare, never with a self-routing flag-op,
+    // one per list, never a payload); class-level in ForgedCharacters.TryImportClassBundle + class_forge (one stun card
+    // per class; no exhaust-pile recursion / add_card / transform_card / graft_card into it). Lockstep with validator._STUN_*.
+    internal const int StunMinCost = 2;
+
+    /// <summary>Phase BR (v70, gap #11): the CLASS-level stun guard rails (the card validators cannot see the class): at most
+    /// ONE stun card per class, and a class with a stun card may not also re-buy it — no <c>retrieve_card pile:"exhaust"</c>
+    /// (Exhume: the exhausted stun card back to hand) and no <c>add_card</c> / <c>transform_card</c> / <c>graft_card</c> naming
+    /// the stun card (a fresh copy is a fresh stun). (add_random_card never generates a stun card — EffectRunner's pool
+    /// filter.) Returns the first violation, or null. Lockstep with class_forge._stun_class_conflict.</summary>
+    internal static string? StunClassError(IReadOnlyList<CardSpec> cards)
+    {
+        var stun = cards.Where(c => c.HasOp("stun")).ToList();
+        if (stun.Count == 0) return null;
+        if (stun.Count > 1)
+            return $"a class may carry at most ONE stun card (found {stun.Count}: {string.Join(", ", stun.Select(c => c.Title ?? c.Id))}).";
+        string sid = stun[0].Id;
+        foreach (var c in cards)
+            foreach (var e in c.Effects.Concat(c.Upgrade ?? []).SelectMany(x => new[] { x }.Concat(x.Triggered ?? [])))
+            {
+                if (e.Op == "retrieve_card" && e.Pile == "exhaust")
+                    return $"'{c.Title ?? c.Id}' returns cards from the exhaust pile — a class with a stun card may not re-buy it.";
+                if (e.Op is "add_card" or "transform_card" or "graft_card" && string.Equals(e.CardId, sid, StringComparison.OrdinalIgnoreCase))
+                    return $"'{c.Title ?? c.Id}' makes a copy of the stun card '{stun[0].Title ?? sid}' — a stun must not repeat.";
+            }
+        return null;
+    }
     // Phase BC (v57, gap #52): the exhaust_card pick modes (the base-game shapes: Burning Pact chooses, True Grit
     // rolls, Purity is "up to N", Second Wind / Fiend Fire take all) and its per-play cap; the hand filter the two
     // hand ops share (`non_attack` is the Pillage / Second Wind filter; cost_shift keeps its own attack/skill/power/all).
@@ -923,7 +965,8 @@ public static class ForgedCards
          "exhaust_pile_size", "discard_pile_size", "discards_this_turn", "cards_drawn_this_turn", "cards_drawn_this_combat",
          "energy_spent_this_turn", "hp_loss_events_this_combat", "cards_generated_this_combat", "total_enemy_poison",
          "target_status_stacks", "to_hand_size",
-         "orb_count", "orb_types"]; // Phase BQ (v68, gap #78): your orbs / their distinct types (Compile Driver); damage/block/draw, orb classes
+         "orb_count", "orb_types", // Phase BQ (v68, gap #78): your orbs / their distinct types (Compile Driver); damage/block/draw, orb classes
+         "cards_removed"]; // Phase BR (v70, gap #79): the cards this play's last discard / exhaust_card removed (Calculated Gamble); damage/block/draw
     // Phase AM (v43): the AM scales that may NOT drive a draw. Phase BJ (v62): + five history/pile reads.
     private static readonly HashSet<string> DamageBlockOnlyScales =
         ["block", "hp_lost_this_turn", "draw_pile_count", "plays_this_combat",
@@ -938,7 +981,8 @@ public static class ForgedCards
     // Lockstep with validator._HITS_SCALE_SOURCES + the schema enum + EffectRunner.ScaleValue.
     internal static readonly HashSet<string> HitsScaleSources =
         ["x", "attacks_played_this_turn", "cards_in_hand", "skills_in_hand", "plays_this_combat",
-         "exhaust_pile_size", "hp_loss_events_this_combat", "energy_spent_this_turn", "orb_count"];
+         "exhaust_pile_size", "hp_loss_events_this_combat", "energy_spent_this_turn", "orb_count",
+         "cards_removed"]; // Phase BR (v70, gap #79): Fiend Fire — one hit per card this play's exhaust_card / discard removed
     // Phase BJ (v62): the statuses target_status_stacks may read (Bully = Vulnerable; Weak; Poison).
     internal static readonly HashSet<string> StatusStackStatuses = ["vulnerable", "weak", "poison",
         "doom"]; // Phase BL (v64, gap #67): Time's Up — damage equal to the enemy's Doom
@@ -1207,6 +1251,23 @@ public static class ForgedCards
         // Phase BO (v66, gap #74): a return_to_hand card costs 1+ (a 0-cost one replays forever; X-cost re-spends nothing).
         if (effects.Any(e => e.Op == "return_to_hand") && (costsX || cost < 1 || (upgradedCost is { } rc && rc < 1)))
         { error = "'return_to_hand' needs a card that costs 1+ energy (base and upgrade; a 0-cost one comes back forever)."; return false; }
+        // Phase BR (v70, gap #11): the stun guard rails (plan §7 decision 7 — a hard lock if it is ever repeatable). The card
+        // Exhausts (base AND upgrade — an upgrade may not drop it), costs 2+ (base and upgrade; never X), is uncommon / rare
+        // and never routes itself back (return_to_hand / to_draw_top / return_next_turn). Class-level rails live in
+        // ForgedCharacters.TryImportClassBundle (one stun card per class; no exhaust-pile recursion / copies of it).
+        if (effects.Concat(upgrade ?? []).Any(e => e.Op == "stun"))
+        {
+            if (rarity is not (CardRarity.Uncommon or CardRarity.Rare))
+            { error = $"'stun' belongs on an UNCOMMON or RARE card (got '{rarity}')."; return false; }
+            if (!effects.Any(e => e.Op == "exhaust") || (upgrade != null && !upgrade.Any(e => e.Op == "exhaust")))
+            { error = "'stun' needs 'exhaust' on the card (base and upgrade) — a stun that comes back every turn is a hard lock."; return false; }
+            if (costsX || cost < StunMinCost || (upgradedCost is { } sc && sc < StunMinCost))
+            { error = $"'stun' needs a card that costs {StunMinCost}+ energy (base and upgrade; never X)."; return false; }
+            if (effects.Concat(upgrade ?? []).Any(e => PileFlagOps.Contains(e.Op)))
+            { error = "'stun' can't share a card with return_to_hand / to_draw_top / return_next_turn (a stun must not come back)."; return false; }
+            if (type == CardType.Power)
+            { error = "'stun' is not allowed on a Power (it needs a chosen enemy)."; return false; }
+        }
         // Phase BD (v58, gap #58): a held_discount needs a cost to lower — never on a 0-cost or X-cost card.
         if (effects.Concat(upgrade ?? []).Any(e => e.Op == "held_discount") && (costsX || cost < 1))
         { error = "'held_discount' needs a card that costs 1+ energy (not 0-cost, not X-cost) — there is nothing to discount."; return false; }
@@ -1464,8 +1525,17 @@ public static class ForgedCards
                         ? $"apply_status '{e.Status}' must use amount {bmCap}; got {e.Amount}."
                         : $"apply_status '{e.Status}' amount must be {bmMin}..{bmCap}; got {e.Amount}.";
             }
-            if (AmountOps.Contains(e.Op) && !e.IsScaled && e.Amount < 1)
+            if (AmountOps.Contains(e.Op) && !e.IsScaled && e.Amount < 1
+                && !(e.Op == "discard" && e.Cards == "all")) // Phase BR (v70): "Discard your hand." carries no amount
                 return $"op '{e.Op}' needs amount >= 1.";
+            // Phase BR (v70, gap #11): `stun` is a flag-op on a single-enemy card (CreatureCmd.Stun the chosen target).
+            if (e.Op == "stun")
+            {
+                if (e.Amount != 0 || e.Status != null || e.IsScaled || e.Hits > 1)
+                    return "stun is a flag-op (no amount / status / scale / hits).";
+                if (target != null && target != TargetType.AnyEnemy)
+                    return "stun needs a single-enemy card (target \"enemy\") — it stuns the enemy you choose.";
+            }
             if (e.Hits < 1)
                 return $"op '{e.Op}' has hits < 1.";
             if (e.Hits > 1 && e.Op != "damage" && e.Op != "summon_attack")
@@ -1894,8 +1964,11 @@ public static class ForgedCards
             // absent) or `choose` (the player picks which hand cards to discard; card-only — ValidateTrigger rejects it).
             else if (e.Op == "discard")
             {
-                if (e.Cards != null && !PickModes.Contains(e.Cards))
-                    return $"discard 'cards' must be one of {string.Join("/", PickModes)}; got '{e.Cards}'.";
+                if (e.Cards != null && !DiscardPickModes.Contains(e.Cards))
+                    return $"discard 'cards' must be one of {string.Join("/", DiscardPickModes)}; got '{e.Cards}'.";
+                // Phase BR (v70, gap #79): "Discard your hand." — the whole hand, so no amount.
+                if (e.Cards == "all" && (e.Amount != 0 || e.IsScaled))
+                    return "discard 'cards':'all' takes no amount (it discards your whole hand).";
             }
             else if (e.Cards != null && e.Op is not ("retrieve_card" or "exhaust_card" or "put_back" or "grant_keyword")) // validated above
                 return $"'cards' only applies to upgrade_card/discard/retrieve_card/exhaust_card/put_back/grant_keyword (op '{e.Op}').";
@@ -2180,6 +2253,19 @@ public static class ForgedCards
                 if (list.Count(e => e.Op == one) > 1)
                     return $"at most one '{one}' effect per card.";
         }
+        // Phase BR (v70, gap #79): `cards_removed` reads the cards THIS play's last discard / exhaust_card removed, so it needs
+        // one EARLIER in the same list (the damage_dealt_unblocked ordering rule — base and upgrade independently). One stun
+        // per list.
+        foreach (var list in new[] { effects, upgrade })
+        {
+            if (list == null) continue;
+            for (int i = 0; i < list.Length; i++)
+                if ((list[i].Scale == "cards_removed" || list[i].HitsScale == "cards_removed")
+                    && !list.Take(i).Any(p => p.Op is "discard" or "exhaust_card"))
+                    return "a 'cards_removed' read needs a 'discard' or 'exhaust_card' op earlier in the same card (it counts the cards that op removed).";
+            if (list.Count(e => e.Op == "stun") > 1)
+                return "at most one 'stun' effect per card.";
+        }
         // Phase AX (v53, gap #44): a `when:forged_ge` gate reads the LIVE Forge counter at execution time, and
         // effects resolve top-to-bottom — so a gated payoff placed AFTER the spend_forge that empties the counter
         // would test a number the same card just spent (the gate reads 0 and the payoff never fires). Order the
@@ -2367,8 +2453,25 @@ public static class ForgedCards
                 return $"'choose_of' / 'free_this_turn' / 'from' are not allowed on a trigger '{t.Op}'.";
             // Phase U (gap #23): `grow` is a per-card-play attack mechanic (a card growing as YOU replay IT) — it
             // has no meaning in a trigger payload (which re-runs from a granted power, not a card the player replays).
+            // Phase BR (v70, gap #79): ONE exception — Rolling Boulder. A turn_start payload whose ONLY effect is a targeted
+            // damage may grow by `grow` each time it fires (a fire counter on the granted ForgedTriggerPower; the tick runs on
+            // AfterSideTurnStart, PoisonPower's hook). Never scaled / multi-hit / gated (the "Increases by N each turn" text
+            // must stay true), 1..9 and <= the base damage like the card-level grow.
             if (t.HasGrow)
-                return "'grow' is not allowed in a trigger payload (it's a per-card-play attack mechanic).";
+            {
+                if (e.Trigger != "turn_start" || t.Op != "damage" || t.Target == null)
+                    return "'grow' in a trigger payload is only allowed on a targeted 'damage' of a turn_start trigger (Rolling Boulder).";
+                if (e.Triggered.Length != 1)
+                    return "a growing turn_start damage must be the trigger's ONLY payload effect.";
+                if (t.IsScaled || t.Hits > 1)
+                    return "a growing payload damage can't also be scaled or multi-hit.";
+                if (e.When != null)
+                    return "a growing turn_start trigger can't carry a 'when' (it grows every turn it fires).";
+                if (t.Grow < 1 || t.Grow > 9)
+                    return $"'grow' must be 1..9 (got {t.Grow}).";
+                if (t.Grow > t.Amount)
+                    return $"'grow' ({t.Grow}) can't exceed the base damage ({t.Amount}).";
+            }
             if (t.HasGrowHeld) // Phase BD (v58)
                 return "'grow_held' is not allowed in a trigger payload (it's a per-card held-turn mechanic).";
             if (t.Keep || t.Which != null || t.Orbs != null || t.PerEnemy) // Phase BQ (v68, gap #78): card-only orb extras
@@ -2663,7 +2766,7 @@ public static class ForgedCards
         "heal"         => "Heal",
         "lose_hp"      => "Loss",
         "gain_max_hp"  => "MaxHp", // Phase AN (v44): the Max HP gain (a real MaxHpVar, upgrade-aware in card text)
-        "discard"      => "Discard", // Phase R (gap #17): the random-discard count (upgrade-aware in card text)
+        "discard"      => e.Cards == "all" ? null : "Discard", // Phase R (gap #17): the random-discard count (BR v70: "Discard your hand." has none)
         "scry"         => "Scry", // Phase AA (gap #17 R-2): the top-of-draw look count (upgrade-aware in card text)
         "apply_status" => "status:" + e.Status,
         _ => null, // channel_orb / evoke / gain_orb_slot / exhaust / innate / retain / ethereal declare no var
@@ -2760,6 +2863,11 @@ public static class ForgedCards
             _ => "",
         };
         var parts = new List<string>(effects.Length);
+        // Phase BR (v70, gap #79): a `cards_removed` read names the op that removed the cards (the LAST discard / exhaust_card
+        // before it in the list — the validator requires one): "Deal damage equal to the cards Exhausted." /
+        // "Deal {Damage} damage for each card Exhausted." Lockstep with cardgen.describe.
+        string removed = "Discarded";
+        string Sp(EffectSpec x) => x.Scale == "cards_removed" ? $"the cards {removed}" : ScalePhrase(x);
         foreach (var e in effects)
         {
             int before = parts.Count;
@@ -2776,7 +2884,7 @@ public static class ForgedCards
                                 ? $"Deal {e.Amount} damage{dmgSuffix}, plus your Forge{ub}."
                                 : e.Scale == "tag_cards_owned"
                                     ? $"Deal {e.Amount} damage{dmgSuffix}, plus 1 per '{e.Tag}' card you own{ub}."
-                                    : $"Deal damage equal to {ScalePhrase(e)}{dmgSuffix}{ub}.");
+                                    : $"Deal damage equal to {Sp(e)}{dmgSuffix}{ub}.");
                     else if (e.HasGrow) // Phase U (gap #23): {CalculatedDamage} (the base-game calc-var name; a bare {Damage} is unresolvable here) shows the CURRENT grown value (calc-var)
                         parts.Add($"Deal {{CalculatedDamage}} damage{dmgSuffix}{ub}. Grows by {e.Grow} each time it is played this combat.");
                     else if (e.HasGrowHeld) // Phase BD (v58, gap #57): Windmill Strike — the calc-var climbs per held turn
@@ -2784,6 +2892,7 @@ public static class ForgedCards
                     else if (e.HitsScale != null) // Phase BK (v63, gap #65): Whirlwind / Finisher — lockstep with cardgen.describe
                         parts.Add(e.HitsScale == "x"
                             ? $"Deal {{Damage}} damage X times{dmgSuffix}{ub}."
+                            : e.HitsScale == "cards_removed" ? $"Deal {{Damage}} damage for each card {removed}{dmgSuffix}{ub}."
                             : $"Deal {{Damage}} damage for each {HitsPhrase(e.HitsScale)}{dmgSuffix}{ub}.");
                     else
                         parts.Add(e.Hits > 1
@@ -2795,19 +2904,20 @@ public static class ForgedCards
                                         : e.Scale == "x" ? "Gain X Block."
                                         : e.Scale == "forged" ? $"Gain {e.Amount} Block, plus your Forge."
                                         : e.Scale == "tag_cards_owned" ? $"Gain {e.Amount} Block, plus 1 per '{e.Tag}' card you own."
-                                        : $"Gain Block equal to {ScalePhrase(e)}."); break;
+                                        : $"Gain Block equal to {Sp(e)}."); break;
                 case "draw":        parts.Add(!e.IsScaled ? "Draw {Cards} card(s)."
                                         : e.Scale == "x" ? "Draw X cards."
                                         : e.Scale == "to_hand_size" ? "Draw cards until you have {Cards} in hand." // Phase BJ (v62): Expertise
-                                        : $"Draw cards equal to {ScalePhrase(e.Scale)}."); break;
+                                        : $"Draw cards equal to {Sp(e)}."); break;
                 case "gain_energy": parts.Add(e.Scale == "energy" ? "Double your energy." : "Gain {Energy} energy."); break; // Phase BJ (v62)
                 case "heal":        parts.Add(e.IsScaled ? $"Heal HP equal to {ScalePhrase(e.Scale)}." : "Heal {Heal} HP."); break;
                 case "lose_hp":     parts.Add("Lose {Loss} HP."); break;
                 case "gain_max_hp": parts.Add("Gain {MaxHp} Max HP."); break; // Phase AN (v44): the Feed payoff (MaxHpVar)
-                case "discard":     parts.Add(e.Cards == "choose" ? "Discard {Discard} card(s) of your choice." // Phase AP (v46): the chosen form
-                                                                  : "Discard {Discard} random card(s)."); break; // Phase R (gap #17)
+                case "discard":     parts.Add(e.Cards == "all" ? "Discard your hand." // Phase BR (v70, gap #79): the whole hand
+                                        : e.Cards == "choose" ? "Discard {Discard} card(s) of your choice." // Phase AP (v46): the chosen form
+                                                                  : "Discard {Discard} random card(s)."); removed = "Discarded"; break; // Phase R (gap #17)
                 case "retrieve_card":   parts.Add(RetrieveSentence(e)); break;   // Phase AP (v46): literal (no var), lockstep with cardgen
-                case "exhaust_card":    parts.Add(ExhaustCardSentence(e)); break; // Phase BC (v57, gap #52): literal (no var), lockstep with cardgen
+                case "exhaust_card":    parts.Add(ExhaustCardSentence(e)); removed = "Exhausted"; break; // Phase BC (v57, gap #52): literal (no var), lockstep with cardgen
                 case "draw_until":      parts.Add(DrawUntilSentence(e)); break;   // Phase BC (v57, gap #53): literal (no var), lockstep with cardgen
                 case "add_status_card": parts.Add(StatusCardSentence(e)); break; // Phase AP (v46): literal (no var), lockstep with cardgen
                 case "scry":        parts.Add("Scry {Scry}. (Look at that many cards from the top of your draw pile and discard any.)"); break; // Phase AA (gap #17 R-2)
@@ -2841,6 +2951,7 @@ public static class ForgedCards
                 // Phase BN (v69, gaps #72/#73): Discovery / Infernal Blade, Havoc / Uproar. Byte-lockstep with cardgen.describe.
                 case "add_random_card":  parts.Add(AddRandomCardSentence(e, capitalize: true)); break;
                 case "autoplay":         parts.Add(AutoplaySentence(e, capitalize: true)); break;
+                case "stun":             parts.Add("Stun the enemy."); break; // Phase BR (v70, gap #11): Whistle. Byte-lockstep with cardgen.describe
                 case "gaptest_enemy_artifact": parts.Add($"Enemies gain {Math.Max(1, e.Amount)} Artifact (gap test)."); break; // PHASE BL GAPTEST only
                 case "corruption":  parts.Add("Your Skills cost 0."); parts.Add("Your Skills Exhaust when played."); break; // Phase AB (gap #20)
                 case "cost_shift":  parts.Add(CostShiftSentence(e)); break; // Phase AO (v45): the discount sentence (literal, no var)
@@ -3055,6 +3166,7 @@ public static class ForgedCards
                                   : sc ? $"deal damage equal to {eq}{to}"
                                   : fg ? $"deal {e.Amount} damage{to}, plus your Forge"
                                   : e.Hits > 1 ? $"deal {e.Amount} damage {e.Hits} times{to}" // Phase AL: multi-hit payload
+                                  : e.HasGrow ? $"deal {e.Amount} damage{to}. Increases by {e.Grow} each turn" // Phase BR (v70): Rolling Boulder
                                   : $"deal {e.Amount} damage{to}",
             "block"         => sc ? $"gain Block equal to {eq}" : fg ? $"gain {e.Amount} Block, plus your Forge" : $"gain {e.Amount} Block",
             "draw"          => sc ? $"draw cards equal to {eq}" : $"draw {e.Amount} card(s)",
@@ -3237,6 +3349,8 @@ public static class ForgedCards
     /// cardgen._exhaust_card_sentence.</summary>
     private static string ExhaustCardSentence(EffectSpec e)
     {
+        // Phase BR (v70, gap #79): the untyped whole hand reads "Exhaust your hand." (Fiend Fire / Second Wind's shape).
+        if (e.Cards == "all" && e.CardKind == null && e.Pile != "draw") return "Exhaust your hand.";
         var (one, many) = HandKindWords(e.CardKind);
         int n = Math.Max(1, e.Amount);
         string what = e.Cards switch

@@ -57,6 +57,10 @@ def card_tokens(card: dict) -> set[str]:
         toks.add("every_n")
     if cc.hits_scale:  # Phase BK (v63): the hit-count field is a token strike_tempo / big_energy / horde_breaker claim
         toks.add("hits_scale")
+        if "cards_removed" in cc.hits_scale:  # Phase BR (v70): Fiend Fire touches the cards_removed read
+            toks.add("cards_removed")
+    if cc.grow:  # Phase BR (v70): `grow` (Rampage / the Rolling Boulder payload) is a token power_ramp / countdown_ripen claim
+        toks.add("grow")
     # Phase BP (v67): an on_debuff_applied status filter touches the status it watches (Vicious is a Vulnerable card).
     for e in (card or {}).get("effects") or []:
         if isinstance(e, dict) and e.get("op") == "add_trigger" and e.get("trigger") == "on_debuff_applied" and e.get("status"):

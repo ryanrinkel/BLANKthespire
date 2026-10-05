@@ -278,7 +278,9 @@ def test_w2_menu_keys_wired() -> None:
                                                   "cards_generated_this_combat", "total_enemy_poison",
                                                   "target_status_stacks", "to_hand_size",
                                                   # Phase BK (v63)
-                                                  "hits_scale"}, "the scale menu")
+                                                  "hits_scale",
+                                                  # Phase BR (v70)
+                                                  "cards_removed"}, "the scale menu")
     check({k for k, _d, _k in coverage.SCALE_MENU_KIND} == {"tag_cards_owned", "forged",
                                                              "orb_count", "orb_types"}, "the gated scale keys")  # Phase BQ (v68)
     check({k for k, _ in coverage.EXOTIC_NOMINATE_ONLY} == {"ritual", "barricade", "intangible"}, "nominate-only exotics")
@@ -353,6 +355,8 @@ def test_w2_menu_keys_wired() -> None:
         "to_hand_size": {"op": "draw", "amount": 6, "scale": "to_hand_size"},
         # Phase BK (v63): the scaled hit count
         "hits_scale": {"op": "damage", "amount": 6, "hits_scale": "attacks_played_this_turn"},
+        # Phase BR (v70): what an earlier discard / exhaust_card removed (Calculated Gamble)
+        "cards_removed": {"op": "draw", "amount": 1, "scale": "cards_removed"},
     }
     check(set(samples) == set(_w2_keys()), "a sample exists for every W2.2 key")
     for key, eff in samples.items():

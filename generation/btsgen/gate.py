@@ -117,7 +117,8 @@ GATED_OP_ORDER = ("balance_step", "add_card", "discard", "upgrade_card", "scry",
                   # Phase BO (v66): recursion / put-back / reshuffle / keyword grants, unmeasured
                   "return_to_hand", "to_draw_top", "return_next_turn", "put_back", "shuffle_hand", "grant_keyword",
                   "cost_delta",  # Phase BP (v67): the self-cost rule, unmeasured
-                  "add_random_card", "autoplay")  # Phase BN (v69): Discovery / Havoc, unmeasured
+                  "add_random_card", "autoplay",  # Phase BN (v69): Discovery / Havoc, unmeasured
+                  "stun")  # Phase BR (v70): Whistle, unmeasured
 
 # ---- Phase 1b: which gate UNIT each schema element belongs to. A unit is a gated op name or a family name. An
 # element whose units are all gated moves to the tail (families are "fam:<name>", so the Forge family never

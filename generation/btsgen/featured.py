@@ -232,6 +232,12 @@ FEATURED_MENU: list[Featured] = [
              'it.") or from "draw_random" + card_type attack (Uproar), or a rare POWER whose turn_start payload autoplays '
              '(Mayhem).',
              lambda cc: "autoplay" in cc.ops or "autoplay" in cc.payload_ops),
+    # Phase BR (v70, gap #79): the whole-hand dump that pays per card removed (Calculated Gamble / Fiend Fire).
+    Featured("hand_dump", 'a card that dumps your WHOLE hand and pays per card (discard / exhaust_card cards "all" + "cards_removed")',
+             'REQUIRED: add a card that removes your hand FIRST - discard cards "all" ("Discard your hand.") or exhaust_card '
+             'cards "all" ("Exhaust your hand.") - then pays per card: a draw with scale "cards_removed" (Calculated Gamble) '
+             'or a damage with hits_scale "cards_removed" (Fiend Fire, rare, exhaust).',
+             lambda cc: "cards_removed" in cc.scales or "cards_removed" in cc.hits_scale),
     # Phase BF (v60, gap #54): the setup-then-release beat on the base game's own amplifiers.
     Featured("setup_spike", 'a SETUP card that spikes your next Attack (apply_status vigor) or a rare that doubles your Attacks for a turn (apply_status double_damage)',
              'REQUIRED: add a skill with apply_status vigor (amount 3-6: your NEXT Attack deals that much more, then it '

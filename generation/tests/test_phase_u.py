@@ -77,8 +77,8 @@ def test_rejects(v: CardValidator) -> None:
     # two calc-vars (grow damage + scaled block) on one card
     bad(_card([{"op": "damage", "amount": 8, "grow": 4}, {"op": "block", "amount": 5, "scale": "x"}], cost="X"),
         "grow damage + scaled block = two calc-vars must reject")
-    # grow inside a trigger payload
-    payload = _card([{"op": "add_trigger", "trigger": "turn_start",
+    # grow inside a trigger payload (Phase BR v70: legal ONLY as the turn_start Rolling Boulder — any other trigger rejects)
+    payload = _card([{"op": "add_trigger", "trigger": "turn_end",
                       "effects": [{"op": "damage", "amount": 6, "grow": 3, "target": "enemy"}]}],
                     **{"type": "power", "target": "self"})
     bad(payload, "grow inside a trigger payload must reject")

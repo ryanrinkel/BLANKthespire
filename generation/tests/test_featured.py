@@ -171,6 +171,7 @@ def test_detectors_round_trip() -> None:
         "kill_payoff": _card([{"op": "damage", "amount": 24}, {"op": "gain_energy", "amount": 3, "when": {"kind": "target_killed"}}]),
         "discovery": _card([{"op": "add_random_card", "pile": "hand", "choose_of": 3, "free_this_turn": True}, {"op": "exhaust"}]),
         "havoc_play": _card([{"op": "autoplay", "from": "draw_top"}]),
+        "hand_dump": _card([{"op": "exhaust_card", "cards": "all"}, {"op": "damage", "amount": 7, "hits_scale": "cards_removed"}]),  # Phase BR (v70)
         # Phase BF (v60): the next-attack spike
         "setup_spike": _card([{"op": "apply_status", "status": "vigor", "amount": 4}, {"op": "draw", "amount": 1}]),
         # Phase BE (v59): the Venom engine

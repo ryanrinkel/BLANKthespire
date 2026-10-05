@@ -848,14 +848,16 @@
           "scale",
           "temp_strength_down",
           "strength_down",
-          "block_next_turn"
+          "block_next_turn",
+          "stun"
         ],
         "class_kind": "normal"
       },
       "buildable": true,
       "gap_refs": [
         "VOCABULARY_GAPS#66",
-        "VOCABULARY_GAPS#70"
+        "VOCABULARY_GAPS#70",
+        "VOCABULARY_GAPS#11"
       ],
       "base_synergies": {
         "hooks": [
@@ -959,7 +961,7 @@
           "Weak to enemy scaling"
         ]
       },
-      "build_notes": "Enemy Strength loss (v64) is Block's twin: `temp_strength_down` (Piercing Wail) blunts the hit you are about to take, `strength_down` (Malaise) every hit after. Next-turn Block (v65): `block_next_turn` banks Block for next turn (Prolong: scale block)."
+      "build_notes": "Enemy Strength loss (v64) is Block's twin: `temp_strength_down` (Piercing Wail) blunts the hit you are about to take, `strength_down` (Malaise) every hit after. Next-turn Block (v65): `block_next_turn` banks Block for next turn (Prolong: scale block). `stun` (v70): ONE Exhaust card per class stuns an enemy so its next attack never lands - the emergency brake."
     },
     {
       "id": "strength_berserk",
@@ -2172,14 +2174,16 @@
           "card_type",
           "every_n",
           "echo_form",
-          "replay_next"
+          "replay_next",
+          "grow"
         ],
         "class_kind": "normal"
       },
       "buildable": true,
       "gap_refs": [
         "VOCABULARY_GAPS#62",
-        "VOCABULARY_GAPS#69"
+        "VOCABULARY_GAPS#69",
+        "VOCABULARY_GAPS#79"
       ],
       "base_synergies": {
         "hooks": [
@@ -2268,13 +2272,13 @@
           "Dead draws late in a fight"
         ]
       },
-      "build_notes": "Replays (v65): a rare `echo_form` Power (first card each turn plays twice) and `replay_next` power (your next Power plays twice)."
+      "build_notes": "Replays (v65): a rare `echo_form` Power (first card each turn plays twice) and `replay_next` power (your next Power plays twice). A turn_start damage may `grow` (v70): Rolling Boulder hits harder every turn."
     },
     {
       "id": "countdown_ripen",
       "name": "Ripening / delayed payoff",
       "description": "Plant something that does nothing now and goes off a few turns later.",
-      "build_notes": "Every ripening effect must be trackable: the player should always see how many turns are left before it goes off (shown as a buff on the player that counts down). Mix a few ripening cards with cards that keep the player alive in the meantime, so the wait feels like planning, not dead turns. A `target_intends_attack` gate (v62) times a payoff to the enemy's attack turn. `doom` (v64) is the enemy's own countdown: it dies at the end of its turn once its HP is at or below its Doom.",
+      "build_notes": "Every ripening effect must be trackable: the player should always see how many turns are left before it goes off (shown as a buff on the player that counts down). Mix a few ripening cards with cards that keep the player alive in the meantime, so the wait feels like planning, not dead turns. A `target_intends_attack` gate (v62) times a payoff to the enemy's attack turn. `doom` (v64) is the enemy's own countdown: it dies at the end of its turn once its HP is at or below its Doom. A turn_start damage that will `grow` (v70, Rolling Boulder) is a clock that keeps ticking up.",
       "metaphors": [
         "the seed",
         "dormancy",
@@ -2306,7 +2310,8 @@
           "ripen",
           "add_trigger",
           "target_intends_attack",
-          "doom"
+          "doom",
+          "grow"
         ],
         "class_kind": "normal"
       },
@@ -2314,7 +2319,8 @@
       "gap_refs": [
         "VOCABULARY_GAPS#6",
         "VOCABULARY_GAPS#64",
-        "VOCABULARY_GAPS#67"
+        "VOCABULARY_GAPS#67",
+        "VOCABULARY_GAPS#79"
       ],
       "base_synergies": {
         "hooks": [
@@ -2471,7 +2477,7 @@
       "id": "madness_discard",
       "name": "Madness / discard-matters",
       "description": "Churn your hand: discard is fuel, and some cards pay out when you throw them away.",
-      "build_notes": "Touchstone: the base-game Reflex and Sly cards. Discard is a resource: pair discard outlets (random or the player's choice, `scry`, discard-then-draw) with cards that are fine to play but even better when an effect discards them (an `on_discard` trigger that adds value on top of a normal play, or the `sly` keyword: discarded by an effect, the card plays itself for free). Add payoffs that react to discards, and `retrieve_card` to bring a key card back. Every card should be playable on its own; avoid cards that do nothing unless discarded. Payoffs (v62): `discards_this_turn` (Memento Mori) and `discard_pile_size` (Stack) scale to the churn. Recursion (v66): `put_back` stacks a discarded card on top of your draw pile (Headbutt), `grant_keyword` makes a hand card Sly this turn (Hand Trick), `return_next_turn` brings an attack back next turn (Bolas). (v69) `autoplay` plays the top card of your draw pile and Exhausts it (Havoc) \u2014 chaos churn that plays your Reflex fuel for free.",
+      "build_notes": "Touchstone: the base-game Reflex and Sly cards. Discard is a resource: pair discard outlets (random or the player's choice, `scry`, discard-then-draw) with cards that are fine to play but even better when an effect discards them (an `on_discard` trigger that adds value on top of a normal play, or the `sly` keyword: discarded by an effect, the card plays itself for free). Add payoffs that react to discards, and `retrieve_card` to bring a key card back. Every card should be playable on its own; avoid cards that do nothing unless discarded. Payoffs (v62): `discards_this_turn` (Memento Mori) and `discard_pile_size` (Stack) scale to the churn. Recursion (v66): `put_back` stacks a discarded card on top of your draw pile (Headbutt), `grant_keyword` makes a hand card Sly this turn (Hand Trick), `return_next_turn` brings an attack back next turn (Bolas). (v69) `autoplay` plays the top card of your draw pile and Exhausts it (Havoc) \u2014 chaos churn that plays your Reflex fuel for free. `discard` `cards:\"all\"` (v70) dumps your hand; a later draw or damage scaled by `cards_removed` pays per card (Calculated Gamble).",
       "metaphors": [
         "the gambler",
         "sifting the ashes",
@@ -2518,7 +2524,8 @@
           "put_back",
           "grant_keyword",
           "return_next_turn",
-          "autoplay"
+          "autoplay",
+          "cards_removed"
         ],
         "class_kind": "normal"
       },
@@ -2529,7 +2536,8 @@
         "VOCABULARY_GAPS#63",
         "VOCABULARY_GAPS#74",
         "VOCABULARY_GAPS#75",
-        "VOCABULARY_GAPS#73"
+        "VOCABULARY_GAPS#73",
+        "VOCABULARY_GAPS#79"
       ],
       "base_synergies": {
         "hooks": [
@@ -2739,7 +2747,7 @@
       "id": "exhaust_pyre",
       "name": "Pyre / exhaust-matters",
       "description": "Burn cards away for power: every Exhaust feeds the engine.",
-      "build_notes": "This deck wants to exhaust the cards in its hand and gets bonuses for doing so. Look for triggered effects that happen on exhaust, cards that have effects when exhausted or return something from the exhausted pool to hand or discard. `exhaust_card` (v57) is the fuel op: burn other hand cards on purpose (choose / random / up to N / all non-Attacks) so every on_exhaust payoff fires. Payoffs read the pile (v62): `exhaust_pile_size` scales damage/Block to the ashes, `exhausted_this_turn` gates an Evil Eye bonus. `exhaust_card` `pile:\"draw\"` (v66) burns a card in your draw pile.",
+      "build_notes": "This deck wants to exhaust the cards in its hand and gets bonuses for doing so. Look for triggered effects that happen on exhaust, cards that have effects when exhausted or return something from the exhausted pool to hand or discard. `exhaust_card` (v57) is the fuel op: burn other hand cards on purpose (choose / random / up to N / all non-Attacks) so every on_exhaust payoff fires. Payoffs read the pile (v62): `exhaust_pile_size` scales damage/Block to the ashes, `exhausted_this_turn` gates an Evil Eye bonus. `exhaust_card` `pile:\"draw\"` (v66) burns a card in your draw pile. Fiend Fire (v70): `exhaust_card` `cards:\"all\"`, then a damage with `hits_scale` `cards_removed`.",
       "metaphors": [
         "the pyre",
         "ashes",
@@ -2774,7 +2782,8 @@
           "retrieve_card",
           "exhaust_card",
           "exhaust_pile_size",
-          "exhausted_this_turn"
+          "exhausted_this_turn",
+          "cards_removed"
         ],
         "class_kind": "normal"
       },
@@ -2784,7 +2793,8 @@
         "VOCABULARY_GAPS#20",
         "VOCABULARY_GAPS#63",
         "VOCABULARY_GAPS#64",
-        "VOCABULARY_GAPS#74"
+        "VOCABULARY_GAPS#74",
+        "VOCABULARY_GAPS#79"
       ],
       "base_synergies": {
         "hooks": [
@@ -3530,7 +3540,7 @@
       "id": "ambush_alpha",
       "name": "Ambusher / opening burst",
       "description": "Hit hardest at the start of a fight and aim to end it before the enemy gets going.",
-      "build_notes": "Front-loaded power: `innate` cards guarantee a strong opening hand, cheap high-impact attacks and early energy make the first turns explosive, and a few payoffs are strongest early in the fight (gate them with `when` `turn_at_most` value 2-3 rather than putting `innate` on everything). Give the class a fallback for fights that drag (card draw, a modest mid-fight plan), but its identity is fast, decisive openings. `target_intends_attack` (v62) rewards striking an enemy that is about to attack (Go for the Eyes).",
+      "build_notes": "Front-loaded power: `innate` cards guarantee a strong opening hand, cheap high-impact attacks and early energy make the first turns explosive, and a few payoffs are strongest early in the fight (gate them with `when` `turn_at_most` value 2-3 rather than putting `innate` on everything). Give the class a fallback for fights that drag (card draw, a modest mid-fight plan), but its identity is fast, decisive openings. `target_intends_attack` (v62) rewards striking an enemy that is about to attack (Go for the Eyes). `stun` (v70) is ONE Whistle-style opener per class: a 2+-cost uncommon/rare Exhaust attack that stuns the chosen enemy (it loses its next action).",
       "metaphors": [
         "the ambush",
         "the first strike",
@@ -3562,13 +3572,15 @@
           "damage",
           "gain_energy",
           "turn_at_most",
-          "target_intends_attack"
+          "target_intends_attack",
+          "stun"
         ],
         "class_kind": "normal"
       },
       "buildable": true,
       "gap_refs": [
-        "VOCABULARY_GAPS#64"
+        "VOCABULARY_GAPS#64",
+        "VOCABULARY_GAPS#11"
       ],
       "base_synergies": {
         "hooks": [

@@ -94,7 +94,8 @@ _BUILD_AROUND_OPS = {"add_trigger", "apply_status_custom",
                      "return_to_hand", "to_draw_top", "return_next_turn", "put_back", "shuffle_hand", "grant_keyword",
                      "cost_delta",  # Phase BP (v67, gap #76): a self-cost rule is energy in disguise, not a stat line
                      "trigger_passive", "lose_orb_slot",  # Phase BQ (v68, gap #78): orb pumps / a slot-for-stats trade
-                     "add_random_card", "autoplay"}  # Phase BN (v69, gaps #72/#73): card generation / free plays
+                     "add_random_card", "autoplay",  # Phase BN (v69, gaps #72/#73): card generation / free plays
+                     "stun"}  # Phase BR (v70, gap #11): an enemy turn skipped is control, not a stat line
 # Phase BD (v58, gap #58): the held_discount band (mirrors ForgedCards.HeldDiscountMaxAmount + the schema clause).
 _HELD_DISCOUNT_MAX = 2
 # Phase BP (v67, gaps #76/#77): the cost_delta shape (its events, lifetimes, the counted events, the signed band) and the
@@ -123,7 +124,8 @@ _SUPPORTED_SCALES = {"x", "cards_in_hand", "cards_retained", "unspent_energy_las
                      "exhaust_pile_size", "discard_pile_size", "discards_this_turn", "cards_drawn_this_turn",
                      "cards_drawn_this_combat", "energy_spent_this_turn", "hp_loss_events_this_combat",
                      "cards_generated_this_combat", "total_enemy_poison", "target_status_stacks", "to_hand_size",
-                     "orb_count", "orb_types"}  # Phase BQ (v68, gap #78): your orbs / their distinct types (orb classes)
+                     "orb_count", "orb_types",  # Phase BQ (v68, gap #78): your orbs / their distinct types (orb classes)
+                     "cards_removed"}  # Phase BR (v70, gap #79): what an earlier discard / exhaust_card removed (damage/block/draw)
 # Phase BQ (v68, gap #78): the orb-extras shape. Mirrors ForgedCards.EvokeWhich / TriggerPassiveReach / the caps + the schema.
 _EVOKE_WHICH = {"next", "newest"}
 _TRIGGER_PASSIVE_REACH = {"first", "all"}
@@ -138,6 +140,16 @@ _CHOOSE_OF_MIN, _CHOOSE_OF_MAX = 2, 3
 _AUTOPLAY_FROM = {"draw_top", "draw_random"}
 _AUTOPLAY_MAX = 2
 _BN_ONE_PER_CARD_OPS = ("add_random_card", "autoplay")
+# Phase BR (v70, gaps #11/#79): discard's pick modes (+ `all` = "Discard your hand.", no amount; card-only), the stun guard
+# rails (card level here: target enemy, exhaust on base + upgrade, cost 2+, uncommon/rare, never with a self-routing
+# flag-op, one per list, never a payload — class level in class_forge._stun_class_conflict: one stun card per class, no
+# exhaust-pile retrieve_card / add_card / transform_card / graft_card into it), and its price (~ an enemy turn skipped).
+# Mirrors ForgedCards.DiscardPickModes / StunMinCost / StunClassError.
+_DISCARD_PICK_MODES = {"random", "choose", "all"}
+_STUN_MIN_COST = 2
+_STUN_VALUE = 10.0
+# Phase BR (v70): a `cards_removed` scaled damage ("Deal damage equal to the cards Exhausted") is priced at ~4 cards.
+_CARDS_REMOVED_EXPECTED = 4.0
 # A kill-gated payoff fires about half the time; a kill-gated Max HP is Feed: the player engineers the kill (the card is an
 # exhausting finisher), so it lands most plays and is run-permanent — priced at 0.75 of the ungated line, not the 0.6 default.
 _TARGET_KILLED_DISCOUNT = 0.5
@@ -157,13 +169,15 @@ _HAND_SIZE_TARGET_MIN, _HAND_SIZE_TARGET_MAX = 2, 10
 # ForgedCards.HitsScaleSources + the schema enum). `x` couples to an X cost; `orb_count` is orb-class only (class_forge
 # drops it off a slotless class, as it does every orb-reading card).
 _HITS_SCALE_SOURCES = {"x", "attacks_played_this_turn", "cards_in_hand", "skills_in_hand", "plays_this_combat",
-                       "exhaust_pile_size", "hp_loss_events_this_combat", "energy_spent_this_turn", "orb_count"}
+                       "exhaust_pile_size", "hp_loss_events_this_combat", "energy_spent_this_turn", "orb_count",
+                       "cards_removed"}  # Phase BR (v70, gap #79): Fiend Fire
 # Phase BK: a hits_scale damage is priced at amount × the EXPECTED hit count (the runtime cap is 10). The open-ended
 # combat counts (plays / exhaust pile / HP-loss events) are late-game payoffs; the turn reads sit near 2.
 _HITS_SCALE_CAP = 10
 _HITS_SCALE_EXPECTED = {"x": 2.5, "attacks_played_this_turn": 2.0, "cards_in_hand": 3.0, "skills_in_hand": 1.5,
                         "plays_this_combat": 6.0, "exhaust_pile_size": 4.0, "hp_loss_events_this_combat": 3.0,
-                        "energy_spent_this_turn": 2.0, "orb_count": 2.5}
+                        "energy_spent_this_turn": 2.0, "orb_count": 2.5,
+                        "cards_removed": _CARDS_REMOVED_EXPECTED}  # Phase BR (v70): Fiend Fire ~ a 4-card hand
 # Phase BJ (v62): the unbounded combat counts are late-game payoffs — a scaled damage is priced at this expected value.
 _LATE_GAME_SCALE_VALUE = {"cards_drawn_this_combat": 18.0, "hp_loss_events_this_combat": 8.0}
 # Phase AM (v43): the `when` kinds that read the CHOSEN target — single-enemy cards only, never in a trigger
@@ -869,8 +883,11 @@ class CardValidator:
             # Phase AP (v46): discard's optional pick mode — random (the default) or choose (card-only; the trigger loop
             # below rejects it). retrieve_card's pick mode is validated with its shape above. Mirrors ForgedCards.Validate.
             elif e.get("op") == "discard":
-                if e.get("cards") is not None and str(e.get("cards", "")).strip().lower() not in _PICK_MODES:
-                    out.append(f"discard 'cards':'{e.get('cards')}' must be one of {'/'.join(sorted(_PICK_MODES))}.")
+                if e.get("cards") is not None and str(e.get("cards", "")).strip().lower() not in _DISCARD_PICK_MODES:
+                    out.append(f"discard 'cards':'{e.get('cards')}' must be one of {'/'.join(sorted(_DISCARD_PICK_MODES))}.")
+                # Phase BR (v70, gap #79): "Discard your hand." — the whole hand, so no amount. Mirrors ForgedCards.Validate.
+                if str(e.get("cards", "")).strip().lower() == "all" and (e.get("amount") is not None or str(e.get("scale", "")).strip()):
+                    out.append("discard 'cards':'all' takes no amount (it discards your whole hand).")
             # Phase BC (v57, gap #52): exhaust_card — a pick mode, an amount 1..3 on the counted modes (none on `all`), an
             # optional hand filter. Mirrors ForgedCards.Validate.
             elif e.get("op") == "exhaust_card":
@@ -1033,6 +1050,12 @@ class CardValidator:
                     out.append(f"{op} is a flag-op (no amount / status / scale / hits).")
                 if str(card.get("target", "")).strip().lower() != "enemy":
                     out.append(f'{op} needs a single-enemy card (target "enemy") — it strips the CHOSEN enemy.')
+            # Phase BR (v70, gap #11): `stun` is a flag-op on a single-enemy card. Mirrors ForgedCards.Validate.
+            if op == "stun":
+                if any(e.get(k) is not None for k in ("amount", "status")) or scale or (isinstance(hits, int) and hits > 1):
+                    out.append("stun is a flag-op (no amount / status / scale / hits).")
+                if str(card.get("target", "")).strip().lower() != "enemy":
+                    out.append('stun needs a single-enemy card (target "enemy") — it stuns the enemy you choose.')
             # Phase BK (v63, gap #65): `hits_scale` — the hit COUNT from a live read; THE card's one multi-hit, so never with
             # a fixed `hits`, a `scale` on the amount, or a growth rule. Mirrors ForgedCards.Validate.
             hsc = e.get("hits_scale")
@@ -1192,6 +1215,16 @@ class CardValidator:
             for one in _BN_ONE_PER_CARD_OPS:
                 if sum(1 for ef in lst if ef.get("op") == one) > 1:
                     out.append(f"at most one '{one}' effect per card.")
+        # Phase BR (v70, gap #79): a `cards_removed` read counts what THIS play's last discard / exhaust_card removed — one
+        # EARLIER in the same list (base and upgrade independently); one stun per list. Mirrors ForgedCards.Validate.
+        for lst in (effects, up_effects):
+            for i, ef in enumerate(lst):
+                if ("cards_removed" in (str(ef.get("scale", "")).strip().lower(), str(ef.get("hits_scale") or "").strip().lower())
+                        and not any(p.get("op") in ("discard", "exhaust_card") for p in lst[:i])):
+                    out.append("a 'cards_removed' read needs a 'discard' or 'exhaust_card' op earlier in the same card "
+                               "(it counts the cards that op removed).")
+            if sum(1 for ef in lst if ef.get("op") == "stun") > 1:
+                out.append("at most one 'stun' effect per card.")
         # Phase BL (v64, gaps #66/#67): one strip_block / strip_artifact / permanent strength_down per effect list, and the
         # strips come BEFORE every enemy debuff on the card (the Expose order). Mirrors ForgedCards.Validate.
         for lst in (effects, up_effects):
@@ -1276,6 +1309,23 @@ class CardValidator:
                 out.append("'return_to_hand' needs a card that costs 1+ energy (base and upgrade; a 0-cost one comes back forever).")
         if "to_draw_top" in bo_flags and any(ef.get("op") == "corruption" for ef in bo_all):
             out.append("'to_draw_top' can't share a card with 'corruption' (Corruption exhausts the Skill; the hook order would decide).")
+        # Phase BR (v70, gap #11): the stun guard rails at card level (plan §7 decision 7 — a hard lock if repeatable): an
+        # UNCOMMON / RARE card that Exhausts (base AND upgrade), costs 2+ (base and upgrade; never X), never routes itself
+        # back, never a Power. Mirrors ForgedCards.TryParseCardJson.
+        if any(ef.get("op") == "stun" for ef in bo_all):
+            if str(card.get("rarity", "")).strip().lower() not in ("uncommon", "rare"):
+                out.append(f"'stun' belongs on an UNCOMMON or RARE card (got '{card.get('rarity')}').")
+            if not any(ef.get("op") == "exhaust" for ef in effects) or (
+                    up_effects and not any(ef.get("op") == "exhaust" for ef in up_effects)):
+                out.append("'stun' needs 'exhaust' on the card (base and upgrade) — a stun that comes back every turn is a hard lock.")
+            sc_, suc_ = card.get("cost"), (card.get("upgrade") or {}).get("cost") if isinstance(card.get("upgrade"), dict) else None
+            if not (isinstance(sc_, int) and not isinstance(sc_, bool) and sc_ >= _STUN_MIN_COST) or (
+                    isinstance(suc_, int) and suc_ < _STUN_MIN_COST):
+                out.append(f"'stun' needs a card that costs {_STUN_MIN_COST}+ energy (base and upgrade; never X).")
+            if bo_flags:
+                out.append("'stun' can't share a card with return_to_hand / to_draw_top / return_next_turn (a stun must not come back).")
+            if str(card.get("type", "")).strip().lower() == "power":
+                out.append("'stun' is not allowed on a Power (it needs a chosen enemy).")
         # Phase BP (v67, gap #76): cost_delta at card level — one per effect list, never beside held_discount (one self-cost
         # rule per card); a DISCOUNT needs a cost to lower (the held_discount rule); never on an X-cost card; on:"played"
         # never on a Power; the upgrade keeps on / scope / set_zero (only the amount moves). Mirrors ForgedCards.
@@ -1631,6 +1681,23 @@ class CardValidator:
                     out.append("'unblockable' is not allowed in a trigger payload (it flags a card-level damage).")
                 if t.get("grow_held"):  # Phase BD (v58)
                     out.append("'grow_held' is not allowed in a trigger payload (it's a per-card held-turn mechanic).")
+                # Phase BR (v70, gap #79): ONE exception to "no grow in a payload" — Rolling Boulder: a turn_start trigger whose
+                # ONLY effect is a targeted damage (the schema adds op/target/no scale/no hits), never gated, 1..9, <= amount.
+                # Mirrors ForgedCards.ValidateTrigger.
+                if t.get("grow") is not None:
+                    tg = t.get("grow")
+                    if e.get("trigger") != "turn_start" or op != "damage" or t.get("target") is None:
+                        out.append("'grow' in a trigger payload is only allowed on a targeted 'damage' of a turn_start trigger (Rolling Boulder).")
+                    if len([x for x in (e.get("effects") or []) if isinstance(x, dict)]) != 1:
+                        out.append("a growing turn_start damage must be the trigger's ONLY payload effect.")
+                    if str(t.get("scale", "")).strip() or (isinstance(t.get("hits"), int) and t.get("hits") > 1):
+                        out.append("a growing payload damage can't also be scaled or multi-hit.")
+                    if e.get("when") is not None:
+                        out.append("a growing turn_start trigger can't carry a 'when' (it grows every turn it fires).")
+                    if not (isinstance(tg, int) and not isinstance(tg, bool) and 1 <= tg <= 9):
+                        out.append(f"'grow' must be 1..9 (got {tg!r}).")
+                    elif tg > int(t.get("amount", 0) or 0):
+                        out.append(f"'grow' ({tg}) can't exceed the base damage ({t.get('amount', 0)}).")
                 if t.get("hits_scale") is not None:  # Phase BK (v63): mirrors ForgedCards.ValidateTrigger
                     out.append("'hits_scale' is not allowed in a trigger payload (it's a card-level damage field; use 'hits').")
                 if tgt is not None:
@@ -1844,6 +1911,8 @@ class CardValidator:
             if late is not None:
                 amt = max(amt, late)
             # Phase BK (v63, gap #65): a scaled hit count is priced at the per-hit damage × its EXPECTED count.
+            if str(eff.get("scale", "")).strip().lower() == "cards_removed":  # Phase BR (v70): ~ a 4-card hand
+                amt = max(amt, _CARDS_REMOVED_EXPECTED)
             hsc = str(eff.get("hits_scale") or "").strip().lower()
             if hsc:
                 n = _HITS_SCALE_EXPECTED.get(hsc, 2.0)
@@ -1986,6 +2055,9 @@ class CardValidator:
         if op == "grant_keyword":
             # Phase BO (v66, gap #75): Snap / Hand Trick — a keyword on another card (Ethereal is mostly a price).
             return _GRANT_VALUE.get(str(eff.get("keyword", "retain")).strip().lower(), 2.0)
+        if op == "stun":
+            # Phase BR (v70, gap #11): Whistle — the chosen enemy loses its next action (~ a turn of its damage blocked).
+            return _STUN_VALUE
         if op in _STRIP_OPS:
             # Phase BL (v64, gap #66): Expose's halves — wiping Block is a burst of free damage (~a 4-damage hit); stripping
             # Artifact only matters against an Artifact enemy (it un-eats the debuffs that follow).

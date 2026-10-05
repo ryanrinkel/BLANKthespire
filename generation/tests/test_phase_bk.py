@@ -37,6 +37,7 @@ SMOKE_SEEDS = ("GAPTESTBK1", "GAPTESTBK2")
 
 SOURCES = ("x", "attacks_played_this_turn", "cards_in_hand", "skills_in_hand", "plays_this_combat",
            "exhaust_pile_size", "hp_loss_events_this_combat", "energy_spent_this_turn", "orb_count")
+BR_SOURCES = ("cards_removed",)  # Phase BR (v70, gap #79): Fiend Fire joins the hit-count sources (smoked by gaptest-br)
 NOUNS = {
     "attacks_played_this_turn": "Attack you played this turn",
     "cards_in_hand": "other card in your hand",
@@ -137,7 +138,7 @@ def _t_engine() -> None:
         check(frag in er, f"{base}: {frag}")
     fc = _cs("Engine", "ForgedCards.cs")
     m = re.search(r"HitsScaleSources =\s*\[(.*?)\];", fc, re.S)
-    check(m is not None and set(re.findall(r'"(\w+)"', m.group(1))) == set(SOURCES), "HitsScaleSources == the nine sources")
+    check(m is not None and set(re.findall(r'"(\w+)"', m.group(1))) == set(SOURCES) | set(BR_SOURCES), "HitsScaleSources == the sources (BR: + cards_removed)")
     m = re.search(r"SupportedScales =\s*\[(.*?)\];", fc, re.S)
     # Phase BQ (v68, gap #78): `orb_count` became a `scale` source too (damage/block/draw); the other two stay hits_scale-only.
     check(m is not None and not ({"attacks_played_this_turn", "skills_in_hand"} & set(re.findall(r'"(\w+)"', m.group(1)))),
@@ -226,8 +227,8 @@ def _t_contract() -> None:
     print("contract surfaces:")
     schema = json.loads(CARD_SCHEMA.read_text(encoding="utf-8"))
     eff = schema["$defs"]["effect"]
-    check(eff["additionalProperties"] is False and set(eff["properties"]["hits_scale"]["enum"]) == set(SOURCES),
-          "schema: the effect object declares hits_scale with the nine sources")
+    check(eff["additionalProperties"] is False and set(eff["properties"]["hits_scale"]["enum"]) == set(SOURCES) | set(BR_SOURCES),
+          "schema: the effect object declares hits_scale with the sources (BR: + cards_removed)")
     check("hits_scale" not in schema["$defs"]["triggerEffect"]["properties"]
           and schema["$defs"]["triggerEffect"].get("additionalProperties") is False, "schema: never on a payload effect")
     rules = json.dumps(eff.get("allOf", []))

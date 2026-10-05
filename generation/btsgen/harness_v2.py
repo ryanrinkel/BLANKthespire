@@ -70,7 +70,8 @@ _PREFERRED_OPS = ["add_trigger", "transform_card", "graft_card", "spread_debuffs
                   "lose_hp"]
 _PREFERRED_SCALES = ["cards_in_hand", "cards_retained", "unspent_energy_last_turn", "forged",
                      "damage_dealt_unblocked", "target_debuff_count", "tag_cards_owned",
-                     "exhaust_pile_size"]  # Phase BJ (v62): the commonest base-game history read (Ashen Strike)
+                     "exhaust_pile_size",  # Phase BJ (v62): the commonest base-game history read (Ashen Strike)
+                     "cards_removed"]  # Phase BR (v70): Calculated Gamble (stun is NOT preferred: one stun card per class)
 _PREFERRED_CONDITIONS = ["hp_below_half", "no_block", "has_block", "turn_at_least", "turn_at_most", "enemy_count_ge",
                          "hand_size_ge", "retained_last_turn", "target_has_status", "draw_pile_empty",
                          "hp_lost_ge", "forged_ge",

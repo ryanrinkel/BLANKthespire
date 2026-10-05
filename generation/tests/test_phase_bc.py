@@ -85,7 +85,7 @@ def test_version() -> None:
 def _t_engine() -> None:
     print("the engine: base-game recipes, one exhaust at a time, the Pillage loop:")
     er = _cs("Engine", "EffectRunner.cs")
-    ex = er.split("internal static async Task ExhaustCards(", 1)[1].split("internal static", 1)[0]
+    ex = er.split("internal static async Task<int> ExhaustCards(", 1)[1]  # Phase BR (v70): returns the cards exhausted.split("internal static", 1)[0]
     check("CardSelectorPrefs.ExhaustSelectionPrompt" in ex, "exhaust_card uses the game's own exhaust prompt (no invented loc key)")
     check("new CardSelectorPrefs(CardSelectorPrefs.ExhaustSelectionPrompt, 0, max)" in ex, "up_to = min 0 (Purity)")
     check("Rng.CombatCardSelection" in ex, "random rolls off the seeded CombatCardSelection stream (True Grit)")
@@ -151,7 +151,7 @@ def _t_describe() -> None:
         ([{"op": "exhaust_card", "cards": "random", "amount": 1, "card_type": "non_attack"}], "Exhaust a random non-Attack card in your hand."),
         ([{"op": "exhaust_card", "cards": "up_to", "amount": 3}], "Exhaust up to 3 cards in your hand."),
         ([{"op": "exhaust_card", "cards": "all", "card_type": "non_attack"}], "Exhaust all non-Attack cards in your hand."),
-        ([{"op": "exhaust_card", "cards": "all"}], "Exhaust all cards in your hand."),
+        ([{"op": "exhaust_card", "cards": "all"}], "Exhaust your hand."),  # Phase BR (v70): the untyped whole hand
         ([{"op": "exhaust_card", "cards": "choose", "amount": 1, "card_type": "skill"}], "Exhaust a Skill in your hand."),
         ([{"op": "draw_until", "card_type": "non_attack"}], "Draw cards until you draw a non-Attack card."),
         ([{"op": "draw_until", "card_type": "power"}], "Draw cards until you draw a Power."),

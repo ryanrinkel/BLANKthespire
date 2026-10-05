@@ -220,7 +220,7 @@ def _t_engine() -> None:
             ("case \"ethereal\": CardCmd.ApplyKeyword(chosen, CardKeyword.Ethereal); break;", "ethereal = ApplyKeyword"),
             ("default:         CardCmd.ApplyKeyword(chosen, CardKeyword.Retain); break;", "retain = ApplyKeyword"),
             ("$\"[BO] grant_keyword {kw} -> '{chosen.Title}'.\"", "the [BO] grant_keyword tag"),
-            ('if (e.Pile == "draw") { await ExhaustFromDraw(e, n, ctx, owner); return; }', "exhaust_card pile draw"),
+            ('if (e.Pile == "draw") return await ExhaustFromDraw(e, n, ctx, owner);', "exhaust_card pile draw"),  # BR: Task<int>
             ("await CardCmd.Exhaust(ctx, c);   // one at a time (the game's own rule) -> Hook.AfterCardExhausted per card",
              "exhaust from the draw pile through CardCmd.Exhaust"),
             ("$\"[BO] exhaust_card draw '{c.Title}'", "the [BO] exhaust_card draw tag"),

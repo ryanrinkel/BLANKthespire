@@ -116,7 +116,8 @@ def _t_sly_engine() -> None:
           "EffectRunner treats sly as a declare-time keyword (no-op at play)")
     # every mod discard is a BATCH call (the Sly timing the game warns about)
     for site in ("DiscardRandom", "DiscardChoose", "Scry"):
-        body = er.split(f"internal static async Task {site}(", 1)[1].split("internal static", 1)[0]
+        # Phase BR (v70): the discard helpers return the cards removed (Task<int>).
+        body = re.split(rf"internal static async Task(?:<int>)? {site}\(", er, maxsplit=1)[1].split("internal static", 1)[0]
         check("CardCmd.Discard(ctx, " in body, f"{site} discards through the batch CardCmd.Discard (Sly-safe)")
     fc = _cs("Engine", "ForgedCards.cs")
     for lst in ("SupportedOps", "UpgradeAddableKeywords", "KeywordOps"):

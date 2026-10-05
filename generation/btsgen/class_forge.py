@@ -435,7 +435,7 @@ At most one scaled damage/block per card. v66: `grant_keyword` gives a hand card
 PRECISION READS (small, high-leverage scalars/gates — reach for one only when the concept invites it; never \
 sprinkle): LIFESTEAL — a `damage` card may then `heal` for the UNBLOCKED damage it just dealt via \
 `scale:"damage_dealt_unblocked"` on the heal (put the heal AFTER the damage on the SAME card): the Reaper — "Deal \
-8 damage to ALL enemies. Heal HP equal to the unblocked damage dealt." ENEMY STRENGTH / EXPOSE / DOOM (v64) — `temp_strength_down` (Piercing Wail) and `strength_down` (Malaise) blunt enemy attacks; `strip_block` / `strip_artifact` go BEFORE the debuff (Expose); `doom` kills at the end of the enemy's turn once its HP <= Doom (Blight Strike: scale damage_dealt_unblocked; Time's Up: target_status_stacks doom). PRICES / REPLAYS (v65) — self-drawbacks pay for a strong card (`no_draw` after a big draw, `no_energy_gain`, `no_block_gain`, `dex_decay`, `lose_strength`); `replay_next` / a rare `echo_form` Power play cards twice; `block_next_turn` banks Block (Prolong); `retain_hand` keeps the hand (Equilibrium). FLECHETTES — a `damage` card may deal \
+8 damage to ALL enemies. Heal HP equal to the unblocked damage dealt." ENEMY STRENGTH / EXPOSE / DOOM (v64) — `temp_strength_down` (Piercing Wail) and `strength_down` (Malaise) blunt enemy attacks; `strip_block` / `strip_artifact` go BEFORE the debuff (Expose); `doom` kills at the end of the enemy's turn once its HP <= Doom (Blight Strike: scale damage_dealt_unblocked; Time's Up: target_status_stacks doom). PRICES / REPLAYS (v65) — self-drawbacks pay for a strong card (`no_draw` after a big draw, `no_energy_gain`, `no_block_gain`, `dex_decay`, `lose_strength`); `replay_next` / a rare `echo_form` Power play cards twice; `block_next_turn` banks Block (Prolong); `retain_hand` keeps the hand (Equilibrium). STUN (v70) — `stun` on ONE uncommon/rare Exhaust card per class (cost 2+, single enemy); nothing re-buys it. FLECHETTES — a `damage` card may deal \
 damage equal to the debuffs on its target via `scale:"target_debuff_count"` (pairs with a Vulnerable/Weak/Frail/\
 Poison shell — more debuffs, bigger hit). GRAND FINALE — gate a splashy rare behind \
 `when:{{"kind":"draw_pile_empty"}}` (fires only once you've drawn your whole deck; pair with heavy draw or a \
@@ -473,7 +473,8 @@ printed amount; it shows its current damage in hand). base-StS Rampage. Reach fo
 built around ONE signature weapon; give a grow attack cheap DRAW/RETAIN support so it recurs, and keep it to \
 1-2 grow cards per class (identity, not wallpaper). Rules: `grow` is DAMAGE-ONLY, 1..9, must be <= `amount`, and \
 can't combine with `scale` (it IS the card's one calculated value). NOT `forge`: `grow` is ONE card feeding \
-itself; Forge is a CLASS-level counter many cards pump into a `scale:"forged"` payoff.
+itself; Forge is a CLASS-level counter many cards pump into a `scale:"forged"` payoff. v70: a turn_start payload \
+damage may `grow` each turn (Rolling Boulder).
 
 IN-RUN UPGRADE (`upgrade_card` — sharpen your tools mid-fight, the Armaments fantasy): a skill may carry \
 `{{"op":"upgrade_card","cards":"choose"}}` (YOU pick one upgradable card in hand — the true Armaments feel, the \
@@ -491,7 +492,7 @@ skill, and it pairs naturally with a normal cost/stat line. Reach for either on 
 the fantasy is sharpening the deck toward a few key cards; keep it to 1-3 per class total. Rules: `purge` and \
 `exhaust` are MUTUALLY EXCLUSIVE on one card; NEVER put `purge`/`purge_card` on a basic (Strike/Defend). No \
 amount/target on either. A thin deck digs (v66): `retrieve_card` `pile:"draw"` tutors a card (Secret Weapon), \
-`exhaust_card` `pile:"draw"` burns one unseen, and an `on_shuffle` power pays off the frequent reshuffles.
+`exhaust_card` `pile:"draw"` burns one unseen, and an `on_shuffle` power pays off the frequent reshuffles. v70: Fiend Fire = `exhaust_card` `cards:"all"` + a damage `hits_scale:"cards_removed"`.
 
 DISCARD / HAND-CHURN (`discard` + `on_discard` — throw cards away for value): reach for this when the fantasy is \
 recklessness / gambling / sifting / a hand you deliberately churn. TWO parts: (1) `discard` INCOME — `{{"op": \
@@ -512,7 +513,8 @@ fits sifting/foresight concepts on its own. Card-only (no repeating-trigger scry
 your hand (Headbutt / Exhume; Status/Curse cards never come back) — the recursion half of a churn or exhaust class. \
 (5) v66: `put_back` (from discard) re-stacks a card on your draw pile, `grant_keyword` sly makes a hand card Sly this \
 turn, `return_next_turn` brings an attack back next turn (Bolas). (6) v69: `autoplay` plays the top card of your \
-draw pile (Havoc; it Exhausts) or a random Attack from it (Uproar).
+draw pile (Havoc; it Exhausts) or a random Attack from it (Uproar). (7) v70: `discard` `"cards":"all"` discards \
+your hand; a later `scale:"cards_removed"` counts them (Calculated Gamble).
 
 CORRUPTION (`corruption` — your Skills cost 0 but Exhaust when played): reach for this when the fantasy is \
 RECKLESS TEMPO / spending yourself / a Faustian bargain — a burst of free skills at the cost of burning them. ONE \
@@ -2884,6 +2886,44 @@ def _card_uses_orbs(card: dict) -> bool:
     return False
 
 
+def _stun_class_conflict(made: list[dict], card: dict) -> str | None:
+    """Phase BR (v70, gap #11): the CLASS-level stun guard rails (the card validator cannot see the class) — at most ONE
+    stun card per class, and a class with a stun card may not also re-buy it: no `retrieve_card pile:"exhaust"` (Exhume)
+    and no `add_card` / `transform_card` / `graft_card` naming the stun card. `made` = the cards already kept; returns why
+    `card` must be dropped, or None. Mirrors ForgedCards.StunClassError (the importer rejects such a bundle)."""
+    def effs(c: dict) -> list[dict]:
+        out = []
+        for e in list(c.get("effects") or []) + list((c.get("upgrade") or {}).get("effects") or []):
+            if isinstance(e, dict):
+                out.append(e)
+                out.extend(x for x in (e.get("effects") or []) if isinstance(x, dict))
+        return out
+
+    def has_stun(c: dict) -> bool:
+        return any(e.get("op") == "stun" for e in effs(c))
+
+    def rebuys(c: dict, stun_id: str | None) -> bool:
+        for e in effs(c):
+            if e.get("op") == "retrieve_card" and str(e.get("pile", "")).strip().lower() == "exhaust":
+                return True
+            if stun_id and e.get("op") in ("add_card", "transform_card", "graft_card") \
+                    and str(e.get("card_id", "")).strip().lower() == stun_id:
+                return True
+        return False
+
+    stuns = [c for c in made if has_stun(c)]
+    if has_stun(card):
+        if stuns:
+            return "a second stun card (one stun card per class)"
+        sid = str(card.get("id", "")).strip().lower()
+        if any(rebuys(c, sid) for c in made) or rebuys(card, sid):
+            return "a stun card in a class that re-buys exhausted cards / copies it"
+        return None
+    if stuns and rebuys(card, str(stuns[0].get("id", "")).strip().lower()):
+        return "re-buys the class's stun card (exhaust-pile retrieve_card / a copy of it)"
+    return None
+
+
 def _card_loses_orb_slot(card: dict) -> bool:
     """Phase BQ (v68, gap #78): the card carries `lose_orb_slot` (base or upgrade) — legal only on a class with
     _LOSE_ORB_SLOT_MIN_SLOTS+ starting slots (ForgedCharacters rejects the import otherwise)."""
@@ -3413,6 +3453,12 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
             res.skipped.append(plan.get("name_hint", f"card {i+1}"))
             note(f"card {i+1} ({plan.get('name_hint','?')}): lose_orb_slot on a class with < {_LOSE_ORB_SLOT_MIN_SLOTS} orb slots — dropped")
             continue
+        # Phase BR (v70, gap #11): one stun card per class, never re-bought (the importer rejects it otherwise).
+        _stun_why = _stun_class_conflict([m["card"] for m in made], pres.card)
+        if _stun_why:
+            res.skipped.append(plan.get("name_hint", f"card {i+1}"))
+            note(f"card {i+1} ({plan.get('name_hint','?')}): {_stun_why} — dropped")
+            continue
         # Safety net (Phase J): apply_status_custom only belongs to a status class. Drop it off a class with
         # no status_pool (the validator's extra_statuses already rejects unknown names, but a class with NO
         # pool would have an empty allowed set, so this is the belt-and-braces drop).
@@ -3482,6 +3528,9 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
         if int(bp.get("orb_slots", 0) or 0) == 0 and _card_uses_orbs(new):
             return None
         if int(bp.get("orb_slots", 0) or 0) < _LOSE_ORB_SLOT_MIN_SLOTS and _card_loses_orb_slot(new):  # Phase BQ (v68)
+            return None
+        # Phase BR (v70, gap #11): the repaired card replaces old_card — check it against the REST of the set.
+        if _stun_class_conflict([m["card"] for m in made if m.get("card") is not old_card], new):
             return None
         if not _status_pool_custom_names(bp) and _card_uses_custom_status(new):
             return None

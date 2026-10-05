@@ -152,6 +152,9 @@ def _exhaust_card_sentence(e: dict) -> str:
     one, many = _hand_kind_words(e.get("card_type"))
     n = max(1, int(e.get("amount", 1) or 1))
     mode = str(e.get("cards", "")).lower()
+    # Phase BR (v70, gap #79): the untyped whole hand reads "Exhaust your hand." (Fiend Fire). Mirrors ForgedCards.ExhaustCardSentence.
+    if mode == "all" and not e.get("card_type") and str(e.get("pile", "")).lower() != "draw":
+        return "Exhaust your hand."
     if mode == "all":
         what = f"all {many}"
     elif mode == "random":
@@ -316,6 +319,9 @@ def effect_literal(e: dict) -> str:
     elif op == "discard" and str(e.get("cards", "")).lower() == "choose":
         # Phase AP (v46): the chosen form carries the named Cards arg; the random form stays the plain literal below.
         lit = f'new EffectSpec("discard", {e.get("amount", 0)}, Cards: "choose")'
+    elif op == "discard" and str(e.get("cards", "")).lower() == "all":
+        # Phase BR (v70, gap #79): "Discard your hand." — no amount, the named Cards arg.
+        lit = 'new EffectSpec("discard", 0, Cards: "all")'
     elif op == "exhaust_card":
         # Phase BC (v57, gap #52): named Cards (+ CardKind) args. Amount = cards exhausted (0 for the `all` mode).
         cards = str(e.get("cards", "choose")).replace("\\", "\\\\").replace('"', '\\"')
@@ -580,6 +586,8 @@ def _trigger_fragment(e: dict) -> str:
             return f"deal {amt} damage{to}, plus your Forge"
         if hits > 1:  # Phase AL (v42): a multi-hit payload
             return f"deal {amt} damage {hits} times{to}"
+        if e.get("grow", 0):  # Phase BR (v70, gap #79): Rolling Boulder. Mirrors ForgedCards.TriggerFragment.
+            return f"deal {amt} damage{to}. Increases by {e['grow']} each turn"
         return f"deal {amt} damage{to}"
     if op == "block":
         return f"gain Block equal to {eq}" if sc else f"gain {amt} Block, plus your Forge" if fg else f"gain {amt} Block"
@@ -825,6 +833,13 @@ def describe(effects: list[dict], target: str) -> str:
     aoe = target == "all_enemies"
     dmg_suffix = " to ALL enemies" if aoe else " to a random enemy" if target == "random_enemy" else ""
     parts: list[str] = []
+    # Phase BR (v70, gap #79): a `cards_removed` read names the op that removed the cards (the LAST discard / exhaust_card
+    # before it). Byte-match ForgedCards.Describe's `removed` / Sp().
+    removed = "Discarded"
+
+    def _sp(x: dict) -> str:
+        return f"the cards {removed}" if str(x.get("scale", "")).lower() == "cards_removed" else _effect_scale_phrase(x)
+
     for e in effects:
         before = len(parts)
         op = e["op"]
@@ -838,7 +853,7 @@ def describe(effects: list[dict], target: str) -> str:
                 parts.append(f"Deal X damage{dmg_suffix}{ub}." if scale == "x"
                              else f"Deal {e.get('amount', 0)} damage{dmg_suffix}, plus your Forge{ub}." if scale == "forged"
                              else f"Deal {e.get('amount', 0)} damage{dmg_suffix}, plus 1 per '{e.get('tag', '')}' card you own{ub}." if scale == "tag_cards_owned"
-                             else f"Deal damage equal to {_effect_scale_phrase(e)}{dmg_suffix}{ub}.")
+                             else f"Deal damage equal to {_sp(e)}{dmg_suffix}{ub}.")
             elif e.get("grow", 0):
                 # Phase U (gap #23, Rampage): {CalculatedDamage} (base-game calc-var name) shows the CURRENT grown value (calc-var). Byte-match ForgedCards.Describe.
                 parts.append(f"Deal {{CalculatedDamage}} damage{dmg_suffix}{ub}. Grows by {e['grow']} each time it is played this combat.")
@@ -849,6 +864,7 @@ def describe(effects: list[dict], target: str) -> str:
                 # Phase BK (v63, gap #65): Whirlwind / Finisher. Byte-match ForgedCards.Describe.
                 hs = str(e["hits_scale"]).strip().lower()
                 parts.append(f"Deal {{Damage}} damage X times{dmg_suffix}{ub}." if hs == "x"
+                             else f"Deal {{Damage}} damage for each card {removed}{dmg_suffix}{ub}." if hs == "cards_removed"
                              else f"Deal {{Damage}} damage for each {_hits_phrase(hs)}{dmg_suffix}{ub}.")
             elif e.get("hits", 1) > 1:
                 parts.append(f"Deal {{Damage}} damage {{Hits}} times{dmg_suffix}{ub}.")
@@ -861,13 +877,13 @@ def describe(effects: list[dict], target: str) -> str:
                          else "Gain X Block." if scale == "x"
                          else f"Gain {e.get('amount', 0)} Block, plus your Forge." if scale == "forged"
                          else f"Gain {e.get('amount', 0)} Block, plus 1 per '{e.get('tag', '')}' card you own." if scale == "tag_cards_owned"
-                         else f"Gain Block equal to {_effect_scale_phrase(e)}.")
+                         else f"Gain Block equal to {_sp(e)}.")
         elif op == "draw":
             scale = str(e.get("scale", "")).lower()
             parts.append("Draw {Cards} card(s)." if not scale
                          else "Draw X cards." if scale == "x"
                          else "Draw cards until you have {Cards} in hand." if scale == "to_hand_size"  # Phase BJ (v62): Expertise
-                         else f"Draw cards equal to {_scale_phrase(scale)}.")
+                         else f"Draw cards equal to {_sp(e)}.")
         elif op == "gain_energy":
             # Phase BJ (v62): Double Energy. Byte-match ForgedCards.Describe.
             parts.append("Double your energy." if str(e.get("scale", "")).lower() == "energy" else "Gain {Energy} energy.")
@@ -884,8 +900,12 @@ def describe(effects: list[dict], target: str) -> str:
         elif op == "discard":
             # Phase R (gap #17): random-discard count via the {Discard} var. Phase AP (v46): the chosen form reads
             # "... card(s) of your choice." Lockstep with ForgedCards.Describe.
-            parts.append("Discard {Discard} card(s) of your choice." if str(e.get("cards", "")).lower() == "choose"
+            # Phase BR (v70, gap #79): `cards:"all"` = "Discard your hand." (no var).
+            dmode = str(e.get("cards", "")).lower()
+            parts.append("Discard your hand." if dmode == "all"
+                         else "Discard {Discard} card(s) of your choice." if dmode == "choose"
                          else "Discard {Discard} random card(s).")
+            removed = "Discarded"
         elif op == "retrieve_card":
             # Phase AP (v46): literal sentence (no var). Lockstep with ForgedCards.Describe / RetrieveSentence.
             parts.append(_retrieve_sentence(e))
@@ -895,6 +915,7 @@ def describe(effects: list[dict], target: str) -> str:
         elif op == "exhaust_card":
             # Phase BC (v57, gap #52): literal sentence (no var). Lockstep with ForgedCards.Describe / ExhaustCardSentence.
             parts.append(_exhaust_card_sentence(e))
+            removed = "Exhausted"
         elif op == "draw_until":
             # Phase BC (v57, gap #53): literal sentence (no var). Lockstep with ForgedCards.Describe / DrawUntilSentence.
             parts.append(_draw_until_sentence(e))
@@ -933,6 +954,8 @@ def describe(effects: list[dict], target: str) -> str:
         elif op == "spread_debuffs":
             # Phase AX (v53, gaps #45-#47): the contagion sentence (flag-op, no var). Lockstep with ForgedCards.Describe.
             parts.append("Copy the target's debuffs to all other enemies.")
+        elif op == "stun":  # Phase BR (v70, gap #11): Whistle. Byte-match ForgedCards.Describe.
+            parts.append("Stun the enemy.")
         elif op == "strip_block":
             # Phase BL (v64, gap #66): Expose, half one (flag-op, no var). Lockstep with ForgedCards.Describe.
             parts.append("Remove all of the enemy's Block.")

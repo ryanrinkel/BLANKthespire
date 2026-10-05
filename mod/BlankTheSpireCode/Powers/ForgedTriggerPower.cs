@@ -38,6 +38,9 @@ public abstract class ForgedTriggerPower : BlankTheSpirePower
     // application), so it resets every combat. Only used when Trigger.Trigger == "ripen".
     private int _ripenLeft = -1;
     private bool _ripenFired;
+    // Phase BR (v70, gap #79): Rolling Boulder — how many times this power's GROWING turn_start payload has fired (instance
+    // state: a fresh power per combat, so it resets every combat). The payload deals amount + grow × _growFires.
+    private int _growFires;
 
     // Phase M (gap #9 "on_hp_lost"): re-entrancy guard so a lose_hp inside the payload doesn't recurse.
     private bool _firingHpLost;
@@ -109,6 +112,8 @@ public abstract class ForgedTriggerPower : BlankTheSpirePower
             // Phase BN (v69, gap #73): a payload that auto-plays (Mayhem) waits for AfterAutoPrePlayPhaseEntered — after the hand
             // draw, where the base MayhemPower plays — so the whole payload fires there instead.
             if (PlaysCards(t)) return;
+            // Phase BR (v70, gap #79): a growing damage tick fires from AfterSideTurnStart (below), PoisonPower's hook.
+            if (Grows(t)) return;
             Flash();
             await TriggerRunner.Run(t, player, ctx);
             return;
@@ -130,6 +135,24 @@ public abstract class ForgedTriggerPower : BlankTheSpirePower
                     Owner.RemovePowerInternal(this);
             }
         }
+    }
+
+    /// <summary>Phase BR (v70, gap #79): does this turn_start payload carry a growing damage (Rolling Boulder)?</summary>
+    private static bool Grows(EffectSpec t) => (t.Triggered ?? []).Any(x => x.HasGrow);
+
+    /// <summary>Phase BR (v70, gap #79): Rolling Boulder, mod-native. The base RollingBoulderPower is NEVER applied (it awaits a
+    /// VFX Finished signal outside TestMode — an AutoSlay hang). A damage tick from a turn hook must not run on
+    /// BeforeSideTurnStart (a lethal tick there NREs ClearBlock and hangs the run at "Combat turn N"): this is PoisonPower's
+    /// hook and context, AfterSideTurnStart + a ThrowingPlayerChoiceContext (no choice can occur under a damage tick — the
+    /// validator keeps the growing damage the payload's ONLY effect). Fires at the start of the OWNER's side's turn and passes
+    /// the fires so far, so the tick grows by `grow` every turn.</summary>
+    public override async Task AfterSideTurnStart(CombatSide side, IReadOnlyList<Creature> participants, ICombatState combatState)
+    {
+        var t = Trigger;
+        if (t?.Trigger != "turn_start" || !Grows(t) || Owner?.Player == null || side != Owner.Side) return;
+        Flash();
+        await TriggerRunner.Run(t, Owner.Player, new ThrowingPlayerChoiceContext(), growFires: _growFires);
+        _growFires++;
     }
 
     /// <summary>Phase BN (v69, gap #73): does this turn_start payload auto-play a card (Mayhem)?</summary>

@@ -110,6 +110,8 @@ def _t_effectrunner() -> None:
     check("FireOnDiscardFor" not in er, "EffectRunner.FireOnDiscardFor is deleted (the hook does the work)")
     check("_firingOnDiscard" not in er, "the guard no longer lives in EffectRunner")
     check("internal static int ModDiscardDepth;" in er, "ModDiscardDepth (tag attribution only) is declared")
+    # Phase BR (v70): DiscardRandom / DiscardChoose now return the cards removed (Task<int>, the cards_removed stash).
+    er = er.replace("internal static async Task<int> ", "internal static async Task ")
     for name, end in (("DiscardRandom", "internal static async Task DiscardChoose"),
                       ("DiscardChoose", "private static bool Retrievable"),
                       ("Scry", "internal static void UpgradeInHand")):

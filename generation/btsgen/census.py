@@ -67,7 +67,9 @@ SPECIALTY_STATUSES = frozenset({"poison", "frail", "focus", "temp_focus"})  # Ph
 KEYWORD_OPS = frozenset({"exhaust", "retain", "innate", "ethereal",
                          "sly",  # Phase BB (v56, gap #55): the base-game Sly keyword is a card shape too
                          # Phase BO (v66, gap #74): the self-routing flag-ops say where the card goes after play — a shape too
-                         "return_to_hand", "to_draw_top", "return_next_turn"})
+                         "return_to_hand", "to_draw_top", "return_next_turn",
+                         # Phase BR (v70, gap #11): the nullary Whistle flag-op (one per class) is a card shape too
+                         "stun"})
 MULTI_HIT_KIND = "multi_hit"
 
 

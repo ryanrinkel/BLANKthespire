@@ -1397,6 +1397,7 @@ public static class ForgedCharacters
         // is rejected at import (it used to import fine and silently channel Lightning at runtime).
         var poolOrbNames = cspec.OrbPool.Where(o => o.IsCustom).Select(o => o.Name.ToLowerInvariant()).ToHashSet();
         var cardJsons = new List<string>(cardsArr.Count);
+        var parsedCards = new List<CardSpec>(cardsArr.Count); // Phase BR (v70, gap #11): the class-level stun rails
         for (int i = 0; i < cardsArr.Count; i++)
         {
             if (cardsArr[i].VariantType != Godot.Variant.Type.Dictionary)
@@ -1410,7 +1411,11 @@ public static class ForgedCharacters
                 && cspec.OrbSlots < ForgedCards.LoseOrbSlotMinSlots)
             { error = $"card {i + 1}: lose_orb_slot needs a class with {ForgedCards.LoseOrbSlotMinSlots}+ orb slots (has {cspec.OrbSlots})."; return false; }
             cardJsons.Add(cj);
+            if (cspecCard != null) parsedCards.Add(cspecCard);
         }
+        // Phase BR (v70, gap #11): one stun card per class, and nothing in the class re-buys it (Exhume / a copy of it).
+        var stunErr = ForgedCards.StunClassError(parsedCards);
+        if (stunErr != null) { error = stunErr; return false; }
 
         int k = explicitSlot > 0 ? explicitSlot
               : (FindClassSlotByName(cspec.Name) ?? FirstFreeClassSlot() ?? -1);

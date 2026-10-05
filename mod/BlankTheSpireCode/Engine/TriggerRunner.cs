@@ -30,7 +30,9 @@ public static class TriggerRunner
     /// fire-time condition holds. <paramref name="attacker"/> (Phase AK, v41) is the creature that just dealt us
     /// damage — supplied only by the <c>attacked</c> hook, so a payload effect with target:"attacker" resolves to
     /// it (the RelicRunner L-3 pattern); null on every other trigger.</summary>
-    public static async Task Run(EffectSpec trigger, Player player, PlayerChoiceContext ctx, Creature? attacker = null)
+    // Phase BR (v70, gap #79): growFires = how many times this power's growing turn_start payload has
+    // ALREADY fired (Rolling Boulder) — a payload damage with grow deals amount + grow x growFires.
+    public static async Task Run(EffectSpec trigger, Player player, PlayerChoiceContext ctx, Creature? attacker = null, int growFires = 0)
     {
         if (trigger.When != null)
         {
@@ -79,6 +81,12 @@ public static class TriggerRunner
                     // dealer — the same path RelicRunner/SummonRunner use. Validator guarantees a target here.
                     var targets = ResolveEnemies(e.Target, player, attacker);
                     int hits = Math.Max(1, e.Hits); // Phase AL (v42): a multi-hit payload loops the intrinsic hit
+                    if (e.HasGrow) // Phase BR (v70, gap #79): Rolling Boulder — the mod-native growth (never the base RollingBoulderPower)
+                    {
+                        int grown = amt + e.Grow * Math.Max(0, growFires);
+                        MainFile.Logger.Info($"[BR] turn_start grow: {amt}+{e.Grow}x{growFires} = {grown} ({targets.Count} enemy/ies).");
+                        amt = grown;
+                    }
                     MainFile.Logger.Info($"[H4] targeted payload: deal {amt} damage to {e.Target} ({targets.Count} enemy/ies).");
                     if (e.Target == "attacker") // Phase AK (v41) smoke tag: the riposte lands on the one that struck (or nobody, if it died)
                         MainFile.Logger.Info($"[AK] riposte: deal {amt} damage to the attacker ({(targets.Count > 0 ? "resolved" : "no living attacker — skipped")}).");

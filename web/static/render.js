@@ -571,6 +571,7 @@ const SCALE_NOUN = {
   // Phase BQ (v68, gap #78): the orb reads (Compile Driver), lockstep with cardgen._scale_phrase
   orb_count: "the orbs you have channeled",
   orb_types: "the different orbs you have channeled",
+  cards_removed: "the cards removed", // Phase BR (v70, gap #79): what an earlier discard / exhaust_card removed
 };
 const scaleNoun = (e) => e.scale === "target_status_stacks" ? `the enemy's ${statusName(e.status)}` : SCALE_NOUN[e.scale];
 // Phase BK (v63, gap #65): the singular noun a `hits_scale` damage counts — lockstep with cardgen._HITS_PHRASE /
@@ -584,6 +585,7 @@ const HITS_NOUN = {
   hp_loss_events_this_combat: "time you have lost HP this combat",
   energy_spent_this_turn: "energy you have spent this turn",
   orb_count: "orb you have channeled",
+  cards_removed: "card removed", // Phase BR (v70, gap #79): Fiend Fire ("for each card Exhausted" in the card text)
 };
 const titleCase = (s) => String(s || "").replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
 const statusName = (s) => STATUS_NAMES[s] || titleCase(s);
@@ -644,7 +646,7 @@ function effPhrase(e, target) {
   if (noun && e.op === "damage") return `Deal damage equal to ${noun}${toAll}${e.unblockable === true ? " (ignores Block)" : ""}`;
   if (noun && e.op === "block") return `Gain Block equal to ${noun}`;
   switch (e.op) {
-    case "damage": return `Deal ${a ?? ""} damage${scale}${toAll}${hits}${e.unblockable === true ? " (ignores Block)" : ""}${e.grow_held ? ` (+${e.grow_held} per turn held)` : ""}`; // Phase AN (v44) / BD (v58)
+    case "damage": return `Deal ${a ?? ""} damage${scale}${toAll}${hits}${e.unblockable === true ? " (ignores Block)" : ""}${e.grow_held ? ` (+${e.grow_held} per turn held)` : ""}${e.grow ? ` (grows by ${e.grow})` : ""}`; // Phase AN (v44) / BD (v58) / BR (v70): grow (Rampage, Rolling Boulder)
     case "block": return `Gain ${a ?? ""} Block${scale}${e.grow_held ? ` (+${e.grow_held} per turn held)` : ""}`; // Phase BD (v58)
     case "held_discount": return `Costs ${a ?? 1} less for each turn it is retained`; // Phase BD (v58, gap #58)
     case "cost_delta": return costDeltaPhrase(e); // Phase BP (v67, gap #76): lockstep with cardgen._cost_delta_sentence
@@ -659,7 +661,9 @@ function effPhrase(e, target) {
       return e.count ? `Your next ${e.count > 1 ? e.count + " " : ""}${kind} cost ${a ?? 1} less ${life}` : `Your ${kind} cost ${a ?? 1} less ${life}`;
     }
     case "heal": return `Heal ${a ?? ""}`;
-    case "discard": return `Discard ${a ?? 1} ${e.cards === "choose" ? "chosen" : "random"} card${(a ?? 1) == 1 ? "" : "s"}`; // Phase AP (v46)
+    case "discard": return e.cards === "all" ? "Discard your hand" // Phase BR (v70, gap #79)
+                         : `Discard ${a ?? 1} ${e.cards === "choose" ? "chosen" : "random"} card${(a ?? 1) == 1 ? "" : "s"}`; // Phase AP (v46)
+    case "stun": return "Stun the enemy"; // Phase BR (v70, gap #11): Whistle, lockstep with cardgen.describe
     case "retrieve_card": { // Phase AP (v46); Phase BO (v66): + the draw-pile tutor and the card_type filter
       const n = a ?? 1;
       const what = { attack: "Attack", skill: "Skill", power: "Power", non_attack: "non-Attack card" }[e.card_type] || "card";
@@ -673,6 +677,7 @@ function effPhrase(e, target) {
       const what = { attack: "Attack", skill: "Skill", power: "Power", non_attack: "non-Attack card" }[e.card_type] || "card";
       const n = a ?? 1;
       const where = e.pile === "draw" ? "draw pile" : "hand"; // Phase BO (v66): + the draw pile
+      if (e.cards === "all" && !e.card_type && e.pile !== "draw") return "Exhaust your hand"; // Phase BR (v70, gap #79)
       if (e.cards === "all") return `Exhaust all ${what}s in your ${where}`;
       if (e.cards === "up_to") return `Exhaust up to ${n} ${what}${n == 1 ? "" : "s"} in your ${where}`;
       return `Exhaust ${n} ${e.cards === "random" ? "random " : ""}${what}${n == 1 ? "" : "s"} in your ${where}`;

@@ -995,6 +995,53 @@ growing damage → `power_ramp` / `countdown_ripen`.
 **Test:** `tests/test_phase_br.py`. **Tester** `gaptest-br`: Whistle-lite (3-cost exhaust 20 damage + stun), Fiend Fire,
 Calculated Gamble, Rolling Boulder power. **Tags:** `[BR] stun '<enemy>': next move <old> -> STUNNED (applied=<b>)`,
 `[BR] stunned turn performed '<enemy>'`, `[BR] cards_removed -> <n>`, `[BR] turn_start grow: <base>+<g>x<fires>`.
+**Findings (BR, built 2026-10-04 on `wave6`, vocab v70):** (1) Verify-first held: `CreatureCmd.Stun(creature, nextMoveId?)` and
+its `Stun(creature, Func<…> stunMove, nextMoveId?)` overload; `Creature.StunInternal` throws for a player and reads
+`StateLog.Last()` (throws on an empty log), builds `MoveState("STUNNED", …) { FollowUpStateId, MustPerformOnceBeforeTransitioning
+= true }` and calls `SetMoveImmediate`, which replaces only a `CanTransitionAway` move — so a locked boss move and an
+already-STUNNED enemy (STUNNED is itself must-perform) are no-ops. `EffectRunner.StunTarget` guards the player / dead / empty-log
+cases, calls the **stunMove overload** with a log-only callback (base default = nothing) — that callback runs when the STUNNED
+move is performed, which is how `[BR] stunned turn performed '<enemy>'` is observed — and reads `NextMove.Id` before/after:
+`[BR] stun '<enemy>': next move <old> -> <new> (applied=<b>)`, plus `[BR] stun skipped: already stunned` / `cannot transition
+(locked move …)` / `empty move log` / `'<enemy>' is dead`. (2) **The shipped stun guard rails** (plan §7 decision 7; both
+validators unless noted): flag-op, no amount / status / scale / hits; a single-enemy card (target `enemy`); `exhaust` on the base
+AND the upgrade list (an upgrade may not drop it); cost ≥ 2 on the base and the upgrade, never X; uncommon / rare; never a Power;
+never with `return_to_hand` / `to_draw_top` / `return_next_turn`; one per list; never a payload (not in `TriggerOps`, not in the
+schema's triggerEffect enum). **Class level** (`ForgedCards.StunClassError` in `TryImportClassBundle` + `class_forge._stun_class_conflict`,
+which drops the conflicting card in the main loop and the coverage repair): at most ONE stun card per class, and a class with one
+may not also carry `retrieve_card pile:"exhaust"` (Exhume — BO's note) or an `add_card` / `transform_card` / `graft_card` naming
+the stun card (a fresh copy is a fresh stun); `put_back` cannot reach an exhausted card, so it needs no rule. Runtime:
+`add_random_card` never generates a stun card (pool filter). Deck COPIES are not limited (card rewards can offer the card twice,
+as the base game can offer two Whistles); a second copy on an already-stunned enemy is the base no-op. Cross-checks: a BM-replayed
+stun card's second play is a no-op (the monster is already STUNNED — logged applied=False / already stunned); a BN-autoplayed stun
+card exhausts anyway (draw_top forces it; draw_random plays an Exhaust card) and hits the enemy AutoPlay rolls. (3) **Rule 0.6 —
+no new exhaust op:** `exhaust_card cards:"all"` has existed since Phase BC; the untyped whole-hand form now reads "Exhaust your
+hand." (test_phase_bc's pin updated). `discard` gained `cards:"all"` (`DiscardPickModes`; retrieve_card keeps random / choose; no
+amount; card-only — a payload discard stays random) through the SAME batch `CardCmd.Discard` (`DiscardRandom` with the whole
+hand), so Sly still fires. (4) `cards_removed` = the count the LAST `discard` / `exhaust_card` before it on the card removed
+(`DataCard.RemovedThisPlay`, reset at the start of every play — a replay re-reads its own dump; `DiscardRandom` / `DiscardChoose` /
+`ExhaustCards` now return their counts); `ScaleValue` falls back to `OtherCardsInHand` for the in-hand preview. It is a `scale`
+source (damage / block / draw) AND a `hits_scale` source (Fiend Fire); the validator requires a discard / exhaust_card EARLIER in
+the same list. The text names the op: "Deal damage equal to the cards Exhausted." / "Draw cards equal to the cards Discarded." /
+"Deal {Damage} damage for each card Exhausted." (5) **Rolling Boulder (mod-native):** `grow` is legal in a payload only on a
+`turn_start` trigger whose ONLY effect is a targeted `damage` (no scale / hits / `when` — the "Increases by N each turn" text
+must stay true; 1..9, ≤ amount). `ForgedTriggerPower` skips such a payload on AfterPlayerTurnStart and ticks it from
+**AfterSideTurnStart** (owner side) with a **ThrowingPlayerChoiceContext** (PoisonPower's hook/ctx; the sole-effect rule keeps
+any choice out of it), passing `growFires` (a per-power counter beside `_ripenLeft`) into `TriggerRunner.Run`:
+`[BR] turn_start grow: <base>+<g>x<fires> = <dmg>`. The base `RollingBoulderPower` is referenced nowhere (test-pinned). A second
+copy of the Power stacks the Single power's Amount, not the tick (every turn_start trigger behaves so). (6) Harness: gate
+`GATED_OP_ORDER` += stun; **census `KEYWORD_OPS` += stun** (nullary, as the phase spec asks — note BL kept its nullary strip ops
+out); coverage `SCALE_MENU` += cards_removed (detector: scale OR hits_scale); featured += `hand_dump`; `_PREFERRED_SCALES` +=
+cards_removed (stun deliberately NOT preferred: one per class); bridges surface `stun`, `cards_removed` (also from hits_scale) and
+**`grow`** (Rampage's existing `grow` claim had no witness token); render.js; 7 exemplars (210 -> 217: Shrill Whistle, Ringing
+Parry, Pyre of Everything, Reckless Reshuffle, Scatter Volley, Rolling Stone, Gathering Avalanche); token claims ambush_alpha /
+block_bulwark `stun` (#11), madness_discard / exhaust_pyre `cards_removed` (#79), power_ramp / countdown_ripen `grow` (#79); six
+DESIGN_HEURISTICS notes; one pitch sentence each in DISCARD, DECK-THINNING, RAMPAGE and PRECISION READS (`full` scaffold snapshot
+47,751 -> 48,141, +390). Stale pins updated: test_phase_au / bb / bc / bo (the discard / exhaust helpers return `Task<int>`),
+test_phase_bc ("Exhaust your hand."), test_phase_bk (`cards_removed` joins the hit-count sources), test_phase_u (payload `grow`
+is now legal on the turn_start Rolling Boulder — the reject case moved to turn_end), test_coverage, test_featured,
+test_harness_v2. (7) Readings: index 9,703 (cap 72) · per-archetype max 77,619 (`slot_machine`) · per-archetype scaffold max
+27,537 (`exhaust_pyre`) · triads 69,442 / 79,433 / 85,178 · all-ops 130,589 · `full` 121,649.
 
 ---
 
@@ -1172,3 +1219,8 @@ non-fatal minion kill closed, all four add_random_card forms + "Auto-selected 1 
 line) and `[BP] on_card_generated fired` for generated cards; 0 mod exceptions, 0 localization errors; no iteration
 (Findings (BN) 8). `test_phase_bn` reads the tags. **The stretch BO..BQ + BN is complete; next: Phase BR (v70), then the v0.4.0
 release (§4).**
+
+**Phase BR BUILT 2026-10-04** (on `wave6`, vocab v70 — the last phase of the wave; gaps #11 / #79 done; tester
+`generation/tests/gaptest-br/`, `--validate-only` green; DLL built + deployed; smoke next). Readings: index 9,703 (cap 72) ·
+per-archetype max 77,619 (`slot_machine`) · per-archetype scaffold max 27,537 · triads 69,442 / 79,433 / 85,178 · all-ops 130,589 ·
+`full` 121,649 (scaffold snapshot 48,141, +390). See Findings (BR) for the stun guard-rail rule set.
