@@ -2,7 +2,7 @@
 
 Status: Phase 1 BUILT 2026-10-05 (plus phase 2 items 2, 3, 4: landing OG tags + `static/img/og-landing.png`,
 sign-in escape hatch, "why sign in" line). Decisions: MOOSE = id 70; GOOSE/MOOSE ship as v55 codes (no
-re-forge); primary CTA "Create Your Own Class", secondary "Try a featured class". Not yet deployed.
+re-forge); primary CTA "Create Your Own Class", secondary "Try a featured class". DEPLOYED 2026-10-05 20:08Z (be77729); live checks: /api/featured returns the 4 classes with art, og-landing.png 200, /login escape hatch present.
 
 Verification: `web/tests` 300 passed; `web/tools/ui_smoke.mjs ... featured` scenario green (boot the server
 with `BTSWEB_FEATURED_FILE` pointing at a JSON whose slugs exist in that server's DB; the list is read once
