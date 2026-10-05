@@ -32,6 +32,8 @@ The deck (slot 04, a normal class, all-aggression so fights end; every BP card o
                        re-raises on_debuff_applied on the SAME power: the _firing guard must stop it
                                                                    [BP] re-entry blocked (on_debuff_applied)
     Vulnerable sources: Bash (8 damage + 2 Vulnerable) and Thunderclap (AoE 4 + 1 Vulnerable)
+  * War Drum         — power: turn_start +1 Strength, 4 Block; max HP 110 (smoke iteration: GAPTESTBP2's first pass died to
+                       The Insatiable after every [BP] tag had already fired)
 
 What the smoke CAN'T prove: AutoSlay never pays energy (it plays through CardCmd.AutoPlay), so every cost_delta is
 proven as a cost READ — the [BP] line logs CardEnergyCost.GetWithModifiers old -> new (Local for the mutating forms; the
@@ -143,8 +145,12 @@ CARDS = [
     card("bp_thunderclap", "Thunderclap", "attack", "common", 1, "all_enemies",
          [{"op": "damage", "amount": 4}, {"op": "apply_status", "status": "vulnerable", "amount": 1}],
          [{"op": "damage", "amount": 7}, {"op": "apply_status", "status": "vulnerable", "amount": 1}]),
+    # Smoke iteration (2026-10-04): GAPTESTBP2's first pass died to The Insatiable (every [BP] tag had fired; no mod frame) —
+    # a Strength + Block ramp and more HP so the run reaches the end.
+    power("bp_war_drum", "War Drum", "rare", 1, "turn_start",
+          [{"op": "apply_status", "status": "strength", "amount": 1}, {"op": "block", "amount": 4}]),
 ]
-# slot -> count (1-based card order): every BP card once, two Strikes, one Defend (21 cards).
+# slot -> count (1-based card order): every BP card once, two Strikes, one Defend (22 cards).
 DECK = {"bp_strike": 2}
 
 CHARACTER = {
@@ -152,7 +158,7 @@ CHARACTER = {
     "description": "Phase BP (v67) tester: self-cost rules (Stomp, Quick Study, Crescendo, Momentum Strike, Kingly Kick, "
                    "Modded, Up My Sleeve, Ash Hunger) and the small reactive triggers (Arsenal on created cards; Vicious, "
                    "Sleight of Flesh and Spreading Rot on applied debuffs).",
-    "max_hp": 80, "max_energy": 3,
+    "max_hp": 110, "max_energy": 3,
     "starting_deck": [{"slot": n, "count": DECK.get(c["id"], 1)} for n, c in enumerate(CARDS, start=1)],
 }
 

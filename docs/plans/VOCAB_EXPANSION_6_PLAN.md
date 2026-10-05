@@ -823,6 +823,18 @@ paragraph + the TRIGGERS sentence; `full` scaffold snapshot 47,178 -> 47,371, +1
 test_phase_bi / bk / bo (the widened target rule, the EffectSpec tail, the add_trigger row), test_exemplars (on_evoke is
 orb-only), test_featured (self_discount sample). (8) Readings: index 9,250 (cap 72) · per-archetype max 74,247
 (`exhaust_pyre`) · per-archetype scaffold max 27,042 · triads 67,987 / 77,235 / 82,980 · all-ops 126,601 · `full` 118,114.
+(9) **Smoke (tests/gaptest-bp, 2026-10-04, one build, no engine iteration):** GAPTESTBP1 **completed the run** (755 [BP] lines);
+the first GAPTESTBP2 launch never reached the game (Steam relaunch race); re-run alone it died to The Insatiable (235 [BP] lines,
+every tag already fired, no mod frame) → the tester gained War Drum (turn_start +1 Strength, 4 Block) and max HP 110; the
+third launch **completed the run** (1,000 [BP] lines). Every tag fired on both completed seeds: cost_delta for all six `on`
+events — Stomp attack_played, Quick Study skill_played, Crescendo card_played (stateless: local read with the counted
+discount, all-modifier read beside it), Momentum Strike `1 -> 0 (combat, set_zero)`, Modded `0 -> 1 (combat, +1)`, Up My Sleeve
+`2 -> 1 (combat, -1)`, Kingly Kick `4 -> 3 (combat, -1)`, Ash Hunger card_exhausted —, `on_card_generated` (Wounds AND Spark
+copies), `on_debuff_applied` (Vulnerable / Poison / Weak; the Vicious filter), `that_enemy`, and **`[BP] re-entry blocked
+(on_debuff_applied)`** 25 / 53× (Spreading Rot's Poison payload: the `_firing` guard held, no loop). 0 mod exceptions, 0
+BlankTheSpire frames, 0 localization errors (the remaining exception lines are BaseLib's two startup Harmony patch failures
+and AutoSlay's post-completion "Options NButton not found"). `on_evoke` is not provable on this normal-class tester (BQ).
+AutoSlay never pays energy: every cost_delta is proven as a cost READ only. No freeze.
 
 ### Phase BQ — Orb extras (v69; gap #78; ~1 day) — 17 base cards, orb classes only
 
@@ -1024,8 +1036,8 @@ per-archetype max 73,278 (`exhaust_pyre`) · per-archetype scaffold max 26,849 �
 localization errors, after one engine fix (an amount-less `retrieve_card` retrieved nothing) and two tester iterations
 (Findings (BO) 11). Tags in `generation/tests/gaptest-bo/godot_BO_tags_<SEED>.txt`; `test_phase_bo` reads them.
 
-**Phase BP BUILT 2026-10-04** (on `wave6`, vocab v67; gaps #76/#77 done; smoke pending — run right after BO's, Ryan's
-go-ahead; tester `generation/tests/gaptest-bp/`, `--validate-only` green). Merged suite: generation **602**, web **293**,
-`test_phase_bp` 299/299 (smoke record pending). Readings: index 9,250 (cap 72) · per-archetype max 74,247 (`exhaust_pyre`) ·
+**Phase BP DONE 2026-10-04** (on `wave6`, vocab v67; gaps #76/#77 done; smokes GAPTESTBP1 / BP2 completed the run, every
+`[BP]` tag fired incl. the re-entry guard, 0 mod exceptions, 0 localization errors, one tester iteration — Findings (BP) 9;
+tester + tags in `generation/tests/gaptest-bp/`). Merged suite: generation **602**, web **293**, `test_phase_bp` 320/320. Readings: index 9,250 (cap 72) · per-archetype max 74,247 (`exhaust_pyre`) ·
 per-archetype scaffold max 27,042 · triads 67,987 / 77,235 / 82,980 · all-ops 126,601 · `full` 118,114 (scaffold snapshot
 47,371, +193). See Findings (BP).

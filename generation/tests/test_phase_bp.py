@@ -10,7 +10,7 @@ three ForgedTriggerPower overrides + the re-entry tag, TriggerRunner's that_enem
 the describe byte-match (Python literals asserted, the C# fragments grepped); the contract surfaces (schema, VOCABULARY
 rows, gate order + field units, coverage + the orb gate, featured, harness_v2, bridges, archetypes, exemplars,
 heuristics, gap log, render.js, the pitch sentences); the tester's validate-only path; the saved AutoSlay tag greps
-under tests/gaptest-bp/ when present ("smoke pending" otherwise); and prints the rule-0.9 readings.
+under tests/gaptest-bp/ (smokes GAPTESTBP1/BP2, 2026-10-04); and prints the rule-0.9 readings.
 """
 from __future__ import annotations
 
@@ -541,9 +541,6 @@ def _t_tester() -> None:
 def _t_smoke_record() -> None:
     print("the saved AutoSlay tag greps (TEST_AUDIT_2026-10 §7):")
     files = [TESTER_DIR / f"godot_BP_tags_{s}.txt" for s in SMOKE_SEEDS]
-    if not any(p.exists() for p in files):
-        print("  smoke pending (no godot_BP_tags_<SEED>.txt yet)")
-        return
     seen = ""
     for p in files:
         assert p.exists(), f"missing smoke record {p}"
@@ -555,6 +552,9 @@ def _t_smoke_record() -> None:
         seen += txt
     for t in TAGS:
         check(t in seen, f"the smoke fired '{t}'")
+    check("Auto-selected" in seen, "Burning Pact's picker resolved through the AutoSlay selector")
+    check("Strength Down" not in seen and "ForgedTempStrengthDownPower" not in seen,
+          "no temporary wrapper ever fired on_debuff_applied")
 
 
 def _t_budget() -> None:

@@ -1,0 +1,791 @@
+# Phase BP AutoSlay smoke — seed GAPTESTBP1 (godot.log grep, 10511 lines)
+# [BP] lines: 755
+# mod exceptions: 0
+# BlankTheSpire stack frames: 0
+# BlankTheSpire frames in non-exception [ERROR] traces (logged, non-fatal): 0
+# Localization formatting errors: 0
+# exception lines (any source): 5
+# Auto-selected (picker) lines: 23
+# run end: [INFO] [AutoSlay] Action: Run completed (max floor reached). Abandoning
+# after completion: [ERROR] [AutoSlay] Run failed with seed=GAPTESTBP1: Node /root/Game/RootSceneContainer/Run/GlobalUi/TopBar/RightAlignedStuff/Options of type NButton not found  (base AutoSlay's post-completion AbandonRunAsync; the run already counted as completed)
+# --- per-tag counts ---
+  cost_delta 'Ash Hunger' on card_exhausted          214
+  cost_delta 'Crescendo' on card_played              152
+  cost_delta 'Kingly Kick' on drawn                   18
+  cost_delta 'Modded' on played                       19
+  cost_delta 'Momentum Strike' on played              26
+  cost_delta 'Quick Study' on skill_played            24
+  cost_delta 'Stomp' on attack_played                 59
+  cost_delta 'Up My Sleeve' on played                 22
+  on_card_generated fired                             11
+  on_debuff_applied fired                            114
+  re-entry blocked (on_debuff_applied)                25
+  that_enemy                                          71
+# --- exception lines (any source) ---
+[ERROR] [BaseLib] HarmonyLib.HarmonyException: Patching exception in method null
+---> System.ArgumentException: Undefined target method for patch method static System.Void BaseLib.Patches.Networking.AdjustCustomMessageKeys::Fuckery()
+[ERROR] [BaseLib] HarmonyLib.HarmonyException: Patching exception in method System.Void MegaCrit.Sts2.Core.Nodes.Screens.RelicCollection.NRelicCollectionCategory::LoadRelics(MegaCrit.Sts2.Core.Entities.Relics.RelicRarity relicRarity, MegaCrit.Sts2.Core.Nodes.Screens.RelicCollection.NRelicCollection 
+---> System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation.
+[ERROR] MegaCrit.Sts2.Core.AutoSlay.AutoSlayTimeoutException: Node /root/Game/RootSceneContainer/Run/GlobalUi/TopBar/RightAlignedStuff/Options of type NButton not found
+# --- every [BP] line ---
+[INFO] [BlankTheSpire] [BP] cost_delta 'Kingly Kick' on drawn: 4 -> 3 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Burning Pact' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Quick Study' on skill_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Burning Pact' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Quick Study' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Quick Study' on skill_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Quick Study' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Momentum Strike' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 3 -> 2 (this_turn; 1 counted, all-modifier cost now 1; 'Momentum Strike' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Momentum Strike' on played: 1 -> 0 (combat, set_zero).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 4 counted, all-modifier cost now 0; 'Stomp' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 2 -> 1 (this_turn; 2 counted, all-modifier cost now 0; 'Stomp' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 5 counted, all-modifier cost now 0; 'Crescendo' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Momentum Strike' on played: 1 -> 0 (combat, set_zero).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Quick Study' on skill_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Burning Pact' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Quick Study' on skill_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Quick Study' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Modded' on played: 0 -> 1 (combat, +1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 3 -> 2 (this_turn; 1 counted, all-modifier cost now 3; 'Flare Shot' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Sleight of Flesh' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Arsenal' played).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Wound' created).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 3 -> 2 (this_turn; 1 counted, all-modifier cost now 1; 'Wild Strike' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Wild Strike' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 2 -> 1 (this_turn; 2 counted, all-modifier cost now 0; 'Crescendo' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 4 counted, all-modifier cost now 0; 'Crescendo' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 1 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Stomp' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Kingly Kick' on drawn: 4 -> 3 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Modded' on played: 0 -> 1 (combat, +1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Momentum Strike' on played: 1 -> 0 (combat, set_zero).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Up My Sleeve' on played: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 3 -> 2 (this_turn; 1 counted, all-modifier cost now 1; 'Stomp' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': VulnerablePower 1 on 'ShrinkerBeetle').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'ShrinkerBeetle'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Vicious': VulnerablePower 1 on 'ShrinkerBeetle', filter vulnerable).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Thunderclap' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Crescendo' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Momentum Strike' on played: 1 -> 0 (combat, set_zero).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Quick Study' on skill_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Quick Study' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 3 -> 2 (this_turn; 1 counted, all-modifier cost now 1; 'Ash Hunger' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 2 -> 1 (this_turn; 2 counted, all-modifier cost now 3; 'Stomp' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 3 -> 2 (this_turn; 1 counted, all-modifier cost now 1; 'Strike' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 2 -> 1 (this_turn; 2 counted, all-modifier cost now 0; 'Stomp' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Kingly Kick' on drawn: 4 -> 3 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Stomp' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 3 -> 2 (this_turn; 1 counted, all-modifier cost now 1; 'Stomp' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Up My Sleeve' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Up My Sleeve' on played: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Thunderclap' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 4 counted, all-modifier cost now 0; 'Crescendo' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Quick Study' on skill_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Modded' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Modded' on played: 0 -> 1 (combat, +1).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Wound' created).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Quick Study' on skill_played: 0 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Quick Study' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 1 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 1 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': WeakPower 1 on 'Wriggler').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'Wriggler'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': WeakPower 1 on 'Wriggler').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'Wriggler'.
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 2; 'Crescendo' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Quick Study' on skill_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Quick Study' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Up My Sleeve' on played: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 5 counted, all-modifier cost now 0; 'Modded' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Modded' on played: 0 -> 1 (combat, +1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 6 counted, all-modifier cost now 0; 'Crescendo' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 1 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Strike' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 0 -> 0 (this_turn; 4 counted, all-modifier cost now 0; 'Stomp' played).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Vicious': VulnerablePower 1 on 'KinFollower', filter vulnerable).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Kingly Kick' on drawn: 4 -> 3 (combat, -1).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': VulnerablePower 1 on 'KinFollower').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'KinFollower'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': PoisonPower 1 on 'KinFollower').
+[INFO] [BlankTheSpire] [BP] re-entry blocked (on_debuff_applied).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Vicious': VulnerablePower 1 on 'KinFollower', filter vulnerable).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': VulnerablePower 1 on 'KinFollower').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'KinFollower'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': PoisonPower 1 on 'KinFollower').
+[INFO] [BlankTheSpire] [BP] re-entry blocked (on_debuff_applied).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Vicious': VulnerablePower 1 on 'KinPriest', filter vulnerable).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': VulnerablePower 1 on 'KinPriest').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'KinPriest'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': PoisonPower 1 on 'KinPriest').
+[INFO] [BlankTheSpire] [BP] re-entry blocked (on_debuff_applied).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 1 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 1 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Vicious': VulnerablePower 1 on 'KinFollower', filter vulnerable).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': VulnerablePower 1 on 'KinFollower').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'KinFollower'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': PoisonPower 1 on 'KinFollower').
+[INFO] [BlankTheSpire] [BP] re-entry blocked (on_debuff_applied).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': PoisonPower 1 on 'KinFollower').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'KinFollower'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': VulnerablePower 1 on 'KinFollower').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'KinFollower'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Vicious': VulnerablePower 1 on 'KinPriest', filter vulnerable).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': VulnerablePower 1 on 'KinPriest').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'KinPriest'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': PoisonPower 1 on 'KinPriest').
+[INFO] [BlankTheSpire] [BP] re-entry blocked (on_debuff_applied).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': PoisonPower 1 on 'KinPriest').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'KinPriest'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': VulnerablePower 1 on 'KinPriest').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'KinPriest'.
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 8 counted, all-modifier cost now 0; 'Thunderclap' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 8 counted, all-modifier cost now 0; 'Thunderclap' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 9 counted, all-modifier cost now 0; 'Crescendo' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 9 counted, all-modifier cost now 0; 'Crescendo' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 10 counted, all-modifier cost now 0; 'Crescendo' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Spark' created).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 3 -> 2 (this_turn; 1 counted, all-modifier cost now 1; 'Stomp' played).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Wound' created).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Vicious': VulnerablePower 2 on 'KinPriest', filter vulnerable).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': VulnerablePower 2 on 'KinPriest').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'KinPriest'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': PoisonPower 1 on 'KinPriest').
+[INFO] [BlankTheSpire] [BP] re-entry blocked (on_debuff_applied).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': PoisonPower 1 on 'KinPriest').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'KinPriest'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': VulnerablePower 2 on 'KinPriest').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'KinPriest' (gone — skipped).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Defend' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Defend' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Flare Shot' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Flare Shot' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Sleight of Flesh+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Sleight of Flesh+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 4 counted, all-modifier cost now 0; 'Ash Hunger' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 4 counted, all-modifier cost now 0; 'Ash Hunger' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 5 counted, all-modifier cost now 0; 'Crescendo' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 5 counted, all-modifier cost now 0; 'Crescendo' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 6 counted, all-modifier cost now 0; 'Crescendo' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Modded' on played: 0 -> 1 (combat, +1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 3 -> 2 (this_turn; 1 counted, all-modifier cost now 1; 'Strike' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 2 -> 1 (this_turn; 2 counted, all-modifier cost now 0; 'Stomp' played).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': VulnerablePower 1 on 'ThievingHopper').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'ThievingHopper'.
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Stomp' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 3 -> 2 (this_turn; 1 counted, all-modifier cost now 1; 'Stomp' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Flare Shot' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Crescendo' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 1 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 1 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Quick Study' on skill_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Up My Sleeve' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Up My Sleeve' on played: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Quick Study' on skill_played: 0 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Quick Study' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Momentum Strike' on played: 1 -> 0 (combat, set_zero).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Kingly Kick' on drawn: 4 -> 3 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Up My Sleeve' on played: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Modded' on played: 0 -> 1 (combat, +1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 1 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Spark' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 0 -> 0 (this_turn; 4 counted, all-modifier cost now 0; 'Stomp' played).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': VulnerablePower 1 on 'HunterKiller').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'HunterKiller'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': VulnerablePower 1 on 'HunterKiller').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'HunterKiller'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': PoisonPower 1 on 'HunterKiller').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'HunterKiller'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': PoisonPower 1 on 'HunterKiller').
+[INFO] [BlankTheSpire] [BP] re-entry blocked (on_debuff_applied).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Kingly Kick' on drawn: 4 -> 3 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Kingly Kick' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 3 -> 2 (this_turn; 1 counted, all-modifier cost now 1; 'Kingly Kick' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Momentum Strike' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 2 -> 1 (this_turn; 2 counted, all-modifier cost now 0; 'Momentum Strike' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Momentum Strike' on played: 1 -> 0 (combat, set_zero).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Flare Shot' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 1 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Flare Shot' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 4 counted, all-modifier cost now 0; 'Momentum Strike' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 0 -> 0 (this_turn; 4 counted, all-modifier cost now 0; 'Momentum Strike' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Momentum Strike' on played: 1 -> 0 (combat, set_zero).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 0 -> 0 (this_turn; 5 counted, all-modifier cost now 0; 'Crescendo' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 5 counted, all-modifier cost now 0; 'Crescendo' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 0 -> 0 (this_turn; 6 counted, all-modifier cost now 0; 'Stomp' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 8 counted, all-modifier cost now 0; 'Up My Sleeve' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Up My Sleeve' on played: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 9 counted, all-modifier cost now 0; 'Spreading Rot' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 10 counted, all-modifier cost now 0; 'Crescendo' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 1 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 1 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 3 -> 2 (this_turn; 1 counted, all-modifier cost now 1; 'Stomp' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 3 -> 2 (this_turn; 1 counted, all-modifier cost now 1; 'Stomp' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Up My Sleeve' on played: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 2 -> 1 (this_turn; 2 counted, all-modifier cost now 0; 'Stomp' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Kingly Kick' on drawn: 4 -> 3 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 4 counted, all-modifier cost now 0; 'Burning Pact' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 5 counted, all-modifier cost now 0; 'Crescendo' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Modded' on played: 0 -> 1 (combat, +1).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': VulnerablePower 1 on 'DecimillipedeSegmentFront').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'DecimillipedeSegmentFront'.
+[INFO] [BlankTheSpire] [BP] cost_delta 'Momentum Strike' on played: 1 -> 0 (combat, set_zero).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 1 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 1 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 1 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Ash Hunger+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Crescendo' played).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Vicious': VulnerablePower 2 on 'InfestedPrism', filter vulnerable).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': VulnerablePower 2 on 'InfestedPrism').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'InfestedPrism'.
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Momentum Strike' on played: 1 -> 0 (combat, set_zero).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Up My Sleeve' on played: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Momentum Strike' on played: 1 -> 0 (combat, set_zero).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Quick Study' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Quick Study' on skill_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Quick Study' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 2; 'Crescendo' played).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': VulnerablePower 2 on 'Ovicopter').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'Ovicopter'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': PoisonPower 1 on 'Ovicopter').
+[INFO] [BlankTheSpire] [BP] re-entry blocked (on_debuff_applied).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Vicious': VulnerablePower 2 on 'Ovicopter', filter vulnerable).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 2 -> 1 (this_turn; 2 counted, all-modifier cost now 0; 'Bash' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 1 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Momentum Strike' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Momentum Strike' on played: 1 -> 0 (combat, set_zero).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 0 -> 0 (this_turn; 4 counted, all-modifier cost now 0; 'Stomp' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': WeakPower 1 on 'ToughEgg').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'ToughEgg'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': PoisonPower 1 on 'ToughEgg').
+[INFO] [BlankTheSpire] [BP] re-entry blocked (on_debuff_applied).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': WeakPower 1 on 'ToughEgg').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'ToughEgg'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': PoisonPower 1 on 'ToughEgg').
+[INFO] [BlankTheSpire] [BP] re-entry blocked (on_debuff_applied).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': WeakPower 1 on 'ToughEgg').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'ToughEgg'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': PoisonPower 1 on 'ToughEgg').
+[INFO] [BlankTheSpire] [BP] re-entry blocked (on_debuff_applied).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': WeakPower 1 on 'Ovicopter').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'Ovicopter'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': PoisonPower 1 on 'Ovicopter').
+[INFO] [BlankTheSpire] [BP] re-entry blocked (on_debuff_applied).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Wound' created).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Wild Strike' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Ash Hunger' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Quick Study' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Quick Study' on skill_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Quick Study' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 4 counted, all-modifier cost now 0; 'Crescendo' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 5 counted, all-modifier cost now 0; 'Modded' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Modded' on played: 0 -> 1 (combat, +1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 6 counted, all-modifier cost now 0; 'Crescendo' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 0 -> 0 (this_turn; 5 counted, all-modifier cost now 0; 'Ash Hunger+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 0 -> 0 (this_turn; 6 counted, all-modifier cost now 0; 'Stomp' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Up My Sleeve' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Up My Sleeve' on played: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Defend' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Up My Sleeve' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Up My Sleeve' on played: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 3 -> 2 (this_turn; 1 counted, all-modifier cost now 1; 'Crescendo' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 4 counted, all-modifier cost now 0; 'Crescendo' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 2 -> 1 (this_turn; 2 counted, all-modifier cost now 0; 'Thunderclap' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 1 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Momentum Strike' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Momentum Strike' on played: 1 -> 0 (combat, set_zero).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 0 -> 0 (this_turn; 4 counted, all-modifier cost now 0; 'Spark' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 0 -> 0 (this_turn; 5 counted, all-modifier cost now 0; 'Stomp' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Kingly Kick' on drawn: 4 -> 3 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 3 -> 2 (this_turn; 1 counted, all-modifier cost now 1; 'Stomp' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Quick Study' on skill_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Quick Study' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Modded' on played: 0 -> 1 (combat, +1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Momentum Strike' on played: 1 -> 0 (combat, set_zero).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': VulnerablePower 1 on 'KnowledgeDemon').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'KnowledgeDemon'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': PoisonPower 1 on 'KnowledgeDemon').
+[INFO] [BlankTheSpire] [BP] re-entry blocked (on_debuff_applied).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': PoisonPower 1 on 'KnowledgeDemon').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'KnowledgeDemon'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': VulnerablePower 1 on 'KnowledgeDemon').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'KnowledgeDemon'.
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 3 -> 2 (this_turn; 1 counted, all-modifier cost now 1; 'Flare Shot' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 1 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 1 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 1 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 2 -> 1 (this_turn; 2 counted, all-modifier cost now 0; 'Flare Shot+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 1 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Ash Hunger' played).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': VulnerablePower 2 on 'KnowledgeDemon').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'KnowledgeDemon'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': PoisonPower 1 on 'KnowledgeDemon').
+[INFO] [BlankTheSpire] [BP] re-entry blocked (on_debuff_applied).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': PoisonPower 1 on 'KnowledgeDemon').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'KnowledgeDemon'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': VulnerablePower 2 on 'KnowledgeDemon').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'KnowledgeDemon'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Vicious': VulnerablePower 2 on 'KnowledgeDemon', filter vulnerable).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 0 -> 0 (this_turn; 4 counted, all-modifier cost now 0; 'Bash' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 0 -> 0 (this_turn; 5 counted, all-modifier cost now 0; 'Stomp' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Sleight of Flesh+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Momentum Strike' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Momentum Strike' on played: 1 -> 0 (combat, set_zero).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Crescendo' played).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Wound' created).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Wild Strike' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Ash Hunger' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Spreading Rot' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': VulnerablePower 1 on 'KnowledgeDemon').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'KnowledgeDemon'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': PoisonPower 1 on 'KnowledgeDemon').
+[INFO] [BlankTheSpire] [BP] re-entry blocked (on_debuff_applied).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': PoisonPower 1 on 'KnowledgeDemon').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'KnowledgeDemon'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': VulnerablePower 1 on 'KnowledgeDemon').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'KnowledgeDemon'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Vicious': VulnerablePower 1 on 'KnowledgeDemon', filter vulnerable).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Up My Sleeve' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Up My Sleeve' on played: 1 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Modded' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Modded' on played: 1 -> 2 (combat, +1).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': VulnerablePower 1 on 'KnowledgeDemon').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'KnowledgeDemon'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': PoisonPower 1 on 'KnowledgeDemon').
+[INFO] [BlankTheSpire] [BP] re-entry blocked (on_debuff_applied).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': PoisonPower 1 on 'KnowledgeDemon').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'KnowledgeDemon'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': VulnerablePower 1 on 'KnowledgeDemon').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'KnowledgeDemon'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Vicious': VulnerablePower 1 on 'KnowledgeDemon', filter vulnerable).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Kingly Kick' on drawn: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 3 -> 2 (this_turn; 1 counted, all-modifier cost now 1; 'Thunderclap' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Thunderclap' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Crescendo' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Up My Sleeve' on played: 1 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Quick Study' on skill_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Quick Study' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 3 -> 2 (this_turn; 1 counted, all-modifier cost now 1; 'Momentum Strike' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Momentum Strike' on played: 0 -> 0 (combat, set_zero).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 2 -> 1 (this_turn; 2 counted, all-modifier cost now 3; 'Stomp' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Stomp' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Stomp' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 3 -> 2 (this_turn; 1 counted, all-modifier cost now 1; 'Stomp' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Crescendo' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Crescendo' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Flare Shot' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 4 counted, all-modifier cost now 0; 'Crescendo' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Kingly Kick' on drawn: 4 -> 3 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 3 -> 2 (this_turn; 1 counted, all-modifier cost now 1; 'Stomp' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Modded' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Modded' on played: 0 -> 1 (combat, +1).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Vicious': VulnerablePower 1 on 'DevotedSculptor', filter vulnerable).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': VulnerablePower 1 on 'DevotedSculptor').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'DevotedSculptor'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': PoisonPower 1 on 'DevotedSculptor').
+[INFO] [BlankTheSpire] [BP] re-entry blocked (on_debuff_applied).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Thunderclap' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Crescendo' played).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Vicious': VulnerablePower 1 on 'DevotedSculptor', filter vulnerable).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': VulnerablePower 1 on 'DevotedSculptor').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'DevotedSculptor'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': PoisonPower 1 on 'DevotedSculptor').
+[INFO] [BlankTheSpire] [BP] re-entry blocked (on_debuff_applied).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Quick Study' on skill_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Modded' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Modded' on played: 0 -> 1 (combat, +1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Quick Study' on skill_played: 0 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Defend' played).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Vicious': VulnerablePower 2 on 'DevotedSculptor', filter vulnerable).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': VulnerablePower 2 on 'DevotedSculptor').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'DevotedSculptor'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': PoisonPower 1 on 'DevotedSculptor').
+[INFO] [BlankTheSpire] [BP] re-entry blocked (on_debuff_applied).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Quick Study' on skill_played: 0 -> 0 (this_turn; 4 counted, all-modifier cost now 0; 'Quick Study' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 3 -> 2 (this_turn; 1 counted, all-modifier cost now 1; 'Stomp' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Spark' created).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Wound' created).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 1 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 1 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 1 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 1 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Momentum Strike' on played: 1 -> 0 (combat, set_zero).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Strike' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Strike' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Flare Shot+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Flare Shot+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Momentum Strike' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Momentum Strike' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Momentum Strike' on played: 1 -> 0 (combat, set_zero).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 4 counted, all-modifier cost now 0; 'Crescendo' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 4 counted, all-modifier cost now 0; 'Crescendo' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 5 counted, all-modifier cost now 0; 'Crescendo' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Up My Sleeve' on played: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Quick Study' on skill_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Modded' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Modded' on played: 0 -> 1 (combat, +1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Quick Study' on skill_played: 0 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Burning Pact' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 3 -> 2 (this_turn; 1 counted, all-modifier cost now 1; 'Stomp' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Quick Study' on skill_played: 0 -> 0 (this_turn; 4 counted, all-modifier cost now 0; 'Modded' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Modded' on played: 0 -> 1 (combat, +1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Quick Study' on skill_played: 0 -> 0 (this_turn; 5 counted, all-modifier cost now 0; 'Quick Study' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Kingly Kick' on drawn: 4 -> 3 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Momentum Strike' on played: 1 -> 0 (combat, set_zero).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Kingly Kick' on drawn: 4 -> 3 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Kingly Kick' on drawn: 4 -> 3 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Up My Sleeve' on played: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': VulnerablePower 1 on 'FlailKnight').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'FlailKnight'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': VulnerablePower 1 on 'SpectralKnight').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'SpectralKnight'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': VulnerablePower 1 on 'MagiKnight').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'MagiKnight'.
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': WeakPower 1 on 'FlailKnight').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'FlailKnight'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': WeakPower 1 on 'SpectralKnight').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'SpectralKnight'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': WeakPower 1 on 'MagiKnight').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'MagiKnight'.
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Up My Sleeve+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Up My Sleeve' on played: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Spreading Rot' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Wild Strike+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 4 counted, all-modifier cost now 0; 'Crescendo+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 1 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 1 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 1 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 1 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Momentum Strike' on played: 1 -> 0 (combat, set_zero).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Momentum Strike' on played: 1 -> 0 (combat, set_zero).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': WeakPower 1 on 'FlailKnight').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'FlailKnight'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': WeakPower 1 on 'FlailKnight').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'FlailKnight'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': PoisonPower 1 on 'FlailKnight').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'FlailKnight'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': PoisonPower 1 on 'FlailKnight').
+[INFO] [BlankTheSpire] [BP] re-entry blocked (on_debuff_applied).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': WeakPower 1 on 'SpectralKnight').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'SpectralKnight'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': WeakPower 1 on 'SpectralKnight').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'SpectralKnight'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': PoisonPower 1 on 'SpectralKnight').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'SpectralKnight'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': PoisonPower 1 on 'SpectralKnight').
+[INFO] [BlankTheSpire] [BP] re-entry blocked (on_debuff_applied).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': WeakPower 1 on 'MagiKnight').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'MagiKnight'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': WeakPower 1 on 'MagiKnight').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'MagiKnight'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': PoisonPower 1 on 'MagiKnight').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'MagiKnight'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': PoisonPower 1 on 'MagiKnight').
+[INFO] [BlankTheSpire] [BP] re-entry blocked (on_debuff_applied).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 3 -> 2 (this_turn; 1 counted, all-modifier cost now 1; 'Strike+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Strike+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Arsenal+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Stomp+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 2 -> 1 (this_turn; 2 counted, all-modifier cost now 0; 'Stomp+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 4 counted, all-modifier cost now 0; 'Modded+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 4 counted, all-modifier cost now 0; 'Modded+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Modded' on played: 0 -> 1 (combat, +1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 5 counted, all-modifier cost now 0; 'Crescendo+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 5 counted, all-modifier cost now 0; 'Crescendo+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 6 counted, all-modifier cost now 0; 'Spreading Rot+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 7 counted, all-modifier cost now 0; 'Sleight of Flesh' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 8 counted, all-modifier cost now 0; 'Crescendo+' played).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': VulnerablePower 2 on 'FlailKnight').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'FlailKnight'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': VulnerablePower 2 on 'FlailKnight').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'FlailKnight'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': PoisonPower 1 on 'FlailKnight').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'FlailKnight'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': PoisonPower 1 on 'FlailKnight').
+[INFO] [BlankTheSpire] [BP] re-entry blocked (on_debuff_applied).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Quick Study' on skill_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Up My Sleeve+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Up My Sleeve' on played: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Quick Study' on skill_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Quick Study+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Kingly Kick' on drawn: 4 -> 3 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Up My Sleeve' on played: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Momentum Strike' on played: 1 -> 0 (combat, set_zero).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Up My Sleeve' on played: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': VulnerablePower 1 on 'ScrollOfBiting').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'ScrollOfBiting'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': VulnerablePower 1 on 'ScrollOfBiting').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'ScrollOfBiting'.
+[INFO] [BlankTheSpire] [BP] cost_delta 'Quick Study' on skill_played: 0 -> 0 (this_turn; 5 counted, all-modifier cost now 0; 'Quick Study+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 1 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 1 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 1 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 1 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': WeakPower 1 on 'ScrollOfBiting').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'ScrollOfBiting'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': WeakPower 1 on 'ScrollOfBiting').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'ScrollOfBiting'.
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Sleight of Flesh+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Apparition+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Crescendo+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Kingly Kick' on drawn: 4 -> 3 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Up My Sleeve' on played: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 3 -> 2 (this_turn; 1 counted, all-modifier cost now 1; 'Thunderclap+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 2 -> 1 (this_turn; 2 counted, all-modifier cost now 0; 'Flare Shot+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Modded' on played: 0 -> 1 (combat, +1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 1 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Kingly Kick+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 0 -> 0 (this_turn; 4 counted, all-modifier cost now 0; 'Stomp+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Up My Sleeve' on played: 2 -> 1 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Momentum Strike' on played: 1 -> 0 (combat, set_zero).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 1 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 1 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 1 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 1 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Sleight of Flesh+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Modded+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Modded' on played: 0 -> 1 (combat, +1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Spreading Rot' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 4 counted, all-modifier cost now 0; 'Vicious+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 5 counted, all-modifier cost now 0; 'Crescendo+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Volley+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Spreading Rot' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Momentum Strike+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Momentum Strike' on played: 1 -> 0 (combat, set_zero).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 4 counted, all-modifier cost now 0; 'Crescendo+' played).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': VulnerablePower 2 on 'TestSubject').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'TestSubject'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': VulnerablePower 2 on 'TestSubject').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'TestSubject' (gone — skipped).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Vicious': VulnerablePower 2 on 'TestSubject', filter vulnerable).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Kingly Kick' on drawn: 4 -> 3 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Ash Hunger+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Ash Hunger+' played).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': VulnerablePower 1 on 'TestSubject').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'TestSubject'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': VulnerablePower 1 on 'TestSubject').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'TestSubject'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': PoisonPower 1 on 'TestSubject').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'TestSubject'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': PoisonPower 1 on 'TestSubject').
+[INFO] [BlankTheSpire] [BP] re-entry blocked (on_debuff_applied).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Vicious': VulnerablePower 1 on 'TestSubject', filter vulnerable).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Thunderclap+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Thunderclap+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Crescendo+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Crescendo+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 4 counted, all-modifier cost now 0; 'Arsenal+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 5 counted, all-modifier cost now 0; 'Defend+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 6 counted, all-modifier cost now 0; 'Crescendo+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Burning Pact+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Burning Pact+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Ash Hunger+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Ash Hunger+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Volley+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Volley+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 4 counted, all-modifier cost now 0; 'Crescendo+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 4 counted, all-modifier cost now 0; 'Crescendo+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 5 counted, all-modifier cost now 0; 'Momentum Strike+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Momentum Strike' on played: 1 -> 0 (combat, set_zero).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 6 counted, all-modifier cost now 0; 'Ash Hunger+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 7 counted, all-modifier cost now 0; 'Flare Shot+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Ash Hunger' on card_exhausted: 0 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 8 counted, all-modifier cost now 0; 'Crescendo+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Defend+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Stomp+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Stomp' on attack_played: 3 -> 2 (this_turn; 1 counted, all-modifier cost now 1; 'Stomp+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Crescendo+' played).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Spark' created).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 2 -> 1 (this_turn; 1 counted, all-modifier cost now 0; 'Modded+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Modded' on played: 1 -> 2 (combat, +1).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': VulnerablePower 3 on 'TestSubject').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'TestSubject'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': VulnerablePower 3 on 'TestSubject').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'TestSubject'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Sleight of Flesh': PoisonPower 1 on 'TestSubject').
+[INFO] [BlankTheSpire] [BP] that_enemy -> 'TestSubject'.
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Spreading Rot': PoisonPower 1 on 'TestSubject').
+[INFO] [BlankTheSpire] [BP] re-entry blocked (on_debuff_applied).
+[INFO] [BlankTheSpire] [BP] on_debuff_applied fired ('Vicious': VulnerablePower 3 on 'TestSubject', filter vulnerable).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 1 -> 0 (this_turn; 2 counted, all-modifier cost now 0; 'Bash+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 3 counted, all-modifier cost now 0; 'Up My Sleeve+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Up My Sleeve' on played: 1 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 4 counted, all-modifier cost now 0; 'Modded+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Modded' on played: 1 -> 2 (combat, +1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 5 counted, all-modifier cost now 0; 'Ash Hunger+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 6 counted, all-modifier cost now 0; 'Momentum Strike+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Momentum Strike' on played: 0 -> 0 (combat, set_zero).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 7 counted, all-modifier cost now 0; 'Momentum Strike+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Momentum Strike' on played: 0 -> 0 (combat, set_zero).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Spark' created).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 8 counted, all-modifier cost now 0; 'Spark+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 9 counted, all-modifier cost now 0; 'Strike+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Kingly Kick' on drawn: 3 -> 2 (combat, -1).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 10 counted, all-modifier cost now 0; 'Up My Sleeve+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Up My Sleeve' on played: 1 -> 0 (combat, -1).
+[INFO] [BlankTheSpire] [BP] on_card_generated fired ('Arsenal': 'Spark' created).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 11 counted, all-modifier cost now 0; 'Spark+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 12 counted, all-modifier cost now 0; 'Ash Hunger+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Crescendo' on card_played: 0 -> 0 (this_turn; 13 counted, all-modifier cost now 2; 'Kingly Kick+' played).
+[INFO] [BlankTheSpire] [BP] cost_delta 'Kingly Kick' on drawn: 4 -> 3 (combat, -1).
+# --- Auto-selected (first 5) ---
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
