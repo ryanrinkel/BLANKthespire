@@ -1825,7 +1825,101 @@ def deck_resolve(slug: str):
         detail = cls.detail()
         detail.pop("id", None)  # public shape: never leak the internal enumerable id
         detail.update(_art_fields(cls, f"/api/deck/{slug}", detail.get("cards")))
+        detail["featured"] = slug in _FEATURED_SLUGS
         return jsonify(detail)
+
+
+# --- featured forges (public) ------------------------------------------------------------------------
+# A short, ordered showcase of shared classes for the landing page. The OPERATOR curates web/featured.json by
+# hand (a list of {word, slug, blurb}: a 5-letter display word, a /deck slug, a one-line blurb) and a deploy
+# publishes it — the file is read once at boot, so editing it on the droplet needs a restart to take effect.
+# Only already-public data goes out (the same fields /api/deck/<slug> exposes); a slug whose class was deleted
+# simply drops out of the list. BTSWEB_FEATURED_FILE overrides the path (tests point it at a temp file).
+
+FEATURED_FILE = Path(os.environ.get("BTSWEB_FEATURED_FILE", "").strip() or (WEB_DIR / "featured.json"))
+_FEATURED_WORD_RE = re.compile(r"^[A-Z]{5}$")
+
+
+def _load_featured(path: Path) -> list[dict]:
+    """Parse the curated featured list: an ordered list of {word, slug, blurb}. A missing or unparseable file
+    is an empty list (with a warning) — never a boot failure. Rows with a word that isn't exactly 5 letters
+    A-Z, or a slug outside 1..32 chars, are skipped (and logged) so one typo can't hide the rest."""
+    try:
+        raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        app.logger.warning("featured: %s not found — no featured forges", path)
+        return []
+    except (OSError, ValueError) as e:
+        app.logger.warning("featured: could not read %s: %s — no featured forges", path, e)
+        return []
+    if not isinstance(raw, list):
+        app.logger.warning("featured: %s is not a JSON list — no featured forges", path)
+        return []
+    out: list[dict] = []
+    for i, row in enumerate(raw):
+        if not isinstance(row, dict):
+            app.logger.warning("featured: row %d is not an object — skipped", i)
+            continue
+        word = row.get("word")
+        slug = row.get("slug")
+        blurb = row.get("blurb")
+        slug = slug.strip() if isinstance(slug, str) else ""
+        if not (isinstance(word, str) and _FEATURED_WORD_RE.match(word)) or not (1 <= len(slug) <= 32):
+            app.logger.warning("featured: row %d (%r) has a bad word or slug — skipped", i, row)
+            continue
+        out.append({"word": word, "slug": slug, "blurb": blurb.strip() if isinstance(blurb, str) else ""})
+    return out
+
+
+FEATURED: list[dict] = _load_featured(FEATURED_FILE)
+
+
+class _FeaturedSlugs:
+    """`slug in _FEATURED_SLUGS` against the CURRENT module-level FEATURED (tests monkeypatch the list)."""
+
+    def __contains__(self, slug: object) -> bool:
+        return any(f.get("slug") == slug for f in FEATURED)
+
+
+_FEATURED_SLUGS = _FeaturedSlugs()
+
+
+@app.route("/api/featured")
+def featured_list():
+    """The curated showcase, in file order: identity + art thumbs + the /deck share link for each class that
+    still resolves. Public; no id or owner data. Cacheable for 5 minutes (the list only changes on deploy)."""
+    items = list(FEATURED)
+    out: list[dict] = []
+    if items:
+        with session_scope() as s:
+            rows = s.query(ForgedClass).filter(ForgedClass.slug.in_([f["slug"] for f in items])).all()
+            by_slug = {c.slug: c for c in rows}
+            for f in items:
+                cls = by_slug.get(f["slug"])
+                if cls is None:
+                    continue  # deleted (or mistyped) — drop silently
+                try:
+                    bundle = json.loads(cls.bundle_json or "{}")
+                except ValueError:
+                    bundle = {}
+                character = bundle.get("character") if isinstance(bundle, dict) else None
+                character = character if isinstance(character, dict) else {}
+                cards = bundle.get("cards") if isinstance(bundle, dict) else None
+                slug = f["slug"]
+                item = {
+                    "word": f["word"],
+                    "slug": slug,
+                    "blurb": f["blurb"],
+                    "name": cls.name or str(character.get("name") or ""),
+                    "description": str(character.get("description") or ""),
+                    "card_count": len(cards) if isinstance(cards, list) else 0,
+                    "share_url": f"/deck/{slug}",
+                }
+                item.update(_art_fields(cls, f"/api/deck/{slug}"))
+                out.append(item)
+    resp = jsonify({"featured": out})
+    resp.headers["Cache-Control"] = "public, max-age=300"
+    return resp
 
 
 def _deck_class(slug: str):

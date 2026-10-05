@@ -19,12 +19,18 @@ How a visitor is counted (all per UTC day, by client IP, so every number here is
                    floor for humans.
   * landing      — GET / answered 200: the public splash.
   * clicked      — a landing visitor who ALSO fetched a page past the splash that day (/login, /app,
-                   /help, /download, /deck/…, /terms, /privacy, /auth/…, /api/…).
+                   /help, /download, /deck/…, /terms, /privacy, /auth/…, /api/…, /workshop). Not
+                   /api/featured: the splash itself fetches it, so it would make every landing look engaged.
   * app          — GET /api/me answered 200: only index.html's JS calls it, so this is a real browser
                    running the signed-in app.
   Each (day, ip) lands in exactly ONE depth bucket — app > clicked > landing — so the daily bars stack
   to "humans seen that day" without double counting.
   * deck         — GET /deck/<slug> 200: a shared class page opened (unique IPs).
+  Overlays (unique IPs, NOT depth buckets — an IP here is also in one of the buckets above, or in none):
+  * featured     — GET /api/deck/<slug> 200 (exactly; not the /api/deck/<slug>/art/… thumbs): the deck
+                   page's JS loaded a class, i.e. the visitor tried a featured/shared class.
+  * workshop     — GET /workshop answered 200 or 302 (it redirects to Steam): install intent. The only
+                   path where a non-200 counts.
   * referers     — the referring HOST of a non-bot page hit, minus ourselves, raw IPs / IP-shaped hosts
                    (the droplet's Plesk-era names are scanner noise), and the OAuth return
                    (accounts.google.com is a sign-in bounce, not a source). android-app:// referers keep
@@ -63,8 +69,11 @@ BOT_UA_RE = re.compile(
     r"preview|monitor|uptime|feedfetcher|fetch|http-client|axios|node|dart|ruby|perl|php",
     re.IGNORECASE)
 # Pages past the splash. /api covers the app's own calls (a real browser on /app), /auth the OAuth hops.
-ENGAGED_RE = re.compile(r"^/(login|app|help|download|deck/|terms|privacy|auth/|api/)")
+ENGAGED_RE = re.compile(r"^/(login|app|help|download|deck/|terms|privacy|auth/|api/|workshop$)")
 DECK_RE = re.compile(r"^/deck/[^/?]+$")
+FEATURED_RE = re.compile(r"^/api/deck/[^/?]+$")
+WORKSHOP_PATH = "/workshop"
+WORKSHOP_STATUSES = ("200", "302")
 # Not pages: our own API/static/auth hops, and anything with a file extension (scanners probing
 # /css/style.css, /wp-login.php, /.env… that happened to answer 200 via the SPA fallback).
 PAGE_SKIP_RE = re.compile(r"^/(static/|api/|favicon\.ico|healthz|auth/|\.well-known/)|^.*\.[A-Za-z0-9]{1,5}$")
@@ -127,6 +136,8 @@ class Tally:
         self.engaged: dict[str, set] = defaultdict(set)
         self.app: dict[str, set] = defaultdict(set)
         self.deck: dict[str, set] = defaultdict(set)
+        self.featured: dict[str, set] = defaultdict(set)
+        self.workshop: dict[str, set] = defaultdict(set)
         self.referers: dict[str, dict[str, set]] = defaultdict(lambda: defaultdict(set))
         self.pages: dict[str, dict[str, set]] = defaultdict(lambda: defaultdict(set))
 
@@ -147,7 +158,13 @@ class Tally:
             return
         method, target = req[0], req[1]
         path = target.split("?", 1)[0]
-        if method != "GET" or status != "200":
+        if method != "GET":
+            return
+        if path == WORKSHOP_PATH and status in WORKSHOP_STATUSES:
+            # The Steam redirect answers 302; it is the one path where a non-200 still counts.
+            self.workshop[day].add(ip)
+            self.engaged[day].add(ip)
+        if status != "200":
             return
         if path == "/":
             self.landing[day].add(ip)
@@ -157,6 +174,8 @@ class Tally:
             self.app[day].add(ip)
         if DECK_RE.match(path):
             self.deck[day].add(ip)
+        if FEATURED_RE.match(path):
+            self.featured[day].add(ip)
         if not PAGE_SKIP_RE.match(path):
             self.pages[day][path].add(ip)
             src = referer_source(m.group("ref"), self.self_hosts)
@@ -185,6 +204,7 @@ class Tally:
                 "humans": len(landing_only) + len(clicked) + len(app),
                 "landing": len(self.landing[day]),
                 "deck": len(self.deck[day]),
+                "featured": len(self.featured[day]), "workshop": len(self.workshop[day]),
                 "requests": self.requests[day], "bot_requests": self.bot_requests[day],
             })
         return out
@@ -197,6 +217,7 @@ class Tally:
             cutoff = _shift_day(today, -(days - 1))
             keys = [k for k in keys if k >= cutoff]
         app: set = set(); clicked: set = set(); landing_only: set = set(); deck: set = set()
+        featured: set = set(); workshop: set = set()
         refs: dict[str, set] = defaultdict(set)
         pages: dict[str, set] = defaultdict(set)
         requests = bots = 0
@@ -204,6 +225,7 @@ class Tally:
             a, c, l = self._depth(day)
             app |= a; clicked |= c; landing_only |= l
             deck |= self.deck[day]
+            featured |= self.featured[day]; workshop |= self.workshop[day]
             requests += self.requests[day]; bots += self.bot_requests[day]
             for src, ips in self.referers[day].items():
                 refs[src] |= ips
@@ -217,7 +239,7 @@ class Tally:
             "since": keys[0] if keys else None,
             "humans": len(app) + len(clicked) + len(landing_only),
             "app": len(app), "clicked": len(clicked), "landing_only": len(landing_only),
-            "deck": len(deck),
+            "deck": len(deck), "featured": len(featured), "workshop": len(workshop),
             "requests": requests, "bot_requests": bots,
             "referers": [{"source": s, "visitors": len(ips)} for s, ips in
                          sorted(refs.items(), key=lambda kv: (-len(kv[1]), kv[0]))[:TOP_N]],

@@ -14,6 +14,9 @@ const LINKING = new URLSearchParams(location.search).get("link") === "1";
 
 const el = (id) => document.getElementById(id);
 
+// The "try a featured class" escape hatch is for visitors without an account; linking is for members.
+if (LINKING) el("try-instead").classList.add("hidden");
+
 // The magic link: POST the address, then swap the form for "check your inbox". The server answers the same
 // way whether it sent anything or not (rate limit, bad syntax), so there is nothing to branch on — and
 // nothing here ever reveals whether an account exists.

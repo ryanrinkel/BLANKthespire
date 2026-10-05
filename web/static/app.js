@@ -65,12 +65,31 @@ async function boot() {
   restoreByok();
   renderTokens();
   restoreForgePref();
+  applyRemixPrefill();
   renderBanner();
   loadEstimate();
   loadDonation();  // the forge tab's inline tier buttons need /api/billing before the Account tab is opened
   // #account is where a finished "link another sign-in" comes back to (auth._landing), so honour the hash.
   selectTab(location.hash === "#account" ? "account" : "forge");
   handlePurchaseReturn();
+}
+
+// "Forge your own twist" on a /deck/<slug> page stashes {concept, name, from} in bts_prefill and sends the
+// visitor here via /login. Seed the concept box once (only if it's empty), say what's being remixed, and
+// clear the key so a later visit starts blank.
+function applyRemixPrefill() {
+  const raw = lsGet("bts_prefill");
+  if (!raw) return;
+  lsDel("bts_prefill");
+  let p = null;
+  try { p = JSON.parse(raw); } catch (_) { return; }
+  const box = el("concept");
+  if (!box || box.value.trim() || !p || typeof p.concept !== "string" || !p.concept.trim()) return;
+  box.value = p.concept;
+  const hint = document.createElement("p");
+  hint.className = "hint";
+  hint.textContent = `Remixing “${p.name || "a shared class"}” — edit the description, then forge.`;
+  box.insertAdjacentElement("afterend", hint);
 }
 
 // Reflect the user's token state in the header chip, the "Use a token" balance line and the Account

@@ -4,7 +4,8 @@
 //     STRIPE_SECRET_KEY=sk_test_smoke PORT=5077 uv run --project ../generation python app.py
 // (the dummy Stripe key only flips /api/billing to {enabled:true} so the donate tiers + custom-amount row
 //  render; nothing in these scenarios ever hits Stripe)
-// then, from web/tools:  node ui_smoke.mjs http://127.0.0.1:5077 <outdir> forge|library|account|pages|art|lost
+// then, from web/tools:  node ui_smoke.mjs http://127.0.0.1:5077 <outdir> forge|library|account|pages|art|lost|featured
+// (`featured` also needs BTSWEB_FEATURED_FILE=<json whose slugs exist in that server's DB>, see the scenario)
 // (needs a package.json with {"type":"module"} next to it, or rename to .mjs — it is already .mjs).
 
 // Minimal Chrome DevTools Protocol driver (Node 24 has a global WebSocket). Usage:
@@ -487,6 +488,74 @@ if (scenario === "forge") {
     loaded: [...document.querySelectorAll('#r-cards .cc-art')].filter((i) => i.complete && i.naturalWidth > 0).length})`);
   check(pub.strip && pub.splash_w > 0 && pub.portraits === pub.cards && pub.loaded === pub.portraits, "public deck page shows the art", JSON.stringify(pub));
   await shot("art-deck");
+} else if (scenario === "featured") {
+  // 2026-10-05: the landing's featured strip (/api/featured), the deck page's featured mode + "Forge your own
+  // twist" prefill, and the sign-in page's no-account escape hatch. Boot the server with BTSWEB_FEATURED_FILE
+  // pointing at slugs that exist in ITS database (docs/plans/FEATURED_FORGES_PLAN.md); the harness's own
+  // sign-in is undone first because the strip is for strangers.
+  await send("Network.clearBrowserCookies");
+  await nav(`${base}/`); await sleep(2500);
+  const hero = await json(`({primary: document.getElementById('signin')?.textContent.trim(), href: document.getElementById('signin')?.getAttribute('href'),
+    alt: document.getElementById('try-featured')?.textContent.trim(), alt_hidden: document.getElementById('try-featured')?.classList.contains('hidden'),
+    og: document.querySelector('meta[property="og:image"]')?.content})`);
+  // landing.js repoints the primary button at /dev-login on a dev-auth server (and /app when signed in)
+  check(hero.primary === "Create Your Own Class" && /^\/(login|dev-login)/.test(hero.href || ""), "hero primary CTA", JSON.stringify(hero));
+  check(hero.alt === "Try a featured class" && !hero.alt_hidden, "hero secondary CTA visible", JSON.stringify(hero));
+  check(/\/static\/img\/og-landing\.png$/.test(hero.og || ""), "landing og:image", hero.og);
+  const strip = await json(`(() => { const s = document.getElementById('featured'); const tiles = [...document.querySelectorAll('#featured-grid .featured-tile')];
+    return {hidden: s.classList.contains('hidden'), tiles: tiles.length, hrefs: tiles.map(t => t.getAttribute('href')),
+      words: tiles.map(t => t.querySelector('.featured-word')?.textContent),
+      imgs: tiles.map(t => { const i = t.querySelector('img'); return !!i && i.complete && i.naturalWidth > 0; })}; })()`);
+  check(!strip.hidden && strip.tiles > 0 && strip.hrefs.every((h) => /^\/deck\/[A-Za-z0-9_-]{20,}$/.test(h)),
+        "featured strip rendered with deck links", JSON.stringify(strip));
+  check(strip.imgs.length > 0 && strip.imgs.every(Boolean), "featured splash thumbs loaded", JSON.stringify(strip.imgs));
+  await shot("featured-landing");
+
+  // hovering a tile flips the split-flap board to its word
+  await evaluate(`document.querySelector('#featured-grid .featured-tile').dispatchEvent(new PointerEvent('pointerenter'))`);
+  await sleep(4500);
+  const board = await evaluate(`[...document.querySelectorAll('#board .flap')].map((f) => f.textContent).join('')`);
+  check(board === strip.words[0], "board flips to the hovered word", board + " vs " + strip.words[0]);
+
+  await send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+  await sleep(600); await shot("featured-landing-phone");
+  await send("Emulation.clearDeviceMetricsOverride"); await sleep(300);
+
+  // the deck page in featured mode: lede + header swap, "More featured" link, code above the cards, checklist
+  await nav(`${base}${strip.hrefs[0]}`); await sleep(1500);
+  const deck = await json(`({lede: document.getElementById('lede')?.textContent.trim(), sub: document.querySelector('header .sub')?.textContent.trim(),
+    more: !document.getElementById('nav-more')?.classList.contains('hidden'), remix: !!document.getElementById('remix'),
+    code_first: !!(document.getElementById('r-code').compareDocumentPosition(document.getElementById('r-cards')) & Node.DOCUMENT_POSITION_FOLLOWING),
+    cards: document.querySelectorAll('#r-cards .cardchip').length, steps: document.querySelectorAll('.play-steps li').length})`);
+  check(deck.lede.startsWith("A featured class") && deck.sub === "a featured class" && deck.more, "deck page featured mode", JSON.stringify(deck));
+  check(deck.remix && deck.code_first && deck.cards > 0 && deck.steps === 3, "deck page: code above cards, remix + checklist", JSON.stringify(deck));
+  await shot("featured-deck");
+
+  // "Forge your own twist" → /login (signed out) with the prefill stashed; the sign-in page shows the escape hatch
+  await evaluate(`document.getElementById('remix').click()`); await sleep(1500);
+  const login = await json(`({path: location.pathname, hatch: !document.getElementById('try-instead')?.classList.contains('hidden'),
+    prefill: localStorage.getItem('bts_prefill')})`);
+  check(login.path === "/login" && login.hatch && !!login.prefill, "remix lands on /login with the prefill stashed + escape hatch", JSON.stringify(login));
+  await shot("featured-login");
+
+  // sign in: the concept box is seeded once and the key is cleared
+  await nav(`${base}/dev-login?email=unlimited@example.com`); await sleep(2500);
+  const app = await json(`({path: location.pathname, concept: document.getElementById('concept').value,
+    hint: document.getElementById('concept').nextElementSibling?.textContent, left: localStorage.getItem('bts_prefill')})`);
+  check(app.path === "/app" && app.concept.length > 0 && /Remixing/.test(app.hint || "") && app.left === null,
+        "remix prefill applied once in the app", JSON.stringify(app));
+  await shot("featured-remix-app", false);
+
+  // a class that is NOT featured keeps the plain share-page copy
+  const plain = await evaluate(`fetch('/api/classes').then((r) => r.json()).then((d) =>
+    d.classes.map((c) => c.slug).find((s) => !${JSON.stringify(strip.hrefs)}.some((h) => h.endsWith(s))) || '')`);
+  if (plain) {
+    await nav(`${base}/deck/${plain}`); await sleep(1200);
+    const p = await json(`({lede: document.getElementById('lede')?.textContent.trim(), more_hidden: document.getElementById('nav-more')?.classList.contains('hidden')})`);
+    check(p.lede.startsWith("Someone forged") && p.more_hidden, "non-featured deck keeps the plain lede", JSON.stringify(p));
+  } else {
+    console.log("skip: no non-featured class in this DB");
+  }
 }
 console.log(errors.length ? "CONSOLE ERRORS:\n" + errors.join("\n") : "no console errors");
 ws.close(); chrome.kill();

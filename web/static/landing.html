@@ -4,10 +4,21 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>BLANK the spire</title>
+  <meta name="description" content="Forge your own Slay the Spire 2 class: Describe a class in a sentence and play it in-game. Or try a featured class right now — no account needed." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="BLANK the spire" />
+  <meta property="og:title" content="BLANK the spire — forge your own Slay the Spire 2 class" />
+  <meta property="og:description" content="Describe a class in a sentence and play it in-game. Or try a featured class right now — no account needed." />
+  <meta property="og:url" content="https://blankthespire.com/" />
+  <meta property="og:image" content="https://blankthespire.com/static/img/og-landing.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="BLANK the spire — forge your own Slay the Spire 2 class" />
+  <meta name="twitter:description" content="Describe a class in a sentence and play it in-game. Or try a featured class right now — no account needed." />
+  <meta name="twitter:image" content="https://blankthespire.com/static/img/og-landing.png" />
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png" />
   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="/static/style.css?v=20261005" />
 </head>
 <body class="landing">
   <main class="splash">
@@ -16,10 +27,24 @@
 
     <p class="splash-sub">the spire</p>
 
-    <a id="signin" class="btn primary splash-go" href="/login">Sign in</a>
-
     <p class="splash-tag muted">How will you fill in the Blank?</p>
+
+    <!-- Primary: forge your own (landing.js repoints #signin to /app or /dev-login). Secondary: jump to the
+         featured strip — hidden until /api/featured returns classes, so a failed fetch leaves today's page. -->
+    <div class="splash-actions">
+      <a id="signin" class="btn primary splash-go" href="/login">Create Your Own Class</a>
+      <a id="try-featured" class="btn splash-alt hidden" href="#featured">Try a featured class</a>
+    </div>
+
+    <p class="splash-note muted">No password. Sign in with Google, GitHub or email to forge and keep your classes.</p>
   </main>
+
+  <!-- Curated classes anyone can open without an account; tiles built by landing.js from /api/featured. -->
+  <section id="featured" class="how featured hidden" aria-label="Featured classes">
+    <h2 class="how-title">Try a featured class</h2>
+    <p class="how-sub muted">Forged by BLANK the spire. Free to play — open one, copy its code, paste it in-game.</p>
+    <div id="featured-grid" class="featured-grid"></div>
+  </section>
 
   <section class="how" aria-label="How it works">
     <h2 class="how-title">What is going on here??</h2>
@@ -29,26 +54,25 @@
       <li class="step">
         <span class="step-num">1</span>
         <div class="step-body">
-          <h3>Sign up or sign in</h3>
-          <p>So you can save your creations.</p>
+          <h3>Subscribe to the mod</h3>
+          <p>Grab BLANK the spire on the <a href="/workshop" target="_blank" rel="noopener">Steam Workshop</a> &mdash; it&rsquo;s free.</p>
         </div>
       </li>
 
       <li class="step">
         <span class="step-num">2</span>
         <div class="step-body">
-          <h3>Describe your class</h3>
-          <p>Explain your ideal in plain language. Robot Overlords build a playable
-             class &mdash; cards, mechanics, identity and all. 🤖</p>
+          <h3>Pick a featured class &mdash; or describe your own</h3>
+          <p>Open one of the <a href="#featured">featured classes</a>, or sign in and explain your idea in plain
+             language. Robot Overlords build a playable class &mdash; cards, mechanics, identity and all. 🤖</p>
         </div>
       </li>
 
       <li class="step">
         <span class="step-num">3</span>
         <div class="step-body">
-          <h3>Copy the code, paste it into the mod&rsquo;s settings menu,
-              <!--<span id="fill-word" class="fill">Blank</span> the Spire!</h3>-->
-          <p>Paste into the BLANK the spire mod, restart the game, then <span id="fill-word" class="fill">Blank</span> the Spire!</p>
+          <h3>Paste the code into the mod&rsquo;s settings menu</h3>
+          <p>Restart the game, and <span id="fill-word" class="fill">Blank</span> the Spire!</p>
         </div>
       </li>
     </ol>

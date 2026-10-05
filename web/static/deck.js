@@ -1,8 +1,8 @@
 "use strict";
 // deck.js — the public share page (/deck/<slug>). Loads the class from /api/deck/<slug> and hands it to
 // render.js's read-only renderer, which fills the same #result markup the app uses. No app.js here: no
-// session, no feedback widgets, nothing mutating. The only interaction is Copy code, because importing a
-// code is the ONLY way the mod can load a shared class.
+// session, no feedback widgets, nothing mutating. Interactions: Copy code (importing a code is the ONLY way
+// the mod can load a shared class) and "Forge your own twist", which prefills the app's concept box.
 //
 // The slug is not inlined into this file (the CSP forbids inline script) — it rides on #deck's data-*.
 
@@ -55,6 +55,33 @@
     }
     const name = cls.character?.name || cls.name;
     if (name) { document.title = name + " — BLANK the spire"; }
+    if (cls.featured === true) { markFeatured(); }
+    const remix = document.getElementById("remix");
+    if (remix) { remix.addEventListener("click", () => startRemix(cls, name)); }
+  }
+
+  // Featured classes are curated, so the page speaks to a stranger rather than "someone shared this".
+  function markFeatured() {
+    const lede = document.getElementById("lede");
+    if (lede) {
+      lede.textContent = "A featured class, free to play. Copy the code, paste it in-game — or make your own.";
+    }
+    const sub = document.querySelector("header .sub");
+    if (sub) { sub.textContent = "a featured class"; }
+    const more = document.getElementById("nav-more");
+    if (more) { more.classList.remove("hidden"); }
+  }
+
+  // "Forge your own twist": hand the concept to the app via localStorage (app.js boot() reads bts_prefill
+  // once, fills #concept, then deletes it). /login bounces signed-in visitors on to /app, so it fits both.
+  function startRemix(cls, name) {
+    const prefill = {
+      concept: cls.concept || name || "",
+      name: name || "",
+      from: root.dataset.slug || "",
+    };
+    try { localStorage.setItem("bts_prefill", JSON.stringify(prefill)); } catch (_) { /* no store */ }
+    location.href = "/login";
   }
 
   fetch(api, { headers: { "Accept": "application/json" } })

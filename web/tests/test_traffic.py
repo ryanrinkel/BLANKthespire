@@ -50,6 +50,15 @@ SAMPLE = [
     line("6.6.6.6", "15/Sep/2026", "/", status=302),  # not a 200 splash
     line("5.5.5.5", "15/Sep/2026", "/css/style.css"),  # a probe that got 200: never a "page"
     line("5.5.5.5", "15/Sep/2026", "/.well-known/acme-challenge/abc"),  # certbot, not a page
+    # featured strip: the deck page's JSON counts, its art thumbs do not
+    line("4.4.4.4", "15/Sep/2026", "/api/deck/abc"),
+    line("4.4.4.4", "15/Sep/2026", "/api/deck/abc"),  # same IP twice
+    line("11.11.11.11", "15/Sep/2026", "/api/deck/abc/art/splash"),
+    line("12.12.12.12", "15/Sep/2026", "/api/featured"),  # the splash fetches this: never "featured"
+    # a splash visitor who clicked through to Steam: the 302 counts as workshop AND as clicked
+    line("10.10.10.10", "15/Sep/2026", "/"),
+    line("10.10.10.10", "15/Sep/2026", "/workshop", status=302),
+    line("13.13.13.13", "15/Sep/2026", "/workshop", status=404),  # not a redirect: does not count
 ]
 
 
@@ -90,9 +99,13 @@ def test_daily_buckets_are_exclusive_and_bots_are_dropped(logs):
     # 14th: 1.1.1.1 splash only, 2.2.2.2 clicked; 9.9.9.9 / 8.8.8.8 / 7.7.7.7 are bots and never appear
     assert (d14["landing_only"], d14["clicked"], d14["app"], d14["humans"]) == (1, 1, 0, 2)
     assert d14["requests"] == 6 and d14["bot_requests"] == 3
-    # 15th: 3.3.3.3 in the app (no splash needed), 1.1.1.1 clicked, 5.5.5.5 clicked, 4.4.4.4 deck only
-    assert (d15["landing_only"], d15["clicked"], d15["app"], d15["humans"]) == (0, 2, 1, 3)
-    assert d15["deck"] == 1 and d15["landing"] == 2  # the 302 from 6.6.6.6 is not a splash view
+    # 15th: 3.3.3.3 in the app (no splash needed), 1.1.1.1 / 5.5.5.5 / 10.10.10.10 (via /workshop 302)
+    # clicked, 4.4.4.4 deck only
+    assert (d15["landing_only"], d15["clicked"], d15["app"], d15["humans"]) == (0, 3, 1, 4)
+    assert d15["deck"] == 1 and d15["landing"] == 3  # the 302 from 6.6.6.6 is not a splash view
+    # overlays: 4.4.4.4's /api/deck/abc (not 11.11.11.11's art thumb, not /api/featured); 10.10.10.10's 302
+    assert d15["featured"] == 1 and d15["workshop"] == 1
+    assert d14["featured"] == 0 and d14["workshop"] == 0
 
 
 def test_windows_count_each_ip_once_at_its_deepest(logs):
@@ -100,13 +113,14 @@ def test_windows_count_each_ip_once_at_its_deepest(logs):
     data = tr.build(paths, {"blankthespire.com"}, today="2026-09-15")
     w = data["windows"]["0"]
     # 1.1.1.1 was splash-only on the 14th and clicked on the 15th: one visitor, counted as clicked.
-    assert (w["humans"], w["app"], w["clicked"], w["landing_only"]) == (4, 1, 3, 0)
+    assert (w["humans"], w["app"], w["clicked"], w["landing_only"]) == (5, 1, 4, 0)
+    assert w["featured"] == 1 and w["workshop"] == 1
     assert w["deck"] == 1 and w["day_count"] == 2 and w["since"] == "2026-09-14"
     refs = {r["source"]: r["visitors"] for r in w["referers"]}
     assert refs == {"google.com": 1, "portfolio.example.net": 1, "com.reddit.frontpage (android app)": 1,
                     "steamcommunity.com": 1}
     pages = {r["path"]: r["visitors"] for r in w["pages"]}
-    assert pages["/"] == 3 and pages["/deck/sherman-52"] == 1 and "/api/me" not in pages and "/css/style.css" not in pages
+    assert pages["/"] == 4 and pages["/deck/sherman-52"] == 1 and "/api/me" not in pages and "/css/style.css" not in pages
     assert not any(p.startswith("/.well-known") for p in pages)
     assert data["windows"]["7"]["day_count"] == 2
     # A window anchored past the log sees nothing, and reports so rather than crashing.
