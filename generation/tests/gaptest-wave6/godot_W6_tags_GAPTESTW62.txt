@@ -1,0 +1,157 @@
+# Wave 6 interaction AutoSlay smoke — seed GAPTESTW62 (godot.log grep, 8737 lines)
+# run start: [INFO] [AutoSlay] Starting run with seed=GAPTESTW62
+# run end: [INFO] [AutoSlay] Action: Run completed (max floor reached). Abandoning
+# outcome: completed (AutoSlay 'Run completed (max floor reached)'; smoke verdict PASS: RunCompleted; v70 DLL from 5eaee3f, gaptest op stripped)
+# tagged lines: 1876
+# per-phase prefix counts: [BI] 566 · [BJ] 27 · [BK] 30 · [BL] 157 · [BM] 190 · [BN] 243 · [BO] 127 · [BP] 321 · [BQ] 37 · [BR] 178
+# mod exceptions: 0
+# BlankTheSpire stack frames: 0
+# BlankTheSpire frames in non-exception [ERROR] traces: 0
+# Localization formatting errors: 0
+# exception lines (any source): 2
+# watchdog 'No progress' lines: 20 (of them 'Combat turn': 20)
+# [Forged] import rejections: 0
+# Auto-selected lines: 89
+# --- [Forged] import rejections ---
+# --- per-tag counts ---
+  [BI] card_type attack matched (on_card_played: '<x>').                                   235
+  [BI] every_n count N/N — FIRES (on_card_played attack).                                   73
+  [BI] every_n count N/N — waiting (on_card_played attack).                                162
+  [BI] random_enemy payload -> BygoneEffigy (of N).                                          3
+  [BI] random_enemy payload -> FlailKnight (of N).                                           1
+  [BI] random_enemy payload -> KinPriest (of N).                                             1
+  [BI] random_enemy payload -> KnowledgeDemon (of N).                                        3
+  [BI] random_enemy payload -> LivingShield (of N).                                          1
+  [BI] random_enemy payload -> MagiKnight (of N).                                            3
+  [BI] random_enemy payload -> MechaKnight (of N).                                           6
+  [BI] random_enemy payload -> Nibbit (of N).                                                1
+  [BI] random_enemy payload -> SlimedBerserker (of N).                                       5
+  [BI] random_enemy payload -> SoulNexus (of N).                                             2
+  [BI] random_enemy payload -> SpectralKnight (of N).                                        1
+  [BI] random_enemy payload -> TestSubject (of N).                                          12
+  [BI] random_enemy payload -> TurretOperator (of N).                                        2
+  [BI] random_enemy payload -> none (no hittable enemy) (of N).                              5
+  [BI] this_turn trigger removed at turn end ('<x>', on_card_played).                       50
+  [BJ] scale target_status_stacks -> N (damage) ('<x>').                                    27
+  [BK] hits_scale cards_removed -> N hits (raw N, cap N) x N from '<x>'.                    23
+  [BK] hits_scale cards_removed -> N hits, skipped (raw N) from '<x>'.                       7
+  [BL] artifact check: '<x>' Artifact N blocked strength_down, Str now N (shell N->N).       1
+  [BL] artifact check: '<x>' Artifact N blocked temp_strength_down, Str now N (shell N       1
+  [BL] doom +N on '<x>' (HP N, Doom N, doomed=False) - blocked by Artifact N.                1
+  [BL] doom +N on '<x>' (HP N, Doom N, doomed=False).                                       18
+  [BL] doom +N on '<x>' (HP N, Doom N, doomed=True).                                         2
+  [BL] strength_down -N on '<x>' (Str now -N).                                              18
+  [BL] strength_down -N on '<x>' (Str now N).                                                7
+  [BL] temp_strength_down +N on '<x>' (Str now -N).                                         66
+  [BL] temp_strength_down +N on '<x>' (Str now N).                                          13
+  [BL] temp_strength_down expired (Str now -N) on '<x>' (had N).                            16
+  [BL] temp_strength_down expired (Str now N) on '<x>' (had N).                             14
+  [BM] block_next_turn +N (scale=block) ('<x>'): next turn N.                               17
+  [BM] echo_form applied by '<x>': Echo Form now N.                                         25
+  [BM] replay play #N of '<x>' (Attack, N plays in the series).                             35
+  [BM] replay play #N of '<x>' (Power, N plays in the series).                              23
+  [BM] replay play #N of '<x>' (Skill, N plays in the series).                              30
+  [BM] replay_next attack xN ('<x>'): stacks now N.                                         20
+  [BM] retain_hand ('<x>'): Retain Hand now N.                                              17
+  [BM] self-debuff no_draw +N on player (Artifact N) from '<x>': No Draw N.                 23
+  [BN] add_random_card attack xN -> Hand ('<x>'; free=True; choose_of=N) ('<x>').           31
+  [BN] add_random_card power xN -> Hand ('<x>'; free=False; choose_of=N) ('<x>').           42
+  [BN] autoplay draw_top '<x>' -> Axebot (depth N) ('<x>').                                  2
+  [BN] autoplay draw_top '<x>' -> BowlbugEgg (depth N) ('<x>').                              1
+  [BN] autoplay draw_top '<x>' -> BowlbugRock (depth N) ('<x>').                             1
+  [BN] autoplay draw_top '<x>' -> BygoneEffigy (depth N) ('<x>').                            2
+  [BN] autoplay draw_top '<x>' -> DecimillipedeSegmentBack (depth N) ('<x>').                1
+  [BN] autoplay draw_top '<x>' -> DecimillipedeSegmentFront (depth N) ('<x>').               2
+  [BN] autoplay draw_top '<x>' -> DecimillipedeSegmentMiddle (depth N) ('<x>').              1
+  [BN] autoplay draw_top '<x>' -> Entomancer (depth N) ('<x>').                              2
+  [BN] autoplay draw_top '<x>' -> Exoskeleton (depth N) ('<x>').                             1
+  [BN] autoplay draw_top '<x>' -> FrogKnight (depth N) ('<x>').                              3
+  [BN] autoplay draw_top '<x>' -> Inklet (depth N) ('<x>').                                  1
+  [BN] autoplay draw_top '<x>' -> KinFollower (depth N) ('<x>').                             2
+  [BN] autoplay draw_top '<x>' -> KinPriest (depth N) ('<x>').                               1
+  [BN] autoplay draw_top '<x>' -> KnowledgeDemon (depth N) ('<x>').                          2
+  [BN] autoplay draw_top '<x>' -> LouseProgenitor (depth N) ('<x>').                         1
+  [BN] autoplay draw_top '<x>' -> MagiKnight (depth N) ('<x>').                              1
+  [BN] autoplay draw_top '<x>' -> MechaKnight (depth N) ('<x>').                             4
+  [BN] autoplay draw_top '<x>' -> OwlMagistrate (depth N) ('<x>').                           2
+  [BN] autoplay draw_top '<x>' -> ScrollOfBiting (depth N) ('<x>').                          2
+  [BN] autoplay draw_top '<x>' -> SlimedBerserker (depth N) ('<x>').                         2
+  [BN] autoplay draw_top '<x>' -> SoulNexus (depth N) ('<x>').                               3
+  [BN] autoplay draw_top '<x>' -> TestSubject (depth N) ('<x>').                             6
+  [BN] autoplay draw_top '<x>' -> TheObscura (depth N) ('<x>').                              3
+  [BN] autoplay draw_top '<x>' -> TurretOperator (depth N) ('<x>').                          2
+  [BN] autoplay draw_top '<x>' -> none (depth N) ('<x>').                                   47
+  [BN] autoplay draw_top '<x>'s Bane'<x>'Echo Barrage').                                     1
+  [BN] autoplay draw_top '<x>'s Bane'<x>'Havoc').                                            2
+  [BN] autoplay draw_top: '<x>' is an autoplay card — never auto-played ('<x>').            15
+  [BN] target_killed gate OPEN (killed=True, fatal=True) ('<x>').                            5
+  [BN] target_killed gate closed (killed=False, fatal=False) ('<x>').                       52
+  [BO] grant_keyword sly -> '<x>'.                                                          64
+  [BO] grant_keyword sly -> '<x>'s Bane'.                                                    1
+  [BO] grant_keyword sly: no eligible card in hand (no-op).                                 10
+  [BO] on_shuffle fired ('<x>', draw pile N).                                                6
+  [BO] return_to_hand '<x>' (Discard -> Hand).                                              12
+  [BO] to_draw_top '<x>' (Discard -> Draw top, auto-play).                                  34
+  [BP] cost_delta '<x>' on drawn: N -> N (combat, -N).                                      33
+  [BP] on_card_generated fired ('<x>': '<x>' created).                                      72
+  [BP] on_debuff_applied fired ('<x>': DoomPower N on '<x>').                                9
+  [BP] on_debuff_applied fired ('<x>': StrengthPower -N on '<x>').                          78
+  [BP] on_debuff_applied fired ('<x>': VulnerablePower N on '<x>').                          9
+  [BP] on_debuff_applied fired ('<x>': WeakPower N on '<x>').                               12
+  [BP] re-entry blocked (on_debuff_applied).                                                54
+  [BP] that_enemy -> '<x>'.                                                                 54
+  [BQ] trigger_passive xN on '<x>' (orbs=first) ('<x>').                                    37
+  [BR] cards_removed -> N ('<x>') (draw).                                                   20
+  [BR] cards_removed -> N ('<x>') (hits).                                                   30
+  [BR] discard all xN ('<x>').                                                              20
+  [BR] stun '<x>': next move BEES_MOVE -> STUNNED (applied=True) ('<x>').                    2
+  [BR] stun '<x>': next move BULK_MOVE -> STUNNED (applied=True) ('<x>').                    1
+  [BR] stun '<x>': next move CHARGE_UP_MOVE -> STUNNED (applied=True) ('<x>').               1
+  [BR] stun '<x>': next move DRAIN_LIFE_MOVE -> STUNNED (applied=True) ('<x>').              1
+  [BR] stun '<x>': next move FLAMETHROWER_MOVE -> STUNNED (applied=True) ('<x>').            1
+  [BR] stun '<x>': next move FOR_THE_QUEEN -> STUNNED (applied=True) ('<x>').                1
+  [BR] stun '<x>': next move HAMMER_UPPERCUT_MOVE -> STUNNED (applied=True) ('<x>').         2
+  [BR] stun '<x>': next move HEAVY_CLEAVE_MOVE -> STUNNED (applied=True) ('<x>').            2
+  [BR] stun '<x>': next move JUDICIAL_FLIGHT -> STUNNED (applied=True) ('<x>').              1
+  [BR] stun '<x>': next move LEECHING_HUG_MOVE -> STUNNED (applied=True) ('<x>').            1
+  [BR] stun '<x>': next move ORB_OF_FRAILTY_MOVE -> STUNNED (applied=True) ('<x>').          1
+  [BR] stun '<x>': next move POUNCE_MOVE -> STUNNED (applied=True) ('<x>').                  1
+  [BR] stun '<x>': next move SLAP_MOVE -> STUNNED (applied=True) ('<x>').                    1
+  [BR] stun '<x>': next move SMASH_MOVE -> STUNNED (applied=True) ('<x>').                   1
+  [BR] stun '<x>': next move SOUL_BURN_MOVE -> STUNNED (applied=True) ('<x>').               1
+  [BR] stun '<x>': next move STRIKE_DOWN_EVIL -> STUNNED (applied=True) ('<x>').             1
+  [BR] stun '<x>': next move STUNNED -> STUNNED (applied=False) ('<x>').                     5
+  [BR] stun '<x>': next move UNLOAD_MOVE_N -> STUNNED (applied=True) ('<x>').                1
+  [BR] stun skipped: '<x>' is dead ('<x>').                                                 12
+  [BR] stun skipped: already stunned '<x>' (STUNNED must be performed first).                5
+  [BR] stunned turn performed '<x>' (lost its turn; repeats '<x>' next).                    16
+  [BR] turn_start grow: N+NxN = N (N enemy/ies).                                            50
+# --- exception lines (any source) ---
+[ERROR] [BaseLib] HarmonyLib.HarmonyException: Patching exception in method null
+ ---> System.ArgumentException: Undefined target method for patch method static System.Void BaseLib.Patches.Networking.AdjustCustomMessageKeys::Fuckery()
+   at HarmonyLib.PatchClassProcessor.ReportException(Exception exception, MethodBase original)
+[ERROR] [BaseLib] HarmonyLib.HarmonyException: Patching exception in method System.Void MegaCrit.Sts2.Core.Nodes.Screens.RelicCollection.NRelicCollectionCategory::LoadRelics(MegaCrit.Sts2.Core.Entities.Relics.RelicRarity relicRarity, MegaCrit.Sts2.Core.Nodes.Screens.RelicCollection.NRelicCollection collection, MegaCrit.Sts2.Core.Localization.LocString header, System.Collections.Generic.HashSet`1<MegaCrit.Sts2.Core.Models.RelicModel> seenRelics, MegaCrit.Sts2.Core.Unlocks.UnlockState unlockState, System.Collections.Generic.HashSet`1<MegaCrit.Sts2.Core.Models.RelicModel> allUnlockedRelics)
+ ---> System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation.
+ ---> System.Exception: Failed to find match:
+   at HarmonyLib.PatchClassProcessor.ReportException(Exception exception, MethodBase original)
+# --- watchdog lines ---
+[INFO] [AutoSlay] [Watchdog] No progress for 5.0s (last: Combat turn 1)
+[INFO] [AutoSlay] [Watchdog] No progress for 5.0s (last: Combat turn 3)
+[INFO] [AutoSlay] [Watchdog] No progress for 5.1s (last: Combat turn 1)
+[INFO] [AutoSlay] [Watchdog] No progress for 5.0s (last: Combat turn 1)
+[INFO] [AutoSlay] [Watchdog] No progress for 5.1s (last: Combat turn 1)
+[INFO] [AutoSlay] [Watchdog] No progress for 5.0s (last: Combat turn 4)
+[INFO] [AutoSlay] [Watchdog] No progress for 5.0s (last: Combat turn 1)
+[INFO] [AutoSlay] [Watchdog] No progress for 5.7s (last: Combat turn 1)
+[INFO] [AutoSlay] [Watchdog] No progress for 5.0s (last: Combat turn 4)
+[INFO] [AutoSlay] [Watchdog] No progress for 5.7s (last: Combat turn 1)
+[INFO] [AutoSlay] [Watchdog] No progress for 5.1s (last: Combat turn 1)
+[INFO] [AutoSlay] [Watchdog] No progress for 5.9s (last: Combat turn 3)
+[INFO] [AutoSlay] [Watchdog] No progress for 5.7s (last: Combat turn 2)
+[INFO] [AutoSlay] [Watchdog] No progress for 5.1s (last: Combat turn 6)
+[INFO] [AutoSlay] [Watchdog] No progress for 5.1s (last: Combat turn 2)
+[INFO] [AutoSlay] [Watchdog] No progress for 5.1s (last: Combat turn 6)
+[INFO] [AutoSlay] [Watchdog] No progress for 5.6s (last: Combat turn 9)
+[INFO] [AutoSlay] [Watchdog] No progress for 6.0s (last: Combat turn 7)
+[INFO] [AutoSlay] [Watchdog] No progress for 5.0s (last: Combat turn 10)
+[INFO] [AutoSlay] [Watchdog] No progress for 5.0s (last: Combat turn 12)

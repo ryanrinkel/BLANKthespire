@@ -1251,3 +1251,20 @@ already-STUNNED no-op incl. on bosses, stunned turns performed, discard all, car
 Fiend Fire's `[BK] hits_scale cards_removed`, the boulder growing to 10 fires), 0 mod exceptions, 0 localization errors, no
 "Combat turn N" hang; one unreproduced BR2 stall (Findings (BR) 8). Merged suite: generation **608**, web **293**,
 `test_phase_br` 222/222. **Wave 6 phases BH..BR are complete; next: the v0.4.0 release (§4).**
+
+**Release prep (v0.4.0, 2026-10-05, on `wave6`, local only).** Pre-release test re-pass done (generation **608**, web **293**,
+same on the droplet-like shell; final readings in `TEST_AUDIT_2026-10.md`); `test_phase_bn` / `bq` / `br` lost their build-time
+"smoke pending" early return. The BL test-only `gaptest_enemy_artifact` op is stripped from the C# (the BL tester keeps
+Warding Gift behind `--with-artifact-op`, default off; `test_phase_bl` asserts the op is gone). **Wave 6 interaction smoke**
+(`generation/tests/gaptest-wave6/`, 27 cards on a normal class with 3 orb slots, every mechanic combined: replay_next +
+autoplay on one card, Echo Form + return_to_hand, to_draw_top + Havoc, add_random_card + cost_delta on:drawn + Arsenal, stun +
+discard-pile retrieve + Calculated Gamble, Fiend Fire + on-kill heal under Doom, an on_debuff_applied power that re-applies
+temp Strength Down on every debuff, every_n + this_turn on ONE trigger, block_next_turn scale:block + retain_hand + no_draw,
+Sly grants + on_shuffle, Rolling Boulder + a turn-start Power generator): **no validator rejected any combination**;
+GAPTESTW61 and GAPTESTW62 both **completed the run** on the first launch, one build, no engine fix — every prefix [BI]..[BR]
+fired on both seeds, 0 mod exceptions, 0 BlankTheSpire frames, 0 localization errors, 0 import rejections, no hang, no freeze
+(the transient 5 s "Combat turn" watchdog lines, 23 / 20, are the baseline). The loop guards held: `[BP] re-entry blocked
+(on_debuff_applied)` 74 / 54 (the self-feeding Strength Down power never recursed), `[BN] … is an autoplay card — never
+auto-played` 21 / 15, replay series never past play #2. Bonus: a natural Artifact enemy (Aeonglass / Mecha Knight) ate a
+`strength_down` and a `temp_strength_down` on each seed with `shell 0->0` — the BL sign-flip proof again, on the stripped DLL.
+Tags: `generation/tests/gaptest-wave6/godot_W6_tags_<SEED>.txt`; `tests/test_wave6_interaction.py` reads them.
