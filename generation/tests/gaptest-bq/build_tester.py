@@ -51,7 +51,7 @@ Pass bar (plan rule 0.3), across the two seeds:
 Save the per-seed tag grep next to this file as godot_BQ_tags_<SEED>.txt (TEST_AUDIT_2026-10 §7), in the format of
 tests/gaptest-bp/godot_BP_tags_<SEED>.txt: a header (`# [BQ] lines: N`, `# mod exceptions: 0`, `# BlankTheSpire stack
 frames: 0`, `# Localization formatting errors: 0`, the run end line), per-tag counts, then the [BQ] + "[BP] on_evoke fired"
-lines. test_phase_bq reads them (until they exist it prints "smoke pending").
+lines. test_phase_bq reads them (a missing file fails the test).
 """
 from __future__ import annotations
 

@@ -10,7 +10,7 @@ RollingBoulderPower anywhere in the mod, the class-level stun rails in the impor
 stun guard rail, the cards_removed ordering rule, the payload-grow rule); the describe byte-match (Python literals asserted, the
 C# fragments grepped); the contract surfaces (schema, VOCABULARY rows, gate, census, coverage, featured, harness_v2,
 class_forge, bridges, archetypes, exemplars, heuristics, gap log, render.js, the plan); the tester's validate-only path; the
-saved AutoSlay tag greps under tests/gaptest-br/ when they exist ("smoke pending" until then); and prints the rule-0.9
+saved AutoSlay tag greps under tests/gaptest-br/ (asserted present); and prints the rule-0.9
 readings.
 """
 from __future__ import annotations
@@ -442,9 +442,6 @@ def _t_tester() -> None:
 def _t_smoke_record() -> None:
     print("the saved AutoSlay tag greps (TEST_AUDIT_2026-10 §7):")
     files = [TESTER_DIR / f"godot_BR_tags_{s}.txt" for s in SMOKE_SEEDS]
-    if not any(p.exists() for p in files):
-        print("  smoke pending (no godot_BR_tags_<SEED>.txt yet)")
-        return
     seen = ""
     for p in files:
         assert p.exists(), f"missing smoke record {p}"

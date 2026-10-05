@@ -255,3 +255,45 @@ Merged suite after BH-1 + BH-2 + BH-3: generation **586 passed**, web **293 pass
 - donor-facing copy never says buy / purchase (test_pages)
 - each pricing v3, BYOK split, admin 4 h, magic link, /workshop, hosted route, stub pinning, explicit request and traffic change has a live-path test (table in §6)
 - each new phase commits generation/tests/gaptest-<xx>/build_tester.py + godot_<XX>_tags_<SEED>.txt
+
+## Final readings at v70 (pre-release, 2026-10-05)
+
+Rule 0.9b re-pass on `wave6` before the v0.4.0 release (plan §4). Printed by `uv run python -m tests.test_phase_bh`
+(102/102; harness v2 on, `BTS_BLUEPRINT_VOCAB=tree`, dossier, triad, seed 1). Ceilings are the ones Ryan set during the
+wave (§7 of the plan); none was raised for the release.
+
+| reading | chars | ceiling |
+|---|---|---|
+| `vocab_index` | 9,703 (274 tokens, clause cap 72) | 11,000 |
+| largest single-archetype prompt (`slot_machine`) | 77,619 | 80,000 |
+| per-archetype scaffold max (`exhaust_pyre`) | 27,537 | 32,000 |
+| triad normal / orb / hybrid | 69,442 / 79,433 / 85,178 | 90,000 |
+| all-ops path | 130,589 | 140,000 (tripwire) |
+| scaffold on the all-ops path | 48,419 | informational |
+| `full` path, untrimmed | 121,649 (scaffold 48,141; VOCABULARY.md 73,508) | snapshot |
+
+Suites (clean state, 2026-10-05): generation **608 passed**, web **293 passed**; the same counts on the droplet-like
+shell (`BTS_HARNESS_V2=1 BTS_VOCAB_GATE=heuristic BTS_BLUEPRINT_VOCAB=tree`). `generation/scratch/_class_gen` was
+untouched by both runs (15,232 files, newest mtime unchanged).
+
+Exit bar walk: every line holds. All 10 wave-6 phase files (bi..br) expose `test_phase_<xx>_all()`, assert a Python
+describe literal and grep the C# fragment, and assert their two `godot_<XX>_tags_<SEED>.txt` files; every
+`gaptest-b[i-r]/` holds `build_tester.py` + two tag files. One fix in the re-pass: `test_phase_bn` / `bq` / `br` still
+carried the build-time "smoke pending" early return (`if not any(p.exists() …): return`), which would have let a
+deleted tag record pass silently. The guard is removed; a missing record now fails the test. No skip / xfail (the
+`importorskip("PIL")` dependency guard stays); no `app.js` renderer greps (the one `app.js` reader is the BYOK
+`PROVIDERS` literal, which lives there); no test still names v0.3.0 / vocab 60 except `test_phase_bf`'s own
+history line.
+
+**Wave 6 in one paragraph.** Phases BH..BR on `wave6`: BH (v0.3.0 shipped, this audit, gaps #62–#79 logged, the
+vocabulary tree replacing the whole-file paste), then BI (v61, trigger filters) · BJ (v62, combat-history scales +
+conditions) · BK (v63, `hits_scale`) · BL (v64, Strength loss / strip / Doom) · BM (v65, base-power statuses, replay,
+next-turn Block, retain hand) · BO (v66, recursion / put-back / `on_shuffle` / `grant_keyword`) · BP (v67, `cost_delta`
++ small reactive triggers) · BQ (v68, orb extras) · BN (v69, on-kill, random generation, autoplay) · BR (v70, stun,
+discard-all + `cards_removed`, growing turn-start damage) — vocab v61 → v70, generation 580 → 608 tests. The smokes
+found three real engine bugs that no offline test could see: an amount-less `retrieve_card` retrieved nothing (BO);
+a missing `break` in `DataCard.DeclareEffects` since BM gave every orb / trigger / forge / summon card a stray
+`BurstPower` var and crashed any card carrying two such ops at run start (found in BQ); and `trigger_passive` passed
+the played target to Frost / Dark / Plasma orbs, whose `Passive` throws on a target (BQ). Two stalls stay
+unexplained and unreproduced: the BM1 whole-process freeze in the Act 3 Queen fight (turn 13) and the BR2 Act 1
+stall after a Sly auto-play overlapped Gambler's Brew's discard-and-draw; both seeds completed on re-run.

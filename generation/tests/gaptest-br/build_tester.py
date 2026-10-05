@@ -43,7 +43,7 @@ Pass bar (plan rule 0.3 + the Phase BR gate), across the two seeds:
   - Map-nav FAIL is expected (AutoSlay verdict); gate on the godot.log tags. AutoSlay never pays energy (the 3-cost Whistle /
     Rolling Boulder are played at no cost — the stun and growth are proven, the price is not).
 Save the per-seed tag grep next to this file as godot_BR_tags_<SEED>.txt (TEST_AUDIT_2026-10 §7), in the format of
-tests/gaptest-bn/godot_BN_tags_<SEED>.txt; test_phase_br reads them (until they exist it prints "smoke pending").
+tests/gaptest-bn/godot_BN_tags_<SEED>.txt; test_phase_br reads them (a missing file fails the test).
 """
 from __future__ import annotations
 

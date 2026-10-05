@@ -9,7 +9,7 @@ log-only tick patch, the importer's 3-slot rule); the validator rules on both si
 asserted, the C# fragments grepped); the contract surfaces (schema, VOCABULARY rows, the loop status file, gate family + field
 units, coverage, featured, harness_v2, class_forge, archetypes, exemplars, heuristics, gap log, render.js, the pitch sentence);
 the tester's validate-only path (an ORB class with custom orbs, every BQ shape + the BP on_evoke proof); the saved AutoSlay tag
-greps under tests/gaptest-bq/ when they exist ("smoke pending" until then); and prints the rule-0.9 readings.
+greps under tests/gaptest-bq/ (asserted present); and prints the rule-0.9 readings.
 """
 from __future__ import annotations
 
@@ -450,9 +450,6 @@ def _t_tester() -> None:
 def _t_smoke_record() -> None:
     print("the saved AutoSlay tag greps (TEST_AUDIT_2026-10 §7):")
     files = [TESTER_DIR / f"godot_BQ_tags_{s}.txt" for s in SMOKE_SEEDS]
-    if not any(p.exists() for p in files):
-        print("  smoke pending (no godot_BQ_tags_<SEED>.txt yet — the BN agent runs BQ's smoke with BN's)")
-        return
     seen = ""
     for p in files:
         assert p.exists(), f"missing smoke record {p}"

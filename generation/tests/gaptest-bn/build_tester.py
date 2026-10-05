@@ -52,7 +52,7 @@ Pass bar (plan rule 0.3), across the two seeds:
     test_phase_bn pins both offline. AutoSlay never pays energy, so "free this turn" is proven as the card being added
     (SetToFreeThisTurn), never as energy saved.
 Save the per-seed tag grep next to this file as godot_BN_tags_<SEED>.txt (TEST_AUDIT_2026-10 §7), in the format of
-tests/gaptest-bp/godot_BP_tags_<SEED>.txt; test_phase_bn reads them (until they exist it prints "smoke pending").
+tests/gaptest-bp/godot_BP_tags_<SEED>.txt; test_phase_bn reads them (a missing file fails the test).
 """
 from __future__ import annotations
 

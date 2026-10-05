@@ -477,9 +477,6 @@ def _t_tester() -> None:
 def _t_smoke_record() -> None:
     print("the saved AutoSlay tag greps (TEST_AUDIT_2026-10 §7):")
     files = [TESTER_DIR / f"godot_BN_tags_{s}.txt" for s in SMOKE_SEEDS]
-    if not any(p.exists() for p in files):
-        print("  smoke pending (no godot_BN_tags_<SEED>.txt yet)")
-        return
     seen = ""
     for p in files:
         assert p.exists(), f"missing smoke record {p}"
