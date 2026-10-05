@@ -22,6 +22,10 @@ public partial class MainFile : Node
 
         harmony.PatchAll();
 
+        // Release banner (v0.4.0 prep): one line that says which card vocabulary this DLL reads, so a packaged-DLL
+        // smoke (and a player's log) can confirm the build matches the site's codes (BTS1Codec rejects newer ones).
+        Logger.Info($"[BTS] BLANK the spire loaded: card vocabulary v{Engine.ForgedCards.VocabVersion}.");
+
         // The in-game "forge" screen (appears in the main-menu mod settings list).
         ModConfigRegistry.Register(ModId, new ForgeConfig());
 

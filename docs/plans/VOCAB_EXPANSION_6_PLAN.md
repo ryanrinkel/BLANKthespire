@@ -1268,3 +1268,13 @@ fired on both seeds, 0 mod exceptions, 0 BlankTheSpire frames, 0 localization er
 auto-played` 21 / 15, replay series never past play #2. Bonus: a natural Artifact enemy (Aeonglass / Mecha Knight) ate a
 `strength_down` and a `temp_strength_down` on each seed with `shell 0->0` — the BL sign-flip proof again, on the stripped DLL.
 Tags: `generation/tests/gaptest-wave6/godot_W6_tags_<SEED>.txt`; `tests/test_wave6_interaction.py` reads them.
+**v0.4.0 packaged (local, 2026-10-05).** `mod/BlankTheSpire.json` v0.3.0 → **v0.4.0** (the web `/download` page reads its version
+from this manifest, so it is the only other copy); a one-line startup banner `[BTS] BLANK the spire loaded: card vocabulary v70.`
+(`MainFile.Initialize`) so a log proves which vocabulary a DLL reads. Release build → `mod/tools/package_release.ps1 -Version
+0.4.0` → `release/BlankTheSpire-v0.4.0.zip` (735,429 bytes): the same six entries as v0.3.0, BaseLib + the .pck byte-identical,
+new DLL (691,200 bytes) + re-stamped manifest. Packaged-DLL smoke (the zip unpacked into `mods\` as a player would, dev folders
+backed up and restored): GAPTESTBR1 pass 1 **died to The Insatiable** (boss, ~floor 33; AutoSlay reports a death as "Rewards
+screen did not appear") with 195 [BR] lines, 0 mod exceptions, 0 localization errors; re-run, it **completed the run** (253 [BR]
+lines, stun applied=True 36, stunned turns 27, 0 mod exceptions, 0 BlankTheSpire frames, 0 localization errors); the banner read
+v70 on both launches. `workshop/build_workspace.ps1 -Version 0.4.0` staged `content/` and the change note (visibility public).
+Not done (Ryan's calls, §4): merge, Workshop upload, scp of the zip, push, deploy.
