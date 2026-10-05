@@ -79,6 +79,44 @@ def test_card_prompt_survives_a_bare_card():
     assert "ember_jab" in p and p.endswith(CARD_STYLE.prompt_suffix)
 
 
+_TANK = ClassArt(class_id="sherman", name="The Sherman", concept="a Sherman tank",
+                 flavor=["diesel smoke"], imagery=["tank turret", "shell casings"])
+
+
+@pytest.mark.parametrize("name,ctype,lead,action", [
+    ("Strike", "attack", "an attack card", "basic attack"),
+    ("Defend", "skill", "a skill card", "basic guard"),
+])
+def test_basics_make_the_class_subject_the_subject_not_the_verb(name, ctype, lead, action):
+    """Strike/Defend are bare verbs shared by every class; "draw the name literally" produced a knight with
+    a sword / a shield for every class (2026-10-05). The basics must lead with the CLASS subject instead."""
+    p = card_prompt(_TANK, {"id": f"sherman_{name.lower()}", "name": name, "type": ctype,
+                            "rarity": "basic"}, CARD_STYLE)
+    head = p[:p.index("The player asked for")]                              # the lead, before the class dress
+    assert f'"{name}", {lead} in a dark-fantasy deckbuilder' in head        # still names card + type
+    assert f'draw "{name}" itself, literally' not in p                      # the verb is NOT the subject
+    assert action in head and "class's own character or thing" in head     # the class subject is
+    assert "armored knight" in head                                         # the genre default is forbidden
+    assert 'The player asked for: "a Sherman tank"' in p                    # concept + motifs still follow
+    assert "tank turret" in p
+    assert p.endswith(CARD_STYLE.prompt_suffix)
+
+
+@pytest.mark.parametrize("name", ["strike", "STRIKE", "Strike+", "Defend+"])
+def test_basic_detection_ignores_case_and_upgrade_plus(name):
+    p = card_prompt(_TANK, {"name": name, "type": "attack"}, CARD_STYLE)
+    assert f'draw "{name}" itself, literally' not in p
+    assert "class's own character or thing" in p
+
+
+def test_signature_with_basic_rarity_keeps_the_literal_rule():
+    """Only the two shared starter NAMES are special; a class's signature starter (rarity basic too) has a
+    real name and keeps the A/B-winning literal lead."""
+    p = card_prompt(_TANK, {"name": "Shell Barrage", "type": "attack", "rarity": "basic"}, CARD_STYLE)
+    assert 'draw "Shell Barrage" itself, literally' in p
+    assert "class's own character or thing" not in p
+
+
 def test_nearest_ratio_snaps_card_size_to_3_2():
     # 4:3 is rejected by the OpenAI image family on OpenRouter; 1536x1024 must land on 3:2
     assert orb.nearest_ratio((1536, 1024)) == "3:2"

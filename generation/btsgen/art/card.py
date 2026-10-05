@@ -30,6 +30,24 @@ from .styles import CARD_STYLE
 CARD_PORTRAIT_SIZE = (1000, 760)
 
 _TYPE_WORD = {"attack": "attack", "skill": "skill", "power": "power"}
+# The two literal starter basics every class shares (see card_prompt). Keyed by lower-cased name; the value
+# replaces the "draw the name literally" lead. Subject-neutral on purpose (a class can be a tank, a hound, a
+# machine, a ghost): the class's own subject performs the action in its own idiom, and the genre default —
+# a knight with a sword or a shield — is named only to forbid it.
+_BASIC_SUBJECTS = {
+    "strike": (
+        "This is the class's plain basic attack. The subject is the class's own character or thing (described "
+        "next), caught mid-attack in whatever way IT naturally attacks — a tank fires its gun, a beast lunges "
+        "and bites, a sorcerer hurls a bolt, a machine slams a piston. Do not draw a generic sword, a generic "
+        "warrior or an armored knight: the attacker must be recognizably this class's subject."
+    ),
+    "defend": (
+        "This is the class's plain basic guard. The subject is the class's own character or thing (described "
+        "next), bracing to take a hit in whatever way IT naturally protects itself — a hull shrugs off fire, a "
+        "beast hunkers and bristles, a sorcerer raises a ward, a machine locks its plates. Do not draw a generic "
+        "shield, a generic warrior or an armored knight: the defender must be recognizably this class's subject."
+    ),
+}
 # The card's own prose, most specific first; the first non-empty ones become the description line.
 _FLAVOR_KEYS = ("description", "text", "flavor", "pitch")
 
@@ -103,10 +121,19 @@ def card_prompt(art: ClassArt, card: dict, style: StyleProfile) -> str:
     name = str((card or {}).get("name") or (card or {}).get("id") or "Card").strip() or "Card"
     kind = _TYPE_WORD.get(str((card or {}).get("type") or "").strip().lower(), "")
     lead = f'{"an" if kind[:1] in "aeiou" else "a"} {kind} card'.replace("  ", " ") if kind else "a card"
-    parts = [
-        f'Card illustration for "{name}", {lead} in a dark-fantasy deckbuilder. '
-        f'The card\'s name is the subject: draw "{name}" itself, literally.'
-    ]
+    basic = _BASIC_SUBJECTS.get(name.rstrip("+").strip().lower())
+    if basic:
+        # Strike / Defend are the ONE place "draw the name literally" fails: every class shares those two
+        # names, they are bare verbs with no prose (character_pipeline._synthesize_basic writes no flavor),
+        # and in a Slay-the-Spire-styled dark-fantasy prompt the literal picture of "strike"/"defend" is a
+        # sword / a shield — so every class's basics came back as an armored knight (2026-10-05). For these
+        # the CLASS SUBJECT is the subject and the card name is only the action it performs.
+        parts = [f'Card illustration for "{name}", {lead} in a dark-fantasy deckbuilder. {basic}']
+    else:
+        parts = [
+            f'Card illustration for "{name}", {lead} in a dark-fantasy deckbuilder. '
+            f'The card\'s name is the subject: draw "{name}" itself, literally.'
+        ]
     line = card_flavor_line(card)
     if line:
         parts.append(line)
