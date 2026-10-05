@@ -1167,6 +1167,15 @@ tree mode). BH-1 needs Ryan's OK on two product fixes: `app.js` donation history
 and the restored `summon_swarm` pricing sentences in DESIGN_HEURISTICS.md — **both OK'd by Ryan 2026-10-02**; the
 status lookup + orb pitch were fixed in the BH-3 follow-up (388ec64, merged 26fcbd7); the index budget stays 6,000.
 
+**RELEASED 2026-10-05 — v0.4.0 (vocab v70) is live everywhere:** Workshop item 3803255976 updated (three previews
+kept, `.gitkeep` dropped from `previews/`), `BlankTheSpire-v0.4.0.zip` on the droplet (checksum verified), `wave6`
+fast-forwarded into `main` (0f4eda3) and pushed, `deploy.sh` healthy (droplet web tests 293 green), `/download`
+serves v0.4.0, droplet `bts1.VOCAB_VERSION = 70`, the vocabulary tree is the live design prompt (`BTS_BLUEPRINT_VOCAB`
+unset = `tree`; rollback = `full` + restart). Pre-release: `TEST_AUDIT_2026-10.md` re-pass (610/293), the test-only
+`gaptest_enemy_artifact` op stripped (5eaee3f), a combined interaction smoke (`gaptest-wave6`, GAPTESTW61/W62) clean
+on both seeds. Follow-ups: watch `[tree] nominated` rates on live forges (widen selection if > ~20%); the two
+unexplained stalls (BM Act-3 Queen at Dex −44; BR2 potion + Sly play) stay open; Wave 7 candidates are §6.
+
 **Phase BI DONE 2026-10-02** (f9500db on `wave6`, vocab v61; smokes GAPTESTBI1/BI2 all four `[BI]` tags, 0 mod
 exceptions, 0 localization errors; tester + tags in `generation/tests/gaptest-bi/`). Merged suite: generation **588**,
 web **293**, `test_phase_bh` 101/101. Readings: index 5,924 · per-archetype max 64,742 · all-ops 114,296 ·
