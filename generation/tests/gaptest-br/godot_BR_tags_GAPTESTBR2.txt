@@ -1,0 +1,430 @@
+# Phase BR AutoSlay smoke — seed GAPTESTBR2 (godot.log grep, 7714 lines)
+# NOTE (pass history): pass 1 of GAPTESTBR2 (alongside BR1) never reached the game (Steam relaunch race). Pass 2 (alone) stalled
+#   on Act 1 F11 (SLIMES_NORMAL), combat turn 1: AutoSlay drank Gambler's Brew (discard 5 chosen incl. both Flicker Guards,
+#   draw 5), then played Scatter Volley ([BR] discard all x4 -> 4 hits); the Sly auto-play of Flicker Guard began
+#   ([BB] sly ...) and the game produced no further combat output for ~30 s, so AutoSlay's 100-turn loop spun through in
+#   5 ms and failed 'Combat did not end' (no exception, no BlankTheSpire frame; the game resumed after the abandon).
+#   Pass 3 (alone, --timeout 1500, this record) took a different route and completed the run. Not reproduced.
+# [BR] lines: 253
+# mod exceptions: 0
+# BlankTheSpire stack frames: 0
+# BlankTheSpire frames in non-exception [ERROR] traces (logged, non-fatal): 0
+# Localization formatting errors: 0
+# exception lines (any source): 4
+# stall / watchdog lines: 7
+# run end: [INFO] [AutoSlay] Action: Run completed (max floor reached). Abandoning
+# 'Combat turn' watchdog lines (transient 5 s no-progress warnings; the run continued): 5
+# stun applied: True 40 / False 14; stunned turns performed: 34
+# turn_start grow: 28 ticks, max fires 6
+# discard all: 47 plays, sizes [(0, 3), (1, 8), (2, 8), (3, 13), (4, 10), (5, 2), (6, 3)]
+# --- cards_removed reads (card, kind, zero/nonzero): count ---
+  Calculated Gamble      draw   nonzero     35
+  Calculated Gamble      draw   zero         1
+  Fiend Fire             hits   nonzero     12
+  Fiend Fire             hits   zero         2
+  Scatter Volley         hits   nonzero      9
+  Scatter Volley         hits   zero         2
+# --- stun calls (enemy, old -> new, applied): count ---
+  BygoneEffigy                     SLEEP_MOVE -> STUNNED        applied=True     2
+  BygoneEffigy                        STUNNED -> STUNNED        applied=False    1
+  CeremonialBeast              BEAST_CRY_MOVE -> STUNNED        applied=True     2
+  CeremonialBeast                  STAMP_MOVE -> STUNNED        applied=True     1
+  CeremonialBeast                     STUNNED -> STUNNED        applied=False    1
+  Crusher                      ENLARGING_STRIKE_MOVE -> STUNNED        applied=True     1
+  CubexConstruct               CHARGE_UP_MOVE -> STUNNED        applied=True     2
+  CubexConstruct               REPEATER_BLAST_MOVE -> STUNNED        applied=True     1
+  DecimillipedeSegmentBack        WRITHE_MOVE -> STUNNED        applied=True     1
+  DecimillipedeSegmentFront    CONSTRICT_MOVE -> STUNNED        applied=True     1
+  DecimillipedeSegmentMiddle      WRITHE_MOVE -> STUNNED        applied=True     1
+  Entomancer                        BEES_MOVE -> STUNNED        applied=True     1
+  Entomancer                          STUNNED -> STUNNED        applied=False    1
+  Exoskeleton                  MANDIBLES_MOVE -> STUNNED        applied=True     1
+  FuzzyWurmCrawler                     INHALE -> STUNNED        applied=True     2
+  Inklet                             JAB_MOVE -> STUNNED        applied=True     1
+  Inklet                       WHIRLWIND_MOVE -> STUNNED        applied=True     1
+  LivingShield                 SHIELD_SLAM_MOVE -> STUNNED        applied=True     2
+  Mawler                            CLAW_MOVE -> STUNNED        applied=True     1
+  Mawler                              STUNNED -> STUNNED        applied=False    1
+  Myte                              SUCK_MOVE -> STUNNED        applied=True     2
+  Myte                             TOXIC_MOVE -> STUNNED        applied=True     1
+  Queen                        BURN_BRIGHT_FOR_ME_MOVE -> STUNNED        applied=True     3
+  Queen                           ENRAGE_MOVE -> STUNNED        applied=True     1
+  Queen                               STUNNED -> STUNNED        applied=False    2
+  Rocket                       PRECISION_BEAM_MOVE -> STUNNED        applied=True     1
+  Rocket                              STUNNED -> STUNNED        applied=False    2
+  ShrinkerBeetle                SHRINKER_MOVE -> STUNNED        applied=True     2
+  SlimedBerserker              FURIOUS_PUMMELING_MOVE -> STUNNED        applied=True     1
+  SlimedBerserker                     STUNNED -> STUNNED        applied=False    3
+  SlimedBerserker              VOMIT_ICHOR_MOVE -> STUNNED        applied=True     2
+  SoulNexus                    MAELSTROM_MOVE -> STUNNED        applied=True     2
+  SoulNexus                    SOUL_BURN_MOVE -> STUNNED        applied=True     2
+  SoulNexus                           STUNNED -> STUNNED        applied=False    2
+  TorchHeadAmalgam              TACKLE_2_MOVE -> STUNNED        applied=True     1
+  Tunneler                         BELOW_MOVE -> STUNNED        applied=True     1
+  Tunneler                            STUNNED -> STUNNED        applied=False    1
+# --- stun skipped reasons ---
+  '<x>' is dead ('<x>').                                                             15
+  already stunned '<x>' (STUNNED must be performed first).                           14
+# --- stunned turns performed (enemy): count ---
+  BygoneEffigy                    2
+  CeremonialBeast                 2
+  Crusher                         1
+  CubexConstruct                  2
+  DecimillipedeSegmentBack        1
+  DecimillipedeSegmentFront       1
+  DecimillipedeSegmentMiddle      1
+  Entomancer                      1
+  Exoskeleton                     1
+  FuzzyWurmCrawler                1
+  Inklet                          1
+  LivingShield                    1
+  Mawler                          1
+  Myte                            3
+  Queen                           4
+  Rocket                          1
+  ShrinkerBeetle                  2
+  SlimedBerserker                 3
+  SoulNexus                       3
+  TorchHeadAmalgam                1
+  Tunneler                        1
+# --- per-tag counts ---
+  cards_removed -> N ('Calculated Gamble') (draw).                             36
+  cards_removed -> N ('Fiend Fire') (hits).                                    14
+  cards_removed -> N ('Scatter Volley') (hits).                                11
+  discard all xN ('Calculated Gamble').                                        36
+  discard all xN ('Scatter Volley').                                           11
+  hits_scale cards_removed -> N hits (raw N, cap N) x N from 'Fiend Fire'.     12
+  hits_scale cards_removed -> N hits (raw N, cap N) x N from 'Scatter Voll      9
+  hits_scale cards_removed -> N hits, skipped (raw N) from 'Fiend Fire'.        2
+  hits_scale cards_removed -> N hits, skipped (raw N) from 'Scatter Volley      2
+  stun '<x>': next move BEAST_CRY_MOVE -> STUNNED (applied=True) ('<x>').       2
+  stun '<x>': next move BEES_MOVE -> STUNNED (applied=True) ('<x>').            1
+  stun '<x>': next move BELOW_MOVE -> STUNNED (applied=True) ('<x>').           1
+  stun '<x>': next move BURN_BRIGHT_FOR_ME_MOVE -> STUNNED (applied=True)       3
+  stun '<x>': next move CHARGE_UP_MOVE -> STUNNED (applied=True) ('<x>').       2
+  stun '<x>': next move CLAW_MOVE -> STUNNED (applied=True) ('<x>').            1
+  stun '<x>': next move CONSTRICT_MOVE -> STUNNED (applied=True) ('<x>').       1
+  stun '<x>': next move ENLARGING_STRIKE_MOVE -> STUNNED (applied=True) ('      1
+  stun '<x>': next move ENRAGE_MOVE -> STUNNED (applied=True) ('<x>').          1
+  stun '<x>': next move FURIOUS_PUMMELING_MOVE -> STUNNED (applied=True) (      1
+  stun '<x>': next move INHALE -> STUNNED (applied=True) ('<x>').               2
+  stun '<x>': next move JAB_MOVE -> STUNNED (applied=True) ('<x>').             1
+  stun '<x>': next move MAELSTROM_MOVE -> STUNNED (applied=True) ('<x>').       2
+  stun '<x>': next move MANDIBLES_MOVE -> STUNNED (applied=True) ('<x>').       1
+  stun '<x>': next move PRECISION_BEAM_MOVE -> STUNNED (applied=True) ('<x      1
+  stun '<x>': next move REPEATER_BLAST_MOVE -> STUNNED (applied=True) ('<x      1
+  stun '<x>': next move SHIELD_SLAM_MOVE -> STUNNED (applied=True) ('<x>')      2
+  stun '<x>': next move SHRINKER_MOVE -> STUNNED (applied=True) ('<x>').        2
+  stun '<x>': next move SLEEP_MOVE -> STUNNED (applied=True) ('<x>').           2
+  stun '<x>': next move SOUL_BURN_MOVE -> STUNNED (applied=True) ('<x>').       2
+  stun '<x>': next move STAMP_MOVE -> STUNNED (applied=True) ('<x>').           1
+  stun '<x>': next move STUNNED -> STUNNED (applied=False) ('<x>').            14
+  stun '<x>': next move SUCK_MOVE -> STUNNED (applied=True) ('<x>').            2
+  stun '<x>': next move TACKLE_N_MOVE -> STUNNED (applied=True) ('<x>').        1
+  stun '<x>': next move TOXIC_MOVE -> STUNNED (applied=True) ('<x>').           1
+  stun '<x>': next move VOMIT_ICHOR_MOVE -> STUNNED (applied=True) ('<x>')      2
+  stun '<x>': next move WHIRLWIND_MOVE -> STUNNED (applied=True) ('<x>').       1
+  stun '<x>': next move WRITHE_MOVE -> STUNNED (applied=True) ('<x>').          2
+  stun skipped: '<x>' is dead ('<x>').                                         15
+  stun skipped: already stunned '<x>' (STUNNED must be performed first).       14
+  stunned turn performed '<x>' (lost its turn; repeats '<x>' next).            34
+  turn_start grow: N+NxN = N (N enemy/ies).                                    28
+# --- exception lines (any source) ---
+[ERROR] [BaseLib] HarmonyLib.HarmonyException: Patching exception in method null
+ ---> System.ArgumentException: Undefined target method for patch method static System.Void BaseLib.Patches.Networking.AdjustCustomMessageKeys::Fuckery()
+   at HarmonyLib.PatchClassProcessor.ReportException(Exception exception, MethodBase original)
+[ERROR] [BaseLib] HarmonyLib.HarmonyException: Patching exception in method System.Void MegaCrit.Sts2.Core.Nodes.Screens.RelicCollection.NRelicCollectionCategory::LoadRelics(MegaCrit.Sts2.Core.Entities.Relics.RelicRarity relicRarity, MegaCrit.Sts2.Core.Nodes.Screens.RelicCollection.NRelicCollection collection, MegaCrit.Sts2.Core.Localization.LocString header, System.Collections.Generic.HashSet`1<MegaCrit.Sts2.Core.Models.RelicModel> seenRelics, MegaCrit.Sts2.Core.Unlocks.UnlockState unlockState, System.Collections.Generic.HashSet`1<MegaCrit.Sts2.Core.Models.RelicModel> allUnlockedRelics)
+ ---> System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation.
+ ---> System.Exception: Failed to find match:
+   at HarmonyLib.PatchClassProcessor.ReportException(Exception exception, MethodBase original)
+[ERROR] [AutoSlay] Run failed with seed=GAPTESTBR2: Node /root/Game/RootSceneContainer/Run/GlobalUi/TopBar/RightAlignedStuff/Options of type NButton not found
+   at MegaCrit.Sts2.Core.AutoSlay.AutoSlayLog.Error(String message, Exception ex)
+   at MegaCrit.Sts2.Core.AutoSlay.AutoSlayLog.RunFailed(String seed, Exception ex)
+   at System.Threading.Tasks.Task.TrySetException(Object exceptionObject)
+   at System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1.SetException(Exception exception, Task`1& taskField)
+[ERROR] MegaCrit.Sts2.Core.AutoSlay.AutoSlayTimeoutException: Node /root/Game/RootSceneContainer/Run/GlobalUi/TopBar/RightAlignedStuff/Options of type NButton not found
+   at MegaCrit.Sts2.Core.Helpers.TaskHelper.LogTaskExceptions(Task task)
+   at MegaCrit.Sts2.Core.Helpers.TaskHelper.LogTaskExceptions(Task task)
+   at System.Threading.Tasks.Task.TrySetException(Object exceptionObject)
+   at System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1.SetException(Exception exception, Task`1& taskField)
+   at System.Threading.Tasks.Task.TrySetException(Object exceptionObject)
+   at System.Runtime.CompilerServices.AsyncTaskMethodBuilder`1.SetException(Exception exception, Task`1& taskField)
+# --- every [BR] line (+ [BK] hits_scale cards_removed) ---
+[INFO] [BlankTheSpire] [BR] discard all x4 ('Scatter Volley').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 4 ('Scatter Volley') (hits).
+[INFO] [BlankTheSpire] [BK] hits_scale cards_removed -> 4 hits (raw 4, cap 10) x 4 from 'Scatter Volley'.
+[INFO] [BlankTheSpire] [BR] discard all x2 ('Scatter Volley').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 2 ('Scatter Volley') (hits).
+[INFO] [BlankTheSpire] [BK] hits_scale cards_removed -> 2 hits (raw 2, cap 10) x 4 from 'Scatter Volley'.
+[INFO] [BlankTheSpire] [BR] stun 'FuzzyWurmCrawler': next move INHALE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun skipped: 'FuzzyWurmCrawler' is dead ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun 'ShrinkerBeetle': next move SHRINKER_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stunned turn performed 'ShrinkerBeetle' (lost its turn; repeats 'SHRINKER_MOVE' next).
+[INFO] [BlankTheSpire] [BR] cards_removed -> 2 ('Fiend Fire') (hits).
+[INFO] [BlankTheSpire] [BK] hits_scale cards_removed -> 2 hits (raw 2, cap 10) x 7 from 'Fiend Fire'.
+[INFO] [BlankTheSpire] [BR] stun 'Mawler': next move CLAW_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun 'Mawler': next move STUNNED -> STUNNED (applied=False) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun skipped: already stunned 'Mawler' (STUNNED must be performed first).
+[INFO] [BlankTheSpire] [BR] stunned turn performed 'Mawler' (lost its turn; repeats 'CLAW_MOVE' next).
+[INFO] [BlankTheSpire] [BR] discard all x2 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 2 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] discard all x4 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 4 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] stun 'Inklet': next move JAB_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun skipped: 'Inklet' is dead ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun 'Inklet': next move WHIRLWIND_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stunned turn performed 'Inklet' (lost its turn; repeats 'WHIRLWIND_MOVE' next).
+[INFO] [BlankTheSpire] [BR] cards_removed -> 3 ('Fiend Fire') (hits).
+[INFO] [BlankTheSpire] [BK] hits_scale cards_removed -> 3 hits (raw 3, cap 10) x 7 from 'Fiend Fire'.
+[INFO] [BlankTheSpire] [BR] turn_start grow: 5+5x0 = 5 (1 enemy/ies).
+[INFO] [BlankTheSpire] [BR] discard all x6 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 6 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] stun 'ShrinkerBeetle': next move SHRINKER_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] discard all x3 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 3 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] stunned turn performed 'ShrinkerBeetle' (lost its turn; repeats 'SHRINKER_MOVE' next).
+[INFO] [BlankTheSpire] [BR] turn_start grow: 5+5x0 = 5 (2 enemy/ies).
+[INFO] [BlankTheSpire] [BR] stun 'FuzzyWurmCrawler': next move INHALE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stunned turn performed 'FuzzyWurmCrawler' (lost its turn; repeats 'INHALE' next).
+[INFO] [BlankTheSpire] [BR] turn_start grow: 5+5x1 = 10 (1 enemy/ies).
+[INFO] [BlankTheSpire] [BR] stun skipped: 'FuzzyWurmCrawler' is dead ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun 'BygoneEffigy': next move SLEEP_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun 'BygoneEffigy': next move STUNNED -> STUNNED (applied=False) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun skipped: already stunned 'BygoneEffigy' (STUNNED must be performed first).
+[INFO] [BlankTheSpire] [BR] stunned turn performed 'BygoneEffigy' (lost its turn; repeats 'SLEEP_MOVE' next).
+[INFO] [BlankTheSpire] [BR] turn_start grow: 5+5x0 = 5 (1 enemy/ies).
+[INFO] [BlankTheSpire] [BR] discard all x1 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 1 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] stun 'BygoneEffigy': next move SLEEP_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stunned turn performed 'BygoneEffigy' (lost its turn; repeats 'SLEEP_MOVE' next).
+[INFO] [BlankTheSpire] [BR] turn_start grow: 5+5x1 = 10 (1 enemy/ies).
+[INFO] [BlankTheSpire] [BR] discard all x4 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 4 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] stun skipped: 'BygoneEffigy' is dead ('Whistle').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 4 ('Fiend Fire') (hits).
+[INFO] [BlankTheSpire] [BK] hits_scale cards_removed -> 4 hits (raw 4, cap 10) x 7 from 'Fiend Fire'.
+[INFO] [BlankTheSpire] [BR] discard all x0 ('Scatter Volley').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 0 ('Scatter Volley') (hits).
+[INFO] [BlankTheSpire] [BK] hits_scale cards_removed -> 0 hits, skipped (raw 0) from 'Scatter Volley'.
+[INFO] [BlankTheSpire] [BR] turn_start grow: 5+5x0 = 5 (2 enemy/ies).
+[INFO] [BlankTheSpire] [BR] discard all x1 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 1 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] turn_start grow: 5+5x1 = 10 (2 enemy/ies).
+[INFO] [BlankTheSpire] [BR] stun 'CeremonialBeast': next move STAMP_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun 'CeremonialBeast': next move STUNNED -> STUNNED (applied=False) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun skipped: already stunned 'CeremonialBeast' (STUNNED must be performed first).
+[INFO] [BlankTheSpire] [BR] stunned turn performed 'CeremonialBeast' (lost its turn; repeats 'STAMP_MOVE' next).
+[INFO] [BlankTheSpire] [BR] turn_start grow: 5+5x0 = 5 (1 enemy/ies).
+[INFO] [BlankTheSpire] [BR] discard all x3 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 3 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] cards_removed -> 1 ('Fiend Fire') (hits).
+[INFO] [BlankTheSpire] [BK] hits_scale cards_removed -> 1 hits (raw 1, cap 10) x 7 from 'Fiend Fire'.
+[INFO] [BlankTheSpire] [BR] turn_start grow: 5+5x1 = 10 (1 enemy/ies).
+[INFO] [BlankTheSpire] [BR] discard all x4 ('Scatter Volley').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 4 ('Scatter Volley') (hits).
+[INFO] [BlankTheSpire] [BK] hits_scale cards_removed -> 4 hits (raw 4, cap 10) x 6 from 'Scatter Volley'.
+[INFO] [BlankTheSpire] [BR] turn_start grow: 5+5x2 = 15 (1 enemy/ies).
+[INFO] [BlankTheSpire] [BR] stun 'CeremonialBeast': next move BEAST_CRY_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stunned turn performed 'CeremonialBeast' (lost its turn; repeats 'BEAST_CRY_MOVE' next).
+[INFO] [BlankTheSpire] [BR] turn_start grow: 5+5x3 = 20 (1 enemy/ies).
+[INFO] [BlankTheSpire] [BR] stun 'CeremonialBeast': next move BEAST_CRY_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun skipped: 'CeremonialBeast' is dead ('Whistle').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 4 ('Fiend Fire') (hits).
+[INFO] [BlankTheSpire] [BK] hits_scale cards_removed -> 4 hits (raw 4, cap 10) x 7 from 'Fiend Fire'.
+[INFO] [BlankTheSpire] [BR] discard all x3 ('Scatter Volley').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 3 ('Scatter Volley') (hits).
+[INFO] [BlankTheSpire] [BK] hits_scale cards_removed -> 3 hits (raw 3, cap 10) x 6 from 'Scatter Volley'.
+[INFO] [BlankTheSpire] [BR] discard all x4 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 4 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] stun 'Tunneler': next move BELOW_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun 'Tunneler': next move STUNNED -> STUNNED (applied=False) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun skipped: already stunned 'Tunneler' (STUNNED must be performed first).
+[INFO] [BlankTheSpire] [BR] stunned turn performed 'Tunneler' (lost its turn; repeats 'BELOW_MOVE' next).
+[INFO] [BlankTheSpire] [BR] stun skipped: 'Tunneler' is dead ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun 'Exoskeleton': next move MANDIBLES_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stunned turn performed 'Exoskeleton' (lost its turn; repeats 'MANDIBLES_MOVE' next).
+[INFO] [BlankTheSpire] [BR] turn_start grow: 5+5x0 = 5 (3 enemy/ies).
+[INFO] [BlankTheSpire] [BR] cards_removed -> 3 ('Fiend Fire') (hits).
+[INFO] [BlankTheSpire] [BK] hits_scale cards_removed -> 3 hits (raw 3, cap 10) x 7 from 'Fiend Fire'.
+[INFO] [BlankTheSpire] [BR] turn_start grow: 5+5x1 = 10 (1 enemy/ies).
+[INFO] [BlankTheSpire] [BR] stun 'DecimillipedeSegmentMiddle': next move WRITHE_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun 'DecimillipedeSegmentFront': next move CONSTRICT_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun skipped: 'DecimillipedeSegmentMiddle' is dead ('Whistle').
+[INFO] [BlankTheSpire] [BR] stunned turn performed 'DecimillipedeSegmentFront' (lost its turn; repeats 'CONSTRICT_MOVE' next).
+[INFO] [BlankTheSpire] [BR] stunned turn performed 'DecimillipedeSegmentMiddle' (lost its turn; repeats 'WRITHE_MOVE' next).
+[INFO] [BlankTheSpire] [BR] stun 'DecimillipedeSegmentBack': next move WRITHE_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stunned turn performed 'DecimillipedeSegmentBack' (lost its turn; repeats 'WRITHE_MOVE' next).
+[INFO] [BlankTheSpire] [BR] stun skipped: 'DecimillipedeSegmentFront' is dead ('Whistle').
+[INFO] [BlankTheSpire] [BR] discard all x2 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 2 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] stun 'Myte': next move TOXIC_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun 'Myte': next move SUCK_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stunned turn performed 'Myte' (lost its turn; repeats 'TOXIC_MOVE' next).
+[INFO] [BlankTheSpire] [BR] stunned turn performed 'Myte' (lost its turn; repeats 'SUCK_MOVE' next).
+[INFO] [BlankTheSpire] [BR] stun 'Myte': next move SUCK_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] discard all x1 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 1 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] stun skipped: 'Myte' is dead ('Whistle').
+[INFO] [BlankTheSpire] [BR] stunned turn performed 'Myte' (lost its turn; repeats 'SUCK_MOVE' next).
+[INFO] [BlankTheSpire] [BR] discard all x4 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 4 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] stun 'Entomancer': next move BEES_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] discard all x3 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 3 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] stun 'Entomancer': next move STUNNED -> STUNNED (applied=False) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun skipped: already stunned 'Entomancer' (STUNNED must be performed first).
+[INFO] [BlankTheSpire] [BR] cards_removed -> 0 ('Fiend Fire') (hits).
+[INFO] [BlankTheSpire] [BK] hits_scale cards_removed -> 0 hits, skipped (raw 0) from 'Fiend Fire'.
+[INFO] [BlankTheSpire] [BR] stunned turn performed 'Entomancer' (lost its turn; repeats 'BEES_MOVE' next).
+[INFO] [BlankTheSpire] [BR] discard all x3 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 3 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] turn_start grow: 5+5x0 = 5 (1 enemy/ies).
+[INFO] [BlankTheSpire] [BR] discard all x4 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 4 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] discard all x1 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 1 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] stun 'Rocket': next move PRECISION_BEAM_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun 'Rocket': next move STUNNED -> STUNNED (applied=False) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun skipped: already stunned 'Rocket' (STUNNED must be performed first).
+[INFO] [BlankTheSpire] [BR] stun 'Rocket': next move STUNNED -> STUNNED (applied=False) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun skipped: already stunned 'Rocket' (STUNNED must be performed first).
+[INFO] [BlankTheSpire] [BR] stunned turn performed 'Rocket' (lost its turn; repeats 'PRECISION_BEAM_MOVE' next).
+[INFO] [BlankTheSpire] [BR] discard all x4 ('Scatter Volley').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 4 ('Scatter Volley') (hits).
+[INFO] [BlankTheSpire] [BK] hits_scale cards_removed -> 4 hits (raw 4, cap 10) x 6 from 'Scatter Volley'.
+[INFO] [BlankTheSpire] [BR] discard all x3 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 3 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] turn_start grow: 5+5x0 = 5 (2 enemy/ies).
+[INFO] [BlankTheSpire] [BR] discard all x3 ('Scatter Volley').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 3 ('Scatter Volley') (hits).
+[INFO] [BlankTheSpire] [BK] hits_scale cards_removed -> 3 hits (raw 3, cap 10) x 6 from 'Scatter Volley'.
+[INFO] [BlankTheSpire] [BR] turn_start grow: 5+5x1 = 10 (2 enemy/ies).
+[INFO] [BlankTheSpire] [BR] discard all x2 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 2 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] turn_start grow: 5+5x2 = 15 (2 enemy/ies).
+[INFO] [BlankTheSpire] [BR] stun 'Crusher': next move ENLARGING_STRIKE_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 1 ('Fiend Fire') (hits).
+[INFO] [BlankTheSpire] [BK] hits_scale cards_removed -> 1 hits (raw 1, cap 10) x 10 from 'Fiend Fire'.
+[INFO] [BlankTheSpire] [BR] stunned turn performed 'Crusher' (lost its turn; repeats 'ENLARGING_STRIKE_MOVE' next).
+[INFO] [BlankTheSpire] [BR] turn_start grow: 5+5x3 = 20 (1 enemy/ies).
+[INFO] [BlankTheSpire] [BR] stun skipped: 'Crusher' is dead ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun 'LivingShield': next move SHIELD_SLAM_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] discard all x3 ('Scatter Volley').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 3 ('Scatter Volley') (hits).
+[INFO] [BlankTheSpire] [BK] hits_scale cards_removed -> 3 hits (raw 3, cap 10) x 6 from 'Scatter Volley'.
+[INFO] [BlankTheSpire] [BR] stunned turn performed 'LivingShield' (lost its turn; repeats 'SHIELD_SLAM_MOVE' next).
+[INFO] [BlankTheSpire] [BR] stun 'LivingShield': next move SHIELD_SLAM_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 2 ('Fiend Fire') (hits).
+[INFO] [BlankTheSpire] [BK] hits_scale cards_removed -> 2 hits (raw 2, cap 10) x 10 from 'Fiend Fire'.
+[INFO] [BlankTheSpire] [BR] stun skipped: 'TurretOperator' is dead ('Whistle').
+[INFO] [BlankTheSpire] [BR] discard all x5 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 5 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] discard all x4 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 4 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] stun skipped: 'ScrollOfBiting' is dead ('Whistle').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 0 ('Fiend Fire') (hits).
+[INFO] [BlankTheSpire] [BK] hits_scale cards_removed -> 0 hits, skipped (raw 0) from 'Fiend Fire'.
+[INFO] [BlankTheSpire] [BR] turn_start grow: 5+5x0 = 5 (2 enemy/ies).
+[INFO] [BlankTheSpire] [BR] discard all x2 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 2 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] turn_start grow: 5+5x1 = 10 (2 enemy/ies).
+[INFO] [BlankTheSpire] [BR] stun 'SlimedBerserker': next move VOMIT_ICHOR_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun 'SlimedBerserker': next move STUNNED -> STUNNED (applied=False) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun skipped: already stunned 'SlimedBerserker' (STUNNED must be performed first).
+[INFO] [BlankTheSpire] [BR] discard all x1 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 1 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] stun 'SlimedBerserker': next move STUNNED -> STUNNED (applied=False) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun skipped: already stunned 'SlimedBerserker' (STUNNED must be performed first).
+[INFO] [BlankTheSpire] [BR] stunned turn performed 'SlimedBerserker' (lost its turn; repeats 'VOMIT_ICHOR_MOVE' next).
+[INFO] [BlankTheSpire] [BR] stun 'SlimedBerserker': next move VOMIT_ICHOR_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun 'SlimedBerserker': next move STUNNED -> STUNNED (applied=False) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun skipped: already stunned 'SlimedBerserker' (STUNNED must be performed first).
+[INFO] [BlankTheSpire] [BR] stunned turn performed 'SlimedBerserker' (lost its turn; repeats 'VOMIT_ICHOR_MOVE' next).
+[INFO] [BlankTheSpire] [BR] discard all x3 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 3 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] cards_removed -> 2 ('Fiend Fire') (hits).
+[INFO] [BlankTheSpire] [BK] hits_scale cards_removed -> 2 hits (raw 2, cap 10) x 10 from 'Fiend Fire'.
+[INFO] [BlankTheSpire] [BR] discard all x3 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 3 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] stun 'SlimedBerserker': next move FURIOUS_PUMMELING_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stunned turn performed 'SlimedBerserker' (lost its turn; repeats 'FURIOUS_PUMMELING_MOVE' next).
+[INFO] [BlankTheSpire] [BR] discard all x4 ('Scatter Volley').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 4 ('Scatter Volley') (hits).
+[INFO] [BlankTheSpire] [BK] hits_scale cards_removed -> 4 hits (raw 4, cap 10) x 6 from 'Scatter Volley'.
+[INFO] [BlankTheSpire] [BR] stun 'SoulNexus': next move SOUL_BURN_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun 'SoulNexus': next move STUNNED -> STUNNED (applied=False) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun skipped: already stunned 'SoulNexus' (STUNNED must be performed first).
+[INFO] [BlankTheSpire] [BR] cards_removed -> 1 ('Fiend Fire') (hits).
+[INFO] [BlankTheSpire] [BK] hits_scale cards_removed -> 1 hits (raw 1, cap 10) x 7 from 'Fiend Fire'.
+[INFO] [BlankTheSpire] [BR] stunned turn performed 'SoulNexus' (lost its turn; repeats 'SOUL_BURN_MOVE' next).
+[INFO] [BlankTheSpire] [BR] stun 'SoulNexus': next move SOUL_BURN_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun 'SoulNexus': next move STUNNED -> STUNNED (applied=False) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun skipped: already stunned 'SoulNexus' (STUNNED must be performed first).
+[INFO] [BlankTheSpire] [BR] stunned turn performed 'SoulNexus' (lost its turn; repeats 'SOUL_BURN_MOVE' next).
+[INFO] [BlankTheSpire] [BR] stun 'SoulNexus': next move MAELSTROM_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] discard all x1 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 1 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] stunned turn performed 'SoulNexus' (lost its turn; repeats 'MAELSTROM_MOVE' next).
+[INFO] [BlankTheSpire] [BR] stun 'SoulNexus': next move MAELSTROM_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] discard all x2 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 2 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] discard all x0 ('Scatter Volley').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 0 ('Scatter Volley') (hits).
+[INFO] [BlankTheSpire] [BK] hits_scale cards_removed -> 0 hits, skipped (raw 0) from 'Scatter Volley'.
+[INFO] [BlankTheSpire] [BR] stun 'CubexConstruct': next move CHARGE_UP_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] discard all x3 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 3 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] stun 'CubexConstruct': next move CHARGE_UP_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] discard all x1 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 1 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] discard all x0 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 0 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] stunned turn performed 'CubexConstruct' (lost its turn; repeats 'CHARGE_UP_MOVE' next).
+[INFO] [BlankTheSpire] [BR] stunned turn performed 'CubexConstruct' (lost its turn; repeats 'CHARGE_UP_MOVE' next).
+[INFO] [BlankTheSpire] [BR] discard all x2 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 2 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] stun 'CubexConstruct': next move REPEATER_BLAST_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] discard all x6 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 6 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] stun skipped: 'CubexConstruct' is dead ('Whistle').
+[INFO] [BlankTheSpire] [BR] turn_start grow: 5+5x0 = 5 (2 enemy/ies).
+[INFO] [BlankTheSpire] [BR] stun skipped: 'CubexConstruct' is dead ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun skipped: 'PunchConstruct' is dead ('Whistle').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 5 ('Fiend Fire') (hits).
+[INFO] [BlankTheSpire] [BK] hits_scale cards_removed -> 5 hits (raw 5, cap 10) x 7 from 'Fiend Fire'.
+[INFO] [BlankTheSpire] [BR] stun 'TorchHeadAmalgam': next move TACKLE_2_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 5 ('Fiend Fire') (hits).
+[INFO] [BlankTheSpire] [BK] hits_scale cards_removed -> 5 hits (raw 5, cap 10) x 10 from 'Fiend Fire'.
+[INFO] [BlankTheSpire] [BR] stunned turn performed 'TorchHeadAmalgam' (lost its turn; repeats 'TACKLE_2_MOVE' next).
+[INFO] [BlankTheSpire] [BR] stun 'Queen': next move BURN_BRIGHT_FOR_ME_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun 'Queen': next move STUNNED -> STUNNED (applied=False) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun skipped: already stunned 'Queen' (STUNNED must be performed first).
+[INFO] [BlankTheSpire] [BR] stun 'Queen': next move STUNNED -> STUNNED (applied=False) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stun skipped: already stunned 'Queen' (STUNNED must be performed first).
+[INFO] [BlankTheSpire] [BR] discard all x3 ('Scatter Volley').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 3 ('Scatter Volley') (hits).
+[INFO] [BlankTheSpire] [BK] hits_scale cards_removed -> 3 hits (raw 3, cap 10) x 6 from 'Scatter Volley'.
+[INFO] [BlankTheSpire] [BR] stunned turn performed 'Queen' (lost its turn; repeats 'BURN_BRIGHT_FOR_ME_MOVE' next).
+[INFO] [BlankTheSpire] [BR] turn_start grow: 5+5x0 = 5 (2 enemy/ies).
+[INFO] [BlankTheSpire] [BR] stun 'Queen': next move BURN_BRIGHT_FOR_ME_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] discard all x2 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 2 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] stunned turn performed 'Queen' (lost its turn; repeats 'BURN_BRIGHT_FOR_ME_MOVE' next).
+[INFO] [BlankTheSpire] [BR] turn_start grow: 5+5x1 = 10 (2 enemy/ies).
+[INFO] [BlankTheSpire] [BR] discard all x6 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 6 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] turn_start grow: 5+5x2 = 15 (2 enemy/ies).
+[INFO] [BlankTheSpire] [BR] discard all x1 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 1 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] stun 'Queen': next move BURN_BRIGHT_FOR_ME_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] stunned turn performed 'Queen' (lost its turn; repeats 'BURN_BRIGHT_FOR_ME_MOVE' next).
+[INFO] [BlankTheSpire] [BR] turn_start grow: 5+5x3 = 20 (2 enemy/ies).
+[INFO] [BlankTheSpire] [BR] discard all x3 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 3 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] turn_start grow: 5+5x4 = 25 (2 enemy/ies).
+[INFO] [BlankTheSpire] [BR] turn_start grow: 5+5x5 = 30 (2 enemy/ies).
+[INFO] [BlankTheSpire] [BR] stun 'Queen': next move ENRAGE_MOVE -> STUNNED (applied=True) ('Whistle').
+[INFO] [BlankTheSpire] [BR] discard all x5 ('Calculated Gamble').
+[INFO] [BlankTheSpire] [BR] cards_removed -> 5 ('Calculated Gamble') (draw).
+[INFO] [BlankTheSpire] [BR] stunned turn performed 'Queen' (lost its turn; repeats 'ENRAGE_MOVE' next).
+[INFO] [BlankTheSpire] [BR] turn_start grow: 5+5x6 = 35 (1 enemy/ies).

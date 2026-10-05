@@ -1042,6 +1042,28 @@ test_phase_bc ("Exhaust your hand."), test_phase_bk (`cards_removed` joins the h
 is now legal on the turn_start Rolling Boulder — the reject case moved to turn_end), test_coverage, test_featured,
 test_harness_v2. (7) Readings: index 9,703 (cap 72) · per-archetype max 77,619 (`slot_machine`) · per-archetype scaffold max
 27,537 (`exhaust_pyre`) · triads 69,442 / 79,433 / 85,178 · all-ops 130,589 · `full` 121,649.
+(8) **Smoke (tests/gaptest-br, 2026-10-04, one build, no engine or tester iteration, three launches):** GAPTESTBR1 **completed the
+run** (431 [BR] lines); the first GAPTESTBR2 launch never reached the game (Steam relaunch race). Re-run alone, GAPTESTBR2
+**stalled** on Act 1 F11, combat turn 1: AutoSlay drank Gambler's Brew (discard 5 chosen — both Flicker Guards — draw 5), then
+played Scatter Volley (`[BR] discard all x4`, 4 hits); the Sly auto-play of Flicker Guard began (`[BB] sly …`) and the game
+produced no combat output for ~30 s, so AutoSlay's turn loop spun 100 "turns" in 5 ms and failed "Combat did not end" (no
+exception, no BlankTheSpire frame, not the turn-start pitfall — the boulder had already ticked twice; the game resumed after the
+abandon). Re-run once more (`--timeout 1500`) the seed took another route and **completed the run** (253 [BR] lines). **Not
+reproduced; the lead if it recurs is a Sly auto-play queued while a potion's DiscardAndDraw and a card's discard overlap**
+(BR1 had 38 Sly auto-plays, 114 whole-hand discards, no stall). Both completed seeds: `[BR] stun … (applied=True)` 43 / 40
+across ~30 enemy types incl. the bosses Ceremonial Beast, Queen, Test Subject, Soul Nexus, Bygone Effigy; `applied=False` 10 /
+14 — every one `STUNNED -> STUNNED` with `[BR] stun skipped: already stunned` (the second Whistle copy on an enemy whose STUNNED
+move is still pending — the must-perform lock, incl. on Ceremonial Beast / Queen / Soul Nexus); **no boss's own locked move
+ever coincided with a stun** (no `cannot transition` line), so that branch is proven only by the STUNNED lock; `[BR] stun
+skipped: … is dead` 10 / 15 (Whistle's 20 damage killed first); `[BR] stunned turn performed` 39 / 34 (the stunMove callback —
+the enemy really lost the turn). `[BR] discard all x0..x6` 114 / 47; `[BR] cards_removed` non-zero on the discard forms
+(Calculated Gamble draw 83 / 35, Scatter Volley hits 12 / 9) AND the exhaust form (Fiend Fire hits 29 / 12), with Fiend Fire's
+hits from `[BK] hits_scale cards_removed -> 1..4 hits … x 7`; `[BR] turn_start grow: 5+5x<fires>` 59 / 28 ticks, fires up to 10 /
+6 (5, 10, 15 … 55 damage); `[BB] sly` fired under the whole-hand discards. 0 mod exceptions, 0 BlankTheSpire frames, 0
+localization errors (the exception lines are BaseLib's two startup Harmony patch failures + BR2's post-completion "Options
+NButton not found"); no hang at "Combat turn N" (the transient 5 s watchdog lines, 11 / 5, are the baseline — BN1 / BN2 had 14 /
+12). Tags in `generation/tests/gaptest-br/godot_BR_tags_<SEED>.txt` (the BR2 file records the stalled pass); `test_phase_br` reads
+them.
 
 ---
 
@@ -1224,3 +1246,8 @@ release (§4).**
 `generation/tests/gaptest-br/`, `--validate-only` green; DLL built + deployed; smoke next). Readings: index 9,703 (cap 72) ·
 per-archetype max 77,619 (`slot_machine`) · per-archetype scaffold max 27,537 · triads 69,442 / 79,433 / 85,178 · all-ops 130,589 ·
 `full` 121,649 (scaffold snapshot 48,141, +390). See Findings (BR) for the stun guard-rail rule set.
+**Phase BR DONE 2026-10-04** — smokes GAPTESTBR1 / BR2 completed the run, every `[BR]` tag fired (stun applied=True + the
+already-STUNNED no-op incl. on bosses, stunned turns performed, discard all, cards_removed non-zero on discard and exhaust forms,
+Fiend Fire's `[BK] hits_scale cards_removed`, the boulder growing to 10 fires), 0 mod exceptions, 0 localization errors, no
+"Combat turn N" hang; one unreproduced BR2 stall (Findings (BR) 8). Merged suite: generation **608**, web **293**,
+`test_phase_br` 222/222. **Wave 6 phases BH..BR are complete; next: the v0.4.0 release (§4).**
