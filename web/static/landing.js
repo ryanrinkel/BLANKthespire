@@ -119,7 +119,7 @@ async function run() {
 
 // --- featured classes strip -------------------------------------------------------------------
 // Curated, account-free classes from /api/featured. Any failure (or an empty list) leaves the section
-// and the hero's secondary button hidden, so the page degrades to the plain splash.
+// hidden, so the page degrades to the plain splash.
 const FEATURED_DESC_MAX = 110;
 function clip(text, max) {
   text = (text || "").trim();
@@ -208,14 +208,6 @@ function featuredTile(item) {
   const grid = document.getElementById("featured-grid");
   for (const it of items) grid.appendChild(featuredTile(it));
   document.getElementById("featured").classList.remove("hidden");
-
-  const go = document.getElementById("try-featured");
-  go.classList.remove("hidden");
-  go.addEventListener("click", (ev) => {
-    ev.preventDefault();
-    document.getElementById("featured").scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" });
-    history.replaceState(null, "", "#featured");
-  });
   // Arrived via /#featured (e.g. from the sign-in page): the section was hidden at load, so jump now.
   if (location.hash === "#featured") document.getElementById("featured").scrollIntoView();
 })();

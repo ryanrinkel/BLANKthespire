@@ -496,11 +496,12 @@ if (scenario === "forge") {
   await send("Network.clearBrowserCookies");
   await nav(`${base}/`); await sleep(2500);
   const hero = await json(`({primary: document.getElementById('signin')?.textContent.trim(), href: document.getElementById('signin')?.getAttribute('href'),
-    alt: document.getElementById('try-featured')?.textContent.trim(), alt_hidden: document.getElementById('try-featured')?.classList.contains('hidden'),
+    buttons: document.querySelectorAll('.splash-actions .btn').length,
     og: document.querySelector('meta[property="og:image"]')?.content})`);
-  // landing.js repoints the primary button at /dev-login on a dev-auth server (and /app when signed in)
-  check(hero.primary === "Create Your Own Class" && /^\/(login|dev-login)/.test(hero.href || ""), "hero primary CTA", JSON.stringify(hero));
-  check(hero.alt === "Try a featured class" && !hero.alt_hidden, "hero secondary CTA visible", JSON.stringify(hero));
+  // landing.js repoints the primary button at /dev-login on a dev-auth server (and /app when signed in).
+  // One button only (2026-10-05): the strip sits right below, so a "Try a featured class" button was redundant.
+  check(hero.primary === "Create Your Own Class" && /^\/(login|dev-login)/.test(hero.href || "") && hero.buttons === 1,
+        "hero: single primary CTA", JSON.stringify(hero));
   check(/\/static\/img\/og-landing\.png$/.test(hero.og || ""), "landing og:image", hero.og);
   const strip = await json(`(() => { const s = document.getElementById('featured'); const tiles = [...document.querySelectorAll('#featured-grid .featured-tile')];
     return {hidden: s.classList.contains('hidden'), tiles: tiles.length, hrefs: tiles.map(t => t.getAttribute('href')),
