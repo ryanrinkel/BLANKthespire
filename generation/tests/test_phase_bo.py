@@ -8,8 +8,8 @@ prompts via CardLoc ExtraLoc, EffectRunner put_back / shuffle_hand / grant_keywo
 the draw pile, ForgedTriggerPower.AfterShuffle); the validator rules on both sides; the describe byte-match (Python
 literals asserted, the C# fragments grepped); the contract surfaces (schema, VOCABULARY rows, gate order + field units,
 census, coverage, featured, harness_v2, archetypes, exemplars, heuristics, gap log, render.js, the pitch sentences); the
-tester's validate-only path; the saved AutoSlay tag greps under tests/gaptest-bo/ when present ("smoke pending"
-otherwise); and prints the rule-0.9 readings.
+tester's validate-only path; the saved AutoSlay tag greps under tests/gaptest-bo/ (smokes GAPTESTBO1/BO2, 2026-10-04);
+and prints the rule-0.9 readings.
 """
 from __future__ import annotations
 
@@ -467,7 +467,7 @@ def _t_contract() -> None:
 
 
 def _t_tester() -> None:
-    print("the tester (validate-only path; staging waits for Ryan):")
+    print("the tester (validate-only path):")
     p = TESTER_DIR / "build_tester.py"
     check(p.exists(), "tests/gaptest-bo/build_tester.py exists")
     spec = importlib.util.spec_from_file_location("bo_tester", p)
@@ -478,7 +478,7 @@ def _t_tester() -> None:
     check(types.count("attack") >= 3 and types.count("skill") >= 3 and types.count("power") >= 1,
           "pool: >= 3 non-basic Attacks + Skills and >= 1 Power (the merchant stall)")
     deck = sum(s["count"] for s in mod.CHARACTER["starting_deck"])
-    check(deck <= 18, f"a THIN starting deck so the draw pile reshuffles often (got {deck})")
+    check(deck <= 19, f"a THIN starting deck so the draw pile reshuffles often (got {deck})")  # 19 after the smoke iteration
     flat = json.dumps(mod.CARDS)
     for need in ('"return_to_hand"', '"to_draw_top"', '"return_next_turn"', '"from": "discard"', '"from": "hand"',
                  '"pile": "draw", "cards": "choose", "card_type": "attack"', '"pile": "draw", "cards": "random", "card_type": "skill"',
@@ -495,9 +495,6 @@ def _t_tester() -> None:
 def _t_smoke_record() -> None:
     print("the saved AutoSlay tag greps (TEST_AUDIT_2026-10 §7):")
     files = [TESTER_DIR / f"godot_BO_tags_{s}.txt" for s in SMOKE_SEEDS]
-    if not any(p.exists() for p in files):
-        print("  smoke pending (no godot_BO_tags_<SEED>.txt yet — the BO smoke runs with BP's, after Ryan's go-ahead)")
-        return
     seen = ""
     for p in files:
         assert p.exists(), f"missing smoke record {p}"
@@ -510,6 +507,9 @@ def _t_smoke_record() -> None:
     for t in TAGS:
         check(t in seen, f"the smoke fired '{t}'")
     check("Auto-selected" in seen, "a BO picker resolved through the AutoSlay selector")
+    er = _cs("Engine", "EffectRunner.cs")
+    check("await RetrieveCards(e, Math.Max(1, amt), ctx, card.Owner, card);" in er,
+          "the BO smoke fix: an amount-less retrieve_card retrieves 1 (it no-op'd before)")
 
 
 def _t_budget() -> None:

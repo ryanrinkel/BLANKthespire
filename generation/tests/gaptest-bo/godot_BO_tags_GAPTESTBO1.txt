@@ -1,0 +1,824 @@
+# Phase BO AutoSlay smoke — seed GAPTESTBO1 (godot.log grep, 18497 lines)
+# [BO] lines: 787
+# mod exceptions: 0
+# BlankTheSpire stack frames: 0
+# BlankTheSpire frames in non-exception [ERROR] traces (logged, non-fatal): 0
+# Localization formatting errors: 0
+# exception lines (any source): 5
+# Auto-selected (picker) lines: 369
+# run end: [INFO] [AutoSlay] Action: Run completed (max floor reached). Abandoning
+# after completion: [ERROR] [AutoSlay] Run failed with seed=GAPTESTBO1: Node /root/Game/RootSceneContainer/Run/GlobalUi/TopBar/RightAlignedStuff/Options of type NButton not found  (base AutoSlay's post-completion AbandonRunAsync; the run already counted as completed)
+# --- per-tag counts ---
+  exhaust_card draw                                   37
+  grant_keyword ethereal                              77
+  grant_keyword retain                                71
+  grant_keyword sly                                   73
+  on_shuffle fired                                    43
+  put_back discard                                   105
+  put_back hand                                       54
+  retrieve draw [attack]                              28
+  retrieve draw [skill]                               49
+  return_next_turn                                    90
+  return_to_hand                                      62
+  shuffle_hand                                        58
+  to_draw_top                                         40
+# --- exception lines (any source) ---
+[ERROR] [BaseLib] HarmonyLib.HarmonyException: Patching exception in method null
+---> System.ArgumentException: Undefined target method for patch method static System.Void BaseLib.Patches.Networking.AdjustCustomMessageKeys::Fuckery()
+[ERROR] [BaseLib] HarmonyLib.HarmonyException: Patching exception in method System.Void MegaCrit.Sts2.Core.Nodes.Screens.RelicCollection.NRelicCollectionCategory::LoadRelics(MegaCrit.Sts2.Core.Entities.Relics.RelicRarity relicRarity, MegaCrit.Sts2.Core.Nodes.Screens.RelicCollection.NRelicCollection 
+---> System.Reflection.TargetInvocationException: Exception has been thrown by the target of an invocation.
+[ERROR] MegaCrit.Sts2.Core.AutoSlay.AutoSlayTimeoutException: Node /root/Game/RootSceneContainer/Run/GlobalUi/TopBar/RightAlignedStuff/Options of type NButton not found
+# --- every [BO] line ---
+[INFO] [BlankTheSpire] [BO] put_back discard 'Strike' -> draw top.
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] put_back hand 'Make It So' -> draw top.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Particle Wall'.
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 3 cards (draw pile now 19).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Headbutt'.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Reboot' -> draw top.
+[INFO] [BlankTheSpire] [BO] shuffle_hand 3 cards (draw pile now 18).
+[INFO] [BlankTheSpire] [BO] put_back discard: empty discard pile (no-op).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Defend+' -> draw top.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] shuffle_hand 4 cards (draw pile now 22).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Reboot' -> draw top.
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Thinking Ahead+' (choose).
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 4 cards (draw pile now 20).
+[INFO] [BlankTheSpire] [BO] grant_keyword sly: no selection (no-op).
+[INFO] [BlankTheSpire] [BO] put_back discard: empty discard pile (no-op).
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Particle Wall' (choose).
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Thinking Ahead+' (random).
+[INFO] [BlankTheSpire] [BO] put_back hand 'Bolas' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Reboot'.
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 17).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 2 cards (draw pile now 17).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Draw.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Turning Tide'.
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] put_back discard: empty discard pile (no-op).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Headbutt' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Snap'.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Headbutt' -> draw top.
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] grant_keyword sly: no eligible card in hand (no-op).
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 21).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 4 cards (draw pile now 21).
+[INFO] [BlankTheSpire] [BO] retrieve draw [attack] 'Strike' (choose).
+[INFO] [BlankTheSpire] [BO] put_back hand 'Strike' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Steady Grip'.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain: no eligible card in hand (no-op).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Strike'.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Particle Wall'.
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] put_back discard: no selection (no-op).
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Particle Wall'.
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Thinking Ahead+' (choose).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Fading Ink' -> draw top.
+[INFO] [BlankTheSpire] [BO] shuffle_hand 2 cards (draw pile now 20).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Steady Grip'.
+[INFO] [BlankTheSpire] [BO] retrieve draw [attack] 'Snap' (choose).
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Snap'.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly: no eligible card in hand (no-op).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Strike'.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Steady Grip' -> draw top.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Reboot' -> draw top.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Snap' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Bolas'.
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 17).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 1 cards (draw pile now 17).
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Rummage'.
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Steady Grip' (random).
+[INFO] [BlankTheSpire] [BO] grant_keyword retain: no eligible card in hand (no-op).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Steady Grip'.
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Reboot' (choose).
+[INFO] [BlankTheSpire] [BO] put_back discard: empty discard pile (no-op).
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Rummage'.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Rummage'.
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Thinking Ahead' (random).
+[INFO] [BlankTheSpire] [BO] put_back hand 'Defend+' -> draw top.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Thinking Ahead' -> draw top.
+[INFO] [BlankTheSpire] [BO] put_back hand 'Steady Grip' -> draw top.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Snap' -> draw top.
+[INFO] [BlankTheSpire] [BO] retrieve draw [attack] 'Make It So' (choose).
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Bolas'.
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Steady Grip'.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Fading Ink'.
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Defend+' (random).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 1 cards (draw pile now 25).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Strike'.
+[INFO] [BlankTheSpire] [BO] put_back hand 'Particle Wall' -> draw top.
+[INFO] [BlankTheSpire] [BO] put_back hand 'Particle Wall' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly: no eligible card in hand (no-op).
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Particle Wall+' (random).
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Ascender's Bane'.
+[INFO] [BlankTheSpire] [BO] put_back hand 'Fading Ink' -> draw top.
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Headbutt' (choose).
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Bolas'.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Bolas'.
+[INFO] [BlankTheSpire] [BO] shuffle_hand 1 cards (draw pile now 23).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Steady Grip'.
+[INFO] [BlankTheSpire] [BO] put_back hand 'Steady Grip' -> draw top.
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Secret Weapon' (random).
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Secret Weapon'.
+[INFO] [BlankTheSpire] [BO] retrieve draw [attack] 'Headbutt' (choose).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Thinking Ahead+' -> draw top.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] put_back hand 'Slimed' -> draw top.
+[INFO] [BlankTheSpire] [BO] put_back hand 'Bolas' -> draw top.
+[INFO] [BlankTheSpire] [BO] retrieve draw [attack] 'Strike+' (choose).
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Snap'.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly: no eligible card in hand (no-op).
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 30).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 3 cards (draw pile now 30).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Infection'.
+[INFO] [BlankTheSpire] [BO] put_back hand 'Defend+' -> draw top.
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Deep Kindling' (random).
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Deep Kindling'.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Particle Wall+' -> draw top.
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Particle Wall+' (choose).
+[INFO] [BlankTheSpire] [BO] put_back hand 'Infection' -> draw top.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Rummage' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Rummage'.
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Steady Grip' (random).
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Infection'.
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] retrieve draw [attack] 'Strike' (choose).
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Fading Ink'.
+[INFO] [BlankTheSpire] [BO] put_back discard: no selection (no-op).
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Strike+'.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Snap' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Defend+'.
+[INFO] [BlankTheSpire] [BO] put_back hand 'Particle Wall+' -> draw top.
+[INFO] [BlankTheSpire] [BO] retrieve draw [attack] 'Strike' (choose).
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Strike'.
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Headbutt' (choose).
+[INFO] [BlankTheSpire] [BO] put_back hand 'Particle Wall+' -> draw top.
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 24).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 4 cards (draw pile now 24).
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] retrieve draw [attack] 'Strike' (choose).
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Twin Jab'.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Thinking Ahead'.
+[INFO] [BlankTheSpire] [BO] put_back hand 'Steady Grip' -> draw top.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] put_back hand 'Rummage' -> draw top.
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 16).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Fading Ink' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Rummage'.
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Defend+' (random).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Particle Wall'.
+[INFO] [BlankTheSpire] [BO] retrieve draw [attack] 'Strike' (choose).
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Headbutt'.
+[INFO] [BlankTheSpire] [BO] put_back hand 'Headbutt' -> draw top.
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 19).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 3 cards (draw pile now 19).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Reboot' -> draw top.
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 19).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 3 cards (draw pile now 19).
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Thinking Ahead'.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Twin Jab'.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Bolas' -> draw top.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Reboot' -> draw top.
+[INFO] [BlankTheSpire] [BO] put_back hand 'Reboot' -> draw top.
+[INFO] [BlankTheSpire] [BO] shuffle_hand 4 cards (draw pile now 29).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Snap'.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Defend+'.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Thinking Ahead+'.
+[INFO] [BlankTheSpire] [BO] put_back hand 'Steady Grip' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Make It So'.
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Steady Grip' -> draw top.
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Steady Grip' (random).
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 25).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 3 cards (draw pile now 25).
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Rummage'.
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Thinking Ahead+' (choose).
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Reboot' (random).
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 22).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 0 cards (draw pile now 22).
+[INFO] [BlankTheSpire] [BO] put_back hand 'Twin Jab' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain: no eligible card in hand (no-op).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Draw.
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Reboot' (choose).
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Thinking Ahead' (random).
+[INFO] [BlankTheSpire] [BO] put_back hand 'Strike+' -> draw top.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Thinking Ahead' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Fading Ink'.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Thinking Ahead'.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Rummage' -> draw top.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 23).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 4 cards (draw pile now 23).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Headbutt'.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Defend+' -> draw top.
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Particle Wall+' (random).
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Turning Tide'.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Rummage'.
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Reboot' (random).
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 32).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 2 cards (draw pile now 32).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Reboot' -> draw top.
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Headbutt' (choose).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Defend+'.
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Reboot' (random).
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 29).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 2 cards (draw pile now 29).
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Rummage' (choose).
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 27).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 3 cards (draw pile now 27).
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 26).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 1 cards (draw pile now 26).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Reboot'.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Steady Grip'.
+[INFO] [BlankTheSpire] [BO] put_back hand 'Bolas' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Ascender's Bane'.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Snap'.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Particle Wall+'.
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Particle Wall'.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Strike+' -> draw top.
+[INFO] [BlankTheSpire] [BO] retrieve draw [attack] 'Strike+' (choose).
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 18).
+[INFO] [BlankTheSpire] [BO] put_back hand 'Bolas' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Strike+'.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Headbutt'.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Headbutt'.
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 21).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 4 cards (draw pile now 21).
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] put_back hand 'Steady Grip' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Twin Jab'.
+[INFO] [BlankTheSpire] [BO] retrieve draw [attack] 'Make It So' (choose).
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Reboot'.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Headbutt'.
+[INFO] [BlankTheSpire] [BO] shuffle_hand 4 cards (draw pile now 34).
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Turning Tide'.
+[INFO] [BlankTheSpire] [BO] put_back hand 'Strike' -> draw top.
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] grant_keyword sly: no eligible card in hand (no-op).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Twin Jab' (choose).
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 30).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 2 cards (draw pile now 30).
+[INFO] [BlankTheSpire] [BO] grant_keyword retain: no eligible card in hand (no-op).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Draw.
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Steady Grip' (random).
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] retrieve draw [attack] 'Make It So' (choose).
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Defend+' (random).
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Particle Wall+'.
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Strike' -> draw top.
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 29).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 3 cards (draw pile now 29).
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Fading Ink+'.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Twin Jab'.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Strike' -> draw top.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Twin Jab' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Twin Jab'.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Headbutt' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Headbutt'.
+[INFO] [BlankTheSpire] [BO] put_back discard: no selection (no-op).
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Particle Wall+'.
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Snap' -> draw top.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Frantic Escape' -> draw top.
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Reboot' (random).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 0 cards (draw pile now 43).
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Frantic Escape'.
+[INFO] [BlankTheSpire] [BO] shuffle_hand 0 cards (draw pile now 43).
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Draw.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Headbutt+'.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Snap'.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Frantic Escape' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Frantic Escape'.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Reboot' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Reboot'.
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 40).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 0 cards (draw pile now 40).
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Defend+' (random).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Draw.
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Steady Grip+' (random).
+[INFO] [BlankTheSpire] [BO] put_back hand 'Frantic Escape' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Frantic Escape'.
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] grant_keyword sly: no eligible card in hand (no-op).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Strike+'.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Make It So'.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Headbutt' (choose).
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Bolas'.
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 36).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 3 cards (draw pile now 36).
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Snap' (choose).
+[INFO] [BlankTheSpire] [BO] grant_keyword retain: no eligible card in hand (no-op).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Rummage'.
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Thinking Ahead+' (random).
+[INFO] [BlankTheSpire] [BO] put_back hand 'Particle Wall+' -> draw top.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Particle Wall+'.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Secret Weapon'.
+[INFO] [BlankTheSpire] [BO] retrieve draw [attack] 'Twin Jab' (choose).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Particle Wall' -> draw top.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Snap' -> draw top.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Rummage+'.
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 37).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 3 cards (draw pile now 37).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Fading Ink'.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Fading Ink'.
+[INFO] [BlankTheSpire] [BO] retrieve draw [attack] 'Snap' (choose).
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Fading Ink'.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Snap'.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly: no eligible card in hand (no-op).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Headbutt'.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Deep Kindling'.
+[INFO] [BlankTheSpire] [BO] put_back hand 'Headbutt' -> draw top.
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Rummage' (choose).
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Ascender's Bane'.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Steady Grip+'.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Twin Jab' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Thinking Ahead+'.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Twin Jab'.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Thinking Ahead+'.
+[INFO] [BlankTheSpire] [BO] put_back hand 'Fading Ink+' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Twin Jab'.
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] put_back hand 'Turning Tide' -> draw top.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Twin Jab' -> draw top.
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Deep Kindling' (random).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Particle Wall'.
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Reboot' (choose).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Turning Tide'.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Snap' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly: no eligible card in hand (no-op).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Fading Ink'.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Snap'.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Deep Kindling'.
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Secret Weapon' (choose).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Bolas'.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Twin Jab' -> draw top.
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Reboot' (random).
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 27).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 1 cards (draw pile now 27).
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Snap'.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Strike+'.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Strike+'.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Strike+'.
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Thinking Ahead+' (random).
+[INFO] [BlankTheSpire] [BO] put_back hand 'Twin Jab' -> draw top.
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Steady Grip+' (choose).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Twin Jab'.
+[INFO] [BlankTheSpire] [BO] shuffle_hand 2 cards (draw pile now 36).
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Strike'.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Particle Wall'.
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Draw.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Deep Kindling'.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Twin Jab'.
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Rummage' (choose).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] shuffle_hand 4 cards (draw pile now 32).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Bolas'.
+[INFO] [BlankTheSpire] [BO] shuffle_hand 1 cards (draw pile now 31).
+[INFO] [BlankTheSpire] [BO] retrieve draw [attack] 'Headbutt+' (choose).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Reboot' -> draw top.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Secret Weapon' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Secret Weapon'.
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 29).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 4 cards (draw pile now 29).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Bolas' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain: no eligible card in hand (no-op).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Draw.
+[INFO] [BlankTheSpire] [BO] put_back hand 'Rummage+' -> draw top.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Twin Jab' -> draw top.
+[INFO] [BlankTheSpire] [BO] retrieve draw [attack] 'Strike+' (choose).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Thinking Ahead+' (random).
+[INFO] [BlankTheSpire] [BO] put_back hand 'Headbutt' -> draw top.
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 28).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 4 cards (draw pile now 28).
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Defend+' (random).
+[INFO] [BlankTheSpire] [BO] put_back hand 'Steady Grip' -> draw top.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' skipped (in Exhaust).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Thinking Ahead+' -> draw top.
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Headbutt+'.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Twin Jab' -> draw top.
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] put_back hand 'Dazed' -> draw top.
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Reboot' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Snap'.
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 29).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 2 cards (draw pile now 29).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Defend+' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Bolas'.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] retrieve draw [attack] 'Headbutt' (choose).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Headbutt+' -> draw top.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Strike+' -> draw top.
+[INFO] [BlankTheSpire] [BO] shuffle_hand 2 cards (draw pile now 40).
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Rummage' (choose).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Headbutt'.
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Thinking Ahead+' (random).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Strike'.
+[INFO] [BlankTheSpire] [BO] retrieve draw [attack] 'Twin Jab' (choose).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Defend+' -> draw top.
+[INFO] [BlankTheSpire] [BO] put_back hand 'Headbutt+' -> draw top.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Twin Jab'.
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Particle Wall'.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 34).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 4 cards (draw pile now 34).
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Twin Jab'.
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Draw.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Headbutt+' -> draw top.
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Steady Grip'.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Headbutt+'.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Twin Jab' -> draw top.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] put_back hand 'Snap' -> draw top.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Fading Ink'.
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Headbutt' (choose).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Secret Weapon'.
+[INFO] [BlankTheSpire] [BO] retrieve draw [attack] 'Snap' (choose).
+[INFO] [BlankTheSpire] [BO] grant_keyword sly: no eligible card in hand (no-op).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Reboot'.
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 28).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 4 cards (draw pile now 28).
+[INFO] [BlankTheSpire] [BO] put_back hand 'Snap' -> draw top.
+[INFO] [BlankTheSpire] [BO] put_back hand 'Headbutt' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly: no selection (no-op).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Headbutt'.
+[INFO] [BlankTheSpire] [BO] put_back discard: empty discard pile (no-op).
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Particle Wall+'.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Make It So'.
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] retrieve draw [attack] 'Strike' (choose).
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Headbutt' -> draw top.
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Snap' (choose).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Bolas'.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Strike' -> draw top.
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 36).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 0 cards (draw pile now 36).
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 36).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 2 cards (draw pile now 36).
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Draw.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Steady Grip'.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Fading Ink'.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Deep Kindling'.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Deep Kindling'.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Strike' -> draw top.
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Fading Ink' (choose).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Twin Jab'.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Snap+' -> draw top.
+[INFO] [BlankTheSpire] [BO] put_back hand 'Snap+' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Snap+'.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Make It So'.
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Bolas'.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Bolas'.
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Secret Weapon' (random).
+[INFO] [BlankTheSpire] [BO] retrieve draw [attack] 'Headbutt' (choose).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Rummage' -> draw top.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Fading Ink' (random).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal: no eligible card in hand (no-op).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 29).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 4 cards (draw pile now 29).
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Strike'.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Draw.
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Rummage+' (random).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Strike+' -> draw top.
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Thinking Ahead+' (random).
+[INFO] [BlankTheSpire] [BO] put_back hand 'Strike+' -> draw top.
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] retrieve draw [attack] 'Twin Jab' (choose).
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 29).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 4 cards (draw pile now 29).
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Particle Wall' (random).
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Defend+' -> draw top.
+[INFO] [BlankTheSpire] [BO] retrieve draw [attack] 'Strike' (choose).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Rummage+' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Strike'.
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Reboot' (choose).
+[INFO] [BlankTheSpire] [BO] put_back hand 'Reboot' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Reboot'.
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 39).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 0 cards (draw pile now 39).
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Turning Tide'.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain: no eligible card in hand (no-op).
+[INFO] [BlankTheSpire] [BO] put_back hand 'Defend+' -> draw top.
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Steady Grip+' (choose).
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Particle Wall+' (random).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal: no eligible card in hand (no-op).
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal: no eligible card in hand (no-op).
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Particle Wall'.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Bolas'.
+[INFO] [BlankTheSpire] [BO] put_back hand 'Deep Kindling' -> draw top.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Strike' -> draw top.
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Twin Jab' (choose).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Rummage' -> draw top.
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Snap' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal: no eligible card in hand (no-op).
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Steady Grip' (random).
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Snap'.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly: no eligible card in hand (no-op).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal: no eligible card in hand (no-op).
+[INFO] [BlankTheSpire] [BO] retrieve draw [attack] 'Strike' (choose).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Steady Grip' -> draw top.
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Snap' -> draw top.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 23).
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Fading Ink'.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Twin Jab'.
+[INFO] [BlankTheSpire] [BO] put_back hand 'Twin Jab' -> draw top.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Snap' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Twin Jab'.
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Strike' (choose).
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Particle Wall+'.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Steady Grip' -> draw top.
+[INFO] [BlankTheSpire] [BO] put_back hand 'Steady Grip' -> draw top.
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Rummage+' (choose).
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Strike+'.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain: no eligible card in hand (no-op).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Rummage'.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Headbutt+'.
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Deep Kindling+' (random).
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Snap' (choose).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Snap' -> draw top.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Fading Ink+' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Particle Wall+'.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 35).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 7 cards (draw pile now 35).
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 35).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 1 cards (draw pile now 35).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Draw.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Twin Jab'.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Particle Wall+'.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Snap'.
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Twin Jab' (choose).
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Defend+'.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Bolas'.
+[INFO] [BlankTheSpire] [BO] shuffle_hand 0 cards (draw pile now 43).
+[INFO] [BlankTheSpire] [BO] put_back hand 'Snap+' -> draw top.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Draw.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Bolas'.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Bolas'.
+[INFO] [BlankTheSpire] [BO] retrieve draw [attack] 'Strike+' (choose).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Particle Wall'.
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Strike+' -> draw top.
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Strike+' (choose).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Bolas' -> draw top.
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Fading Ink' (choose).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Draw.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Fading Ink'.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Rummage+' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Rummage+'.
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Rummage' (random).
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Fading Ink+' (random).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Twin Jab'.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Rummage+' -> draw top.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] put_back hand 'Particle Wall+' -> draw top.
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Steady Grip+' (random).
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Reboot'.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Reboot'.
+[INFO] [BlankTheSpire] [BO] shuffle_hand 4 cards (draw pile now 32).
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Particle Wall+' (choose).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Reboot' -> draw top.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Draw.
+[INFO] [BlankTheSpire] [BO] put_back hand 'Snap+' -> draw top.
+[INFO] [BlankTheSpire] [BO] shuffle_hand 2 cards (draw pile now 30).
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Draw.
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] put_back hand 'Rummage' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Make It So'.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Defend+' -> draw top.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Thinking Ahead+' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Headbutt'.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Rummage' -> draw top.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] put_back hand 'Steady Grip' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Bolas'.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Bolas' -> draw top.
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Secret Weapon' (random).
+[INFO] [BlankTheSpire] [BO] grant_keyword sly: no selection (no-op).
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Headbutt'.
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Thinking Ahead+' (choose).
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Snap' (choose).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Snap' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Fading Ink'.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Snap'.
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Particle Wall+' (choose).
+[INFO] [BlankTheSpire] [BO] exhaust_card draw 'Fading Ink' (choose).
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Rummage' (random).
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Rummage+' (random).
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Secret Weapon' (random).
+[INFO] [BlankTheSpire] [BO] retrieve draw [attack] 'Twin Jab' (choose).
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Steady Grip+'.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Headbutt+'.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Steady Grip+'.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Steady Grip+' -> draw top.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Rummage+' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Wither'.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Wither+1' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Fading Ink+'.
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Wither+1'.
+[INFO] [BlankTheSpire] [BO] put_back hand 'Wither+1' -> draw top.
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] to_draw_top 'Make It So' (Discard -> Draw top, auto-play).
+[INFO] [BlankTheSpire] [BO] grant_keyword ethereal -> 'Bolas'.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Strike+'.
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 35).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 2 cards (draw pile now 35).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Reboot' -> draw top.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Draw.
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 38).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 6 cards (draw pile now 38).
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Wither+2'.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Draw.
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Reboot' (random).
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 39).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 3 cards (draw pile now 39).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Reboot' -> draw top.
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Draw.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Particle Wall' -> draw top.
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 40).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 3 cards (draw pile now 40).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' skipped (in Exhaust).
+[INFO] [BlankTheSpire] [BO] retrieve draw [attack] 'Headbutt' (choose).
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Particle Wall' (random).
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Twin Jab' -> draw top.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Wither+3' -> draw top.
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Steady Grip+' (random).
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Twin Jab'.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Particle Wall'.
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Strike+' -> draw top.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Headbutt' -> draw top.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Twin Jab' -> draw top.
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 46).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 7 cards (draw pile now 46).
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Snap'.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Snap'.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Wither+4'.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Wither+4' -> draw top.
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 47).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 4 cards (draw pile now 47).
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Wither+4'.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Wither+4'.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Wither+5' -> draw top.
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Steady Grip+' (random).
+[INFO] [BlankTheSpire] [BO] retrieve draw [attack] 'Bolas' (choose).
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Wither+5'.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Particle Wall' (random).
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] put_back hand 'Bolas' -> draw top.
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Twin Jab' -> draw top.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Wither+6' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Wither+6'.
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Particle Wall' (random).
+[INFO] [BlankTheSpire] [BO] return_to_hand 'Particle Wall' (Discard -> Hand).
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] put_back discard 'Headbutt+' -> draw top.
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Reboot'.
+[INFO] [BlankTheSpire] [BO] on_shuffle fired ('Turning Tide', draw pile 56).
+[INFO] [BlankTheSpire] [BO] shuffle_hand 4 cards (draw pile now 56).
+[INFO] [BlankTheSpire] [BO] grant_keyword retain -> 'Bolas'.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' skipped (in Hand).
+[INFO] [BlankTheSpire] [BO] put_back discard 'Wither+7' -> draw top.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] retrieve draw [skill] 'Defend+' (random).
+[INFO] [BlankTheSpire] [BO] grant_keyword sly -> 'Wither+7'.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+[INFO] [BlankTheSpire] [BO] return_next_turn 'Bolas' <- Discard.
+# --- Auto-selected (first 5) ---
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt
+[INFO] [AutoSlay] Auto-selected 1 card(s) for selection prompt

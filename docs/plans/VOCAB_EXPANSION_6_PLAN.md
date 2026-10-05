@@ -739,6 +739,21 @@ test_phase_bk / test_phase_bi (EffectSpec field order, the widened card_type rul
 #74/#75), test_featured (recursion sample). (10) Rule 0.9 — index budget raised to 11,000 first (b0cae05: 8,692 chars at the
 full 72-char cap). Readings: index 9,115 (cap 72) · per-archetype max 73,278 (`exhaust_pyre`) · per-archetype scaffold max
 26,849 · triads 66,328 / 75,576 / 82,011 · all-ops 124,942 · `full` 116,590.
+(11) **Smoke (tests/gaptest-bo, 2026-10-04, four passes):** pass 1 (the v66 build) — GAPTESTBO1 ran to Act 3 but hit the
+900 s wall clock (a slow run, not a hang), and **every `[BO] retrieve draw` was a no-op: `[AP] retrieve_card: nothing
+retrievable in the Draw pile` 85×** — a real bug: `retrieve_card`'s `amount` is optional (the describe reads it as 1) but
+EffectRunner passed the raw 0, so every amount-less retrieve_card (Secret Weapon — and any LLM card that omits the amount,
+since Phase AP) silently did nothing. **Fix: `RetrieveCards(e, Math.Max(1, amt), …)`.** GAPTESTBO2 pass 1: AutoSlay's own
+180 s timeout clicking through an Ancient event (no mod frame). Pass 2 (fix built, `--timeout 1500`): BO1 died to the Act 1
+boss (AutoSlay then fails "Rewards screen did not appear" — base behaviour on a loss), BO2 reached AutoSlay's 100-turn cap
+against Knowledge Demon (the thin deck burned itself down). Tester iteration: Deep Kindling / Fading Ink Exhaust
+themselves, a third Strike, max HP 90. Pass 3: GAPTESTBO1 **completed the run** (787 [BO] lines); BO2 never reached the game
+(Steam relaunch race) and, re-run alone, hit the Knowledge Demon 100-turn cap again → the tester gained War Drum (turn_start
++1 Strength). Pass 4: GAPTESTBO2 **completed the run** (455 [BO] lines). Both completed seeds: every [BO] tag fired —
+return_to_hand / to_draw_top / return_next_turn, put_back hand + discard, retrieve draw [attack] + [skill], exhaust_card
+draw, on_shuffle, shuffle_hand, grant_keyword sly / retain / ethereal; "Auto-selected" 369 / 199; 0 mod exceptions, 0
+BlankTheSpire frames, 0 localization errors (the five exception lines are BaseLib's two startup Harmony patch failures +
+AutoSlay's post-completion "Options NButton not found", all pre-existing). No freeze.
 
 ### Phase BP — `cost_delta` + small reactive triggers (v67 — second of the stretch phases, Ryan's order BO → BP → BQ → BN; gaps #76, #77; ~1 day) — 24 base cards
 
@@ -1005,6 +1020,9 @@ go-ahead; tester `generation/tests/gaptest-bo/`, `--validate-only` green). Index
 Merged suite: generation **600**, web **293**, `test_phase_bo` 266/266 (smoke record pending). Readings: index 9,115 (cap 72) ·
 per-archetype max 73,278 (`exhaust_pyre`) · per-archetype scaffold max 26,849 · triads 66,328 / 75,576 / 82,011 · all-ops
 124,942 · `full` 116,590 (scaffold snapshot 47,178, +492). See Findings (BO).
+**Phase BO DONE 2026-10-04** — smokes GAPTESTBO1 / BO2 completed the run, every `[BO]` tag fired, 0 mod exceptions, 0
+localization errors, after one engine fix (an amount-less `retrieve_card` retrieved nothing) and two tester iterations
+(Findings (BO) 11). Tags in `generation/tests/gaptest-bo/godot_BO_tags_<SEED>.txt`; `test_phase_bo` reads them.
 
 **Phase BP BUILT 2026-10-04** (on `wave6`, vocab v67; gaps #76/#77 done; smoke pending — run right after BO's, Ryan's
 go-ahead; tester `generation/tests/gaptest-bp/`, `--validate-only` green). Merged suite: generation **602**, web **293**,

@@ -7,7 +7,7 @@ gaps #74 / #75).
     uv run python tests/gaptest-bo/build_tester.py --remove          # restores whatever slot 04 held before
     uv run btsgen-autoslay-smoke --seeds GAPTESTBO1 GAPTESTBO2 --character class4 --relic auto --timeout 900
 
-The deck (slot 04, a normal class, a THIN 17-card deck so the draw pile reshuffles every few turns; attack-leaning so
+The deck (slot 04, a normal class, a THIN 19-card deck so the draw pile reshuffles every few turns; attack-leaning so
 fights end):
   * Particle Wall      — 9 Block, return_to_hand (cost 1)                 [BO] return_to_hand 'Particle Wall'
   * Bolas              — 3 damage, return_next_turn (0-cost rare attack)  [BO] return_next_turn 'Bolas' <- Discard
@@ -17,7 +17,7 @@ fights end):
   * Thinking Ahead     — draw 2, put_back from hand                       [BO] put_back hand '<card>' -> draw top
   * Secret Weapon      — retrieve_card pile draw, choose, card_type attack [BO] retrieve draw [attack] '<card>'
   * Rummage            — 5 Block, retrieve_card pile draw, random Skill   [BO] retrieve draw [skill] '<card>'
-  * Deep Kindling      — 8 Block, exhaust_card pile draw, choose 1        [BO] exhaust_card draw '<card>'
+  * Deep Kindling      — 8 Block, exhaust_card pile draw, choose 1; Exhaust [BO] exhaust_card draw '<card>'
   * Snap               — 7 damage, grant_keyword sly                      [BO] grant_keyword sly -> '<card>'
   * Steady Grip        — 6 Block, grant_keyword retain                    [BO] grant_keyword retain -> '<card>'
   * Fading Ink         — draw 1, grant_keyword ethereal                   [BO] grant_keyword ethereal -> '<card>'
@@ -26,6 +26,8 @@ fights end):
   * Reboot             — shuffle_hand + draw 3 (Reboot-lite, 0-cost rare)  [BO] shuffle_hand <n> cards (and an
                                                                            on_shuffle fire right after it)
   * Twin Jab           — a plain non-basic attack (the merchant stall needs >= 3 non-basic Attacks + Skills + 1 Power)
+  * War Drum (Power)   — turn_start: gain 1 Strength (smoke iteration: so a long boss fight ends; GAPTESTBO1's passing run
+                         predates it — GAPTESTBO2 twice hit AutoSlay's 100-turn cap against Knowledge Demon without it)
 
 Picker proof (rule 0.4/0.5): AutoSlay's selector logs "Auto-selected N card(s) for selection prompt" whenever a picker
 had more than one candidate — Headbutt / Thinking Ahead (put_back), Secret Weapon (retrieve draw choose), Deep Kindling
@@ -108,14 +110,14 @@ CARDS = [
     card("bo_rummage", "Rummage", "skill", "uncommon", 1, "self",
          [{"op": "block", "amount": 5}, tutor("random", "skill")], [{"op": "block", "amount": 8}, tutor("random", "skill")]),
     card("bo_deep_kindling", "Deep Kindling", "skill", "uncommon", 1, "self",
-         [{"op": "block", "amount": 8}, {"op": "exhaust_card", "pile": "draw", "cards": "choose", "amount": 1}],
-         [{"op": "block", "amount": 11}, {"op": "exhaust_card", "pile": "draw", "cards": "choose", "amount": 1}]),
+         [{"op": "block", "amount": 8}, {"op": "exhaust_card", "pile": "draw", "cards": "choose", "amount": 1}, {"op": "exhaust"}],
+         [{"op": "block", "amount": 11}, {"op": "exhaust_card", "pile": "draw", "cards": "choose", "amount": 1}, {"op": "exhaust"}]),
     card("bo_snap", "Snap", "attack", "common", 1, "enemy",
          [{"op": "damage", "amount": 7}, gk("sly")], [{"op": "damage", "amount": 10}, gk("sly")]),
     card("bo_steady_grip", "Steady Grip", "skill", "common", 1, "self",
          [{"op": "block", "amount": 6}, gk("retain")], [{"op": "block", "amount": 9}, gk("retain")]),
     card("bo_fading_ink", "Fading Ink", "skill", "common", 0, "self",
-         [{"op": "draw", "amount": 1}, gk("ethereal")], [{"op": "draw", "amount": 2}, gk("ethereal")]),
+         [{"op": "draw", "amount": 1}, gk("ethereal"), {"op": "exhaust"}], [{"op": "draw", "amount": 2}, gk("ethereal"), {"op": "exhaust"}]),
     card("bo_turning_tide", "Turning Tide", "power", "uncommon", 1, "self",
          [{"op": "add_trigger", "trigger": "on_shuffle", "effects": [{"op": "block", "amount": 4}]}],
          [{"op": "add_trigger", "trigger": "on_shuffle", "effects": [{"op": "block", "amount": 6}]}]),
@@ -123,17 +125,23 @@ CARDS = [
          [{"op": "shuffle_hand"}, {"op": "draw", "amount": 3}], [{"op": "shuffle_hand"}, {"op": "draw", "amount": 4}]),
     card("bo_twin_jab", "Twin Jab", "attack", "common", 1, "enemy",
          [{"op": "damage", "amount": 4, "hits": 2}], [{"op": "damage", "amount": 5, "hits": 2}]),
+    # Smoke iteration (2026-10-04, GAPTESTBO2): a Strength ramp so a long boss fight ends — the BO2 re-runs reached AutoSlay's
+    # 100-turn cap against Knowledge Demon twice with the plain deck (no mod frame, no exception).
+    card("bo_war_drum", "War Drum", "power", "rare", 1, "self",
+         [{"op": "add_trigger", "trigger": "turn_start", "effects": [{"op": "apply_status", "status": "strength", "amount": 1}]}]),
 ]
-# slot -> count (1-based card order). A THIN 17-card deck (every BO card once, two Strikes) so the draw pile empties and
-# reshuffles often — the on_shuffle power's fuel.
-DECK = {"bo_strike": 2}
+# slot -> count (1-based card order). A THIN 19-card deck (every BO card once, three Strikes) so the draw pile empties and
+# reshuffles often — the on_shuffle power's fuel. Smoke iteration (2026-10-04): the self-burners (Deep Kindling's
+# exhaust-from-draw, Fading Ink's Ethereal grant) Exhaust themselves, so a long fight can't burn the deck down to a
+# damage-less stalemate (GAPTESTBO2 hit AutoSlay's 100-turn cap against Knowledge Demon); max HP 90.
+DECK = {"bo_strike": 3}
 
 CHARACTER = {
     "name": "BO Gap Tester",
     "description": "Phase BO (v66) tester: recursion (Particle Wall, Bolas, a to_draw_top attack), put-back (Headbutt, "
                    "Thinking Ahead), the draw-pile tutor (Secret Weapon, Rummage), exhaust from the draw pile, keyword "
                    "grants (Sly / Retain / Ethereal), an on_shuffle power and Reboot.",
-    "max_hp": 80, "max_energy": 3,
+    "max_hp": 90, "max_energy": 3,
     "starting_deck": [{"slot": n, "count": DECK.get(c["id"], 1)} for n, c in enumerate(CARDS, start=1)],
 }
 

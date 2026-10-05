@@ -538,7 +538,9 @@ public static class EffectRunner
                     // Phase AP (v46): return `amt` card(s) from the discard/exhaust pile to hand — random (the Exhume-
                     // roulette) or the player's pick (CardSelectCmd.FromCombatPile, the Headbutt surface). Status/Curse
                     // cards are never offered (a random recursion pulling Wounds is anti-fun). Empty pile → no-op.
-                    await RetrieveCards(e, amt, ctx, card.Owner, card);
+                    // BO smoke fix (2026-10-04): `amount` is optional (default 1 — the describe already reads Math.Max(1, ...)),
+                    // so an amount-less retrieve_card (Secret Weapon) passed n = 0 and silently no-op'd every play.
+                    await RetrieveCards(e, Math.Max(1, amt), ctx, card.Owner, card);
                     break;
                 case "exhaust_card":
                     // Phase BC (v57, gap #52): exhaust OTHER cards in your hand — the player's pick (Burning Pact / Purity),
