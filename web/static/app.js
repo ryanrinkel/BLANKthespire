@@ -1498,6 +1498,8 @@ function renderTraffic(d) {
     { k: "Visitors", v: fmtInt(w.humans), s: `${fmtInt(w.landing_only)} splash only · ${fmtInt(w.clicked)} clicked through · ${fmtInt(w.app)} in the app` },
     { k: "Reached the app", v: fmtInt(w.app), s: `${pct(w.app, w.humans)} of visitors · signed in, JS running` },
     { k: "Shared deck pages", v: fmtInt(w.deck), s: "unique visitors to /deck/…" },
+    // The mod fetching a class's art from /static/forged/ is the only trace a code was imported.
+    { k: "Imported into the game", v: fmtInt(w.imports), s: `classes the mod fetched art for · ${fmtInt(w.import_fetches)} fetches · all-time ${fmtInt(Object.keys(d.imports || {}).length)}` },
     { k: "Requests", v: fmtInt(w.requests), s: `${botShare} from crawlers and scanners` },
   ];
   el("traffic-tiles").innerHTML = tiles.map((t) =>
@@ -1610,7 +1612,8 @@ function renderAdminUsers(d) {
   // The per-row status note gets a column of its own at the END: parked next to Save it would widen that
   // cell the moment it said anything and shunt every column after it sideways mid-edit.
   const head = `<tr><th class="who-cell">Account</th><th class="num">Tokens</th><th></th>`
-    + `<th>Unlimited</th><th class="num">Forges</th><th class="num">Donated</th><th>Joined</th>`
+    + `<th>Unlimited</th><th class="num">Forges</th><th class="num" title="Classes the game has fetched art for = codes imported into the mod (from the nginx log, refreshed every 15 min)">Imported</th>`
+    + `<th class="num">Donated</th><th>Joined</th>`
     + `<th></th></tr>`;
   const rows = users.map((u) => {
     // On the env master list ⇒ the toggle can't change anything, so it is checked and disabled with a
@@ -1633,16 +1636,19 @@ function renderAdminUsers(d) {
       + (envLocked ? `<div class="sub">via env list</div>` : "")
       + `</td>`
       + `<td class="num">${fmtInt(u.forges)}</td>`
+      + `<td class="num">${importedCell(u, d.imports_known)}</td>`
       + `<td class="num">${u.donated_cents ? fmtMoney(u.donated_cents, "usd") : "—"}</td>`
       + `<td>${esc(joined)}</td>`
       + `<td><span class="row-note" role="status"></span></td></tr>`;
   }).join("");
   el("admin-users-table").innerHTML = head
-    + (rows || `<tr><td colspan="8" class="muted">No accounts match that search.</td></tr>`);
+    + (rows || `<tr><td colspan="9" class="muted">No accounts match that search.</td></tr>`);
 
-  el("admin-users-note").textContent = users.length < (d.total || 0)
+  el("admin-users-note").textContent = (users.length < (d.total || 0)
     ? `Showing ${users.length} of ${d.total} accounts — narrow the search to see the rest.`
-    : `${d.total || 0} account${(d.total || 0) === 1 ? "" : "s"}. Changing a balance takes effect on their next forge.`;
+    : `${d.total || 0} account${(d.total || 0) === 1 ? "" : "s"}. Changing a balance takes effect on their next forge.`)
+    + (d.imports_known ? " “Imported” = classes the game has fetched art for (hover for which, when); up to 15 min behind."
+                       : " “Imported” is unknown until the traffic summary has run.");
 
   // One delegated listener per render: the rows are innerHTML, so per-row handlers would leak.
   const table = el("admin-users-table");
@@ -1660,6 +1666,20 @@ function renderAdminUsers(d) {
       saveAdminTokens(ev.target.closest("tr"));
     }
   };
+}
+
+// "2 / 3" classes imported, with a hover listing each imported class, its first/last fetch (UTC) and
+// the mod version that fetched it (none shown = a build before the mod sent a user agent).
+function importedCell(u, known) {
+  if (!known) return `<span class="muted" title="No traffic summary yet">?</span>`;
+  const imp = u.imported || [];
+  if (!imp.length) return `<span class="muted" title="The game has never fetched art for any of this account's ${fmtInt(u.classes)} classes">0 / ${fmtInt(u.classes)}</span>`;
+  const when = (s) => String(s || "").replace("T", " ").replace("Z", "");
+  const tip = imp.map((r) => `#${r.class_id} ${r.name || "(unnamed)"}: first ${when(r.first)}`
+    + (r.last && r.last !== r.first ? `, last ${when(r.last)}` : "")
+    + ` · ${r.imports} import${r.imports === 1 ? "" : "s"}, ${r.fetches} fetches`
+    + (r.versions && r.versions.length ? ` · mod ${r.versions.join(", ")}` : "")).join("\n");
+  return `<span class="imported" title="${esc(tip)}">${imp.length} / ${fmtInt(u.classes)}</span>`;
 }
 
 function adminRowNote(row, msg, cls) {

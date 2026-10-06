@@ -151,12 +151,21 @@ public static class ForgedSplash
         MainFile.Logger.Info($"[ForgedCardArt] class {k:00}: unpacked {written}/{entries} card portraits from cards.zip ({downloadedBytes} bytes) from {url}.");
     }
 
+    /// <summary>What the server sees us as. These fetches are the only trace that a forged code was
+    /// imported into the game (the site logs nothing else from the mod), and the web side's traffic
+    /// report keys "the mod" off the "BlankTheSpire/" prefix — keep it. The release version is stamped
+    /// into the manifest at package time, not into the DLL, so the build is identified by the one number
+    /// it does carry: its card vocabulary version ("BlankTheSpire/vocab70"). Builds through v0.4.0 sent
+    /// no user agent at all, which the report also accepts.</summary>
+    private static readonly string UserAgent = "BlankTheSpire/vocab" + Engine.ForgedCards.VocabVersion;
+
     /// <summary>Best-effort GET; null on any failure (already logged).</summary>
     private static byte[]? Download(string url, int timeoutSeconds)
     {
         try
         {
             using var http = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(timeoutSeconds) };
+            http.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", UserAgent);
             byte[] bytes = http.GetByteArrayAsync(url).GetAwaiter().GetResult();
             if (bytes is not { Length: > 0 })
             {

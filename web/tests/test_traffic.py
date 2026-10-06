@@ -23,8 +23,8 @@ UA_PHONE = ("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/
 GOOGLEBOT = "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"
 
 
-def line(ip, day, path, status=200, ref="-", ua=UA_CHROME, method="GET"):
-    return f'{ip} - - [{day}:12:00:00 +0000] "{method} {path} HTTP/1.1" {status} 512 "{ref}" "{ua}"\n'
+def line(ip, day, path, status=200, ref="-", ua=UA_CHROME, method="GET", time="12:00:00"):
+    return f'{ip} - - [{day}:{time} +0000] "{method} {path} HTTP/1.1" {status} 512 "{ref}" "{ua}"\n'
 
 
 SAMPLE = [
@@ -59,6 +59,17 @@ SAMPLE = [
     line("10.10.10.10", "15/Sep/2026", "/"),
     line("10.10.10.10", "15/Sep/2026", "/workshop", status=302),
     line("13.13.13.13", "15/Sep/2026", "/workshop", status=404),  # not a redirect: does not count
+    # imports: the mod (no user agent through v0.4.0) pulling class 78's four assets in one burst ...
+    line("20.20.20.20", "15/Sep/2026", "/static/forged/78/splash.png?v=97c9b086", ua="-", time="04:12:00"),
+    line("20.20.20.20", "15/Sep/2026", "/static/forged/78/sprite.png?v=82719e6b", ua="-", time="04:12:01"),
+    line("20.20.20.20", "15/Sep/2026", "/static/forged/78/relic.png", ua="-", time="04:12:02"),
+    line("20.20.20.20", "15/Sep/2026", "/static/forged/78/cards.zip?v=1c3e", ua="-", time="04:12:03"),
+    # ... a later build, from another player, same class (a second import session)
+    line("21.21.21.21", "15/Sep/2026", "/static/forged/78/splash.png", ua="BlankTheSpire/0.5.0", time="18:30:00"),
+    # never imports: a 404 (class deleted), a browser opening the URL, a sub-path the mod never fetches
+    line("20.20.20.20", "15/Sep/2026", "/static/forged/79/splash.png", status=404, ua="-"),
+    line("22.22.22.22", "15/Sep/2026", "/static/forged/80/splash.png", ref="https://blankthespire.com/deck/x"),
+    line("20.20.20.20", "15/Sep/2026", "/static/forged/78/cards/strike.png", ua="-"),
 ]
 
 
@@ -126,6 +137,34 @@ def test_windows_count_each_ip_once_at_its_deepest(logs):
     # A window anchored past the log sees nothing, and reports so rather than crashing.
     empty = tr.Tally({"x"}).window(7, "2026-09-15")
     assert empty["humans"] == 0 and empty["since"] is None and empty["referers"] == []
+
+
+def test_imports_are_the_mods_art_fetches(logs):
+    """A forged code counts as imported when THE MOD fetched the class's art from /static/forged/<id>/:
+    the UA-less builds and the "BlankTheSpire/<v>" ones alike, 200s only, the four import assets only.
+    A browser on the same URL, a 404, or a per-card PNG is not an import."""
+    paths = tr._sorted_logs(str(logs / "access.log*"))
+    data = tr.build(paths, {"blankthespire.com"}, today="2026-09-15")
+    assert set(data["imports"]) == {"78"}
+    rec = data["imports"]["78"]
+    assert rec["first"] == "2026-09-15T04:12:00Z" and rec["last"] == "2026-09-15T18:30:00Z"
+    assert rec["fetches"] == 5 and rec["imports"] == 2 and rec["players"] == 2
+    assert rec["assets"] == ["cards.zip", "relic.png", "splash.png", "sprite.png"]
+    assert rec["versions"] == ["0.5.0"]   # the UA-less build contributes no version
+    by_day = {r["day"]: r for r in data["daily"]}
+    assert (by_day["2026-09-15"]["imports"], by_day["2026-09-15"]["import_fetches"]) == (1, 5)
+    assert (by_day["2026-09-14"]["imports"], by_day["2026-09-14"]["import_fetches"]) == (0, 0)
+    w = data["windows"]["0"]
+    assert w["imports"] == 1 and w["import_fetches"] == 5
+    # the mod's fetches stay out of the visitor numbers: no UA is a bot, and /static/ is never a page
+    assert w["humans"] == 5 and all(not p["path"].startswith("/static/") for p in w["pages"])
+
+
+def test_mod_version_from_user_agent():
+    assert tr.mod_version("-") == "" and tr.mod_version("") == ""
+    assert tr.mod_version("BlankTheSpire/0.5.0") == "0.5.0"
+    assert tr.mod_version("BlankTheSpire/0.5.0 (Godot)") == "0.5.0"
+    assert tr.mod_version(UA_CHROME) is None and tr.mod_version("python-requests/2.31") is None
 
 
 def test_cli_writes_json_and_skips_goaccess(logs, tmp_path, monkeypatch, capsys):

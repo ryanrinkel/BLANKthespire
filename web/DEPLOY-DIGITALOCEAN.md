@@ -148,6 +148,15 @@ sudo systemctl start btsweb-traffic.service && ls -la /opt/btsweb/traffic   # fi
 Counting rules (unique IPs per UTC day, crawlers/scanners dropped by user agent, so every number is a
 floor) are documented at the top of `web/tools/traffic_report.py`.
 
+**Was a code imported into the game?** The mod fetches a class's art (`/static/forged/<id>/splash.png`,
+`sprite.png`, `relic.png`, `cards.zip`) when a player imports its code, and nothing else phones home — so
+the nginx site keeps `access_log` ON for that one prefix (`deploy/nginx-btsweb.conf`; the rest of
+`/static/` stays unlogged). The same timer turns those hits into `traffic.json`'s `imports` block, which
+the user panel shows as the **Imported** column ("2 / 3" = classes the game fetched art for, hover for
+which class, first/last fetch, mod version) and the traffic card as "Imported into the game". The mod
+sent no user agent through v0.4.0 (logged as `-`); later builds send `BlankTheSpire/<version>`. Added
+2026-10-06 — nothing before that date is knowable.
+
 ## 6. nginx + TLS
 
 ```bash

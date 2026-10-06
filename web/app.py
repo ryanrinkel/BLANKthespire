@@ -2309,6 +2309,28 @@ TRAFFIC_REPORT_CSP = ("default-src 'none'; script-src 'unsafe-inline'; style-src
                       "img-src data:; font-src data:; connect-src 'none'; object-src 'none'; "
                       "frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
 
+_class_imports_cache: dict = {"mtime": None, "data": {}}
+
+
+def _class_imports() -> dict[str, dict]:
+    """traffic.json's all-time `imports` block: class id (str) -> {first, last, fetches, imports, players,
+    assets, versions}, i.e. which forged codes the MOD has fetched art for — the only evidence a code was
+    ever imported into the game (see tools/traffic_report.py). Re-read when the file changes (the timer
+    rewrites it every 15 min); {} when it has never been generated, so callers degrade to "unknown"."""
+    path = TRAFFIC_DIR / "traffic.json"
+    try:
+        st = path.stat()
+        mtime = (st.st_mtime_ns, st.st_size)   # size too: two writes inside one timestamp tick
+    except OSError:
+        return {}
+    if _class_imports_cache["mtime"] != mtime:
+        try:
+            data = json.loads(path.read_text(encoding="utf-8")).get("imports") or {}
+        except (OSError, ValueError):
+            data = {}
+        _class_imports_cache.update(mtime=mtime, data=data if isinstance(data, dict) else {})
+    return _class_imports_cache["data"]
+
 
 @app.route("/api/admin/traffic")
 @require_login
@@ -2382,11 +2404,26 @@ def admin_users():
         rows = uq.order_by(User.id.desc()).limit(limit).all()
         ids = [u.id for u in rows]
 
-        # Three grouped queries for the whole page rather than three per row.
+        # Four grouped queries for the whole page rather than four per row.
         forges: dict[int, int] = {}
         donated: dict[int, int] = {}
         idents: dict[int, list[str]] = {}
+        # Which of each account's classes the game has fetched art for (= the code was imported). Joined
+        # here against traffic.json rather than a table: the fact lives in the nginx log, nowhere else.
+        imports_by_class = _class_imports()
+        imported: dict[int, list[dict]] = {}
+        classes_n: dict[int, int] = {}
         if ids:
+            for cid, uid, name, created in (s.query(ForgedClass.id, ForgedClass.user_id, ForgedClass.name,
+                                                    ForgedClass.created_at)
+                                            .filter(ForgedClass.user_id.in_(ids)).all()):
+                classes_n[uid] = classes_n.get(uid, 0) + 1
+                rec = imports_by_class.get(str(cid))
+                if rec:
+                    imported.setdefault(uid, []).append({
+                        "class_id": cid, "name": name or "", "first": rec.get("first"),
+                        "last": rec.get("last"), "imports": int(rec.get("imports") or 0),
+                        "fetches": int(rec.get("fetches") or 0), "versions": rec.get("versions") or []})
             for uid, n in (s.query(ForgeJob.user_id, sa_func.count(ForgeJob.id))
                            .filter(ForgeJob.user_id.in_(ids)).group_by(ForgeJob.user_id).all()):
                 forges[uid] = int(n or 0)
@@ -2410,11 +2447,16 @@ def admin_users():
             "unlimited_env": is_unlimited(u.email or ""),
             "admin": is_admin(u.email or ""),
             "forges": forges.get(u.id, 0),
+            "classes": classes_n.get(u.id, 0),
+            # Classes of theirs the game has fetched art for (the code was imported), newest import first.
+            # Empty means "none seen" — or "no traffic summary yet"; `imports_known` tells those apart.
+            "imported": sorted(imported.get(u.id, []), key=lambda r: r.get("last") or "", reverse=True),
             "donated_cents": donated.get(u.id, 0),
             "created_at": u.created_at.isoformat() if u.created_at else None,
         } for u in rows]
 
-    return jsonify({"users": users, "total": total, "limit": limit, "q": q})
+    return jsonify({"users": users, "total": total, "limit": limit, "q": q,
+                    "imports_known": bool(imports_by_class) or (TRAFFIC_DIR / "traffic.json").is_file()})
 
 
 @app.route("/api/admin/users/<int:user_id>/tokens", methods=["POST"])

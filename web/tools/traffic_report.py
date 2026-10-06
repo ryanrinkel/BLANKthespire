@@ -35,6 +35,14 @@ How a visitor is counted (all per UTC day, by client IP, so every number here is
                    (the droplet's Plesk-era names are scanner noise), and the OAuth return
                    (accounts.google.com is a sign-in bounce, not a source). android-app:// referers keep
                    the package name so the Reddit app shows up as itself.
+  * imports      — a forged code IMPORTED INTO THE GAME. The mod fetches a class's splash/sprite/relic/
+                   cards.zip from /static/forged/<id>/ on import and that is the only trace a code was ever
+                   used, so nginx logs that one static prefix. Counted BEFORE the bot filter (the mod sends
+                   no user agent through v0.4.0, "BlankTheSpire/<version>" after). Per day / window:
+                   unique class ids the mod fetched ("imports") and raw fetches. Top-level "imports" is
+                   the all-time per-class record the operator panel shows next to each account: first and
+                   last fetch (UTC), fetches, (day, ip) sessions ≈ imports, distinct player IPs, which
+                   assets, which mod versions. A browser opening the same URL is not an import.
 """
 from __future__ import annotations
 
@@ -80,10 +88,30 @@ PAGE_SKIP_RE = re.compile(r"^/(static/|api/|favicon\.ico|healthz|auth/|\.well-kn
 IPISH_HOST_RE = re.compile(r"^\d{1,3}(\.\d{1,3}){3}(:\d+)?$|\d{1,3}-\d{1,3}-\d{1,3}-\d{1,3}")
 REFERER_SKIP_HOSTS = {"accounts.google.com", "localhost"}
 
+# A code IMPORTED into the game. On import the mod (ForgedSplash.TryCacheFromBundle) fetches the class's
+# splash/sprite/relic/cards.zip from /static/forged/<class id>/ — the only server-side trace a forged code
+# was ever used. nginx logs that one static prefix for exactly this reason (deploy/nginx-btsweb.conf).
+# The mod's HttpClient sent no User-Agent through v0.4.0 ("-" in the log); later builds send
+# "BlankTheSpire/<version>". Anything else (a browser opening the URL from the deck page, a crawler
+# following it) is NOT an import.
+IMPORT_RE = re.compile(r"^/static/forged/(?P<cid>\d+)/(?P<asset>splash\.png|sprite\.png|relic\.png|cards\.zip)$")
+MOD_UA_PREFIX = "BlankTheSpire/"
+
 
 def is_bot(ua: str) -> bool:
     ua = ua.strip()
     return not ua or ua == "-" or ua == "Mozilla/5.0" or bool(BOT_UA_RE.search(ua))
+
+
+def mod_version(ua: str) -> str | None:
+    """The mod version an asset fetch came from: "" for the UA-less builds (<= v0.4.0), the version string
+    for later ones, None when the client is not the mod at all."""
+    ua = (ua or "").strip()
+    if not ua or ua == "-":
+        return ""
+    if ua.startswith(MOD_UA_PREFIX):
+        return ua[len(MOD_UA_PREFIX):].split(" ", 1)[0]
+    return None
 
 
 def referer_source(ref: str, self_hosts: set[str]) -> str | None:
@@ -140,6 +168,11 @@ class Tally:
         self.workshop: dict[str, set] = defaultdict(set)
         self.referers: dict[str, dict[str, set]] = defaultdict(lambda: defaultdict(set))
         self.pages: dict[str, dict[str, set]] = defaultdict(lambda: defaultdict(set))
+        # Imports (see IMPORT_RE): per class id, everything the operator wants to know; per day, the set
+        # of class ids fetched by the mod, for the chart/tiles.
+        self.imports: dict[int, dict] = {}
+        self.imported: dict[str, set] = defaultdict(set)
+        self.import_fetches: dict[str, int] = defaultdict(int)
 
     def add(self, line: str) -> None:
         m = LINE_RE.match(line)
@@ -150,10 +183,17 @@ class Tally:
             return
         ip, status, ua = m.group("ip"), m.group("status"), m.group("ua")
         self.requests[day] += 1
+        req = m.group("req").split(" ")
+        if len(req) >= 2 and req[0] == "GET" and status == "200":
+            # Before the bot filter: the mod has no user agent, which is_bot (rightly) treats as a bot.
+            im = IMPORT_RE.match(req[1].split("?", 1)[0])
+            if im:
+                ver = mod_version(ua)
+                if ver is not None:
+                    self._import(int(im.group("cid")), im.group("asset"), ver, ip, day, m.group("time"))
         if is_bot(ua):
             self.bot_requests[day] += 1
             return
-        req = m.group("req").split(" ")
         if len(req) < 2:
             return
         method, target = req[0], req[1]
@@ -182,10 +222,37 @@ class Tally:
             if src:
                 self.referers[day][src].add(ip)
 
+    def _import(self, cid: int, asset: str, ver: str, ip: str, day: str, time: str) -> None:
+        when = f"{day}T{time[:8]}Z"   # the log's time is "HH:MM:SS +0000" (UTC on the droplet)
+        rec = self.imports.get(cid)
+        if rec is None:
+            rec = self.imports[cid] = {"first": when, "last": when, "fetches": 0, "assets": set(),
+                                       "ips": set(), "sessions": set(), "versions": set()}
+        rec["first"] = min(rec["first"], when)   # logs are read oldest-first, but don't depend on it
+        rec["last"] = max(rec["last"], when)
+        rec["fetches"] += 1
+        rec["assets"].add(asset)
+        rec["ips"].add(ip)
+        rec["sessions"].add((day, ip))   # one import pulls ~4 assets in a burst: (day, ip) ≈ one import
+        if ver:
+            rec["versions"].add(ver)
+        self.imported[day].add(cid)
+        self.import_fetches[day] += 1
+
     # -- output -------------------------------------------------------------------------------------
 
     def days(self) -> list[str]:
         return sorted(self.requests)
+
+    def imports_out(self) -> dict[str, dict]:
+        """All-time, keyed by class id as a string (JSON): was THIS code ever imported, when, how often."""
+        out = {}
+        for cid in sorted(self.imports):
+            r = self.imports[cid]
+            out[str(cid)] = {"first": r["first"], "last": r["last"], "fetches": r["fetches"],
+                             "imports": len(r["sessions"]), "players": len(r["ips"]),
+                             "assets": sorted(r["assets"]), "versions": sorted(r["versions"])}
+        return out
 
     def _depth(self, day: str) -> tuple[set, set, set]:
         """Exclusive buckets for one day: (app, clicked-but-not-app, landing-only)."""
@@ -205,6 +272,7 @@ class Tally:
                 "landing": len(self.landing[day]),
                 "deck": len(self.deck[day]),
                 "featured": len(self.featured[day]), "workshop": len(self.workshop[day]),
+                "imports": len(self.imported[day]), "import_fetches": self.import_fetches[day],
                 "requests": self.requests[day], "bot_requests": self.bot_requests[day],
             })
         return out
@@ -217,15 +285,16 @@ class Tally:
             cutoff = _shift_day(today, -(days - 1))
             keys = [k for k in keys if k >= cutoff]
         app: set = set(); clicked: set = set(); landing_only: set = set(); deck: set = set()
-        featured: set = set(); workshop: set = set()
+        featured: set = set(); workshop: set = set(); imported: set = set()
         refs: dict[str, set] = defaultdict(set)
         pages: dict[str, set] = defaultdict(set)
-        requests = bots = 0
+        requests = bots = import_fetches = 0
         for day in keys:
             a, c, l = self._depth(day)
             app |= a; clicked |= c; landing_only |= l
             deck |= self.deck[day]
             featured |= self.featured[day]; workshop |= self.workshop[day]
+            imported |= self.imported[day]; import_fetches += self.import_fetches[day]
             requests += self.requests[day]; bots += self.bot_requests[day]
             for src, ips in self.referers[day].items():
                 refs[src] |= ips
@@ -240,6 +309,7 @@ class Tally:
             "humans": len(app) + len(clicked) + len(landing_only),
             "app": len(app), "clicked": len(clicked), "landing_only": len(landing_only),
             "deck": len(deck), "featured": len(featured), "workshop": len(workshop),
+            "imports": len(imported), "import_fetches": import_fetches,
             "requests": requests, "bot_requests": bots,
             "referers": [{"source": s, "visitors": len(ips)} for s, ips in
                          sorted(refs.items(), key=lambda kv: (-len(kv[1]), kv[0]))[:TOP_N]],
@@ -269,6 +339,7 @@ def build(paths: list[str], self_hosts: set[str], today: str | None = None) -> d
         "last_day": days[-1] if days else None,
         "daily": tally.daily(),
         "windows": {str(w): tally.window(w, today) for w in WINDOWS},
+        "imports": tally.imports_out(),
     }
 
 

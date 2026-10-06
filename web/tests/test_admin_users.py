@@ -427,3 +427,46 @@ def test_a_no_op_write_logs_nothing(client, app_module, caplog):
     caplog.set_level(logging.INFO, logger=app_module.app.logger.name)
     client.post(f"/api/admin/users/{uid}/tokens", json={"balance": 5}, headers=H)
     assert not [rec for rec in caplog.records if rec.getMessage().startswith("admin action:")]
+
+
+# --- "Imported": did the game ever fetch this account's class art? ------------------------------------
+
+def test_imported_column_comes_from_the_traffic_summary(client, app_module, stub_forge):
+    """"Imported" = the game fetched the class's art (tools/traffic_report.py's `imports`, keyed by class
+    id). No traffic.json yet means UNKNOWN, not zero; a class absent from it means never imported."""
+    import json as _json
+    from models import ForgedClass
+    login(client, "imported@example.com")
+    seed_tokens(app_module, "imported@example.com", 2)
+    assert sse_events(_forge(client))[-1][0] == "result"
+    uid = _uid(app_module, "imported@example.com")
+    with app_module.session_scope() as s:
+        cid = s.query(ForgedClass.id).filter(ForgedClass.user_id == uid).scalar()
+    assert cid
+    login(client, ADMIN)
+    d = app_module.TRAFFIC_DIR
+    d.mkdir(parents=True, exist_ok=True)
+    tj = d / "traffic.json"
+    if tj.exists():
+        tj.unlink()
+
+    body = client.get("/api/admin/users?q=imported@example.com").get_json()
+    row = body["users"][0]
+    assert body["imports_known"] is False and row["imported"] == [] and row["classes"] == 1
+
+    rec = {"first": "2026-10-06T04:12:00Z", "last": "2026-10-06T18:30:00Z", "fetches": 5, "imports": 2,
+           "players": 2, "assets": ["cards.zip", "splash.png"], "versions": ["vocab70"]}
+    other = {"first": "x", "last": "x", "fetches": 1, "imports": 1, "players": 1, "assets": [], "versions": []}
+    tj.write_text(_json.dumps({"daily": [], "windows": {}, "imports": {str(cid): rec, "999999": other}}),
+                  encoding="utf-8")
+    body = client.get("/api/admin/users?q=imported@example.com").get_json()
+    assert body["imports_known"] is True
+    imp = body["users"][0]["imported"]
+    assert len(imp) == 1 and imp[0]["class_id"] == cid and imp[0]["name"]
+    assert (imp[0]["first"], imp[0]["last"], imp[0]["imports"], imp[0]["fetches"], imp[0]["versions"]) == (
+        "2026-10-06T04:12:00Z", "2026-10-06T18:30:00Z", 2, 5, ["vocab70"])
+
+    # A summary that has simply never seen this class: known, and never imported.
+    tj.write_text(_json.dumps({"imports": {}}), encoding="utf-8")
+    body = client.get("/api/admin/users?q=imported@example.com").get_json()
+    assert body["imports_known"] is True and body["users"][0]["imported"] == []
