@@ -713,6 +713,36 @@ def _card_art_id(card: dict, index: int) -> str:
     return safe or f"card_{index}"
 
 
+def _is_rate_limited(err: str) -> bool:
+    """Did an image backend refuse this card because the VENDOR throttled us? HTTP 429 from any backend,
+    or a body that says so (OpenAI: "Rate limit reached for gpt-image-1-mini ... in organization org-...")."""
+    e = (err or "").lower()
+    return "429" in e or "rate limit" in e or "rate_limit" in e or "too many requests" in e
+
+
+def _rate_limit_explainer(skipped: int, total: int, vendor: str, sample: str) -> str:
+    """The user-facing paragraph for a pack that lost cards to the vendor's rate limit. It is deliberately
+    long and loud: on 2026-10-06 a BYOK forge on a fresh OpenAI org lost 29 of 34 portraits to HTTP 429 and
+    the only trace the player got was 29 one-line "not produced (HTTP 429: {...)" notes — which read like
+    OUR outage. It is theirs: a per-minute image cap on their own provider account, nothing to do with the
+    key, the balance, or the forge. Say what it means, what it does NOT mean, and what to do next time."""
+    who = f"your image provider ({vendor})" if vendor else "your image provider"
+    lines = [
+        f"!! CARD ART RATE-LIMITED: {skipped} of {total} card portraits were NOT made.",
+        f"   {who} refused them with HTTP 429 \"rate limit reached\": {sample}" if sample
+        else f"   {who} refused them with HTTP 429 \"rate limit reached\".",
+        "   WHAT THIS MEANS: a card pack asks for ~34 images within a minute or two, and your provider account",
+        "   has a cap on how many images it will generate per minute. New or low-usage OpenAI organizations",
+        "   allow only a handful of gpt-image-1-mini images per minute, so most of the pack was turned away.",
+        "   WHAT IT DOES NOT MEAN: your API key is fine, you were not charged for the refused images, and the",
+        "   class itself is complete — every card, the relic, the splash and the sprite were made normally.",
+        "   IN THE GAME: cards without a portrait show the standard per-type card art instead of custom art.",
+        "   NEXT TIME: raise the image rate limit on your provider account (OpenAI: Settings > Limits, a",
+        "   higher usage tier), or forge with a provider/key that allows more images per minute.",
+    ]
+    return "\n".join(lines)
+
+
 def _generate_card_art(class_id: int, out: dict, bundle: dict, on_event=None, meter=None,
                        backend=None) -> str | None:
     """Best-effort: render one portrait per card into static/forged/<id>/cards/<card_id>.png, zip the
@@ -775,6 +805,9 @@ def _generate_card_art(class_id: int, out: dict, bundle: dict, on_event=None, me
         made: dict[str, Path] = {}
         spent = 0.0
         done = 0
+        throttled: list[str] = []   # card ids the vendor refused with a rate limit (HTTP 429)
+        throttle_sample = ""        # the first such error body, for the summary
+        throttle_vendor = ""
         note(f"card art: {total} cards…")
         pool = ThreadPoolExecutor(max_workers=max(1, CARD_ART_WORKERS))
         try:
@@ -796,6 +829,15 @@ def _generate_card_art(class_id: int, out: dict, bundle: dict, on_event=None, me
                     why = str(res.error or "no backend")[:160]
                     app.logger.warning("card art %s not produced for class %s: %s", cid, class_id, why)
                     note(f"card art: {cid} not produced ({why})")
+                    if _is_rate_limited(why):
+                        if not throttled:  # first one: say it NOW, in plain words, not 30 lines later
+                            throttle_sample = why
+                            throttle_vendor = str(res.model or res.backend or "")
+                            note("!! card art: your image provider is RATE-LIMITING this pack (HTTP 429). "
+                                 "That is a per-minute image cap on YOUR provider account, not a problem with "
+                                 "your key or this forge. Cards it refuses will use the game's standard art. "
+                                 "A full explanation follows when the pack finishes.")
+                        throttled.append(cid)
                 if res is not None and res.ok and res.path:
                     made[cid] = Path(res.path)
                     if res.cost_usd:
@@ -820,9 +862,14 @@ def _generate_card_art(class_id: int, out: dict, bundle: dict, on_event=None, me
         finally:
             pool.shutdown(wait=True)
 
+        if throttled:
+            app.logger.warning("card art for class %s: vendor rate-limited %d/%d cards (%s): %s",
+                               class_id, len(throttled), total, throttle_vendor or "?", throttle_sample)
         if not made:
             shutil.rmtree(cards_dir, ignore_errors=True)  # don't leave an empty cards/ per class
             note("card art: none produced")
+            if throttled:
+                note(_rate_limit_explainer(len(throttled), total, throttle_vendor, throttle_sample))
             return None
 
         import hashlib
@@ -838,7 +885,10 @@ def _generate_card_art(class_id: int, out: dict, bundle: dict, on_event=None, me
         (STATIC_FORGED_DIR / str(class_id) / "cards.zip").write_bytes(blob)
         digest = hashlib.sha256(blob).hexdigest()[:16]
         bundle["card_art_url"] = _art_url(class_id, "cards", digest)
-        note(f"card art: packed {len(made)}/{total} portraits")
+        note(f"card art: packed {len(made)}/{total} portraits"
+             + (f" — {len(throttled)} refused by the provider's rate limit" if throttled else ""))
+        if throttled:
+            note(_rate_limit_explainer(len(throttled), total, throttle_vendor, throttle_sample))
         return digest
     except Exception as e:  # logged, swallowed — art is cosmetic, the class still ships
         app.logger.warning("card art failed for class %s: %s", class_id, e)

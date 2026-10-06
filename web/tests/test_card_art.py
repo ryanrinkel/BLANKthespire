@@ -212,6 +212,92 @@ def test_the_time_budget_stops_the_pack(client, app_module, fake_bundle, monkeyp
     assert any("time budget" in line for line in lines)
 
 
+def _stub_cards_throttled(monkeypatch, *, allow: int):
+    """A vendor that honours the first `allow` cards and answers every later one with OpenAI's real 429 body
+    (what a fresh org's gpt-image-1-mini images-per-minute cap looks like, 2026-10-06)."""
+    import threading
+    import btsgen.art as bart
+    from btsgen.art.request import ImageResult
+
+    seen = []
+    lock = threading.Lock()
+
+    def fake(art, card, *, out_path=None, **kw):
+        with lock:
+            seen.append(card.get("id"))
+            n = len(seen)
+        if n > allow:
+            return ImageResult(ok=False, backend="openai", model="gpt-image-1-mini",
+                               error='HTTP 429: {"error": {"message": "Rate limit reached for gpt-image-1-mini '
+                                     '(for limit gpt-image-mini) in organization org-x on images per min"}}')
+        p = Path(out_path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(b"\x89PNG\r\n\x1a\n" + b"stub")
+        return ImageResult(ok=True, backend="openai", model="gpt-image-1-mini", path=p, cost_usd=0.004,
+                           width=1000, height=760)
+
+    monkeypatch.setattr(bart, "forge_card_art", fake)
+
+
+def test_a_rate_limited_pack_tells_the_player_what_429_means(client, app_module, fake_bundle, monkeypatch):
+    """2026-10-06: a BYOK forge on a new OpenAI org lost 29/34 portraits to HTTP 429 and the player only saw
+    29 cryptic one-liners. The partial pack must still ship, and the stream must say — loudly, once at the
+    first refusal and once in a counted summary — that this is THEIR provider's per-minute image cap, not
+    the key, not the forge, and that the class is complete."""
+    monkeypatch.setattr(app_module, "CARD_ART_WORKERS", 1)   # deterministic: exactly `allow` succeed
+    monkeypatch.setenv("BTSWEB_CARD_ART_BUDGET_S", "600")
+    monkeypatch.setenv("BTSWEB_CARD_ART_MAX_USD", "100")
+    total = len(fake_bundle["cards"])
+    _stub_cards_throttled(monkeypatch, allow=2)
+    lines: list[str] = []
+
+    uid = _user_id(app_module, login(client, "card429@example.com")["email"])
+    detail = _persist(app_module, fake_bundle, uid, on_event=lines.append)
+
+    assert len(_zip_names(app_module, detail["id"])) == 2 and "card_art_url" in detail
+    # the per-card trace is still there (it names WHICH cards), ...
+    assert sum("not produced (HTTP 429" in line for line in lines) == total - 2
+    # ... the first refusal is called out immediately in plain words, ...
+    alerts = [line for line in lines if line.startswith("!! card art: your image provider is RATE-LIMITING")]
+    assert len(alerts) == 1 and "not a problem with your key" in alerts[0]
+    # ... and the summary carries the count, the vendor, the meaning, and what it does NOT mean.
+    summary = [line for line in lines if line.startswith("!! CARD ART RATE-LIMITED")]
+    assert len(summary) == 1
+    text = summary[0]
+    assert f"{total - 2} of {total} card portraits were NOT made" in text
+    assert "gpt-image-1-mini" in text and "HTTP 429" in text
+    assert "WHAT THIS MEANS" in text and "per minute" in text
+    assert "WHAT IT DOES NOT MEAN" in text and "your API key is fine" in text and "not charged" in text
+    assert "IN THE GAME" in text and "NEXT TIME" in text
+    assert any(line.startswith(f"card art: packed 2/{total} portraits") and "rate limit" in line for line in lines)
+    # the summary comes AFTER the packed line (it is the last word on the pack)
+    assert lines.index(summary[0]) > max(i for i, line in enumerate(lines) if line.startswith("card art: packed"))
+
+
+def test_a_fully_rate_limited_pack_still_explains_itself(client, app_module, fake_bundle, monkeypatch):
+    monkeypatch.setattr(app_module, "CARD_ART_WORKERS", 1)
+    monkeypatch.setenv("BTSWEB_CARD_ART_BUDGET_S", "600")
+    _stub_cards_throttled(monkeypatch, allow=0)
+    lines: list[str] = []
+
+    uid = _user_id(app_module, login(client, "card429all@example.com")["email"])
+    detail = _persist(app_module, fake_bundle, uid, on_event=lines.append)
+
+    assert "card_art_url" not in detail
+    assert any(line == "card art: none produced" for line in lines)
+    total = len(fake_bundle["cards"])
+    assert any(line.startswith(f"!! CARD ART RATE-LIMITED: {total} of {total}") for line in lines)
+
+
+def test_an_ordinary_art_failure_is_not_called_a_rate_limit(app_module):
+    assert app_module._is_rate_limited("HTTP 429: {...}")
+    assert app_module._is_rate_limited("Rate limit reached for gpt-image-1-mini")
+    assert app_module._is_rate_limited("HTTP 429 Too Many Requests")
+    assert not app_module._is_rate_limited("HTTP 400: moderation_blocked")
+    assert not app_module._is_rate_limited("HTTP 500: upstream")
+    assert not app_module._is_rate_limited("no backend")
+
+
 def test_card_art_can_be_switched_off(client, app_module, fake_bundle, procedural, monkeypatch):
     monkeypatch.setenv("BTSWEB_CARD_ART", "0")
     uid = _user_id(app_module, login(client, "cardoff@example.com")["email"])
