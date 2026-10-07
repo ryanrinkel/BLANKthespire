@@ -31,6 +31,12 @@ How a visitor is counted (all per UTC day, by client IP, so every number here is
                    page's JS loaded a class, i.e. the visitor tried a featured/shared class.
   * workshop     — GET /workshop answered 200 or 302 (it redirects to Steam): install intent. The only
                    path where a non-200 counts.
+  * tagged       — a page hit whose URL carries utm_source (an ad or a tracked post link, e.g.
+                   /?utm_source=youtube&utm_campaign=promo-oct26). Keyed "source/campaign". Per window:
+                   clicks (hits), visitors (unique IPs), and how deep those IPs got in the window —
+                   clicked past the splash, reached the app, hit /workshop. This is the only attribution
+                   the site has: nothing is set client-side, so a visitor who comes back untagged later
+                   in the window still counts (same IP), one who comes back from another IP does not.
   * referers     — the referring HOST of a non-bot page hit, minus ourselves, raw IPs / IP-shaped hosts
                    (the droplet's Plesk-era names are scanner noise), and the OAuth return
                    (accounts.google.com is a sign-in bounce, not a source). android-app:// referers keep
@@ -59,7 +65,7 @@ import tempfile
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 WINDOWS = (7, 30, 90, 0)   # days; 0 = everything the logs hold. Mirrors ADMIN_STATS_WINDOWS in app.py.
 TOP_N = 12
@@ -138,6 +144,20 @@ def referer_source(ref: str, self_hosts: set[str]) -> str | None:
     return host
 
 
+def campaign_key(target: str) -> str | None:
+    """'/?utm_source=youtube&utm_medium=video-ad&utm_campaign=promo-oct26' -> 'youtube/promo-oct26'.
+    utm_source alone -> 'youtube'. No utm_source -> None (gclid, fbclid etc. on their own don't count:
+    without a source they say nothing about where the click came from)."""
+    if "?" not in target:
+        return None
+    params = parse_qs(target.split("?", 1)[1], keep_blank_values=False)
+    src = (params.get("utm_source") or [""])[0].strip().lower()[:40]
+    if not src:
+        return None
+    camp = (params.get("utm_campaign") or [""])[0].strip().lower()[:60]
+    return f"{src}/{camp}" if camp else src
+
+
 def _open(path: str):
     if path.endswith(".gz"):
         return gzip.open(path, "rt", encoding="utf-8", errors="replace")
@@ -168,6 +188,9 @@ class Tally:
         self.workshop: dict[str, set] = defaultdict(set)
         self.referers: dict[str, dict[str, set]] = defaultdict(lambda: defaultdict(set))
         self.pages: dict[str, dict[str, set]] = defaultdict(lambda: defaultdict(set))
+        # Tagged links (see campaign_key): per day, hits and unique IPs per "source/campaign".
+        self.campaign_hits: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+        self.campaign_ips: dict[str, dict[str, set]] = defaultdict(lambda: defaultdict(set))
         # Imports (see IMPORT_RE): per class id, everything the operator wants to know; per day, the set
         # of class ids fetched by the mod, for the chart/tiles.
         self.imports: dict[int, dict] = {}
@@ -221,6 +244,10 @@ class Tally:
             src = referer_source(m.group("ref"), self.self_hosts)
             if src:
                 self.referers[day][src].add(ip)
+            key = campaign_key(target)
+            if key:
+                self.campaign_hits[day][key] += 1
+                self.campaign_ips[day][key].add(ip)
 
     def _import(self, cid: int, asset: str, ver: str, ip: str, day: str, time: str) -> None:
         when = f"{day}T{time[:8]}Z"   # the log's time is "HH:MM:SS +0000" (UTC on the droplet)
@@ -273,6 +300,7 @@ class Tally:
                 "deck": len(self.deck[day]),
                 "featured": len(self.featured[day]), "workshop": len(self.workshop[day]),
                 "imports": len(self.imported[day]), "import_fetches": self.import_fetches[day],
+                "tagged_clicks": sum(self.campaign_hits[day].values()),
                 "requests": self.requests[day], "bot_requests": self.bot_requests[day],
             })
         return out
@@ -288,10 +316,17 @@ class Tally:
         featured: set = set(); workshop: set = set(); imported: set = set()
         refs: dict[str, set] = defaultdict(set)
         pages: dict[str, set] = defaultdict(set)
+        camp_hits: dict[str, int] = defaultdict(int)
+        camp_ips: dict[str, set] = defaultdict(set)
+        engaged: set = set()
         requests = bots = import_fetches = 0
         for day in keys:
             a, c, l = self._depth(day)
             app |= a; clicked |= c; landing_only |= l
+            engaged |= self.engaged[day]
+            for key, n in self.campaign_hits[day].items():
+                camp_hits[key] += n
+                camp_ips[key] |= self.campaign_ips[day][key]
             deck |= self.deck[day]
             featured |= self.featured[day]; workshop |= self.workshop[day]
             imported |= self.imported[day]; import_fetches += self.import_fetches[day]
@@ -315,6 +350,11 @@ class Tally:
                          sorted(refs.items(), key=lambda kv: (-len(kv[1]), kv[0]))[:TOP_N]],
             "pages": [{"path": p, "visitors": len(ips)} for p, ips in
                       sorted(pages.items(), key=lambda kv: (-len(kv[1]), kv[0]))[:TOP_N]],
+            # Tagged links: how deep the IPs that arrived via each tag got, anywhere in the window.
+            "campaigns": [{"campaign": k, "clicks": camp_hits[k], "visitors": len(ips),
+                           "clicked": len(ips & engaged), "app": len(ips & app),
+                           "workshop": len(ips & workshop)}
+                          for k, ips in sorted(camp_ips.items(), key=lambda kv: (-len(kv[1]), kv[0]))[:TOP_N]],
         }
 
 

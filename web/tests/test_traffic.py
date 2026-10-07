@@ -36,7 +36,7 @@ SAMPLE = [
     line("8.8.8.8", "14/Sep/2026", "/wp-login.php", status=404, ua="python-requests/2.31"),
     line("7.7.7.7", "14/Sep/2026", "/", ua="-"),
     # 15 Sep: a signed-in user straight into the app (no splash), the splash-only human returns and clicks
-    line("3.3.3.3", "15/Sep/2026", "/app"),
+    line("3.3.3.3", "15/Sep/2026", "/app?utm_source=Reddit&utm_campaign=sts2"),  # a tracked post link
     line("3.3.3.3", "15/Sep/2026", "/api/me"),
     line("3.3.3.3", "15/Sep/2026", "/api/classes"),
     line("1.1.1.1", "15/Sep/2026", "/", ref="android-app://com.reddit.frontpage/"),
@@ -55,9 +55,15 @@ SAMPLE = [
     line("4.4.4.4", "15/Sep/2026", "/api/deck/abc"),  # same IP twice
     line("11.11.11.11", "15/Sep/2026", "/api/deck/abc/art/splash"),
     line("12.12.12.12", "15/Sep/2026", "/api/featured"),  # the splash fetches this: never "featured"
-    # a splash visitor who clicked through to Steam: the 302 counts as workshop AND as clicked
-    line("10.10.10.10", "15/Sep/2026", "/"),
+    # a splash visitor who clicked through to Steam: the 302 counts as workshop AND as clicked. They came
+    # in from a tagged ad link (twice: a double click), so they are also the youtube/promo-oct26 tag's visitor
+    line("10.10.10.10", "15/Sep/2026", "/?utm_source=youtube&utm_medium=video-ad&utm_campaign=promo-oct26"),
+    line("10.10.10.10", "15/Sep/2026", "/?utm_source=youtube&utm_medium=video-ad&utm_campaign=promo-oct26"),
     line("10.10.10.10", "15/Sep/2026", "/workshop", status=302),
+    # an ad network's verification crawler opening the same tagged link: a bot, never a click
+    line("14.14.14.14", "15/Sep/2026", "/?utm_source=youtube&utm_campaign=promo-oct26", ua=GOOGLEBOT),
+    # a gclid alone (no utm_source) says nothing about the source: not a tag
+    line("1.1.1.1", "15/Sep/2026", "/download?gclid=abc123", ua=UA_PHONE),
     line("13.13.13.13", "15/Sep/2026", "/workshop", status=404),  # not a redirect: does not count
     # imports: the mod (no user agent through v0.4.0) pulling class 78's four assets in one burst ...
     line("20.20.20.20", "15/Sep/2026", "/static/forged/78/splash.png?v=97c9b086", ua="-", time="04:12:00"),
@@ -137,6 +143,34 @@ def test_windows_count_each_ip_once_at_its_deepest(logs):
     # A window anchored past the log sees nothing, and reports so rather than crashing.
     empty = tr.Tally({"x"}).window(7, "2026-09-15")
     assert empty["humans"] == 0 and empty["since"] is None and empty["referers"] == []
+
+
+def test_campaign_key():
+    assert tr.campaign_key("/?utm_source=youtube&utm_medium=video-ad&utm_campaign=promo-oct26") == "youtube/promo-oct26"
+    assert tr.campaign_key("/app?utm_source=Reddit&utm_campaign=sts2") == "reddit/sts2"
+    assert tr.campaign_key("/?utm_source=youtube") == "youtube"
+    assert tr.campaign_key("/?utm_campaign=promo") is None   # no source, no attribution
+    assert tr.campaign_key("/?gclid=abc") is None and tr.campaign_key("/") is None
+    assert tr.campaign_key("/?utm_source=") is None
+
+
+def test_tagged_links_show_clicks_visitors_and_depth(logs):
+    paths = tr._sorted_logs(str(logs / "access.log*"))
+    data = tr.build(paths, {"blankthespire.com"}, today="2026-09-15")
+    by_day = {r["day"]: r for r in data["daily"]}
+    assert by_day["2026-09-15"]["tagged_clicks"] == 3 and by_day["2026-09-14"]["tagged_clicks"] == 0
+    camps = {c["campaign"]: c for c in data["windows"]["0"]["campaigns"]}
+    # 10.10.10.10 clicked the ad link twice (2 clicks, 1 visitor), got past the splash to /workshop, never
+    # signed in; the crawler's hit and the bare gclid never appear
+    assert camps["youtube/promo-oct26"] == {"campaign": "youtube/promo-oct26", "clicks": 2, "visitors": 1,
+                                            "clicked": 1, "app": 0, "workshop": 1}
+    # 3.3.3.3 came in on a tagged /app link and ran the app
+    assert camps["reddit/sts2"] == {"campaign": "reddit/sts2", "clicks": 1, "visitors": 1,
+                                    "clicked": 1, "app": 1, "workshop": 0}
+    assert set(camps) == {"youtube/promo-oct26", "reddit/sts2"}
+    # the tag never changes the depth buckets themselves: the tagged splash view is still a splash view
+    assert by_day["2026-09-15"]["landing"] == 3
+    assert tr.Tally({"x"}).window(7, "2026-09-15")["campaigns"] == []
 
 
 def test_imports_are_the_mods_art_fetches(logs):

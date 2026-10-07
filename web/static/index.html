@@ -330,6 +330,12 @@
           <h4>Pages opened</h4>
           <table id="traffic-pages" class="stats-table"></table>
         </div>
+        <div>
+          <!-- Links carrying ?utm_source=…&utm_campaign=… (ads, tracked posts), with how far those
+               visitors got. See tools/traffic_report.py "tagged". -->
+          <h4>Tagged links (ads, tracked posts)</h4>
+          <table id="traffic-campaigns" class="stats-table"></table>
+        </div>
       </div>
       <p id="traffic-note" class="hint"></p>
     </section>

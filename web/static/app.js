@@ -1484,7 +1484,7 @@ function renderTraffic(d) {
   if (!d.available) {
     el("traffic-tiles").innerHTML = "";
     el("traffic-chart").innerHTML = "";
-    el("traffic-referers").innerHTML = el("traffic-pages").innerHTML = "";
+    el("traffic-referers").innerHTML = el("traffic-pages").innerHTML = el("traffic-campaigns").innerHTML = "";
     el("traffic-note").textContent = d.reason || "No traffic summary yet.";
     return;
   }
@@ -1515,6 +1515,14 @@ function renderTraffic(d) {
     `<tr><td>${esc(r.path)}</td><td class="num">${fmtInt(r.visitors)}</td></tr>`).join("");
   el("traffic-pages").innerHTML = `<tr><th>Page</th><th class="num">Visitors</th></tr>`
     + (pageRows || `<tr><td colspan="2" class="muted">No page hits in this window.</td></tr>`);
+  // Tagged links: clicks = hits on a URL carrying utm_source, visitors = unique IPs, then how deep those
+  // IPs got anywhere in the window (same IP = same person, as everywhere on this card).
+  const campRows = (w.campaigns || []).map((r) =>
+    `<tr><td>${esc(r.campaign)}</td><td class="num">${fmtInt(r.clicks)}</td><td class="num">${fmtInt(r.visitors)}</td>`
+    + `<td class="num">${fmtInt(r.clicked)}</td><td class="num">${fmtInt(r.app)}</td><td class="num">${fmtInt(r.workshop)}</td></tr>`).join("");
+  el("traffic-campaigns").innerHTML =
+    `<tr><th>source/campaign</th><th class="num">Clicks</th><th class="num">Visitors</th><th class="num">Clicked on</th><th class="num">App</th><th class="num">Workshop</th></tr>`
+    + (campRows || `<tr><td colspan="6" class="muted">No tagged links in this window. Tag a link with ?utm_source=…&amp;utm_campaign=… and it shows up here.</td></tr>`);
 
   const span = w.since ? `${w.since} → ${d.last_day} (${fmtInt(w.day_count)} days, UTC)` : "no days logged";
   el("traffic-note").textContent = `${span}. From the nginx access log, refreshed ${d.generated_at || "?"}. `
