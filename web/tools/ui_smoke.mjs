@@ -86,17 +86,54 @@ if (scenario === "forge") {
   await evaluate(`localStorage.clear()`);
   await nav(`${base}/app`);
 
-  // (a) fresh account, no tokens, nothing remembered: both boxes shut, button disabled.
+  // (a) fresh account, no tokens, nothing remembered: since 2026-10-12 the token box opens by default (a new
+  // account's forges all died on made-up keys when the key path came first), the chooser is just its strip,
+  // and the default is NOT written to bts_forge_pref. With 0 tokens the button is still disabled.
   const fresh = await json(`({unlimited: !!ME.unlimited, balance: ME.token_balance,
     disabled: document.getElementById('forge-btn').disabled,
     label: document.getElementById('forge-btn').textContent,
     title: document.getElementById('forge-btn').title,
     byok_open: document.getElementById('forge-byok').open,
     token_open: document.getElementById('forge-token').open,
+    pref: localStorage.getItem('bts_forge_pref'),
+    chooser_hidden: document.getElementById('chooser').classList.contains('hidden'),
+    cards_hidden: document.getElementById('chooser-cards').classList.contains('hidden'),
+    strip_hidden: document.getElementById('chooser-strip').classList.contains('hidden'),
+    strip: document.getElementById('chooser-strip').textContent,
+    pay_lbl: document.querySelector('.pay-lbl').textContent,
+    key_hint: [...document.querySelectorAll('#forge-token > .hint')].map(p => p.textContent).join(' | '),
     balance_line: document.getElementById('token-balance-line').textContent})`);
-  check(!fresh.unlimited && fresh.balance === 0 && fresh.disabled && !fresh.byok_open && !fresh.token_open
-        && fresh.label === "Forge the class",
-        "fresh 0-token account: button disabled, both boxes closed", JSON.stringify(fresh));
+  check(!fresh.unlimited && fresh.balance === 0 && fresh.disabled && !fresh.byok_open && fresh.token_open
+        && fresh.label === "Forge the class" && fresh.title.includes("no tokens") && fresh.pref === null,
+        "fresh 0-token account: token box open by default, key box closed, no pref stored", JSON.stringify(fresh));
+  check(!fresh.chooser_hidden && fresh.cards_hidden && !fresh.strip_hidden && fresh.strip.startsWith("Forging with tokens")
+        && fresh.pay_lbl.startsWith("Who provides your compute?")
+        && fresh.key_hint.includes("Have an API key? Forging with it is free — open “Bring your own key” above."),
+        "chooser collapsed to the tokens strip; compute label + key hint under the token box", JSON.stringify(fresh));
+  // "change" brings back the cards, token card first and primary, key card second and secondary.
+  const cards = await json(`(() => { document.getElementById('chooser-change').click();
+    const ids = [...document.querySelectorAll('#chooser-cards .chooser-card button')].map(b => b.id + ':' + b.className);
+    return {ids, cards_hidden: document.getElementById('chooser-cards').classList.contains('hidden'),
+            pref: localStorage.getItem('bts_forge_pref')}; })()`);
+  check(!cards.cards_hidden && cards.ids.join() === "choose-token:btn primary,choose-byok:btn" && cards.pref === null,
+        "change shows the cards, token first", JSON.stringify(cards));
+  await shot("forge-change-cards");
+  // A saved key with no stored pref still lands on the key box (and still writes no pref).
+  await evaluate(`localStorage.setItem('bts_byok', JSON.stringify({provider: 'anthropic', api_key: 'sk-ant-saved', model: 'claude-sonnet-4-6'}))`);
+  await nav(`${base}/app`);
+  const saved = await json(`({byok_open: document.getElementById('forge-byok').open,
+    token_open: document.getElementById('forge-token').open, pref: localStorage.getItem('bts_forge_pref'),
+    strip: document.getElementById('chooser-strip').textContent})`);
+  check(saved.byok_open && !saved.token_open && saved.pref === null && saved.strip.startsWith("Forging with your key"),
+        "saved key + no pref: key box open by default", JSON.stringify(saved));
+  // A stored "byok" pref (no saved key) still restores the key box.
+  await evaluate(`localStorage.clear(); localStorage.setItem('bts_forge_pref', 'byok')`);
+  await nav(`${base}/app`);
+  const pb = await json(`({byok_open: document.getElementById('forge-byok').open,
+    token_open: document.getElementById('forge-token').open, pref: localStorage.getItem('bts_forge_pref')})`);
+  check(pb.byok_open && !pb.token_open && pb.pref === "byok", "stored byok pref restores the key box", JSON.stringify(pb));
+  await evaluate(`localStorage.clear()`);
+  await nav(`${base}/app`);
 
   // (d) the interactive toggle is a property of the forge, not of how it is paid for: it sits in the card
   // but inside neither box.
@@ -120,8 +157,8 @@ if (scenario === "forge") {
             label: document.getElementById('forge-btn').textContent,
             token_open: document.getElementById('forge-token').open,
             pref: localStorage.getItem('bts_forge_pref')}; })()`);
-  check(!keyed.disabled && keyed.label.includes("uses your API key") && !keyed.token_open,
-        "byok box open + key + model: button enabled", JSON.stringify(keyed));
+  check(!keyed.disabled && keyed.label.includes("uses your API key") && !keyed.token_open && keyed.pref === "byok",
+        "byok box open + key + model: button enabled, pick remembered", JSON.stringify(keyed));
   // The pay boxes read as a radio pair (2026-09-26): the selected one carries the accent border and a
   // "Selected" tag, the other neither; clicking the selected header does not fold it.
   const radio = await json(`(() => {
@@ -400,7 +437,8 @@ if (scenario === "forge") {
   console.log(await evaluate(`loadStats().then(() => 'loadStats ok: hidden=' + document.getElementById('stats').classList.contains('hidden') + ' tiles=' + document.querySelectorAll('.stat-tile').length).catch(e => 'loadStats threw: ' + e.message)`));
   await shot("account2");
 } else if (scenario === "v3") {
-  // Pricing v3: a fresh (0-token, non-unlimited) account sees the key-or-token chooser + the launch banner;
+  // Pricing v3: a fresh (0-token, non-unlimited) account sees the launch banner and, since 2026-10-12, the
+  // token box open by default with the chooser collapsed to its "Forging with tokens · change" strip;
   // "Support the forge" opens the inline tier buttons; the Account tab shows the same tiers; public pages.
   await nav(`${base}/dev-login?email=newbie@example.com`);
   await nav(`${base}/app`); await sleep(1200);

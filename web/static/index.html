@@ -58,21 +58,23 @@
       <button id="v3-banner-x" class="banner-x" aria-label="Dismiss">×</button>
     </div>
 
-    <!-- First-run chooser: your key vs our tokens. Collapses to the one-line strip once a path is picked
-         (localStorage bts_forge_pref); whichever <details> box below is open stays the source of truth. -->
+    <!-- Chooser: our tokens vs your key. Since 2026-10-12 a fresh visit opens the token box by default, so this
+         normally shows only the one-line strip ("Forging with tokens · change"); "change" brings back the two
+         cards, token card first. A click on a card or box is remembered in localStorage bts_forge_pref (the
+         default never is); whichever <details> box below is open stays the source of truth. -->
     <section id="chooser" class="card chooser hidden">
       <h2 id="chooser-head">How will you fill in the blank?</h2>
       <div id="chooser-cards" class="chooser-cards">
-        <div class="chooser-card">
-          <h3>I have an API key</h3>
-          <p class="hint">Forging is free (but compute is not). Paste a key from Anthropic, OpenAI, OpenRouter and more — it stays in your browser.</p>
-          <button id="choose-byok" class="btn primary">Use my key</button>
-        </div>
         <div class="chooser-card">
           <h3>Use a token</h3>
           <p class="hint">We run it on our models. Each token is one forge: $3 → 2 tokens, $5 → 4, $10 → 10,
             or any whole amount from $11 at one token per dollar.</p>
           <button id="choose-token" class="btn primary">Support the forge</button>
+        </div>
+        <div class="chooser-card">
+          <h3>I have an API key</h3>
+          <p class="hint">Forging is free (but compute is not). Paste a key from Anthropic, OpenAI, OpenRouter and more — it stays in your browser.</p>
+          <button id="choose-byok" class="btn">Use my key</button>
         </div>
       </div>
       <p id="chooser-strip" class="chooser-strip hidden"></p>
@@ -83,10 +85,11 @@
       <!-- can we add a few more contrasting examples and select one at random so the user doesn't always see the same sample text? another example might be 'the bravest toaster in the world' -->
       <textarea id="concept" rows="3" placeholder="e.g. a venomous plague doctor who sacrifices health to stack poison, then turns blood into armor"></textarea>
 
-      <!-- How this forge is paid for: exactly one of the two boxes is open (app.js currentMode()). They behave
-           like a radio pair: the open one is highlighted with a filled dot, and clicking its own header does
-           not close it (app.js onPaySummaryClick) — switch by opening the other. -->
-      <p class="lbl pay-lbl">How do you want to pay for this forge? <span class="muted">Pick one.</span></p>
+      <!-- Whose compute runs this forge: exactly one of the two boxes is open (app.js currentMode()) — "Use a
+           token" by default since 2026-10-12, "Bring your own key" when a key is saved or that was the last
+           pick. They behave like a radio pair: the open one is highlighted with a filled dot, and clicking its
+           own header does not close it (app.js onPaySummaryClick) — switch by opening the other. -->
+      <p class="lbl pay-lbl">Who provides your compute? <span class="muted">Pick one.</span></p>
       <details id="forge-byok" class="settings pay">
         <summary>Bring your own key</summary>
         <div class="byok-grid">
@@ -170,6 +173,7 @@
           </div>
           <p id="forge-donate-note" class="hint hidden">Donations aren't available right now — bring your own API key to keep forging.</p>
         </div>
+        <p class="hint">Have an API key? Forging with it is free — open “Bring your own key” above.</p>
       </details>
 
       <div class="forge-actions">

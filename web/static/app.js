@@ -149,8 +149,10 @@ function onPayBoxToggle(openedId, otherId, mode) {
   if (box && box.open) {
     const other = el(otherId);
     if (other && other.open) other.open = false;   // fires the other box's toggle, which just re-renders
-    setForgePref(mode);
-    CHOOSER_FORCED = false;
+    // The box restoreForgePref opened by default is not a choice: don't remember it (the event is async,
+    // so it arrives here after the fact).
+    if (DEFAULT_OPENED === openedId) DEFAULT_OPENED = null;
+    else { setForgePref(mode); CHOOSER_FORCED = false; }
   }
   renderForgeButton();
   renderChooser();
@@ -197,11 +199,13 @@ function renderForgeButton() {
 }
 
 // --- onboarding chooser (forge tab) ---------------------------------------------------------------
-// First visit with nothing to spend and no key on file: two cards, "use my key" vs "support the forge".
-// Once a path is picked it collapses to a one-line strip. The open <details> box stays the source of
-// truth — this only opens one of them and remembers the pick in localStorage.bts_forge_pref.
+// A path is always open on load (token box by default, see restoreForgePref), so the chooser is normally
+// the one-line strip; its "change" link brings back the two cards, "support the forge" then "use my key".
+// The open <details> box stays the source of truth — this only opens one of them and remembers an
+// explicit pick in localStorage.bts_forge_pref.
 
 let CHOOSER_FORCED = false;  // "change" reopens the cards even for an account that now has tokens
+let DEFAULT_OPENED = null;   // id of the box restoreForgePref opened as a default, until its toggle event lands
 
 function forgePref() {
   const p = lsGet("bts_forge_pref");
@@ -224,11 +228,19 @@ function setMode(mode) {
 }
 
 // Start on the path last chosen — a returning user with a saved key shouldn't have to reopen the box
-// every visit. With nothing remembered both boxes stay shut and the button stays disabled until one is
-// opened (the chooser cards above are what points at them).
+// every visit. With nothing remembered, a saved key opens the key box and otherwise the token box opens:
+// our hosted compute is the default since 2026-10-12, because a new account's 11 forges on 2026-10-11 all
+// died on made-up API keys — the key path was presented first and looked like the way in. (Before that,
+// both boxes stayed shut and the forge button stayed disabled until one was opened.) The default is not
+// written to bts_forge_pref, so "change" still shows the cards and a key saved later still wins.
 function restoreForgePref() {
   const pref = forgePref();
   if (pref) setMode(pref);
+  else if (!currentMode()) {
+    const mode = hasSavedKey() ? "byok" : "token";
+    DEFAULT_OPENED = mode === "byok" ? "forge-byok" : "forge-token";
+    setMode(mode);
+  }
   renderForgeButton();
   renderChooser();
 }
@@ -238,12 +250,13 @@ function renderChooser() {
   if (!box) return;
   const paid = Number((ME && ME.token_balance) || 0);
   const pref = forgePref();
-  // Undecided: nothing to spend, no key on file, nothing remembered.
+  // Undecided: "change" was clicked, or (rare now that restoreForgePref always opens a box) nothing to
+  // spend, no key on file, nothing remembered and no box open.
   const undecided = CHOOSER_FORCED
-    || (!!ME && !ME.unlimited && paid <= 0 && !hasSavedKey() && !pref);
+    || (!!ME && !ME.unlimited && paid <= 0 && !hasSavedKey() && !pref && !currentMode());
   const mode = pref || currentMode();
-  // Nothing decided and nothing to decide about (unlimited, offline demo, or simply no box open yet on an
-  // account that isn't stuck): no strip to draw.
+  // Nothing decided and nothing to decide about (unlimited, offline demo, or no box open on an account
+  // that isn't stuck): no strip to draw.
   if (!ME || (!undecided && (!mode || ME.unlimited || mode === "fake"))) {
     box.classList.add("hidden");
     return;
