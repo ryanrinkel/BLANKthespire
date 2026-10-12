@@ -1620,7 +1620,7 @@ function renderAdminUsers(d) {
   // The per-row status note gets a column of its own at the END: parked next to Save it would widen that
   // cell the moment it said anything and shunt every column after it sideways mid-edit.
   const head = `<tr><th class="who-cell">Account</th><th class="num">Tokens</th><th></th>`
-    + `<th>Unlimited</th><th class="num">Forges</th><th class="num" title="Classes the game has fetched art for = codes imported into the mod (from the nginx log, refreshed every 15 min)">Imported</th>`
+    + `<th>Unlimited</th><th class="num" title="Forges that finished and saved a class. Attempts that died (a bad key, a mistyped model, no credits) are listed separately — hover the count for the latest error">Forges</th><th class="num" title="Classes the game has fetched art for = codes imported into the mod (from the nginx log, refreshed every 15 min)">Imported</th>`
     + `<th class="num">Donated</th><th>Joined</th>`
     + `<th></th></tr>`;
   const rows = users.map((u) => {
@@ -1643,7 +1643,7 @@ function renderAdminUsers(d) {
       + `${envLocked ? " disabled" : ""} /> ∞</label>`
       + (envLocked ? `<div class="sub">via env list</div>` : "")
       + `</td>`
-      + `<td class="num">${fmtInt(u.forges)}</td>`
+      + `<td class="num">${forgesCell(u)}</td>`
       + `<td class="num">${importedCell(u, d.imports_known)}</td>`
       + `<td class="num">${u.donated_cents ? fmtMoney(u.donated_cents, "usd") : "—"}</td>`
       + `<td>${esc(joined)}</td>`
@@ -1674,6 +1674,21 @@ function renderAdminUsers(d) {
       saveAdminTokens(ev.target.closest("tr"));
     }
   };
+}
+
+// Finished forges, then the attempts that died as a muted "· N failed" whose hover carries the newest error
+// (mode, UTC time, the provider's words). Failed attempts used to be folded into one number, which made an
+// account whose every forge died on its own API key read as a prolific forger who never imported.
+function forgesCell(u) {
+  const done = fmtInt(u.forges);
+  const failed = Number(u.forges_failed || 0);
+  if (!failed) return done;
+  const lf = u.last_failed || {};
+  const when = lf.at ? String(lf.at).slice(0, 16).replace("T", " ") + " UTC" : "";
+  const tip = `${failed} attempt${failed === 1 ? "" : "s"} failed. Latest`
+    + (lf.mode ? ` (${lf.mode}` + (when ? `, ${when}` : "") + `)` : when ? ` (${when})` : "")
+    + `: ${lf.error || "no detail recorded"}`;
+  return `${done} <span class="sub failed-n" title="${esc(tip)}">· ${failed} failed</span>`;
 }
 
 // "2 / 3" classes imported, with a hover listing each imported class, its first/last fetch (UTC) and

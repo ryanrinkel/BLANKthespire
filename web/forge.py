@@ -686,11 +686,59 @@ def forge_to_bundle(concept: str, *, key: dict | None = None, hosted: bool = Fal
         return _bundle_result(res)
 
 
+# (pattern, one-sentence explanation) for the provider refusals a BYOK forge dies on at its FIRST call. Order
+# matters: the first match wins, so the specific "no credits" 429 sits above the generic 429.
+_PROVIDER_REFUSALS: list[tuple[re.Pattern, str]] = [
+    (re.compile(r"model_not_found|does not exist or you do not have access|not_found_error|unknown model|"
+                r"no such model|model .{0,80}? (?:is )?not found", re.I),
+     "Your provider doesn't offer a model called “{model}” on this key. Open “Bring your own key”, "
+     "click “Load my model list” and pick one from the list (check the provider matches the key, too)."),
+    (re.compile(r"insufficient_quota|credit_balance_exhausted|no credits remaining|exceeded your current quota|"
+                r"insufficient[_ ]credits|billing_hard_limit", re.I),
+     "Your provider account has no credits left, so it refused the request. Add credits on your provider's "
+     "billing page, then forge again — nothing was charged here."),
+    (re.compile(r"invalid_api_key|authentication_error|invalid x-api-key|incorrect api key|invalid api key|"
+                r"HTTP 401|Error code: 401|401.{0,40}unauthorized", re.I),
+     "Your provider rejected the API key. Paste a current key from your provider's dashboard (and check the "
+     "provider dropdown matches where the key came from)."),
+    (re.compile(r"HTTP 403|permission_denied|forbidden", re.I),
+     "Your provider says this key isn't allowed to use that model or endpoint. Check the key's permissions "
+     "on your provider's dashboard, or pick another model."),
+    (re.compile(r"HTTP 429|rate[_ ]limit|too many requests", re.I),
+     "Your provider rate-limited the key. Wait a minute and forge again, or raise the limit on your "
+     "provider account."),
+]
+
+_MODEL_IN_ERROR = re.compile(r"[Tt]he model [`'\"‘“]([^`'\"’”]+)[`'\"’”]")
+
+
+def explain_provider_error(detail: str, model: str | None = None) -> str | None:
+    """One plain sentence for a BYOK refusal the player's PROVIDER sent back, or None when the failure isn't
+    one we recognise. On 2026-10-11 a new account's 11 forges all died in under two seconds on the user's own
+    key (a mistyped model, an Anthropic model id sent to OpenAI, a key with no credits, a placeholder key)
+    and every one surfaced as the raw JSON error body, which reads like OUR outage. The raw text still
+    follows the sentence so an operator can see what the provider actually said."""
+    if not detail:
+        return None
+    for pat, text in _PROVIDER_REFUSALS:
+        if pat.search(detail):
+            m = _MODEL_IN_ERROR.search(detail)
+            name = (m.group(1) if m else None) or model or "that"
+            return text.format(model=name)
+    return None
+
+
 def _bundle_result(res) -> dict:
     """Turn a forge_class result into the web response dict (encode the BTSC code). Raises ForgeError if the
     class didn't generate. Shared by the Anthropic/BYOK path and the hosted Ollama-mix (token) path."""
     if not res.ok or res.bundle is None:
         tail = res.log[-1] if res.log else "no detail"
+        why = explain_provider_error(tail)
+        if why:
+            # Plain words first (that's what the toast + log line show), the provider's own text after, on
+            # one line and trimmed: the JSON body is for the operator's forge_jobs.error, not the player.
+            raw = " ".join(str(tail).split())
+            raise ForgeError(f"{why} (Your provider said: {raw[:300]})")
         raise ForgeError(f"class did not generate: {tail}")
 
     from btsgen.bts1 import encode_class

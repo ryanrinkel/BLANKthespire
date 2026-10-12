@@ -470,3 +470,25 @@ def test_imported_column_comes_from_the_traffic_summary(client, app_module, stub
     tj.write_text(_json.dumps({"imports": {}}), encoding="utf-8")
     body = client.get("/api/admin/users?q=imported@example.com").get_json()
     assert body["imports_known"] is True and body["users"][0]["imported"] == []
+
+
+def test_failed_attempts_are_counted_apart_from_forges(client, app_module, stub_forge):
+    """2026-10-11: an account whose 11 BYOK forges all died on its own key read as "11 forges" in the panel.
+    Finished forges and failed attempts are separate numbers, and the newest failure travels with the row."""
+    login(client, "dies@example.com")
+    seed_tokens(app_module, "dies@example.com", 3)
+    assert sse_events(_forge(client))[-1][0] == "result"
+    stub_forge.error = ("Your provider rejected the API key. Paste a current key. "
+                        "(Your provider said: HTTP 401 invalid_api_key)")
+    assert sse_events(_forge(client))[-1][0] == "error"
+    assert sse_events(_forge(client))[-1][0] == "error"
+    login(client, ADMIN)
+
+    row = client.get("/api/admin/users?q=dies@example.com").get_json()["users"][0]
+    assert row["forges"] == 1
+    assert row["forges_failed"] == 2
+    assert row["classes"] == 1
+    assert row["last_failed"]["mode"] == "token"
+    assert "rejected the API key" in row["last_failed"]["error"]
+    assert row["last_failed"]["at"]
+    assert row["token_balance"] == 2   # the two failures were refunded

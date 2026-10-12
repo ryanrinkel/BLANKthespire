@@ -2405,7 +2405,9 @@ def admin_users():
         ids = [u.id for u in rows]
 
         # Four grouped queries for the whole page rather than four per row.
-        forges: dict[int, int] = {}
+        forges: dict[int, int] = {}          # finished forges (status done) — what "forged N times" should mean
+        failed: dict[int, int] = {}          # attempts that died (status failed); running rows count in neither
+        last_failed: dict[int, dict] = {}    # the newest failed attempt per account: when + why
         donated: dict[int, int] = {}
         idents: dict[int, list[str]] = {}
         # Which of each account's classes the game has fetched art for (= the code was imported). Joined
@@ -2424,9 +2426,22 @@ def admin_users():
                         "class_id": cid, "name": name or "", "first": rec.get("first"),
                         "last": rec.get("last"), "imports": int(rec.get("imports") or 0),
                         "fetches": int(rec.get("fetches") or 0), "versions": rec.get("versions") or []})
-            for uid, n in (s.query(ForgeJob.user_id, sa_func.count(ForgeJob.id))
-                           .filter(ForgeJob.user_id.in_(ids)).group_by(ForgeJob.user_id).all()):
-                forges[uid] = int(n or 0)
+            # Counted by status: on 2026-10-11 the panel read "11 forges, 0 classes" for an account whose
+            # every attempt had died in two seconds on its own API key, and the attempts looked like output.
+            for uid, status, n in (s.query(ForgeJob.user_id, ForgeJob.status, sa_func.count(ForgeJob.id))
+                                   .filter(ForgeJob.user_id.in_(ids))
+                                   .group_by(ForgeJob.user_id, ForgeJob.status).all()):
+                if status == "done":
+                    forges[uid] = int(n or 0)
+                elif status == "failed":
+                    failed[uid] = int(n or 0)
+            for j in (s.query(ForgeJob.user_id, ForgeJob.mode, ForgeJob.error, ForgeJob.started_at)
+                      .filter(ForgeJob.user_id.in_(ids), ForgeJob.status == "failed")
+                      .order_by(ForgeJob.started_at.desc()).all()):
+                if j.user_id not in last_failed:
+                    last_failed[j.user_id] = {
+                        "mode": j.mode or "", "error": (j.error or "")[:300],
+                        "at": j.started_at.isoformat() if j.started_at else None}
             for uid, cents in (s.query(Purchase.user_id, sa_func.sum(Purchase.amount_cents))
                                .filter(Purchase.user_id.in_(ids), Purchase.status == "paid")
                                .group_by(Purchase.user_id).all()):
@@ -2447,6 +2462,8 @@ def admin_users():
             "unlimited_env": is_unlimited(u.email or ""),
             "admin": is_admin(u.email or ""),
             "forges": forges.get(u.id, 0),
+            "forges_failed": failed.get(u.id, 0),
+            "last_failed": last_failed.get(u.id),   # {mode, error, at} or None
             "classes": classes_n.get(u.id, 0),
             # Classes of theirs the game has fetched art for (the code was imported), newest import first.
             # Empty means "none seen" — or "no traffic summary yet"; `imports_known` tells those apart.
