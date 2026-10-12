@@ -188,7 +188,7 @@ function renderForgeButton() {
       if (paid > 0) {
         ok = true;
         label = `Forge the class (uses 1 of your ${paid} token${paid === 1 ? "" : "s"})`;
-      } else why = "You have no tokens \u2014 get some below or bring a key.";
+      } else why = "You have no tokens \u2014 get some above or bring a key.";
     }
   } else {
     why = "Open 'Bring your own key' and enter a key, or 'Use a token'.";

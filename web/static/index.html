@@ -7,7 +7,7 @@
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png" />
   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/static/style.css?v=20261001" />
+  <link rel="stylesheet" href="/static/style.css?v=20261012" />
 </head>
 <body>
   <header>
@@ -88,8 +88,31 @@
       <!-- Whose compute runs this forge: exactly one of the two boxes is open (app.js currentMode()) — "Use a
            token" by default since 2026-10-12, "Bring your own key" when a key is saved or that was the last
            pick. They behave like a radio pair: the open one is highlighted with a filled dot, and clicking its
-           own header does not close it (app.js onPaySummaryClick) — switch by opening the other. -->
+           own header does not close it (app.js onPaySummaryClick) — switch by opening the other. The token box
+           sits first, the key box under it (same 2026-10-12 change). -->
       <p class="lbl pay-lbl">Who provides your compute? <span class="muted">Pick one.</span></p>
+      <!-- Tokens without leaving the forge: the balance, then the same tier + custom-amount buttons the
+           Account tab builds (app.js renderDonatePanel). -->
+      <details id="forge-token" class="settings pay">
+        <summary>Use a token</summary>
+        <p class="hint" id="token-balance-line"></p>
+        <!-- The tiers fold behind "Get tokens" (2026-09-26) so someone spending a token they already hold
+             isn't looking at a price list. Open by default only when the balance is 0 (app.js
+             renderGetTokens); unlimited accounts never see either. -->
+        <div class="get-tokens-row">
+          <button id="forge-get-tokens" class="btn" type="button" aria-expanded="false"
+                  aria-controls="forge-donate-wrap">Get tokens</button>
+        </div>
+        <div id="forge-donate-wrap" class="hidden">
+          <div id="forge-donate-box" class="donate hidden">
+            <div id="forge-donate-tiers" class="donate-tiers"></div>
+            <div id="forge-donate-custom" class="donate-custom hidden"></div>
+          </div>
+          <p id="forge-donate-note" class="hint hidden">Donations aren't available right now — bring your own API key to keep forging.</p>
+        </div>
+        <p class="hint">Have an API key? Forging with it is free — open “Bring your own key” below.</p>
+      </details>
+
       <details id="forge-byok" class="settings pay">
         <summary>Bring your own key</summary>
         <div class="byok-grid">
@@ -152,28 +175,6 @@
           <button id="estimate-btn" class="linkish" type="button">Estimate cost</button>
         </div>
         <div class="estimate hidden" id="byok-estimate"></div>
-      </details>
-
-      <!-- Tokens without leaving the forge: the balance, then the same tier + custom-amount buttons the
-           Account tab builds (app.js renderDonatePanel). -->
-      <details id="forge-token" class="settings pay">
-        <summary>Use a token</summary>
-        <p class="hint" id="token-balance-line"></p>
-        <!-- The tiers fold behind "Get tokens" (2026-09-26) so someone spending a token they already hold
-             isn't looking at a price list. Open by default only when the balance is 0 (app.js
-             renderGetTokens); unlimited accounts never see either. -->
-        <div class="get-tokens-row">
-          <button id="forge-get-tokens" class="btn" type="button" aria-expanded="false"
-                  aria-controls="forge-donate-wrap">Get tokens</button>
-        </div>
-        <div id="forge-donate-wrap" class="hidden">
-          <div id="forge-donate-box" class="donate hidden">
-            <div id="forge-donate-tiers" class="donate-tiers"></div>
-            <div id="forge-donate-custom" class="donate-custom hidden"></div>
-          </div>
-          <p id="forge-donate-note" class="hint hidden">Donations aren't available right now — bring your own API key to keep forging.</p>
-        </div>
-        <p class="hint">Have an API key? Forging with it is free — open “Bring your own key” above.</p>
       </details>
 
       <div class="forge-actions">
@@ -405,7 +406,7 @@
 
   <!-- ?v= busts the 1-hour static cache on deploy: bump both whenever either file changes. render.js holds
        the class renderers shared with the public /deck page and must load first. -->
-  <script src="/static/render.js?v=20261001"></script>
-  <script src="/static/app.js?v=20261001c"></script>
+  <script src="/static/render.js?v=20261012"></script>
+  <script src="/static/app.js?v=20261012"></script>
 </body>
 </html>

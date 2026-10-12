@@ -102,14 +102,15 @@ if (scenario === "forge") {
     strip: document.getElementById('chooser-strip').textContent,
     pay_lbl: document.querySelector('.pay-lbl').textContent,
     key_hint: [...document.querySelectorAll('#forge-token > .hint')].map(p => p.textContent).join(' | '),
+    token_first: !!(document.getElementById('forge-token').compareDocumentPosition(document.getElementById('forge-byok')) & Node.DOCUMENT_POSITION_FOLLOWING),
     balance_line: document.getElementById('token-balance-line').textContent})`);
   check(!fresh.unlimited && fresh.balance === 0 && fresh.disabled && !fresh.byok_open && fresh.token_open
         && fresh.label === "Forge the class" && fresh.title.includes("no tokens") && fresh.pref === null,
         "fresh 0-token account: token box open by default, key box closed, no pref stored", JSON.stringify(fresh));
   check(!fresh.chooser_hidden && fresh.cards_hidden && !fresh.strip_hidden && fresh.strip.startsWith("Forging with tokens")
         && fresh.pay_lbl.startsWith("Who provides your compute?")
-        && fresh.key_hint.includes("Have an API key? Forging with it is free — open “Bring your own key” above."),
-        "chooser collapsed to the tokens strip; compute label + key hint under the token box", JSON.stringify(fresh));
+        && fresh.token_first && fresh.key_hint.includes("Have an API key? Forging with it is free — open “Bring your own key” below."),
+        "chooser collapsed to the tokens strip; compute label, token box above the key box, key hint inside it", JSON.stringify(fresh));
   // "change" brings back the cards, token card first and primary, key card second and secondary.
   const cards = await json(`(() => { document.getElementById('chooser-change').click();
     const ids = [...document.querySelectorAll('#chooser-cards .chooser-card button')].map(b => b.id + ':' + b.className);
