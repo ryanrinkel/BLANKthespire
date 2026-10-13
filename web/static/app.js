@@ -1472,12 +1472,27 @@ function renderStatsChart(daily, series = STATS_SERIES, boxId = "stats-chart",
 // --- admin: site traffic ------------------------------------------------------------------------------
 // Same gate as the stats card. Data: /api/admin/traffic = the nginx access log summarised by
 // tools/traffic_report.py (unique IPs per UTC day, crawlers/scanners dropped by user agent, so every
-// number is a floor). The three depth buckets are exclusive per day, so the bars stack to "humans seen".
+// number is a floor). The four depth buckets are exclusive per day, so the bars stack to "humans seen".
+// "browser" = /api/me ran (landing.js calls it on every splash load), so it only proves a real browser;
+// "signed_in" = a signed-in-only route answered 200. Summaries written before 2026-10-13 carry one "app"
+// bucket instead (= today's browser + signed_in); trafficCompat() shows it as "ran our JS".
 const TRAFFIC_SERIES = [
-  { key: "app", label: "Reached the app", color: "#8f55eb" },
+  { key: "signed_in", label: "Signed in", color: "#8f55eb" },
   { key: "clicked", label: "Clicked past the splash", color: "#28a07f" },
-  { key: "landing_only", label: "Splash only", color: "#5a5870" },
+  { key: "browser", label: "Ran our JS, went no further", color: "#3f7fbf" },
+  { key: "landing_only", label: "Splash only (no JS)", color: "#5a5870" },
 ];
+
+function trafficCompat(r) {
+  if (!r || r.browser !== undefined || r.signed_in !== undefined || r.app === undefined) return r || {};
+  return { ...r, browser: r.app, signed_in: 0 };
+}
+
+// "desktop 12 · phone 9 · webview 7" (webview = an in-app browser, e.g. the YouTube app). "" on old data.
+function deviceChips(dv) {
+  if (!dv) return "";
+  return `desktop ${fmtInt(dv.desktop)} · phone ${fmtInt(dv.phone)} · webview ${fmtInt(dv.phone_webview)}`;
+}
 
 async function loadTraffic() {
   const card = el("traffic");
@@ -1502,14 +1517,17 @@ function renderTraffic(d) {
     return;
   }
   const days = el("traffic-days").value;
-  const w = (d.windows || {})[days] || {};
-  const daily = (d.daily || []).filter((r) => !w.since || r.day >= w.since);
+  const w = trafficCompat((d.windows || {})[days]);
+  const daily = (d.daily || []).map(trafficCompat).filter((r) => !w.since || r.day >= w.since);
   el("traffic-report").classList.toggle("hidden", !d.report);
 
   const botShare = pct(w.bot_requests, w.requests);
+  const dv = w.devices;
   const tiles = [
-    { k: "Visitors", v: fmtInt(w.humans), s: `${fmtInt(w.landing_only)} splash only · ${fmtInt(w.clicked)} clicked through · ${fmtInt(w.app)} in the app` },
-    { k: "Reached the app", v: fmtInt(w.app), s: `${pct(w.app, w.humans)} of visitors · signed in, JS running` },
+    { k: "Visitors", v: fmtInt(w.humans), s: `${fmtInt(w.landing_only)} splash only · ${fmtInt(w.browser)} ran our JS · ${fmtInt(w.clicked)} clicked through · ${fmtInt(w.signed_in)} signed in` },
+    { k: "Signed in", v: fmtInt(w.signed_in), s: `${pct(w.signed_in, w.humans)} of visitors · used the app signed in` },
+    ...(dv ? [{ k: "On a phone", v: pct(Number(dv.phone || 0) + Number(dv.phone_webview || 0), w.humans),
+                s: deviceChips(dv) }] : []),
     { k: "Shared deck pages", v: fmtInt(w.deck), s: "unique visitors to /deck/…" },
     // The mod fetching a class's art from /static/forged/ is the only trace a code was imported.
     { k: "Imported into the game", v: fmtInt(w.imports), s: `classes the mod fetched art for · ${fmtInt(w.import_fetches)} fetches · all-time ${fmtInt(Object.keys(d.imports || {}).length)}` },
@@ -1530,17 +1548,23 @@ function renderTraffic(d) {
     + (pageRows || `<tr><td colspan="2" class="muted">No page hits in this window.</td></tr>`);
   // Tagged links: clicks = hits on a URL carrying utm_source, visitors = unique IPs, then how deep those
   // IPs got anywhere in the window (same IP = same person, as everywhere on this card).
-  const campRows = (w.campaigns || []).map((r) =>
-    `<tr><td>${esc(r.campaign)}</td><td class="num">${fmtInt(r.clicks)}</td><td class="num">${fmtInt(r.visitors)}</td>`
-    + `<td class="num">${fmtInt(r.clicked)}</td><td class="num">${fmtInt(r.app)}</td><td class="num">${fmtInt(r.workshop)}</td></tr>`).join("");
+  // Rows from before 2026-10-13 have "app" (= ran our JS) and no signed_in / devices: show "—" there.
+  const campRows = (w.campaigns || []).map((r) => {
+    const chips = deviceChips(r.devices);
+    return `<tr><td>${esc(r.campaign)}${chips ? `<div class="muted">${esc(chips)}</div>` : ""}</td>`
+      + `<td class="num">${fmtInt(r.clicks)}</td><td class="num">${fmtInt(r.visitors)}</td>`
+      + `<td class="num">${fmtInt(r.clicked)}</td><td class="num">${fmtInt(r.browser !== undefined ? r.browser : r.app)}</td>`
+      + `<td class="num">${r.signed_in !== undefined ? fmtInt(r.signed_in) : "—"}</td><td class="num">${fmtInt(r.workshop)}</td></tr>`;
+  }).join("");
   el("traffic-campaigns").innerHTML =
-    `<tr><th>source/campaign</th><th class="num">Clicks</th><th class="num">Visitors</th><th class="num">Clicked on</th><th class="num">App</th><th class="num">Workshop</th></tr>`
-    + (campRows || `<tr><td colspan="6" class="muted">No tagged links in this window. Tag a link with ?utm_source=…&amp;utm_campaign=… and it shows up here.</td></tr>`);
+    `<tr><th>source/campaign</th><th class="num">Clicks</th><th class="num">Visitors</th><th class="num">Clicked on</th><th class="num">Ran JS</th><th class="num">Signed in</th><th class="num">Workshop</th></tr>`
+    + (campRows || `<tr><td colspan="7" class="muted">No tagged links in this window. Tag a link with ?utm_source=…&amp;utm_campaign=… and it shows up here.</td></tr>`);
 
   const span = w.since ? `${w.since} → ${d.last_day} (${fmtInt(w.day_count)} days, UTC)` : "no days logged";
   el("traffic-note").textContent = `${span}. From the nginx access log, refreshed ${d.generated_at || "?"}. `
     + "Unique IPs, crawlers and scanners dropped by user agent — spoofed ones still land in “splash only”, "
-    + "so “clicked through” is the honest floor for people. The site loads no analytics script.";
+    + "so “ran our JS” and deeper are people. Device = the IP's first user agent of the day; "
+    + "webview = an in-app browser (YouTube, Reddit, Discord). The site loads no analytics script.";
 }
 
 // --- wiring --------------------------------------------------------------------------------------

@@ -21,6 +21,15 @@ UA_CHROME = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTM
 UA_PHONE = ("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 Version/17.0 "
             "Mobile/15E148 Safari/604.1")
 GOOGLEBOT = "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"
+# The YouTube iOS app's in-app browser: a WKWebView, so no "Safari/" token.
+UA_IOS_WEBVIEW = ("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) "
+                  "Mobile/15E148")
+UA_IOS_CHROME = ("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) "
+                 "CriOS/129.0.6668.69 Mobile/15E148 Safari/604.1")
+UA_ANDROID = ("Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) "
+              "Chrome/129.0.0.0 Mobile Safari/537.36")
+UA_ANDROID_WV = ("Mozilla/5.0 (Linux; Android 14; Pixel 8 Build/AP2A.240905.003; wv) AppleWebKit/537.36 "
+                 "(KHTML, like Gecko) Version/4.0 Chrome/129.0.6668.81 Mobile Safari/537.36")
 
 
 def line(ip, day, path, status=200, ref="-", ua=UA_CHROME, method="GET", time="12:00:00"):
@@ -114,11 +123,13 @@ def test_daily_buckets_are_exclusive_and_bots_are_dropped(logs):
     by_day = {r["day"]: r for r in data["daily"]}
     d14, d15 = by_day["2026-09-14"], by_day["2026-09-15"]
     # 14th: 1.1.1.1 splash only, 2.2.2.2 clicked; 9.9.9.9 / 8.8.8.8 / 7.7.7.7 are bots and never appear
-    assert (d14["landing_only"], d14["clicked"], d14["app"], d14["humans"]) == (1, 1, 0, 2)
+    assert (d14["landing_only"], d14["clicked"], d14["signed_in"], d14["humans"]) == (1, 1, 0, 2)
+    assert d14["browser"] == 0 and "app" not in d14
     assert d14["requests"] == 6 and d14["bot_requests"] == 3
-    # 15th: 3.3.3.3 in the app (no splash needed), 1.1.1.1 / 5.5.5.5 / 10.10.10.10 (via /workshop 302)
-    # clicked, 4.4.4.4 deck only
-    assert (d15["landing_only"], d15["clicked"], d15["app"], d15["humans"]) == (0, 3, 1, 4)
+    # 15th: 3.3.3.3 signed in (/api/classes; no splash needed), 1.1.1.1 / 5.5.5.5 / 10.10.10.10 (via
+    # /workshop 302) clicked, 4.4.4.4 deck only
+    assert (d15["landing_only"], d15["clicked"], d15["signed_in"], d15["humans"]) == (0, 3, 1, 4)
+    assert d15["browser"] == 0
     assert d15["deck"] == 1 and d15["landing"] == 3  # the 302 from 6.6.6.6 is not a splash view
     # overlays: 4.4.4.4's /api/deck/abc (not 11.11.11.11's art thumb, not /api/featured); 10.10.10.10's 302
     assert d15["featured"] == 1 and d15["workshop"] == 1
@@ -130,7 +141,9 @@ def test_windows_count_each_ip_once_at_its_deepest(logs):
     data = tr.build(paths, {"blankthespire.com"}, today="2026-09-15")
     w = data["windows"]["0"]
     # 1.1.1.1 was splash-only on the 14th and clicked on the 15th: one visitor, counted as clicked.
-    assert (w["humans"], w["app"], w["clicked"], w["landing_only"]) == (5, 1, 4, 0)
+    assert (w["humans"], w["signed_in"], w["clicked"], w["browser"], w["landing_only"]) == (5, 1, 4, 0, 0)
+    # 1.1.1.1 used a phone on the 15th, but its first request (14th, and again on the 15th) was desktop
+    assert w["devices"] == {"desktop": 5, "phone": 0, "phone_webview": 0}
     assert w["featured"] == 1 and w["workshop"] == 1
     assert w["deck"] == 1 and w["day_count"] == 2 and w["since"] == "2026-09-14"
     refs = {r["source"]: r["visitors"] for r in w["referers"]}
@@ -163,14 +176,93 @@ def test_tagged_links_show_clicks_visitors_and_depth(logs):
     # 10.10.10.10 clicked the ad link twice (2 clicks, 1 visitor), got past the splash to /workshop, never
     # signed in; the crawler's hit and the bare gclid never appear
     assert camps["youtube/promo-oct26"] == {"campaign": "youtube/promo-oct26", "clicks": 2, "visitors": 1,
-                                            "clicked": 1, "app": 0, "workshop": 1}
-    # 3.3.3.3 came in on a tagged /app link and ran the app
+                                            "clicked": 1, "browser": 0, "signed_in": 0, "workshop": 1,
+                                            "devices": {"desktop": 1, "phone": 0, "phone_webview": 0}}
+    # 3.3.3.3 came in on a tagged /app link and signed in
     assert camps["reddit/sts2"] == {"campaign": "reddit/sts2", "clicks": 1, "visitors": 1,
-                                    "clicked": 1, "app": 1, "workshop": 0}
+                                    "clicked": 1, "browser": 1, "signed_in": 1, "workshop": 0,
+                                    "devices": {"desktop": 1, "phone": 0, "phone_webview": 0}}
     assert set(camps) == {"youtube/promo-oct26", "reddit/sts2"}
     # the tag never changes the depth buckets themselves: the tagged splash view is still a splash view
     assert by_day["2026-09-15"]["landing"] == 3
     assert tr.Tally({"x"}).window(7, "2026-09-15")["campaigns"] == []
+
+
+# A phone ad day, shaped like the 2026-10-07 YouTube run: every splash load runs landing.js, which fetches
+# /api/featured and /api/me, so neither may count as clicking through or as signing in.
+AD = "/?utm_source=youtube&utm_medium=video-ad&utm_campaign=promo-oct26"
+FUNNEL = [
+    # 30: YouTube app webview, splash + its JS, then hands off to real Safari and opens /login. Still
+    # a webview visitor: the first request of the day sets the device.
+    line("30.30.30.30", "07/Oct/2026", AD, ua=UA_IOS_WEBVIEW, time="10:00:00"),
+    line("30.30.30.30", "07/Oct/2026", "/api/featured", ua=UA_IOS_WEBVIEW, time="10:00:01"),
+    line("30.30.30.30", "07/Oct/2026", "/api/me", ua=UA_IOS_WEBVIEW, time="10:00:01"),
+    line("30.30.30.30", "07/Oct/2026", "/login", ua=UA_PHONE, time="10:01:00"),
+    # 31: webview, splash + JS, nothing else -> browser
+    line("31.31.31.31", "07/Oct/2026", AD, ua=UA_IOS_WEBVIEW),
+    line("31.31.31.31", "07/Oct/2026", "/api/featured", ua=UA_IOS_WEBVIEW),
+    line("31.31.31.31", "07/Oct/2026", "/api/me", ua=UA_IOS_WEBVIEW),
+    # 32: real iPhone Safari, splash + JS -> browser
+    line("32.32.32.32", "07/Oct/2026", AD, ua=UA_PHONE),
+    line("32.32.32.32", "07/Oct/2026", "/api/me", ua=UA_PHONE),
+    # 33: Android webview, the splash HTML only, no JS -> splash only
+    line("33.33.33.33", "07/Oct/2026", AD, ua=UA_ANDROID_WV),
+    # 34: desktop, splash -> /login -> signed-in /app boot (/api/me, then /api/forge-estimate)
+    line("34.34.34.34", "07/Oct/2026", AD),
+    line("34.34.34.34", "07/Oct/2026", "/api/me"),
+    line("34.34.34.34", "07/Oct/2026", "/login"),
+    line("34.34.34.34", "07/Oct/2026", "/app"),
+    line("34.34.34.34", "07/Oct/2026", "/api/me"),
+    line("34.34.34.34", "07/Oct/2026", "/api/forge-estimate"),
+    # 35: desktop, untagged, opens /app signed out: /api/me runs, /api/forge-estimate is a 401 -> browser
+    line("35.35.35.35", "07/Oct/2026", "/app"),
+    line("35.35.35.35", "07/Oct/2026", "/api/me"),
+    line("35.35.35.35", "07/Oct/2026", "/api/forge-estimate", status=401),
+    # next day 31 comes back on a desktop UA: that day it is desktop, but the window keeps its first class
+    line("31.31.31.31", "08/Oct/2026", "/"),
+]
+
+
+@pytest.fixture()
+def funnel(tmp_path):
+    (tmp_path / "access.log").write_text("".join(FUNNEL), encoding="utf-8")
+    return tr.build(tr._sorted_logs(str(tmp_path / "access.log*")), {"blankthespire.com"}, today="2026-10-08")
+
+
+def test_device_class():
+    assert tr.device_class(UA_CHROME) == "desktop"
+    assert tr.device_class(UA_PHONE) == "phone"              # iPhone Safari
+    assert tr.device_class(UA_IOS_WEBVIEW) == "phone_webview"
+    assert tr.device_class(UA_IOS_CHROME) == "phone"         # Chrome on iOS: CriOS, not a webview
+    assert tr.device_class(UA_IOS_WEBVIEW + " FxiOS/131.0") == "phone"
+    assert tr.device_class(UA_ANDROID) == "phone"
+    assert tr.device_class(UA_ANDROID_WV) == "phone_webview"
+    assert tr.device_class("Mozilla/5.0 (Mobile; rv:48.0) Gecko/48.0 Firefox/48.0") == "phone"
+    assert tr.device_class("") == "desktop"
+
+
+def test_signed_in_and_browser_buckets_are_exclusive(funnel):
+    d = {r["day"]: r for r in funnel["daily"]}["2026-10-07"]
+    # 34 signed in; 30 clicked (/login); 31, 32, 35 only ran our JS; 33 never ran it
+    assert (d["signed_in"], d["clicked"], d["browser"], d["landing_only"]) == (1, 1, 3, 1)
+    assert d["humans"] == 6 == d["signed_in"] + d["clicked"] + d["browser"] + d["landing_only"]
+    assert d["landing"] == 5
+    w = funnel["windows"]["0"]
+    # 31 was "browser" on the 7th and "splash only" on the 8th: one visitor, at its deepest
+    assert (w["humans"], w["signed_in"], w["clicked"], w["browser"], w["landing_only"]) == (6, 1, 1, 3, 1)
+    assert w["devices"] == {"desktop": 2, "phone": 1, "phone_webview": 3}
+    assert sum(w["devices"].values()) == w["humans"]
+    d8 = {r["day"]: r for r in funnel["daily"]}["2026-10-08"]
+    assert (d8["humans"], d8["landing_only"]) == (1, 1)
+
+
+def test_campaign_rows_carry_reach_and_devices(funnel):
+    camps = {c["campaign"]: c for c in funnel["windows"]["0"]["campaigns"]}
+    assert set(camps) == {"youtube/promo-oct26"}
+    # 30..34 came in on the ad; 30 and 34 got past the splash; all but 33 ran the JS; only 34 signed in
+    assert camps["youtube/promo-oct26"] == {"campaign": "youtube/promo-oct26", "clicks": 5, "visitors": 5,
+                                            "clicked": 2, "browser": 4, "signed_in": 1, "workshop": 0,
+                                            "devices": {"desktop": 1, "phone": 1, "phone_webview": 3}}
 
 
 def test_imports_are_the_mods_art_fetches(logs):

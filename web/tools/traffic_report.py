@@ -20,11 +20,29 @@ How a visitor is counted (all per UTC day, by client IP, so every number here is
   * landing      — GET / answered 200: the public splash.
   * clicked      — a landing visitor who ALSO fetched a page past the splash that day (/login, /app,
                    /help, /download, /deck/…, /terms, /privacy, /auth/…, /api/…, /workshop). Not
-                   /api/featured: the splash itself fetches it, so it would make every landing look engaged.
-  * app          — GET /api/me answered 200: only index.html's JS calls it, so this is a real browser
-                   running the signed-in app.
-  Each (day, ip) lands in exactly ONE depth bucket — app > clicked > landing — so the daily bars stack
-  to "humans seen that day" without double counting.
+                   /api/featured or /api/me: the splash's own JS (landing.js) fetches both on every load,
+                   so either would make every landing look engaged.
+  * browser      — GET /api/me answered 200. landing.js (splash), signin.js (/login) and app.js (/app)
+                   all call it on load, so this means "a real browser ran our JS" — a bot filter, NOT
+                   signed-in use. (Until 2026-10-13 this bucket was called "app" and the card labelled it
+                   "reached the app", which over-read the YouTube ad by ~600 visitors.)
+  * signed_in    — GET /api/forge-estimate or /api/classes answered 200. Both are @require_login (401
+                   when signed out); app.js boot() fetches /api/forge-estimate right after /api/me says
+                   there is a user (every signed-in /app load, whatever tab opens), and /api/classes when
+                   the library tab opens. Nothing on the splash, /login, /deck or /download calls either.
+  Each (day, ip) lands in exactly ONE depth bucket — signed_in > clicked > browser > landing — so the
+  daily bars stack to "humans seen that day" without double counting. "browser" sits BELOW "clicked":
+  every JS-running splash visitor is a browser, so putting it above would swallow the click-throughs.
+  "browser" = ran our JS but went no further; "landing" (splash only) = no JS ran at all, which is
+  mostly spoofed-UA scanners plus no-JS / prefetching clients.
+  * device       — desktop / phone / phone_webview, from the user agent (see device_class): iOS =
+                   iPhone|iPad|iPod, an iOS UA without "Safari/" and without CriOS|FxiOS is an in-app
+                   WKWebView (the YouTube / Reddit / Discord apps); Android with "; wv)" is an Android
+                   WebView; anything else with iOS, Android or "Mobile" is a phone; the rest desktop. One
+                   class per IP: the FIRST non-bot request an IP makes on a UTC day sets its class for that
+                   day, and across a window the earliest day wins (an IP that later shows another UA, e.g.
+                   the webview hand-off to real Safari, keeps its first-seen class). Shown on the
+                   window's humans line and on each tagged-link row.
   * deck         — GET /deck/<slug> 200: a shared class page opened (unique IPs).
   Overlays (unique IPs, NOT depth buckets — an IP here is also in one of the buckets above, or in none):
   * featured     — GET /api/deck/<slug> 200 (exactly; not the /api/deck/<slug>/art/… thumbs): the deck
@@ -33,8 +51,9 @@ How a visitor is counted (all per UTC day, by client IP, so every number here is
                    path where a non-200 counts.
   * tagged       — a page hit whose URL carries utm_source (an ad or a tracked post link, e.g.
                    /?utm_source=youtube&utm_campaign=promo-oct26). Keyed "source/campaign". Per window:
-                   clicks (hits), visitors (unique IPs), and how deep those IPs got in the window —
-                   clicked past the splash, reached the app, hit /workshop. This is the only attribution
+                   clicks (hits), visitors (unique IPs), how deep those IPs got in the window —
+                   clicked past the splash, ran our JS (browser), signed in, hit /workshop — and the
+                   visitors' device split. This is the only attribution
                    the site has: nothing is set client-side, so a visitor who comes back untagged later
                    in the window still counts (same IP), one who comes back from another IP does not.
   * referers     — the referring HOST of a non-bot page hit, minus ourselves, raw IPs / IP-shaped hosts
@@ -84,6 +103,12 @@ BOT_UA_RE = re.compile(
     re.IGNORECASE)
 # Pages past the splash. /api covers the app's own calls (a real browser on /app), /auth the OAuth hops.
 ENGAGED_RE = re.compile(r"^/(login|app|help|download|deck/|terms|privacy|auth/|api/|workshop$)")
+# ...minus what the splash's own JS (landing.js) fetches on every load.
+SPLASH_API_PATHS = {"/api/featured", "/api/me"}
+BROWSER_PATH = "/api/me"
+# Only a signed-in /app answers 200 here (both routes are @require_login). app.js boot() fetches
+# /api/forge-estimate once /api/me reports a user; /api/classes is the library tab.
+SIGNED_IN_PATHS = {"/api/forge-estimate", "/api/classes"}
 DECK_RE = re.compile(r"^/deck/[^/?]+$")
 FEATURED_RE = re.compile(r"^/api/deck/[^/?]+$")
 WORKSHOP_PATH = "/workshop"
@@ -102,6 +127,26 @@ REFERER_SKIP_HOSTS = {"accounts.google.com", "localhost"}
 # following it) is NOT an import.
 IMPORT_RE = re.compile(r"^/static/forged/(?P<cid>\d+)/(?P<asset>splash\.png|sprite\.png|relic\.png|cards\.zip)$")
 MOD_UA_PREFIX = "BlankTheSpire/"
+
+
+IOS_RE = re.compile(r"iPhone|iPad|iPod")
+IOS_OTHER_BROWSER_RE = re.compile(r"CriOS|FxiOS")
+DEVICES = ("desktop", "phone", "phone_webview")
+
+
+def device_class(ua: str) -> str:
+    """'desktop', 'phone' or 'phone_webview' (an in-app browser: YouTube/Reddit/Discord on iOS open links in
+    a WKWebView whose UA drops the "Safari/" token; Android WebViews add "; wv)")."""
+    ua = ua or ""
+    if IOS_RE.search(ua):
+        if "Safari/" not in ua and not IOS_OTHER_BROWSER_RE.search(ua):
+            return "phone_webview"
+        return "phone"
+    if "Android" in ua:
+        return "phone_webview" if "; wv)" in ua else "phone"
+    if "Mobile" in ua:
+        return "phone"
+    return "desktop"
 
 
 def is_bot(ua: str) -> bool:
@@ -182,7 +227,10 @@ class Tally:
         self.bot_requests: dict[str, int] = defaultdict(int)
         self.landing: dict[str, set] = defaultdict(set)
         self.engaged: dict[str, set] = defaultdict(set)
-        self.app: dict[str, set] = defaultdict(set)
+        self.browser: dict[str, set] = defaultdict(set)
+        self.signed_in: dict[str, set] = defaultdict(set)
+        # Per day, ip -> device_class of that IP's FIRST non-bot request that day.
+        self.device: dict[str, dict[str, str]] = defaultdict(dict)
         self.deck: dict[str, set] = defaultdict(set)
         self.featured: dict[str, set] = defaultdict(set)
         self.workshop: dict[str, set] = defaultdict(set)
@@ -221,6 +269,8 @@ class Tally:
             return
         method, target = req[0], req[1]
         path = target.split("?", 1)[0]
+        if ip not in self.device[day]:
+            self.device[day][ip] = device_class(ua)
         if method != "GET":
             return
         if path == WORKSHOP_PATH and status in WORKSHOP_STATUSES:
@@ -231,10 +281,12 @@ class Tally:
             return
         if path == "/":
             self.landing[day].add(ip)
-        if ENGAGED_RE.match(path):
+        if ENGAGED_RE.match(path) and path not in SPLASH_API_PATHS:
             self.engaged[day].add(ip)
-        if path == "/api/me":
-            self.app[day].add(ip)
+        if path == BROWSER_PATH:
+            self.browser[day].add(ip)
+        if path in SIGNED_IN_PATHS:
+            self.signed_in[day].add(ip)
         if DECK_RE.match(path):
             self.deck[day].add(ip)
         if FEATURED_RE.match(path):
@@ -281,21 +333,23 @@ class Tally:
                              "assets": sorted(r["assets"]), "versions": sorted(r["versions"])}
         return out
 
-    def _depth(self, day: str) -> tuple[set, set, set]:
-        """Exclusive buckets for one day: (app, clicked-but-not-app, landing-only)."""
-        app = set(self.app[day])
-        clicked = (self.landing[day] & self.engaged[day]) - app
-        landing_only = self.landing[day] - self.engaged[day] - app
-        return app, clicked, landing_only
+    def _depth(self, day: str) -> tuple[set, set, set, set]:
+        """Exclusive buckets for one day, deepest first: (signed_in, clicked, browser, landing_only)."""
+        signed_in = set(self.signed_in[day])
+        clicked = (self.landing[day] & self.engaged[day]) - signed_in
+        browser = self.browser[day] - signed_in - clicked
+        landing_only = self.landing[day] - self.engaged[day] - signed_in - browser
+        return signed_in, clicked, browser, landing_only
 
     def daily(self) -> list[dict]:
         out = []
         for day in self.days():
-            app, clicked, landing_only = self._depth(day)
+            signed_in, clicked, browser, landing_only = self._depth(day)
             out.append({
                 "day": day,
-                "landing_only": len(landing_only), "clicked": len(clicked), "app": len(app),
-                "humans": len(landing_only) + len(clicked) + len(app),
+                "landing_only": len(landing_only), "browser": len(browser), "clicked": len(clicked),
+                "signed_in": len(signed_in),
+                "humans": len(landing_only) + len(browser) + len(clicked) + len(signed_in),
                 "landing": len(self.landing[day]),
                 "deck": len(self.deck[day]),
                 "featured": len(self.featured[day]), "workshop": len(self.workshop[day]),
@@ -312,18 +366,23 @@ class Tally:
         if days:
             cutoff = _shift_day(today, -(days - 1))
             keys = [k for k in keys if k >= cutoff]
-        app: set = set(); clicked: set = set(); landing_only: set = set(); deck: set = set()
+        signed_in: set = set(); clicked: set = set(); browser: set = set(); landing_only: set = set()
+        deck: set = set()
+        device: dict[str, str] = {}   # ip -> class; the earliest day in the window wins
         featured: set = set(); workshop: set = set(); imported: set = set()
         refs: dict[str, set] = defaultdict(set)
         pages: dict[str, set] = defaultdict(set)
         camp_hits: dict[str, int] = defaultdict(int)
         camp_ips: dict[str, set] = defaultdict(set)
-        engaged: set = set()
+        engaged: set = set(); browser_any: set = set()
         requests = bots = import_fetches = 0
         for day in keys:
-            a, c, l = self._depth(day)
-            app |= a; clicked |= c; landing_only |= l
+            si, c, b, l = self._depth(day)
+            signed_in |= si; clicked |= c; browser |= b; landing_only |= l
+            for ip, cls in self.device[day].items():
+                device.setdefault(ip, cls)
             engaged |= self.engaged[day]
+            browser_any |= self.browser[day] | self.signed_in[day]
             for key, n in self.campaign_hits[day].items():
                 camp_hits[key] += n
                 camp_ips[key] |= self.campaign_ips[day][key]
@@ -335,14 +394,25 @@ class Tally:
                 refs[src] |= ips
             for path, ips in self.pages[day].items():
                 pages[path] |= ips
-        # An IP that was landing-only on Monday and in the app on Friday counts once, at its deepest.
-        clicked -= app
-        landing_only -= app | clicked
+        # An IP that was landing-only on Monday and signed in on Friday counts once, at its deepest.
+        clicked -= signed_in
+        browser -= signed_in | clicked
+        landing_only -= signed_in | clicked | browser
+        humans = signed_in | clicked | browser | landing_only
+
+        def devices(ips: set) -> dict[str, int]:
+            out = dict.fromkeys(DEVICES, 0)
+            for ip in ips:
+                out[device.get(ip, "desktop")] += 1
+            return out
+
         return {
             "days": days, "day_count": len(keys),
             "since": keys[0] if keys else None,
-            "humans": len(app) + len(clicked) + len(landing_only),
-            "app": len(app), "clicked": len(clicked), "landing_only": len(landing_only),
+            "humans": len(humans),
+            "signed_in": len(signed_in), "clicked": len(clicked), "browser": len(browser),
+            "landing_only": len(landing_only),
+            "devices": devices(humans),
             "deck": len(deck), "featured": len(featured), "workshop": len(workshop),
             "imports": len(imported), "import_fetches": import_fetches,
             "requests": requests, "bot_requests": bots,
@@ -351,9 +421,12 @@ class Tally:
             "pages": [{"path": p, "visitors": len(ips)} for p, ips in
                       sorted(pages.items(), key=lambda kv: (-len(kv[1]), kv[0]))[:TOP_N]],
             # Tagged links: how deep the IPs that arrived via each tag got, anywhere in the window.
+            # browser / signed_in here are overlapping reach counts (ran our JS at all / signed in at
+            # all), not the exclusive buckets: a tagged visitor who signed in also ran the JS.
             "campaigns": [{"campaign": k, "clicks": camp_hits[k], "visitors": len(ips),
-                           "clicked": len(ips & engaged), "app": len(ips & app),
-                           "workshop": len(ips & workshop)}
+                           "clicked": len(ips & engaged), "browser": len(ips & browser_any),
+                           "signed_in": len(ips & signed_in), "workshop": len(ips & workshop),
+                           "devices": devices(ips)}
                           for k, ips in sorted(camp_ips.items(), key=lambda kv: (-len(kv[1]), kv[0]))[:TOP_N]],
         }
 
@@ -455,7 +528,8 @@ def main() -> int:
     os.replace(tmp, out_dir / "traffic.json")
     w7 = data["windows"]["7"]
     print(f"traffic.json: {len(data['daily'])} days ({data['first_day']}..{data['last_day']}), "
-          f"last 7d humans={w7['humans']} app={w7['app']}; goaccess={data['goaccess']}")
+          f"last 7d humans={w7['humans']} signed_in={w7['signed_in']} browser={w7['browser']}; "
+          f"goaccess={data['goaccess']}")
     return 0
 
 
