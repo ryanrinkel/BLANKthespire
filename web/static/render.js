@@ -8,6 +8,46 @@
 const $ = (sel) => document.querySelector(sel);
 const el = (id) => document.getElementById(id);
 
+// --- phones (docs/plans/PHONE_FUNNEL_PLAN.md section 5) ----------------------------------------------
+// A phone can forge but cannot play: the game runs on a PC. Coarse pointer (touch-first) or a phone/tablet
+// UA turns on the hand-off furniture (body.is-phone shows .phone-only); desktops never see it.
+const IS_PHONE = (() => {
+  try {
+    return window.matchMedia("(pointer: coarse)").matches || /iPhone|iPad|iPod|Android|Mobile/.test(navigator.userAgent);
+  } catch (_) { return false; }
+})();
+document.body.classList.toggle("is-phone", IS_PHONE);
+
+// "Send to my PC": the OS share sheet (AirDrop to a Mac, Messages / Notes / Mail to yourself) with the
+// public /deck/<slug> link, which shows the import code. Where there is no share sheet, copy the link.
+async function sendToPc(name, url) {
+  if (!url) return;
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: `${name || "A class"} — BLANK the spire`,
+        text: `${name || "A class"}: a Slay the Spire 2 class. Open this on your PC to grab the import code.`,
+        url,
+      });
+      return;
+    } catch (e) {
+      if (e && e.name === "AbortError") return;  // the sheet was dismissed: not an error
+    }
+  }
+  await copy(url);
+}
+
+// The import code box is readonly; a tap selects the whole code so the phone's Copy bubble is one tap away.
+// One delegated listener covers the app and the public /deck page (both render #r-code).
+function selectCodeBox(ev) {
+  const box = ev.target;
+  if (!box || box.id !== "r-code") return;
+  box.select();
+  try { box.setSelectionRange(0, box.value.length); } catch (_) { /* iOS needs the range form */ }
+}
+document.addEventListener("focusin", selectCodeBox);
+document.addEventListener("click", selectCodeBox);
+
 // --- art ------------------------------------------------------------------------------------------
 // "Show art" is a browser-only preference (the checkbox lives on My Classes); default on. It lives here
 // rather than app.js because the public /deck page renders the same class view without app.js. Private

@@ -22,8 +22,8 @@
   <meta name="twitter:image" content="{{IMAGE}}" />
   <meta name="description" content="{{DESC}}" />
 
-  <link rel="stylesheet" href="/static/style.css?v=20260924" />
-  <link rel="stylesheet" href="/static/deck.css?v=20261005" />
+  <link rel="stylesheet" href="/static/style.css?v=20261013" />
+  <link rel="stylesheet" href="/static/deck.css?v=20261013" />
 </head>
 <body>
   <header>
@@ -56,6 +56,9 @@
           <textarea id="r-code" rows="3" readonly></textarea>
           <div class="play-actions">
             <button id="copy-code" class="btn" type="button">Copy code</button>
+            <!-- Phones only (render.js body.is-phone): the share sheet, to get this page onto the PC. -->
+            <button id="send-pc" class="btn phone-only" type="button"
+                    title="Share this class to your PC (AirDrop, Messages, Notes, Mail…)">📲 Send to my PC</button>
             <button id="remix" class="btn primary" type="button">Forge your own twist</button>
           </div>
         </div>
@@ -87,7 +90,7 @@
     <p class="foot-note">Unofficial fan project — not affiliated with or endorsed by Mega Crit.</p>
   </footer>
 
-  <script src="/static/render.js?v=20260924"></script>
-  <script src="/static/deck.js?v=20261005"></script>
+  <script src="/static/render.js?v=20261013"></script>
+  <script src="/static/deck.js?v=20261013"></script>
 </body>
 </html>

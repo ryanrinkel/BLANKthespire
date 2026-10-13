@@ -56,6 +56,11 @@
     const name = cls.character?.name || cls.name;
     if (name) { document.title = name + " — BLANK the spire"; }
     if (cls.featured === true) { markFeatured(); }
+    const sendPc = document.getElementById("send-pc");
+    if (sendPc && window.sendToPc) {
+      const url = location.origin + "/deck/" + encodeURIComponent(root.dataset.slug || "");
+      sendPc.addEventListener("click", () => window.sendToPc(name, url));
+    }
     const remix = document.getElementById("remix");
     if (remix) { remix.addEventListener("click", () => startRemix(cls, name)); }
   }

@@ -604,3 +604,16 @@ body.landing a:focus-visible { outline: 2px solid var(--accent); outline-offset:
 .admin-log { list-style: none; margin: 0; padding: 0; font-size: 12px; color: var(--muted); }
 .admin-log li { padding: 3px 0; border-bottom: 1px solid var(--line); }
 .admin-log li:last-child { border-bottom: none; }
+
+/* --- phones: forge here, play on the PC (docs/plans/PHONE_FUNNEL_PLAN.md section 5) --------------- */
+/* render.js sets body.is-phone (coarse pointer or a phone UA); .phone-only furniture never shows on a desktop. */
+body:not(.is-phone) .phone-only { display: none !important; }
+.banner.phone .banner-icon { color: var(--accent); }
+.phone-banner-text { flex: 1; min-width: 0; margin: 0; line-height: 1.45; }
+/* The hand-off row on the result page: sits under the description, above the art and the card gallery. */
+.handoff { margin: 10px 0 14px; padding: 12px 14px; border: 1px solid var(--accent2); border-radius: 12px;
+  background: linear-gradient(135deg, rgba(124,92,255,.12), var(--panel2)); }
+.handoff-lede { margin: 0 0 8px; font-size: 13px; color: var(--ink); }
+.handoff-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.handoff-actions .btn { margin: 0; flex: 1 1 150px; text-align: center; }
+.handoff .hint { margin: 8px 0 0; }

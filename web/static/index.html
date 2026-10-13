@@ -7,7 +7,7 @@
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png" />
   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/static/style.css?v=20261012" />
+  <link rel="stylesheet" href="/static/style.css?v=20261013" />
 </head>
 <body>
   <header>
@@ -38,6 +38,14 @@
 
   <!-- Forge view -->
   <main id="view-forge" class="hidden">
+    <!-- Phone banner (PHONE_FUNNEL_PLAN.md 5.1): phones only (render.js IS_PHONE), until dismissed
+         (bts_phone_banner_dismissed). Forging on a phone is fine; playing needs the PC. -->
+    <div id="phone-banner" class="banner phone hidden" role="status">
+      <span class="banner-icon" aria-hidden="true">📱</span>
+      <p class="phone-banner-text">On a phone? Forge away — the class is saved to My Classes. Open
+        blankthespire.com on the PC that runs Slay the Spire 2 to grab the code, or send it to yourself below.</p>
+      <button id="phone-banner-x" class="banner-x" aria-label="Dismiss">×</button>
+    </div>
     <!-- Welcome banner (2026-09-30): a five-step "how it works" tutorial, shown to every signed-in account
          until it is dismissed (bts_tutorial_banner_dismissed). It replaced the 2026-09-28 "subscribe to the
          mod" warning: people were reaching this page and leaving, so the whole flow is spelled out up front.
@@ -47,7 +55,8 @@
       <div id="v3-banner-text" class="tutorial-body">
         <strong>How it works</strong>
         <ol class="tutorial-steps">
-          <li><a href="/workshop" target="_blank" rel="noopener">Subscribe to the mod</a> on Steam Workshop (once).</li>
+          <!-- On a phone app.js moves this step last and prefixes "Later, on your PC:" — it is not a blocker there. -->
+          <li id="tut-subscribe"><a href="/workshop" target="_blank" rel="noopener">Subscribe to the mod</a> on Steam Workshop (once).</li>
           <li>Pick how to pay: paste your own API key (free) or get a forge token (one token = one forge). The Forge button stays off until you do.</li>
           <li>Describe a class below and press Forge. You get a code.</li>
           <li>In Slay the Spire 2: Mods → BLANK the spire → <em>Import a class code</em> → paste → Import.</li>
@@ -231,6 +240,18 @@
       </div>
       <h2 id="r-name"></h2>
       <p id="r-desc" class="muted"></p>
+      <!-- Phone hand-off (PHONE_FUNNEL_PLAN.md 5.2/5.3): above the art and the card gallery so it is on the
+           first screen. .phone-only: desktops never see it. -->
+      <div id="r-handoff" class="handoff phone-only">
+        <p class="handoff-lede">Play it on your PC — send the class there:</p>
+        <div class="handoff-actions">
+          <button id="send-pc" class="btn primary" type="button"
+                  title="Share the class link to your PC (AirDrop, Messages, Notes, Mail…)">📲 Send to my PC</button>
+          <button id="email-me" class="btn" type="button"
+                  title="Email the link and the import code to your account's address">✉️ Email it to me</button>
+        </div>
+        <p id="r-handoff-note" class="hint hidden"></p>
+      </div>
       <div id="r-art" class="r-art hidden"></div>
       <div id="r-archetypes" class="archetypes hidden"></div>
       <div id="r-relic" class="relic hidden"></div>
@@ -406,7 +427,7 @@
 
   <!-- ?v= busts the 1-hour static cache on deploy: bump both whenever either file changes. render.js holds
        the class renderers shared with the public /deck page and must load first. -->
-  <script src="/static/render.js?v=20261012"></script>
-  <script src="/static/app.js?v=20261012"></script>
+  <script src="/static/render.js?v=20261013"></script>
+  <script src="/static/app.js?v=20261013"></script>
 </body>
 </html>

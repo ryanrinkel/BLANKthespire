@@ -37,6 +37,7 @@ if os.environ.get("BTSWEB_NO_DOTENV", "").strip() not in ("1", "true", "yes"):
 from auth import (current_user, init_auth, is_admin, is_production, is_unlimited,  # noqa: E402
                   require_login, session_age, user_is_unlimited)
 import alerts as _alerts  # noqa: E402
+import auth as _auth  # noqa: E402  (module attrs: tests swap the mailer / mail_configured)
 from billing import init_billing  # noqa: E402
 from db import db_ping, init_db, session_scope  # noqa: E402
 from forge import (ELEMENT_KINDS, VALID_FEEDBACK_CATEGORIES, ForgeError, UsageMeter,  # noqa: E402
@@ -1856,6 +1857,64 @@ def delete_class(class_id: int):
     # class without its art; ignore_errors because the dir may never have existed (no image backend).
     shutil.rmtree(STATIC_FORGED_DIR / str(class_id), ignore_errors=True)
     return jsonify({"ok": True})
+
+
+# --- "Email it to me": the phone -> PC hand-off (docs/plans/PHONE_FUNNEL_PLAN.md 5.2) -------------------
+# Someone who forged on a phone needs the class on the PC that runs the game. This mails the account's own
+# address the share link + the import code. Only ever the signed-in account's address (users.email, written
+# from a provider-VERIFIED address only), so it cannot be aimed at a stranger; 5 per hour per account.
+
+def _class_mail(name: str, url: str, code: str) -> tuple[str, str, str]:
+    """(subject, text, html) for the class hand-off mail. Text first: it is what most clients show."""
+    subject = f"Your Slay the Spire 2 class: {name}"
+    text = (f"Here is \"{name}\", the class you forged on BLANK the spire.\n\n"
+            f"Open it on the PC that runs Slay the Spire 2:\n{url}\n\n"
+            "Or paste this import code in-game (Mods -> BLANK the spire -> Import a class code -> Import, "
+            "then restart the game):\n\n"
+            f"{code}\n\n"
+            f"Don't have the mod yet? {PUBLIC_BASE_URL}/workshop\n"
+            "You asked for this email from your My Classes page; nothing else is sent.\n")
+    n, u, c = html_escape(name), html_escape(url), html_escape(code)
+    html = (f"<p>Here is <b>{n}</b>, the class you forged on BLANK the spire.</p>"
+            f"<p>Open it on the PC that runs Slay the Spire 2:<br><a href=\"{u}\">{u}</a></p>"
+            "<p>Or paste this import code in-game (Mods &rarr; BLANK the spire &rarr; <i>Import a class code</i>"
+            " &rarr; Import, then restart the game):</p>"
+            f"<pre style=\"white-space:pre-wrap;word-break:break-all;font-family:monospace\">{c}</pre>"
+            f"<p>Don't have the mod yet? <a href=\"{PUBLIC_BASE_URL}/workshop\">Get it on Steam Workshop</a>.</p>"
+            "<p style=\"color:#888\">You asked for this email from your My Classes page; nothing else is sent.</p>")
+    return subject, text, html
+
+
+@app.route("/api/classes/<int:class_id>/email", methods=["POST"])
+@require_login
+def email_class(class_id: int):
+    """Mail the signed-in account its own class: name, /deck/<slug> link, import code.
+    200 {sent: true} | 404 not yours | 400 no email on the account | 429 rate limited | 503 mail not
+    configured | 502 the mail provider refused."""
+    if not _auth.mail_configured():
+        return jsonify({"error": "email isn't set up on this server — copy the code or use the share link"}), 503
+    user = current_user()
+    with session_scope() as s:
+        cls = _owned(s, user["id"], class_id)
+        if cls is None:
+            return jsonify({"error": "not found"}), 404
+        row = s.query(User).filter_by(id=user["id"]).one_or_none()
+        to = ((row.email if row is not None else "") or "").strip()
+        if not to:
+            return jsonify({"error": "this account has no email address — sign in with Google, GitHub or "
+                                     "email to use this, or copy the code instead"}), 400
+        if not cls.slug:
+            cls.slug = new_slug()  # every class has one since the backfill; belt and braces
+        name, code, url = cls.name, cls.code, f"{PUBLIC_BASE_URL}/deck/{cls.slug}"
+    if not _auth.class_mail_limiter.check(f"user:{user['id']}", _client_ip()):
+        return jsonify({"error": "that's a lot of emails — try again in an hour, or copy the code"}), 429
+    subject, text, html = _class_mail(name, url, code)
+    try:
+        _auth._send_mail(to, subject, html, text)
+    except Exception:
+        app.logger.exception("class email to user %s failed", user["id"])
+        return jsonify({"error": "the email didn't go out — try again later, or copy the code"}), 502
+    return jsonify({"sent": True, "to": to})
 
 
 # --- share resolver (public) -------------------------------------------------------------------------

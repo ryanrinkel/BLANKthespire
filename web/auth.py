@@ -322,20 +322,30 @@ def _public_url() -> str:
             or request.url_root.rstrip("/"))
 
 
-def _send_magic_link(email: str, url: str) -> None:
-    """Send one sign-in link through Resend's HTTPS API (no SDK — requests is already a dependency).
-    Deliberately plain text, one URL, no tracking pixels or click-wrapping: HTML mail and redirect-tracking
-    are what put magic links in the spam folder. Module-level so tests can swap it for a capture stub."""
-    body = ("Here is your sign-in link for BLANK the spire:\n\n"
-            f"{url}\n\n"
-            "This link expires in 15 minutes. If you didn't ask for it, ignore this email.\n")
+def _send_mail(to: str, subject: str, html: str | None, text: str) -> None:
+    """Send one message through Resend's HTTPS API (no SDK — requests is already a dependency). The one mail
+    transport: the magic link and the "email my class" hand-off both go through here. `html` is optional —
+    the magic link is deliberately text-only (HTML mail and redirect-tracking are what put sign-in links in
+    the spam folder). Raises on a non-2xx so the caller decides what the user sees."""
+    payload = {"from": os.environ.get("BTSWEB_MAIL_FROM", "").strip(), "to": [to],
+               "subject": subject, "text": text}
+    if html:
+        payload["html"] = html
     resp = requests.post(
         RESEND_ENDPOINT,
         headers={"Authorization": f"Bearer {os.environ.get('RESEND_API_KEY', '').strip()}"},
-        json={"from": os.environ.get("BTSWEB_MAIL_FROM", "").strip(), "to": [email],
-              "subject": "Your BLANK the spire sign-in link", "text": body},
+        json=payload,
         timeout=10)
     resp.raise_for_status()
+
+
+def _send_magic_link(email: str, url: str) -> None:
+    """Send one sign-in link. Deliberately plain text, one URL, no tracking pixels or click-wrapping.
+    Module-level so tests can swap it for a capture stub."""
+    body = ("Here is your sign-in link for BLANK the spire:\n\n"
+            f"{url}\n\n"
+            "This link expires in 15 minutes. If you didn't ask for it, ignore this email.\n")
+    _send_mail(email, "Your BLANK the spire sign-in link", None, body)
 
 
 class MagicLinkLimiter:
@@ -383,6 +393,9 @@ class MagicLinkLimiter:
 
 
 magic_limiter = MagicLinkLimiter()
+# "Email it to me" (POST /api/classes/<id>/email, phone hand-off): keyed by user id (the address is the
+# account's own, so a per-address cap is the same thing), 5 per hour; plus a per-IP hourly backstop.
+class_mail_limiter = MagicLinkLimiter(per_email=5, email_window_s=3600, per_ip=20, ip_window_s=3600)
 
 
 def _claim_link(token: str, *, consume: bool) -> str | None:
@@ -581,8 +594,10 @@ def init_auth(app) -> None:
                     "admin": is_admin(user.get("email", "")),
                     "identities": _identities_of(user["id"])}
         # email_login gates signin.js's email form: mail configured, or the dev bypass standing in for it.
+        # mail: this deploy can send mail (Resend) — gates the "Email it to me" class hand-off button.
         return jsonify({"user": user, "dev_auth": _dev_auth_enabled(),
-                        "providers": configured_providers(), "email_login": email_login_enabled()})
+                        "providers": configured_providers(), "email_login": email_login_enabled(),
+                        "mail": mail_configured()})
 
     if _dev_auth_enabled():
         @app.route("/dev-login")

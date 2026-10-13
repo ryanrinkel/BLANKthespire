@@ -211,6 +211,7 @@ def _reset_process_state(app_module):
     import auth
 
     auth.magic_limiter.reset()
+    auth.class_mail_limiter.reset()
     with app_module._user_active_lock:
         app_module._user_active.clear()
     with app_module._feedback_lock:

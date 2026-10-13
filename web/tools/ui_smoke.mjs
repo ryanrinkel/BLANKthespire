@@ -4,7 +4,7 @@
 //     STRIPE_SECRET_KEY=sk_test_smoke PORT=5077 uv run --project ../generation python app.py
 // (the dummy Stripe key only flips /api/billing to {enabled:true} so the donate tiers + custom-amount row
 //  render; nothing in these scenarios ever hits Stripe)
-// then, from web/tools:  node ui_smoke.mjs http://127.0.0.1:5077 <outdir> forge|library|account|pages|art|lost|featured|webview
+// then, from web/tools:  node ui_smoke.mjs http://127.0.0.1:5077 <outdir> forge|library|account|pages|art|lost|featured|webview|phone
 // (`featured` also needs BTSWEB_FEATURED_FILE=<json whose slugs exist in that server's DB>, see the scenario)
 // (needs a package.json with {"type":"module"} next to it, or rename to .mjs — it is already .mjs).
 
@@ -708,6 +708,163 @@ if (scenario === "forge") {
   check(desk.cta < desk.featured, "desktop hero order unchanged (CTA above featured)", JSON.stringify(desk));
   await shot("desktop-landing", false);
   await send("Fetch.disable");
+} else if (scenario === "phone") {
+  // 2026-10-13 (docs/plans/PHONE_FUNNEL_PLAN.md phase 2): iPhone Safari at 390 px with touch emulation (so
+  // `pointer: coarse` matches). The app shows the one-line phone banner (dismissible), moves the tutorial's
+  // "subscribe" step last; a forged class's result page carries "Send to my PC" + "Email it to me" ABOVE the
+  // art and the card gallery; every library row carries both; /deck/<slug> carries the share-sheet button.
+  // The dev server has no mail, so the email button is first checked disabled-with-a-reason, then /api/me is
+  // rewritten (Fetch response stage) to say mail is configured and the POST is stubbed. navigator.share is
+  // replaced with a capture stub (headless has no real sheet). Desktop is checked last: none of it shows.
+  const IOS_SAFARI = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
+  await send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+  await send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 });
+  await send("Emulation.setUserAgentOverride", { userAgent: IOS_SAFARI, platform: "iPhone" });
+  await nav(`${base}/dev-login?email=unlimited@example.com`);
+  await evaluate(`localStorage.clear()`);
+  await nav(`${base}/app`); await sleep(500);
+  const vis = `(e) => !!e && e.offsetParent !== null && getComputedStyle(e).display !== 'none'`;
+  const noScroll = `document.documentElement.scrollWidth <= window.innerWidth`;
+  const top = `(e) => e ? e.getBoundingClientRect().top + window.scrollY : -1`;
+
+  // (a) phone banner + tutorial order
+  const b = await json(`(() => { const vis = ${vis};
+    const steps = [...document.querySelectorAll('#v3-banner .tutorial-steps li')].map(li => li.textContent.trim());
+    return {coarse: matchMedia('(pointer: coarse)').matches, is_phone: document.body.classList.contains('is-phone'),
+      banner: vis(document.getElementById('phone-banner')), text: document.querySelector('#phone-banner p').textContent.replace(/\\s+/g, ' ').trim(),
+      above_forge: !!(document.getElementById('phone-banner').compareDocumentPosition(document.getElementById('forge-input')) & Node.DOCUMENT_POSITION_FOLLOWING),
+      first: steps[0], last: steps[steps.length - 1], no_scroll: ${noScroll}}; })()`);
+  check(b.coarse && b.is_phone, "touch emulation: pointer coarse + body.is-phone", JSON.stringify(b));
+  check(b.banner && b.above_forge && b.text.startsWith("On a phone? Forge away") && b.text.includes("send it to yourself below"),
+        "phone banner visible above the forge box", JSON.stringify(b));
+  check(b.last.startsWith("Later, on your PC: Subscribe to the mod") && b.first.startsWith("Pick how to pay"),
+        "tutorial: subscribe step moved last, labelled for the PC", JSON.stringify(b));
+  check(b.no_scroll, "app at 390: no sideways scroll");
+  await shot("phone-app-390-fold", false);
+  await evaluate(`document.getElementById('phone-banner-x').click()`); await sleep(200);
+  const dis = await json(`({hidden: document.getElementById('phone-banner').classList.contains('hidden'),
+    key: localStorage.getItem('bts_phone_banner_dismissed'), tutorial: !document.getElementById('v3-banner').classList.contains('hidden')})`);
+  await nav(`${base}/app`); await sleep(300);
+  const after = await evaluate(`document.getElementById('phone-banner').classList.contains('hidden')`);
+  check(dis.hidden && dis.key === "1" && dis.tutorial && after, "phone banner dismisses (and stays dismissed), tutorial untouched", JSON.stringify(dis));
+
+  // (b) forge a class through the UI (dev-only offline demo) and look at the result page
+  await evaluate(`(() => { document.getElementById('forge-advanced').open = true;
+    document.getElementById('mode-fake').checked = true;
+    document.getElementById('concept').value = 'a phone-smoke lighthouse keeper';
+    document.getElementById('forge-btn').disabled = false; document.getElementById('forge-btn').click(); })()`);
+  let done = false;
+  for (let i = 0; i < 90 && !done; i++) {
+    await sleep(1000);
+    done = await evaluate(`!document.getElementById('result').classList.contains('hidden') && !!document.getElementById('r-code').value`);
+  }
+  check(done, "fake forge reached the result page");
+  const r = await json(`(() => { const vis = ${vis}, top = ${top};
+    const ho = document.getElementById('r-handoff'), send = document.getElementById('send-pc'), mail = document.getElementById('email-me');
+    const art = document.getElementById('r-art'), cards = document.getElementById('r-cards');
+    return {handoff: vis(ho), send: vis(send), mail: vis(mail), send_text: send.textContent, mail_text: mail.textContent,
+      mail_disabled: mail.disabled, mail_title: mail.title, note: document.getElementById('r-handoff-note').textContent,
+      before_cards: top(ho) < top(cards), before_art: !!(ho.compareDocumentPosition(art) & Node.DOCUMENT_POSITION_FOLLOWING),
+      fold: send.getBoundingClientRect().bottom, inner: window.innerHeight, no_scroll: ${noScroll},
+      name: document.getElementById('r-name').textContent}; })()`);
+  check(r.handoff && r.send && r.mail && r.send_text.includes("Send to my PC") && r.mail_text.includes("Email it to me"),
+        "result page: both hand-off buttons", JSON.stringify(r));
+  check(r.before_cards && r.before_art, "result page: hand-off sits before the art and the card gallery", JSON.stringify(r));
+  check(r.mail_disabled && /isn't set up/.test(r.mail_title) && /isn't set up/.test(r.note),
+        "no mail on this server: email button disabled with the reason", JSON.stringify(r));
+  check(r.no_scroll, "result at 390: no sideways scroll");
+  check(r.fold > 0 && r.fold <= r.inner, "result page: scrolled into view, Send to my PC above the fold", JSON.stringify({fold: r.fold, inner: r.inner}));
+  await shot("phone-result-390-fold", false);
+  await evaluate(`window.scrollTo(0, 0)`);
+  await shot("phone-result-390");
+
+  // share sheet: stubbed navigator.share receives the class name + the /deck/<slug> link
+  await evaluate(`Object.defineProperty(navigator, 'share', {configurable: true, value: async (d) => { window.__shared = d; }})`);
+  await evaluate(`document.getElementById('send-pc').click()`); await sleep(300);
+  const shared = await json(`window.__shared || null`);
+  check(!!shared && /\/deck\/[A-Za-z0-9_-]{20,}$/.test(shared.url) && shared.title.includes(r.name),
+        "Send to my PC opens the share sheet with the deck link", JSON.stringify(shared));
+  // no share sheet: falls back to copying the link (headless clipboard may refuse; either toast is the fallback)
+  await evaluate(`Object.defineProperty(navigator, 'share', {configurable: true, value: undefined})`);
+  await evaluate(`document.getElementById('send-pc').click()`); await sleep(400);
+  const fb = await evaluate(`document.getElementById('toast').textContent`);
+  check(/Copied|Copy failed/.test(fb), "no share sheet: falls back to copying the link", fb);
+  // the code box selects all on tap
+  const sel = await json(`(() => { const t = document.getElementById('r-code'); t.blur(); t.focus(); t.click();
+    return {start: t.selectionStart, end: t.selectionEnd, len: t.value.length, ro: t.readOnly}; })()`);
+  check(sel.ro && sel.start === 0 && sel.end === sel.len && sel.len > 0, "code box: readonly, select-all on tap", JSON.stringify(sel));
+
+  // (c) library rows
+  await evaluate(`document.getElementById('nav-library').click()`); await sleep(1200);
+  const lib = await json(`(() => { const vis = ${vis}; return [...document.querySelectorAll('#lib-list .lib-row')].map(li => ({
+    send: vis(li.querySelector('[data-act=sendpc]')), mail: vis(li.querySelector('[data-act=email]')),
+    mail_disabled: li.querySelector('[data-act=email]')?.disabled})); })()`);
+  check(lib.length > 0 && lib.every((x) => x.send && x.mail && x.mail_disabled), "library rows: both hand-off buttons (email disabled: no mail)", JSON.stringify(lib));
+  check(await evaluate(noScroll), "library at 390: no sideways scroll");
+  await shot("phone-library-390", false);
+
+  // (d) mail configured (rewritten /api/me) + a stubbed send: the button enables and the toast names the address
+  const posted = [];
+  listeners.push(async (msg) => {
+    if (msg.method !== "Fetch.requestPaused") return;
+    const p = msg.params, path = new URL(p.request.url).pathname;
+    if (path === "/api/me" && p.responseStatusCode) {
+      const body = await send("Fetch.getResponseBody", { requestId: p.requestId });
+      const data = JSON.parse(body.base64Encoded ? Buffer.from(body.body, "base64").toString() : body.body);
+      data.mail = true;
+      send("Fetch.fulfillRequest", { requestId: p.requestId, responseCode: 200,
+        responseHeaders: [{ name: "Content-Type", value: "application/json" }],
+        body: Buffer.from(JSON.stringify(data)).toString("base64") });
+    } else if (/^\/api\/classes\/\d+\/email$/.test(path)) {
+      posted.push(path);
+      send("Fetch.fulfillRequest", { requestId: p.requestId, responseCode: 200,
+        responseHeaders: [{ name: "Content-Type", value: "application/json" }],
+        body: Buffer.from(JSON.stringify({ sent: true, to: "unlimited@example.com" })).toString("base64") });
+    } else {
+      send("Fetch.continueRequest", { requestId: p.requestId });
+    }
+  });
+  await send("Fetch.enable", { patterns: [{ urlPattern: "*/api/me*", requestStage: "Response" },
+                                          { urlPattern: "*/api/classes/*/email*", requestStage: "Request" }] });
+  await nav(`${base}/app`); await sleep(500);
+  await evaluate(`document.getElementById('nav-library').click()`); await sleep(1200);
+  const en = await json(`(() => { const m = document.querySelector('#lib-list [data-act=email]'); return {disabled: m.disabled, title: m.title}; })()`);
+  check(!en.disabled && en.title.includes("unlimited@example.com"), "mail configured: email button enabled", JSON.stringify(en));
+  await evaluate(`document.querySelector('#lib-list [data-act=email]').click()`); await sleep(800);
+  const toastText = await evaluate(`document.getElementById('toast').textContent`);
+  check(posted.length === 1 && /Sent to unlimited@example.com/.test(toastText), "Email it to me posts and confirms", toastText);
+  await send("Fetch.disable");
+
+  // (e) the public share page at 390: the share-sheet button, no email, no sideways scroll
+  const slug = shared && shared.url.split("/deck/")[1];
+  await nav(`${base}/deck/${slug}`); await sleep(1000);
+  const d = await json(`(() => { const vis = ${vis}, top = ${top};
+    return {send: vis(document.getElementById('send-pc')), email: !!document.getElementById('email-me'),
+      before_cards: top(document.getElementById('send-pc')) < top(document.getElementById('r-cards')),
+      no_scroll: ${noScroll}}; })()`);
+  check(d.send && !d.email && d.before_cards && d.no_scroll, "/deck at 390: share-sheet button, no email, no sideways scroll", JSON.stringify(d));
+  await evaluate(`Object.defineProperty(navigator, 'share', {configurable: true, value: async (x) => { window.__shared = x; }})`);
+  await evaluate(`document.getElementById('send-pc').click()`); await sleep(300);
+  const ds = await json(`window.__shared || null`);
+  check(!!ds && ds.url.endsWith("/deck/" + slug), "/deck Send to my PC shares this page", JSON.stringify(ds));
+  await shot("phone-deck-390-fold", false);
+  await shot("phone-deck-390");
+
+  // (f) desktop: none of it shows
+  await send("Emulation.setTouchEmulationEnabled", { enabled: false });
+  await send("Emulation.clearDeviceMetricsOverride");
+  await send("Emulation.setUserAgentOverride", { userAgent: "" });
+  await nav(`${base}/app`); await sleep(500);
+  await evaluate(`localStorage.clear()`); await nav(`${base}/app`); await sleep(500);
+  const desk = await json(`(() => { const vis = ${vis}; return {is_phone: document.body.classList.contains('is-phone'),
+    banner: vis(document.getElementById('phone-banner')),
+    first: document.querySelector('#v3-banner .tutorial-steps li').textContent.trim()}; })()`);
+  await evaluate(`document.getElementById('nav-library').click()`); await sleep(1000);
+  const deskLib = await evaluate(`[...document.querySelectorAll('#lib-list [data-act=sendpc], #lib-list [data-act=email]')].some(e => e.offsetParent !== null)`);
+  check(!desk.is_phone && !desk.banner && desk.first.startsWith("Subscribe to the mod") && !deskLib,
+        "desktop: no phone banner, tutorial order unchanged, no hand-off buttons", JSON.stringify(desk));
+  await nav(`${base}/deck/${slug}`); await sleep(800);
+  check(!(await evaluate(`document.getElementById('send-pc').offsetParent !== null`)), "desktop /deck: no share-sheet button");
 }
 console.log(errors.length ? "CONSOLE ERRORS:\n" + errors.join("\n") : "no console errors");
 ws.close(); chrome.kill();

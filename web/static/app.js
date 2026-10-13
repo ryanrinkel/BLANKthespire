@@ -297,7 +297,22 @@ function renderBanner() {
   const bar = el("v3-banner");
   if (!bar) return;
   bar.classList.toggle("hidden", !(ME && !lsGet("bts_tutorial_banner_dismissed")));
+  // Phones (render.js IS_PHONE, PHONE_FUNNEL_PLAN.md 5.1): a one-line "forge here, play on the PC" banner,
+  // dismissed on its own key.
+  el("phone-banner").classList.toggle("hidden", !(ME && IS_PHONE && !lsGet("bts_phone_banner_dismissed")));
 }
+
+// On a phone, step 1 ("Subscribe to the mod on Steam Workshop") reads as a blocker — it can only be done on
+// the PC. Move it last and say so. Runs once at load; the tutorial markup is static.
+function phoneTutorialOrder() {
+  const li = el("tut-subscribe");
+  if (!IS_PHONE || !li) return;
+  li.parentNode.appendChild(li);
+  const later = document.createElement("em");
+  later.textContent = "Later, on your PC: ";
+  li.insertBefore(later, li.firstChild);
+}
+phoneTutorialOrder();
 
 // --- BYOK cost estimate ---------------------------------------------------------------------------
 // Everything here is SERVER-COMPUTED (/api/forge-estimate) — the browser multiplies, it never owns a price
@@ -840,6 +855,9 @@ function renderResult(cls) {
   renderClassView(cls);
   renderShareBar(cls, false);
   renderUsage(cls);
+  // On a phone the result lands under the forge box and the progress log, a screen or two down: bring it
+  // (and its "Send to my PC" row) into view. Desktops keep their scroll position.
+  if (IS_PHONE) el("result").scrollIntoView({ block: "start" });
 }
 
 // The bar above a rendered class: a share link (the public /deck/<slug> page) and, when the class was opened
@@ -849,9 +867,47 @@ function renderShareBar(cls, viewing) {
   const url = cls.share_url || (cls.slug ? `${location.origin}/deck/${cls.slug}` : "");
   share.dataset.url = url;
   share.classList.toggle("hidden", !url);
+  wireHandoff(el("send-pc"), el("email-me"), cls, url);
+  const why = emailBlocker();
+  el("r-handoff-note").textContent = why;
+  el("r-handoff-note").classList.toggle("hidden", !why);
   el("view-back").classList.toggle("hidden", !viewing);
   el("view-title").textContent = viewing ? "Viewing a saved class" : "Your new class";
   el("view-bar").classList.remove("hidden");
+}
+
+// --- phone -> PC hand-off (PHONE_FUNNEL_PLAN.md 5.2) -------------------------------------------------
+// "Send to my PC" (render.js sendToPc: the share sheet, else copy the link) and "Email it to me" (POST
+// /api/classes/<id>/email: the link + the import code to the account's own address). Shown on phones only
+// (.phone-only); the email button is disabled, with the reason in its title, when it cannot work.
+function emailBlocker() {
+  if (!ME_META || !ME_META.mail) return "Email isn't set up on this server yet — use Send to my PC, or copy the code.";
+  if (!ME || !ME.email) return "This account has no email address — use Send to my PC, or copy the code.";
+  return "";
+}
+
+function wireHandoff(sendBtn, mailBtn, cls, url) {
+  const name = cls.character?.name || cls.name || "";
+  sendBtn.disabled = !url;
+  sendBtn.onclick = () => sendToPc(name, url);
+  const why = cls.id == null ? "Open this class from My Classes to email it." : emailBlocker();
+  mailBtn.disabled = !!why;
+  mailBtn.title = why || "Email the link and the import code to " + (ME?.email || "your address");
+  mailBtn.onclick = why ? null : () => emailClass(cls.id, mailBtn);
+}
+
+async function emailClass(id, btn) {
+  btn.disabled = true;
+  try {
+    const r = await fetch(`/api/classes/${id}/email`, { method: "POST" });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
+    toast(`Sent to ${d.to || "your inbox"} — open it on your PC.`);
+  } catch (e) {
+    toast(e.message || "The email didn't go out — copy the code instead.");
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 // What this forge consumed (the server sums the usage meter): shown after a BYOK forge so the cost warning
@@ -1008,6 +1064,8 @@ function libRow(c) {
     + `<div class="lr-concept muted">${esc(c.concept || "")}</div></div>`
     + `<div class="lr-actions">`
     + `<button data-act="share" title="Copy a public link to this class">🔗 Share link</button>`
+    + `<button data-act="sendpc" class="phone-only">📲 Send to my PC</button>`
+    + `<button data-act="email" class="phone-only">✉️ Email it to me</button>`
     + `<button data-act="code" title="Copy the in-game import code">Copy code</button>`
     + `<button data-act="rename">Rename</button>`
     + `<button data-act="open">Open</button>`
@@ -1024,6 +1082,8 @@ function libRow(c) {
   const share = li.querySelector('[data-act="share"]');
   if (c.slug) share.onclick = () => copy(`${location.origin}/deck/${c.slug}`);
   else share.remove();  // classes without a slug (none since the backfill) simply get no share button
+  wireHandoff(li.querySelector('[data-act="sendpc"]'), li.querySelector('[data-act="email"]'), c,
+              c.slug ? `${location.origin}/deck/${c.slug}` : "");
   li.querySelector('[data-act="code"]').onclick = () => copyClassCode(c.id);
   li.querySelector('[data-act="rename"]').onclick = () => renameClass(c.id, c.name);
   li.querySelector('[data-act="open"]').onclick = () => openClass(c.id);
@@ -1048,6 +1108,7 @@ async function openClass(id) {
   el("forge-input").classList.add("hidden");
   el("chooser").classList.add("hidden");    // viewing a saved class: the forge furniture gets out of the way
   el("v3-banner").classList.add("hidden");
+  el("phone-banner").classList.add("hidden");
   el("progress").classList.add("hidden");
   el("spinner").classList.add("hidden");
   renderClassView(cls);
@@ -1588,6 +1649,7 @@ el("load-models").onclick = loadModels;
 el("choose-byok").onclick = chooseByok;
 el("choose-token").onclick = chooseToken;
 el("v3-banner-x").onclick = () => { lsSet("bts_tutorial_banner_dismissed", "1"); renderBanner(); };
+el("phone-banner-x").onclick = () => { lsSet("bts_phone_banner_dismissed", "1"); renderBanner(); };
 
 // feedback overlay: close on the × button, a backdrop click, or Escape; submit posts the rating.
 el("fb-close").onclick = closeFeedback;
