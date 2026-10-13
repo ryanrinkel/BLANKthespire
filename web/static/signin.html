@@ -7,7 +7,7 @@
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png" />
   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/static/style.css?v=20261005" />
+  <link rel="stylesheet" href="/static/style.css?v=20261013" />
 </head>
 <body>
   <header>
@@ -22,6 +22,14 @@
       <h1 id="title">Sign in</h1>
       <p id="lede" class="muted">Pick a provider — we only ever see the email address and display name it
         shares. No passwords, ever.</p>
+
+      <!-- In an in-app browser (webview.js): why Google is missing, plus a hand-off to the real browser.
+           signin.js fills the copy, unhides this box and moves the email form up under it. -->
+      <div id="webview-box" class="webview-box hidden">
+        <p id="webview-head" class="webview-head"></p>
+        <a id="open-browser" class="btn ghost webview-open hidden" href="#">Open in Safari</a>
+        <p id="webview-menu" class="hint webview-menu hidden"></p>
+      </div>
 
       <!-- One .btn.primary per provider /api/me reports, built by signin.js (CSP forbids inline script). -->
       <div id="providers" class="signin-options"></div>
@@ -59,6 +67,7 @@
     <p class="foot-note">Unofficial fan project — not affiliated with or endorsed by Mega Crit.</p>
   </footer>
 
-  <script src="/static/signin.js"></script>
+  <script src="/static/webview.js?v=20261013"></script>
+  <script src="/static/signin.js?v=20261013"></script>
 </body>
 </html>

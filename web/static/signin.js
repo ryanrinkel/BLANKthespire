@@ -17,6 +17,38 @@ const el = (id) => document.getElementById(id);
 // The "try a featured class" escape hatch is for visitors without an account; linking is for members.
 if (LINKING) el("try-instead").classList.add("hidden");
 
+// In an in-app browser (YouTube, Instagram, ...: webview.js) Google sign-in cannot work — Google refuses
+// embedded webviews — so the button is dropped, and the email magic link goes first with a line saying why:
+// Mail opens the link in the real browser, where the session then lives. GitHub (which does not block
+// webviews) stays, below the form. Plus a one-tap hand-off to Safari / Chrome, with the menu route always
+// spelled out under it because the x-safari-https scheme is not guaranteed to do anything.
+const WV = window.BTS_WEBVIEW || { any: false };
+const WEBVIEW_BLOCKED = new Set(["google"]);
+
+function webviewLayout(emailLogin) {
+  el("webview-head").textContent = "You're in " + WV.where + " — Google can't sign you in here.";
+  if (WV.openUrl) {
+    const open = el("open-browser");
+    open.href = WV.openUrl;
+    open.textContent = "Open in " + WV.browser;
+    open.classList.remove("hidden");
+    el("webview-menu").textContent = WV.menuHint + ".";
+    el("webview-menu").classList.remove("hidden");
+  }
+  el("webview-box").classList.remove("hidden");
+  if (!LINKING) el("lede").classList.add("hidden");  // link mode keeps its "signed in as ..." lede
+  if (emailLogin) {
+    // DOM order becomes: webview box, email form, "or", provider buttons.
+    const box = el("providers");
+    box.before(el("email-form"));
+    box.before(el("or"));
+    el("email-form").querySelector("label").textContent =
+      "Enter your email and we'll send a link; it opens in " + WV.browser + " and you're in.";
+    el("email-form").classList.add("signin-email-first");
+    el("email-form").querySelector("button").classList.add("primary");  // the way in here: make it the loud one
+  }
+}
+
 // The magic link: POST the address, then swap the form for "check your inbox". The server answers the same
 // way whether it sent anything or not (rate limit, bad syntax), so there is nothing to branch on — and
 // nothing here ever reveals whether an account exists.
@@ -82,11 +114,14 @@ function wireEmailForm() {
 
   // In link mode the account's existing providers are dropped: re-running one of them would just sign in
   // again (rule 1) and link nothing.
-  const providers = ((me && me.providers) || []).filter((p) => !owned.has(p));
+  const providers = ((me && me.providers) || [])
+    .filter((p) => !owned.has(p) && !(WV.any && WEBVIEW_BLOCKED.has(p)));
+  if (WV.any) webviewLayout(Boolean(me && me.email_login));
   const box = el("providers");
   for (const p of providers) {
     const a = document.createElement("a");
-    a.className = "btn primary";
+    // In a webview the email button is the primary one; the provider buttons step back to plain.
+    a.className = WV.any && me && me.email_login ? "btn" : "btn primary";
     a.href = "/login/" + p;
     a.textContent = (LINKING ? "Link " : "Continue with ") + (LABELS[p] || p);
     box.appendChild(a);

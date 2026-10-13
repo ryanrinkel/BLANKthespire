@@ -212,6 +212,15 @@ function featuredTile(item) {
   if (location.hash === "#featured") document.getElementById("featured").scrollIntoView();
 })();
 
+// In an in-app browser (webview.js) Google sign-in will fail, so the note under the CTA says up front that
+// email is the way in here, or how to reopen the page in the real browser.
+const WV = window.BTS_WEBVIEW;
+if (WV && WV.any) {
+  const who = WV.app ? "the " + WV.app + " browser" : "this in-app browser";
+  document.getElementById("splash-note").textContent = "Sign in by email — " + who
+    + " can't do Google sign-in. Or tap " + (WV.ios ? "···" : "⋮") + " → Open in " + WV.browser + ".";
+}
+
 // Point the button at the right place: already signed in → straight to the app; local dev (no OAuth
 // credentials, so the chooser has no buttons) → the dev-login bypass; otherwise → /login, the provider
 // chooser (the default href).

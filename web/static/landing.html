@@ -18,7 +18,7 @@
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png" />
   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/static/style.css?v=20261005" />
+  <link rel="stylesheet" href="/static/style.css?v=20261013" />
 </head>
 <body class="landing">
   <main class="splash">
@@ -26,6 +26,9 @@
     <div id="board" class="board" aria-label="BLANK the spire" role="img"></div>
 
     <p class="splash-sub">the spire</p>
+
+    <!-- Say "PC" before anything else: an ad viewer on a phone can't play it there. -->
+    <p class="splash-pc">A free mod for Slay the Spire 2 on Steam. Forge on any device; play on your PC.</p>
 
     <p class="splash-tag muted">How will you fill in the Blank?</p>
 
@@ -35,7 +38,8 @@
       <a id="signin" class="btn primary splash-go" href="/login">Create Your Own Class</a>
     </div>
 
-    <p class="splash-note muted">No password. Sign in with Google, GitHub or email to forge and keep your classes.</p>
+    <!-- landing.js swaps this for the email-first copy inside an in-app browser (webview.js). -->
+    <p id="splash-note" class="splash-note muted">No password. Sign in with Google, GitHub or email to forge and keep your classes.</p>
   </main>
 
   <!-- Curated classes anyone can open without an account; tiles built by landing.js from /api/featured. -->
@@ -92,6 +96,7 @@
     <p class="foot-note">Unofficial fan project — not affiliated with or endorsed by Mega Crit.</p>
   </footer>
 
-  <script src="/static/landing.js"></script>
+  <script src="/static/webview.js?v=20261013"></script>
+  <script src="/static/landing.js?v=20261013"></script>
 </body>
 </html>

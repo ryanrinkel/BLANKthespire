@@ -4,7 +4,7 @@
 //     STRIPE_SECRET_KEY=sk_test_smoke PORT=5077 uv run --project ../generation python app.py
 // (the dummy Stripe key only flips /api/billing to {enabled:true} so the donate tiers + custom-amount row
 //  render; nothing in these scenarios ever hits Stripe)
-// then, from web/tools:  node ui_smoke.mjs http://127.0.0.1:5077 <outdir> forge|library|account|pages|art|lost|featured
+// then, from web/tools:  node ui_smoke.mjs http://127.0.0.1:5077 <outdir> forge|library|account|pages|art|lost|featured|webview
 // (`featured` also needs BTSWEB_FEATURED_FILE=<json whose slugs exist in that server's DB>, see the scenario)
 // (needs a package.json with {"type":"module"} next to it, or rename to .mjs — it is already .mjs).
 
@@ -41,8 +41,10 @@ const target = await getTarget();
 const ws = new WebSocket(target.webSocketDebuggerUrl);
 await new Promise((r) => (ws.onopen = r));
 let id = 0; const pending = new Map(); const errors = [];
+const listeners = [];  // extra CDP event handlers a scenario registers (e.g. Fetch.requestPaused stubs)
 ws.onmessage = (m) => {
   const msg = JSON.parse(m.data);
+  for (const fn of listeners) fn(msg);
   if (msg.id && pending.has(msg.id)) { pending.get(msg.id)(msg); pending.delete(msg.id); }
   if (msg.method === "Runtime.exceptionThrown") errors.push("EXC " + (msg.params.exceptionDetails.exception?.description || msg.params.exceptionDetails.text));
   if (msg.method === "Runtime.consoleAPICalled" && (msg.params.type === "error" || msg.params.type === "warning"))
@@ -596,6 +598,116 @@ if (scenario === "forge") {
   } else {
     console.log("skip: no non-featured class in this DB");
   }
+} else if (scenario === "webview") {
+  // 2026-10-13 (docs/plans/PHONE_FUNNEL_PLAN.md phases 1 + 3): inside an in-app browser (no `Safari/` token
+  // on iOS, `; wv)` on Android) /login drops Google (it 403s embedded webviews), puts the email form first and
+  // offers an Open-in-Safari/Chrome hand-off; a real browser keeps the old order. The dev server has no OAuth
+  // credentials, so /api/me is stubbed to report google + github + email; /api/featured is stubbed too so the
+  // phone hero order (featured strip above the CTA) has tiles to show. Signed out: the top-level dev-login is
+  // undone by clearing cookies.
+  const IOS_WEBVIEW = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148";
+  const IOS_SAFARI = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1";
+  const ANDROID_WEBVIEW = "Mozilla/5.0 (Linux; Android 14; Pixel 8 Build/AP2A; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/129.0.6668.100 Mobile Safari/537.36";
+  await send("Network.enable"); await send("Network.clearBrowserCookies");
+  const stubs = {
+    "/api/me": { user: null, dev_auth: false, providers: ["google", "github"], email_login: true },
+    "/api/featured": { featured: [
+      { word: "CRAVE", name: "The Glutton", share_url: "/deck/smokeAAAAAAAAAAAAAAAAAAAA", card_count: 75,
+        description: "Eats cards to grow stronger; every meal is a gamble on what the next draw brings." },
+      { word: "GOOSE", name: "Honk Knight", share_url: "/deck/smokeBBBBBBBBBBBBBBBBBBBB", card_count: 75,
+        description: "A goose with a sword and absolutely no plan. Chaos stacks into damage." },
+      { word: "MOOSE", name: "Antler Warden", share_url: "/deck/smokeCCCCCCCCCCCCCCCCCCCC", card_count: 75,
+        description: "Slow, huge and impossible to move; block turns into antler charges." } ] },
+  };
+  listeners.push((msg) => {
+    if (msg.method !== "Fetch.requestPaused") return;
+    const body = stubs[new URL(msg.params.request.url).pathname];
+    if (!body) { send("Fetch.continueRequest", { requestId: msg.params.requestId }); return; }
+    send("Fetch.fulfillRequest", { requestId: msg.params.requestId, responseCode: 200,
+      responseHeaders: [{ name: "Content-Type", value: "application/json" }],
+      body: Buffer.from(JSON.stringify(body)).toString("base64") });
+  });
+  await send("Fetch.enable", { patterns: [{ urlPattern: "*/api/me*" }, { urlPattern: "*/api/featured*" }] });
+  const phone = () => send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+  const ua = (userAgent) => send("Emulation.setUserAgentOverride",
+    { userAgent, platform: userAgent.includes("Android") ? "Linux armv8l" : "iPhone" });
+  const loginState = `(() => { const pos = (a, b) => !!(a && b && (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING));
+    const form = document.getElementById('email-form'), gh = document.querySelector('a[href="/login/github"]'),
+      g = document.querySelector('a[href="/login/google"]'), box = document.getElementById('webview-box'),
+      open = document.getElementById('open-browser'), vis = (e) => !!e && !e.classList.contains('hidden') && e.offsetParent !== null;
+    return {path: location.pathname, google: !!g, github: !!gh, form_visible: vis(form), box_visible: vis(box),
+      form_before_github: pos(form, gh), google_before_form: pos(g, form), google_before_github: pos(g, gh),
+      box_before_form: pos(box, form), head: document.getElementById('webview-head').textContent,
+      label: form.querySelector('label').textContent, open_visible: vis(open), open_href: open.getAttribute('href'),
+      open_text: open.textContent, menu: document.getElementById('webview-menu').textContent,
+      menu_visible: vis(document.getElementById('webview-menu')), lede_visible: vis(document.getElementById('lede')),
+      hatch: vis(document.getElementById('try-instead')), host: location.host,
+      email_primary: form.querySelector('button').classList.contains('primary'), github_primary: !!gh && gh.classList.contains('primary'),
+      overflow: document.documentElement.scrollWidth > window.innerWidth}; })()`;
+
+  // (a) iPhone WKWebView, arriving from the ad: landing first (remembers utm_source=youtube for the tab).
+  await ua(IOS_WEBVIEW); await phone();
+  await nav(`${base}/?utm_source=youtube&utm_campaign=smoke`); await sleep(800);
+  const land = await json(`(() => { const top = (el) => el.getBoundingClientRect().top;
+    return {wv: window.BTS_WEBVIEW, note: document.getElementById('splash-note').textContent,
+      pc: document.querySelector('.splash-pc')?.textContent, featured_hidden: document.getElementById('featured').classList.contains('hidden'),
+      featured_top: top(document.getElementById('featured')), cta_top: top(document.getElementById('signin')),
+      board_top: top(document.getElementById('board')), pc_top: top(document.querySelector('.splash-pc')),
+      overflow: document.documentElement.scrollWidth > window.innerWidth}; })()`);
+  check(land.wv.ios && land.wv.any && land.wv.app === "YouTube", "webview.js: iPhone WKWebView detected, YouTube from utm", JSON.stringify(land.wv));
+  check(land.note === "Sign in by email — the YouTube browser can't do Google sign-in. Or tap ··· → Open in Safari.",
+        "landing note swapped for the webview copy", land.note);
+  check(land.pc === "A free mod for Slay the Spire 2 on Steam. Forge on any device; play on your PC." && land.pc_top > land.board_top,
+        "PC line under the board", JSON.stringify(land));
+  check(!land.featured_hidden && land.board_top < land.featured_top && land.featured_top < land.cta_top && !land.overflow,
+        "phone hero order: board, featured strip, then the CTA; no sideways scroll", JSON.stringify(land));
+  await shot("webview-landing-390");
+  await shot("webview-landing-390-fold", false);
+
+  await nav(`${base}/login`); await sleep(500);
+  const wv = await json(loginState);
+  check(wv.path === "/login" && !wv.google && wv.github, "webview /login: no Google button, GitHub kept", JSON.stringify(wv));
+  check(wv.form_visible && wv.form_before_github && wv.box_visible && wv.box_before_form && !wv.lede_visible,
+        "webview /login: notice, then the email form, then GitHub", JSON.stringify(wv));
+  check(wv.head === "You're in the YouTube app's browser — Google can't sign you in here."
+        && wv.label === "Enter your email and we'll send a link; it opens in Safari and you're in.",
+        "webview /login: plan 4.2 heading copy", wv.head + " | " + wv.label);
+  check(wv.open_visible && wv.open_text === "Open in Safari" && wv.open_href === `x-safari-https://${wv.host}/login`
+        && wv.menu_visible && wv.menu.includes("··· menu at the top right and choose Open in Safari"),
+        "webview /login: Open in Safari via x-safari-https + the menu fallback", JSON.stringify(wv));
+  check(wv.email_primary && !wv.github_primary, "webview /login: the email button is the primary one", JSON.stringify(wv));
+  check(wv.hatch && !wv.overflow, "webview /login: featured-class escape hatch kept; no sideways scroll", JSON.stringify(wv));
+  await shot("webview-login-390");
+
+  // (b) Android System WebView: the hand-off is an intent:// URL that keeps the path + query.
+  await ua(ANDROID_WEBVIEW);
+  await nav(`${base}/login?from=smoke`); await sleep(500);
+  const an = await json(loginState);
+  check(!an.google && an.form_before_github && an.open_text === "Open in Chrome"
+        && an.open_href === `intent://${an.host}/login?from=smoke#Intent;scheme=https;end`,
+        "android webview /login: email first, intent:// hand-off", JSON.stringify(an));
+
+  // (c) real iPhone Safari: the old order (Google, GitHub, then "or" + the email form), no webview notice.
+  await evaluate(`sessionStorage.clear()`);
+  await ua(IOS_SAFARI);
+  await nav(`${base}/login`); await sleep(500);
+  const sf = await json(loginState);
+  check(sf.google && sf.github && sf.google_before_github && sf.google_before_form && !sf.form_before_github
+        && !sf.box_visible && sf.lede_visible && sf.form_visible && sf.github_primary && !sf.email_primary, "Safari /login: old order, Google first", JSON.stringify(sf));
+  await shot("safari-login-390");
+  await nav(`${base}/`); await sleep(800);
+  const sl = await json(`({note: document.getElementById('splash-note').textContent, any: window.BTS_WEBVIEW.any})`);
+  check(!sl.any && sl.note.startsWith("No password. Sign in with Google"), "Safari landing keeps the default note", JSON.stringify(sl));
+
+  // (d) desktop keeps the old hero order: CTA above the featured strip.
+  await send("Emulation.clearDeviceMetricsOverride");
+  await send("Emulation.setUserAgentOverride", { userAgent: "" });
+  await nav(`${base}/`); await sleep(800);
+  const desk = await json(`({cta: document.getElementById('signin').getBoundingClientRect().top,
+    featured: document.getElementById('featured').getBoundingClientRect().top})`);
+  check(desk.cta < desk.featured, "desktop hero order unchanged (CTA above featured)", JSON.stringify(desk));
+  await shot("desktop-landing", false);
+  await send("Fetch.disable");
 }
 console.log(errors.length ? "CONSOLE ERRORS:\n" + errors.join("\n") : "no console errors");
 ws.close(); chrome.kill();

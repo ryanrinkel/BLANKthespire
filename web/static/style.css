@@ -66,6 +66,15 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
              font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
 .signin-or::before, .signin-or::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 .signin-sent { margin-top: 14px; }
+/* In an in-app browser (signin.js + webview.js): why Google is missing + the Safari/Chrome hand-off, then the
+   email form moved up under it. */
+.webview-box { margin: 4px 0 6px; padding: 12px 14px; border: 1px solid var(--accent2); border-radius: 10px;
+               background: var(--panel2); }
+.webview-head { margin: 0; font-weight: 600; }
+.webview-open { margin-top: 10px; }
+.webview-menu { margin: 8px 0 0; font-size: 13px; color: var(--muted); }
+.signin-email-first .lbl.small { color: var(--ink); font-size: 14px; }
+.signin-email-first .btn { width: 100%; text-align: center; }
 
 .settings { margin: 14px 0; border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
 .settings summary { cursor: pointer; color: var(--muted); }
@@ -449,6 +458,8 @@ body.landing {
 }
 .splash-go { margin-top: 30px; padding: 13px 38px; font-size: 16px; align-self: center; }
 .splash-tag { margin: 22px 0 0; font-size: 14px; }
+/* "it's a PC game" said under the board, before anyone spends a sign-in on a phone */
+.splash-pc { margin: 18px auto 0; max-width: 46ch; font-size: 14px; color: var(--ink); }
 /* hero CTAs: primary "Create Your Own Class" + secondary "Try a featured class", side by side, stacking on phones */
 .splash-actions { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 12px;
   margin-top: 26px; }
@@ -456,6 +467,21 @@ body.landing {
 .splash-note { margin: 14px auto 0; font-size: 13px; max-width: 46ch; }
 body.landing a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 @media (max-width: 520px) { .splash-actions .btn { width: 100%; max-width: 320px; text-align: center; } }
+/* Phone hero order: board + PC line, then the featured classes (something to look at in two seconds), THEN the
+   CTA. The splash box dissolves (display: contents) so its children and the featured section become siblings
+   in one flex column that `order` can interleave; desktop keeps the plain document order. */
+@media (max-width: 520px) {
+  body.landing { display: flex; flex-direction: column; }
+  body.landing > * { order: 4; }
+  body.landing .splash { display: contents; }
+  .splash > * { order: 1; padding-left: 20px; padding-right: 20px; text-align: center; }
+  .splash > .board { margin-top: 32px; }
+  .splash > .splash-actions, .splash > .splash-note { order: 3; }
+  .splash > .splash-note { margin-bottom: 36px; }
+  body.landing > .featured { order: 2; border-top: none; padding-bottom: 8px; width: 100%; }
+  .featured .how-title { margin-top: 24px; }
+  .featured .how-sub { margin-bottom: 14px; }
+}
 
 /* --- landing: how it works -------------------------------------------------------------------- */
 .how {
@@ -483,7 +509,14 @@ body.landing a:focus-visible { outline: 2px solid var(--accent); outline-offset:
 .featured { max-width: 1100px; padding-bottom: 56px; }
 .featured-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
 @media (max-width: 900px) { .featured-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 520px) { .featured-grid { grid-template-columns: 1fr; } }
+/* phones: one swipeable row (the next tile peeks in) so the CTA under the strip stays near the top */
+@media (max-width: 520px) {
+  .featured-grid { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 82%; gap: 12px;
+                   overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 8px;
+                   /* bleed to the screen edge so the next tile visibly peeks in */
+                   margin: 0 -20px; padding-left: 20px; padding-right: 20px; scroll-padding: 0 20px; }
+  .featured-tile { scroll-snap-align: start; }
+}
 .featured-tile {
   display: flex; flex-direction: column; overflow: hidden; text-decoration: none; color: var(--ink);
   background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
