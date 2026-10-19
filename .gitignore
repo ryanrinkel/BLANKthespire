@@ -26,6 +26,7 @@ generation/reference/sts2_rarity_examples.md
 web/dev.db*
 *.sqlite
 web/captured_gaps.jsonl
+web/jev_signals.jsonl
 web/card_feedback.jsonl
 
 # ── Droplet-local files living inside the /opt/btsweb checkout ───────

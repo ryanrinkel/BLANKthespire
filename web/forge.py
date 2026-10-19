@@ -370,6 +370,51 @@ def _append_captured_gaps(entries: list[dict]) -> int:
         return 0
 
 
+# Server-side Jev quality signals (card qa / relic form / vocab gate / triage lines). forge_class only streams
+# these to the browser and returns them in the HTTP response; nothing else persists them, so without this log
+# the Jev signals can never be compared against the validator later. Untracked append-only side log like GAP_LOG
+# above (a write to a git-tracked file would block deploy.sh's `git pull --ff-only`); survives deploys, review by
+# `tail` / scp down. ONE line per forge, and only when a Jev slot produced something. Path overridable via
+# BTSWEB_JEV_LOG; defaults next to the app (web/jev_signals.jsonl).
+JEV_LOG = Path(os.environ.get("BTSWEB_JEV_LOG", str(Path(__file__).resolve().parent / "jev_signals.jsonl")))
+
+_JEV_LINE_MARKERS = ("snapped nomination", "[triage:")
+
+
+def _append_jev_signals(res, *, user_id=None, concept: str = "") -> bool:
+    """Append this forge's Jev signals as ONE JSON line to JEV_LOG. Returns True when a line was written.
+    Skips (False) when no Jev slot produced anything, so forges with the slots off don't spam the file. Never
+    raises — a telemetry write must never break a forge."""
+    try:
+        stats = getattr(res, "stats", None) or {}
+        jev_qa = stats.get("jev_qa")
+        jev_relic = stats.get("jev_relic")
+        jev_lines = [str(ln) for ln in (getattr(res, "log", None) or [])
+                     if "jev" in str(ln).lower() or any(m in str(ln) for m in _JEV_LINE_MARKERS)]
+        if not jev_qa and not jev_relic and not jev_lines:
+            return False
+        bundle = getattr(res, "bundle", None) or {}
+        cards = bundle.get("cards") if isinstance(bundle, dict) else None
+        char = bundle.get("character") if isinstance(bundle, dict) else None
+        row = {"ts": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+               "user_id": user_id,
+               "class": (char.get("name") or "") if isinstance(char, dict) else "",
+               "concept": (concept or "")[:200],
+               "cards": len(cards) if isinstance(cards, (list, tuple)) else 0,
+               "skipped": list(getattr(res, "skipped", None) or []),
+               "vocab_gate": stats.get("vocab_gate"),
+               "jev_qa": jev_qa,
+               "jev_relic": jev_relic,
+               "jev_lines": jev_lines}
+        line = json.dumps(row, ensure_ascii=False, default=str) + "\n"
+        JEV_LOG.parent.mkdir(parents=True, exist_ok=True)
+        with JEV_LOG.open("a", encoding="utf-8") as f:
+            f.write(line)
+        return True
+    except Exception:  # OSError, odd res shapes, unserialisable stats: telemetry never breaks a forge
+        return False
+
+
 # Per-card player feedback (the website's per-card feedback buttons append here). Written in the EXACT
 # shape btsgen.contract.feedback_section() reads back as few-shot examples / anti-examples, so a periodic
 # pull of this log into generation/btsgen/feedback/card_feedback.jsonl feeds the refinement loop with no
@@ -669,6 +714,7 @@ def forge_to_bundle(concept: str, *, key: dict | None = None, hosted: bool = Fal
             res = forge_class(brief, blueprint_gen=blueprint_gen, card_gen_factory=card_factory,
                               relic_gen=relic_gen, fake=False, front_end=front_end, on_event=on_event,
                               triad=triad, gap_log_append=_append_captured_gaps)
+            _append_jev_signals(res, user_id=user_id, concept=brief.concept)
             return _bundle_result(res)
 
         blueprint_gen, card_factory, relic_gen = _build_generators(key, hosted, fake, model, on_usage=on_usage)
@@ -688,6 +734,8 @@ def forge_to_bundle(concept: str, *, key: dict | None = None, hosted: bool = Fal
         res = forge_class(brief, blueprint_gen=blueprint_gen, card_gen_factory=card_factory, relic_gen=relic_gen,
                           fake=(fake and front_end is None), front_end=front_end, on_event=on_event,
                           triad=triad, gap_log_append=None if fake else _append_captured_gaps)
+        if not fake:
+            _append_jev_signals(res, user_id=user_id, concept=brief.concept)
         return _bundle_result(res)
 
 
