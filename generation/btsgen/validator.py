@@ -375,6 +375,42 @@ def vocab_misses(errors: list[str]) -> list[tuple[str, str]]:
     return out
 
 
+# Jev slot "vocab" (class_forge.triage_vocab_misses): the EXISTING tokens of each miss kind, read from the card
+# schema's own enums (the same file the validator checks), so triage answers "which of these did it mean?".
+_ENUM_PATHS = {  # miss kind -> the schema enums whose union is that kind's vocabulary
+    "op": (("$defs", "effect", "properties", "op"),),
+    "condition": (("$defs", "condition", "properties", "kind"),),
+    "scale": (("$defs", "effect", "properties", "scale"), ("$defs", "triggerEffect", "properties", "scale")),
+    "status": (("$defs", "effect", "properties", "status"), ("$defs", "triggerEffect", "properties", "status")),
+    "trigger": (("$defs", "effect", "properties", "trigger"),),
+}
+_ENUM_CACHE: dict = {}
+
+
+def vocab_enums() -> dict[str, list[str]]:
+    """{miss kind: existing tokens} from card.schema.json (cached per schema path). A kind whose enum can't be
+    found is left out (its misses go untriaged)."""
+    key = str(paths.CARD_SCHEMA)
+    hit = _ENUM_CACHE.get(key)
+    if hit is not None:
+        return hit
+    schema = json.loads(paths.CARD_SCHEMA.read_text(encoding="utf-8"))
+    out: dict[str, list[str]] = {}
+    for kind, plist in _ENUM_PATHS.items():
+        toks: list[str] = []
+        for path in plist:
+            node = schema
+            for k in path:
+                node = node.get(k) if isinstance(node, dict) else None
+            for t in (node or {}).get("enum") or [] if isinstance(node, dict) else []:
+                if isinstance(t, str) and t not in toks:
+                    toks.append(t)
+        if toks:
+            out[kind] = toks
+    _ENUM_CACHE[key] = out
+    return out
+
+
 def _cost_delta_errors(e: dict, scale: str, hits) -> list[str]:
     """Phase BP (v67, gap #76): the cost_delta shape. Mirrors ForgedCards.ValidateCostDelta."""
     out: list[str] = []

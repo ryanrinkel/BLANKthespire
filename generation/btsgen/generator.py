@@ -268,6 +268,31 @@ def looks_like_stub(text: str) -> bool:
     return isinstance(obj, list) and not obj
 
 
+_JEV_STUB_Q = ("Is this reply a placeholder/stub (empty object, all -1/null/empty values, or refusal boilerplate) "
+               "rather than a real answer?")
+
+
+def _jev_stub_enabled() -> bool:
+    try:
+        from . import jev
+        return jev.enabled("stub")
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _jev_stub_verdict(text: str, string_stub: bool, on_usage=None) -> dict:
+    """Jev slot "stub" (plan 3b): {"p": P(placeholder) or None, "string_stub": looks_like_stub's verdict}. LOG-ONLY
+    agreement data next to the string detector — the retry decision stays the string detector's. Never raises."""
+    p = None
+    try:
+        from . import jev
+        got = jev.nouls("stub", {"reply": (text or "")[:3000]}, {"stub": _JEV_STUB_Q}, on_usage=on_usage)
+        p = (got or {}).get("stub")
+    except Exception:  # noqa: BLE001
+        p = None
+    return {"p": None if p is None else round(float(p), 3), "string_stub": bool(string_stub)}
+
+
 class EndpointHTTPError(RuntimeError):
     """A non-adaptable HTTP status from an OpenAI-compatible endpoint. Subclasses RuntimeError with the
     same message the forge log always showed, but keeps `.code` so callers can react to the status —
@@ -509,10 +534,18 @@ class OpenAICompatGenerator:
             if (self.model, key) not in OpenAICompatGenerator._rejected_extra_keys:
                 payload[key] = value
         stubs: list[str] = []  # providers that answered THIS call with a placeholder (see looks_like_stub)
+        jev_stub = self._is_openrouter() and _jev_stub_enabled()  # read once per call; off (default) = no work
+        jev_seen: list[dict] = []
         while True:
             self._provider_field(payload)
             text = self._complete_once(payload)
-            if not (self._is_openrouter() and looks_like_stub(text)):
+            string_stub = self._is_openrouter() and looks_like_stub(text)
+            if jev_stub:
+                jev_seen.append(_jev_stub_verdict(text, string_stub, self._on_usage))
+                # _complete_once rebuilt last_meta for THIS reply; re-attach the verdicts gathered so far
+                self.last_meta = {**self.last_meta, "jev_stub": jev_seen[-1],
+                                  **({"jev_stub_all": list(jev_seen)} if len(jev_seen) > 1 else {})}
+            if not string_stub:
                 break
             bad = self.last_meta.get("provider")
             stubs.append(bad or "?")

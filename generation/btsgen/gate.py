@@ -40,12 +40,12 @@ import logging
 import os
 import re
 import threading
-import time
-import urllib.error
-import urllib.request
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
+
+from . import jev as _jev
+from .jev import JEV_ENDPOINT, JEV_MODEL, JEV_TIMEOUT_S  # noqa: F401 — re-exported (tests, tools)
 
 _log = logging.getLogger(__name__)
 
@@ -53,9 +53,6 @@ ENV = "BTS_VOCAB_GATE"
 MODES = ("off", "heuristic", "jev")
 SCHEMA_ENV = "BTS_VOCAB_GATE_SCHEMA"
 SCHEMA_MODES = ("split", "whole")
-JEV_ENDPOINT = "https://openrouter.ai/api/alpha/decisions"
-JEV_MODEL = "typesafe/jev-1.13"
-JEV_TIMEOUT_S = 15
 SECTION_THRESHOLD = 0.15   # Phase 0a: union with the heuristic at 0.15 -> 96.7% of cards complete
 OP_THRESHOLD = 0.05        # Phase 0b: Jev >= 0.05 OR the core op rows -> 97.9%
 
@@ -281,47 +278,19 @@ class Decision:
         return self.families is None and self.ops is None
 
 
-def _jev_post(key: str, state, questions: dict) -> dict:
-    body = json.dumps({"model": JEV_MODEL, "state": state, "questions": questions}).encode()
-    req = urllib.request.Request(JEV_ENDPOINT, data=body, method="POST",
-                                 headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=JEV_TIMEOUT_S) as r:
-        return json.load(r)
-
-
+# The transport lives in jev.py (shared with the Phase 2 quality slots); these thin wrappers look it up at call
+# time so a test patching jev.post / jev.key reaches the gate too. The gate books its usage as role "gate".
 def _jev_ask(key: str, state, questions: dict) -> dict:
     """One Decisions request with a single short backoff on 429/529. Raises on anything else."""
-    try:
-        return _jev_post(key, state, questions)
-    except urllib.error.HTTPError as e:
-        if e.code not in (429, 529):
-            raise
-        time.sleep(1.5)
-        return _jev_post(key, state, questions)
+    return _jev.request(key, state, questions)
 
 
 def _jev_key() -> str:
-    from .generator import load_env
-    load_env()
-    return (os.environ.get("OPENROUTER_API_KEY") or "").strip()
+    return _jev.key()
 
 
 def _report_usage(on_usage, resp: dict) -> float:
-    u = resp.get("usage") or {}
-    cost = u.get("cost")
-    try:
-        cost_f = float(cost) if cost is not None and not isinstance(cost, bool) else 0.0
-    except (TypeError, ValueError):
-        cost_f = 0.0
-    if on_usage is not None:
-        try:
-            # the stable slug, not resp["model"] (a dated build id), so the ledger keeps ONE gate row
-            on_usage({"_role": "gate", "_model": JEV_MODEL,
-                      "input_tokens": int(u.get("input_tokens", 0) or 0), "output_tokens": 0,
-                      **({"cost": cost} if cost is not None else {})})
-        except Exception:  # noqa: BLE001 — a telemetry sink must never break a forge
-            pass
-    return cost_f
+    return _jev.report_usage(on_usage, resp, role="gate")
 
 
 def _decide_jev(brief_text: str, fams: tuple[str, ...], ops: tuple[str, ...], op_rows: dict[str, str],

@@ -3199,6 +3199,215 @@ def _card_context(bp: dict, plan: dict, bridge_ctx=None, class_ctx: str | None =
     return ctx
 
 
+def usage_sink(gen):
+    """The usage callback a built generator reports to (its `_on_usage`, or its first failover tier's), so a side
+    call made on that generator's behalf (the Jev quality slots) lands in the same forge ledger. None if absent.
+    The hosted mixture keeps a dict's own `_role`; a BYOK wrapper (web/forge.py _tagged) re-tags it as its role."""
+    try:
+        sink = getattr(gen, "_on_usage", None)
+        if sink is None:
+            tiers = getattr(gen, "tiers", None)
+            if tiers:
+                sink = getattr(tiers[0].gen, "_on_usage", None)
+        return sink if callable(sink) else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+_TRIAGE_CONTEXT = ("A card model for a Slay-the-Spire-like deckbuilder mod wrote vocabulary tokens that the closed "
+                   "card vocabulary does not have. For each, decide whether it is a typo or synonym of an EXISTING "
+                   "token, or a genuinely new mechanic.")
+TRIAGE_NEAR_P = 0.8
+
+
+def triage_vocab_misses(misses, theme: str = "", *, on_usage=None) -> dict:
+    """Jev slot "vocab": {(kind, token): {"verdict": "near:<tok>" | "new", "nearest": tok, "p": p}} for the
+    misses Jev answered, in ONE request; {} when the slot is off / no key / any error / a kind without a usable
+    schema enum. A miss is "near" only at p >= TRIAGE_NEAR_P with an existing token as the best answer."""
+    try:
+        from . import jev
+        if not misses or not jev.enabled("vocab"):
+            return {}
+        from .validator import vocab_enums
+        enums = vocab_enums()
+        asks, qmap = {}, {}
+        for i, (kind, token) in enumerate(misses):
+            opts = [o for o in enums.get(kind) or () if o != token]
+            if not opts or len(opts) + 1 > jev.MAX_OPTIONS:
+                continue
+            q = f"m{i}"
+            qmap[q] = (kind, token)
+            asks[q] = (opts, f"The card model wrote the {kind} `{token}`. Which existing {kind} did it mean? Pick "
+                             "genuinely_new if it is a mechanic none of these covers.")
+        if not asks:
+            return {}
+        state = {"context": _TRIAGE_CONTEXT, "card_theme": str(theme or "")[:200],
+                 "misses": [f"{k}: {t}" for k, t in qmap.values()]}
+        got = jev.choices("vocab", state, asks, on_usage=on_usage, none_label="genuinely_new") or {}
+        out = {}
+        for q, kt in qmap.items():
+            if q not in got:
+                continue
+            best, prob = got[q]
+            near = best != "genuinely_new" and prob >= TRIAGE_NEAR_P
+            out[kt] = {"verdict": f"near:{best}" if near else "new", "nearest": best, "p": round(float(prob), 3)}
+        return out
+    except Exception as e:  # noqa: BLE001 — triage is advisory; the demand entry is recorded regardless
+        import logging
+        logging.getLogger(__name__).warning("vocab triage skipped (%s)", str(e)[:200])
+        return {}
+
+
+def _triage_suffix(t: dict | None) -> str:
+    if not t:
+        return ""
+    if str(t.get("verdict", "")).startswith("near:"):
+        return f" [triage: near `{t.get('nearest')}` p={float(t.get('p') or 0):.2f}]"
+    return " [triage: new]"
+
+
+# --- Jev slot "relic" (plan 3b): which relic FORM did the keystone implement? A signal, never a gate. ------------
+_FORM_BULLET = re.compile(r"(?m)^\s*-\s+\*\*(.+?)\*\*")
+# a guess that legitimately overlaps another form's description (Combat-start boon names channel_orb / summon too)
+_FORM_COMPATIBLE = {"Class-kind boon": {"Combat-start boon"}, "Combat-start boon": {"Class-kind boon"}}
+_PAYOFF_TRIGGERS = {"on_card_played", "on_exhaust", "on_block_gained", "on_damage_dealt", "on_card_drawn"}
+
+
+def relic_form_names(forms_text: str | None = None) -> list[str]:
+    """The form names in the relic_forms heuristic ("- **Name** — ..." bullets), parsed at call time so
+    DESIGN_HEURISTICS.md stays the source of truth. [] on any error."""
+    try:
+        if forms_text is None:
+            from .contract import relic_forms
+            forms_text = relic_forms()
+        seen: list[str] = []
+        for n in _FORM_BULLET.findall(forms_text or ""):
+            n = n.strip()
+            if n and n not in seen:
+                seen.append(n)
+        return seen
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def guess_relic_form(relic) -> str | None:
+    """A cheap deterministic form guess from the relic JSON (hook trigger / every_n / once_per_combat / ops /
+    modifiers), named as in relic_forms. None = no confident guess (e.g. a turn_end hook)."""
+    try:
+        hooks = [h for h in (relic.get("hooks") or []) if isinstance(h, dict)]
+        mods = [m for m in (relic.get("modifiers") or []) if isinstance(m, dict)]
+        if any(str(m.get("stat")) in ("max_energy", "cost_reduction") for m in mods):
+            return "Boon with a price"
+        if not hooks:
+            return "Passive modifier" if mods else None
+        h = hooks[0]
+        trig = str(h.get("trigger") or "")
+        ops = {str(e.get("op")) for e in (h.get("effects") or []) if isinstance(e, dict)}
+        if h.get("every_n"):
+            return "Counter relic"
+        if trig == "combat_end":
+            return "Victory heal"
+        if trig == "attacked":
+            return "Reactive counter"
+        if trig == "on_hp_lost":
+            return "Bleed payoff"
+        if trig == "turn_start":
+            if not h.get("once_per_combat"):
+                return "Per-turn drip"
+            return "Class-kind boon" if ops & {"forge", "channel_orb", "summon"} else "Combat-start boon"
+        return "Do-what-you-do payoff" if trig in _PAYOFF_TRIGGERS else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def jev_relic_form(relic, *, on_usage=None) -> dict | None:
+    """Jev slot "relic": {"form", "p", "guess", "agree"} for a structurally valid relic, or None (slot off, no key,
+    any error, fewer than two parseable form names). Never affects the forge."""
+    try:
+        from . import jev
+        if not isinstance(relic, dict) or not jev.enabled("relic"):
+            return None
+        from .contract import relic_forms
+        text = relic_forms()
+        names = relic_form_names(text)
+        if len(names) < 2:
+            return None
+        got = jev.choice("relic", {"forms": text, "relic": relic}, names,
+                         "Which ONE form from the list does this relic implement?", on_usage=on_usage,
+                         none_label="none_of_these")
+        if got is None:
+            return None
+        best, p = got
+        guess = guess_relic_form(relic)
+        agree = None if guess is None else (best == guess or best in _FORM_COMPATIBLE.get(guess, ()))
+        return {"form": best, "p": round(float(p), 3), "guess": guess, "agree": agree}
+    except Exception as e:  # noqa: BLE001 — a quality signal must never break a forge
+        logging.getLogger(__name__).warning("relic form slot skipped (%s)", str(e)[:200])
+        return None
+
+
+# --- Jev slot "qa" (plan 3b): post-card QA signals, logged next to the validator's numbers. Never gates. ----------
+QA_POWER_LEVELS = ("1 very weak", "2 weak", "3 fair", "4 strong", "5 very strong")
+
+
+# describe() emits the game's localization placeholders ("Deal {Damage} damage."); fill the plain ones from the
+# card's first top-level effect of that op so the judge sees numbers. Anything else stays a placeholder, which is
+# why the QA state also carries the effects JSON.
+_QA_VARS = {"Damage": "damage", "Block": "block", "Cards": "draw", "Energy": "gain_energy", "Heal": "heal",
+            "Scry": "scry", "Discard": "discard"}
+
+
+def _card_text(card: dict) -> str:
+    try:
+        from .cardgen import describe
+        text = describe(card.get("effects") or [], card.get("target"))
+        effs = [e for e in (card.get("effects") or []) if isinstance(e, dict)]
+        for var, op in _QA_VARS.items():
+            amt = next((e.get("amount") for e in effs if e.get("op") == op and e.get("amount") is not None), None)
+            if amt is not None:
+                text = text.replace("{" + var + "}", str(amt))
+        hits = next((e.get("times") or e.get("hits") for e in effs if e.get("op") == "damage"
+                     and (e.get("times") or e.get("hits"))), None)
+        if hits is not None:
+            text = text.replace("{Hits}", str(hits))
+        return text
+    except Exception:  # noqa: BLE001
+        return json.dumps(card.get("effects") or [], ensure_ascii=False)[:1500]
+
+
+def jev_card_qa(card: dict, theme: str = "", *, on_usage=None) -> dict | None:
+    """Jev slot "qa": ONE request, three questions about a validated card -> {"name_fits": p, "reads_like_sts": p,
+    "power": expected 1-5, "power_level": most likely 1-5}; a question whose answer was unusable is left out. None
+    when the slot is off / no key / any error."""
+    try:
+        from . import jev
+        if not isinstance(card, dict) or not jev.enabled("qa"):
+            return None
+        state = {"name": card.get("name"), "cost": card.get("cost"), "type": card.get("type"),
+                 "rarity": card.get("rarity"), "text": _card_text(card), "brief": str(theme or "")[:400],
+                 "effects": json.dumps(card.get("effects") or [], ensure_ascii=False)[:1500]}
+        qs = {"name_fits": {"type": "noul", "instructions": "Does the card's name fit what the card does?"},
+              "reads_like_sts": {"type": "noul", "instructions": "Does the text read like a real Slay the Spire "
+                                                                 "card (clear, conventional wording)?"},
+              "power": jev.score_q("How powerful is this card for its energy cost and rarity, as a Slay the "
+                                   "Spire card?", QA_POWER_LEVELS)}
+        ans = jev.ask("qa", state, qs, on_usage=on_usage)
+        if ans is None:
+            return None
+        out: dict = {}
+        for n in ("name_fits", "reads_like_sts"):
+            v = jev.parse_noul(ans.get(n))
+            if v is not None:
+                out[n] = round(v, 3)
+        sc = jev.parse_score(ans.get("power"), len(QA_POWER_LEVELS))
+        if sc is not None:
+            out["power"], out["power_level"] = sc
+        return out
+    except Exception as e:  # noqa: BLE001
+        logging.getLogger(__name__).warning("card qa slot skipped (%s)", str(e)[:200])
+        return None
+
+
 def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen=None, fake: bool = False,
                 on_event=None, front_end=None, triad: bool | None = None,
                 gap_log_append=None) -> ClassResult:
@@ -3417,23 +3626,32 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
             theme = f"{theme} (suggested name: {plan['name_hint']})"
         cbrief = CardBrief(card_type=plan.get("type", "attack"), rarity=plan.get("rarity", "common"),
                            target_cost=plan.get("cost"), theme=theme,
-                           context=_card_context(bp, plan, bridge_ctx, class_ctx))
+                           context=_card_context(bp, plan, bridge_ctx, class_ctx), enforce_type_rarity=True)
         _v2_brief(cbrief, plan, f"card{i}")
         note(f"card {i+1}/{total}: designing '{plan.get('name_hint', '?')}' - "
              f"{plan.get('rarity', '?')} {plan.get('type', '?')}, cost {plan.get('cost', '?')}"
              + (f" - {str(plan.get('theme'))[:90]}" if plan.get("theme") else ""))
         pres = generate_card(cbrief, gen=card_gen, validator=validator)
         _count(pres)
-        for kind, token in vocab_misses(pres.all_errors):
+        _misses = vocab_misses(pres.all_errors)
+        # Jev slot "vocab" (plan 3b): typo / synonym / genuinely new, one batched request per card. Advisory:
+        # the demand entry is always recorded; {} (slot off, no key, error) = exactly the untriaged line.
+        _triage = triage_vocab_misses(_misses, str(plan.get("theme", "")), on_usage=usage_sink(card_gen)) \
+            if _misses else {}
+        for kind, token in _misses:
+            _t = _triage.get((kind, token))
             note(f"card {i+1} ({plan.get('name_hint','?')}): reached for missing {kind} `{token}` — "
-                 "recording as vocab demand")
-            vocab_demand.append({
+                 "recording as vocab demand" + _triage_suffix(_t))
+            entry = {
                 "title": f"`{token}` ({kind}) — card-stage demand",
                 "surfaced_by": f"card stage ('{bp.get('name', '?')}' / '{plan.get('name_hint', '?')}')",
                 "fantasy": str(plan.get("theme", ""))[:200],
                 "sketch": f"the card model emitted `{token}` as a {kind} the vocabulary doesn't have "
                           f"while implementing this brief — organic demand mined from validation errors.",
-            })
+            }
+            if _t:
+                entry["triage"] = _t
+            vocab_demand.append(entry)
         if not pres.ok or pres.card is None:
             res.skipped.append(plan.get("name_hint", f"card {i+1}"))
             # Name the killing errors (2026-08-16): a bare "failed, skipped" hid WHY slots died, which sent
@@ -3474,6 +3692,19 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
             continue
         made.append({"plan": plan, "card": pres.card})
         validator.known_cards.add(pres.card["id"])
+        # Jev slot "qa" (plan 3b): name / wording / perceived-power signals, logged next to the validator's score.
+        # Log only - never gates or repairs (compare against the heuristics before trusting them).
+        _qa = jev_card_qa(pres.card, str(plan.get("theme", "")), on_usage=usage_sink(card_gen))
+        if _qa:
+            _vs = getattr(pres.result, "score", None)
+            _vs = round(float(_vs), 2) if isinstance(_vs, (int, float)) and not isinstance(_vs, bool) else None
+            res.stats.setdefault("jev_qa", []).append(
+                {"name": pres.card.get("name"), "name_fits": _qa.get("name_fits"),
+                 "reads_like_sts": _qa.get("reads_like_sts"), "power": _qa.get("power"),
+                 "validator_score": _vs})
+            note(f"card {i+1} qa (jev): name_fits={_qa.get('name_fits', '?')} "
+                 f"reads_like_sts={_qa.get('reads_like_sts', '?')} power={_qa.get('power', '?')}/5"
+                 + (f" (validator score {_vs:.1f})" if _vs is not None else ""))
         if pres.balance_repaired and pres.balance_repair:
             br = pres.balance_repair
             note(f"card {i+1} ({pres.card.get('name')}): overtuned — auto-tuned "
@@ -3516,7 +3747,7 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
         theme = f"{theme}\n{directive}".strip()
         cbrief = CardBrief(card_type=plan.get("type", "attack"), rarity=plan.get("rarity", "common"),
                            target_cost=plan.get("cost"), theme=theme,
-                           context=_card_context(bp, plan, bridge_ctx, class_ctx))
+                           context=_card_context(bp, plan, bridge_ctx, class_ctx), enforce_type_rarity=True)
         _v2_brief(cbrief, plan, "regen:" + str((old_card or {}).get("id", "")))
         pres = generate_card(cbrief, gen=card_gen, validator=validator)
         _count(pres)
@@ -3557,7 +3788,8 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
             # Fix B: the blueprint's per-class nominations (else the caller's) restrict the coverage menus;
             # with none, each menu is shuffled on the concept seed so no two classes share an injection order.
             _nominated = coverage.sanitize_nominations(bp.get("coverage_nominations")
-                                                       or getattr(brief, "coverage_nominations", None))
+                                                       or getattr(brief, "coverage_nominations", None),
+                                                       on_usage=usage_sink(card_gen), log=note)
             if _nominated:
                 note("coverage nominations: " + "; ".join(f"{k}=[{', '.join(v)}]" for k, v in _nominated.items()))
             else:
@@ -3666,6 +3898,13 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
         else:
             relic.setdefault("source", "llm")
             note(f"relic OK: {relic.get('name')}")
+            # Jev slot "relic" (plan 3b): which form the keystone implements, vs a deterministic guess. Signal only.
+            _jf = jev_relic_form(relic, on_usage=usage_sink(relic_gen))
+            if _jf:
+                res.stats["jev_relic"] = _jf
+                note(f"relic form (jev): {_jf['form']} p={_jf['p']:.2f}"
+                     + (f"; heuristic guess {_jf['guess']} ({'agrees' if _jf['agree'] else 'DISAGREES'})"
+                        if _jf.get("guess") else "; no heuristic guess"))
     if relic is not None:
         relic.setdefault("tier", "starter")
 
@@ -4163,6 +4402,9 @@ def _fake_relic(bp: dict) -> dict:
 class _CardFake:
     """Keyless card generator emitting unique valid v2 cards (duck-types AnthropicGenerator)."""
     model = "fake-offline"
+    # picks each card's TYPE from the brief's theme (its shapes are only valid under that type), so the pipeline's
+    # brief type/rarity check (pipeline._brief_mismatch) must not send it to a repair it can't perform
+    brief_meta_exempt = True
 
     def __init__(self) -> None:
         self._n = 0

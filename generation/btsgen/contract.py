@@ -110,6 +110,10 @@ class Brief:
     exemplars: list | None = None
     used_shapes: str = ""
     archetype_ids: list = field(default_factory=list)   # the class's archetype ids (exemplar selection)
+    # Opt-in: pipeline.generate_card rejects (-> the one repair call) a card whose `type`/`rarity` differs
+    # from card_type/rarity above. Off by default because Brief()'s attack/common are PLACEHOLDERS for the
+    # CLI/test callers; the class forge + character pipeline set it (their values come from the blueprint).
+    enforce_type_rarity: bool = False
 
     def describe(self) -> str:
         parts = [f"type: {self.card_type}", f"rarity: {self.rarity}"]

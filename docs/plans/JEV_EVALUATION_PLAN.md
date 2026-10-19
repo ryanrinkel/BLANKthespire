@@ -1,6 +1,6 @@
 # Jev (TypeSafe "System One") evaluation plan
 
-Status: Phase 0 + 0c measured; Phases 1a + 1b BUILT behind `BTS_VOCAB_GATE` (default off) and A/B'd locally 2026-09-25/26, NOT committed or deployed. Paired 1b A/B DONE 2026-09-26 (with the when/trigger fixes): parity on cards, -35% card input tokens. Written 2026-09-25.
+Status: Phase 1 (heuristic gate, split schema) SHIPPED 2026-09-26 (2d410cc, `BTS_VOCAB_GATE=heuristic` on the droplet); week-over-week check done 2026-10-18 (-17% card input tokens/forge, see Phase 1 follow-up). Phase 2 quality slots BUILT 2026-10-18 behind `BTS_JEV_SLOTS` (default off), live-probed, NOT committed or deployed (see Phase 2 RESULTS). Written 2026-09-25.
 
 ## 1. What Jev is
 
@@ -404,6 +404,47 @@ rows before/after (cached share per rule 6).
 
 Each is a small contract change plus a validator hook. Do nomination snapping first because it
 directly feeds the coverage machinery already built in W0.5.
+
+### Phase 1 follow-up: droplet week-over-week (2026-10-18)
+
+`forge_usage` on the droplet, hosted OK forges, `cards` role: 25 forges before (09-08..09-26) vs 22 after
+(09-26..10-17): card input tokens/forge 1,407k -> 1,162k (-17%), card calls 44 -> 43, cached share 80% -> 77%.
+Smaller than the paired A/B's -35% because Wave 6 (vocab v64-v70) grew the core prompt after the gate shipped;
+`gate.py` was updated in every Wave 6 phase, so it is not a coverage gap. Dollar columns are NOT comparable
+(Ollama-primary routing from 09-25 reports zero metered LLM cost).
+
+### Phase 2 RESULTS (2026-10-18, built by two Opus agents, supervised; uncommitted, not deployed)
+
+Shared client `btsgen/jev.py` (transport moved out of gate.py; the gate's behaviour and its `gate` ledger role are
+unchanged). One env flag `BTS_JEV_SLOTS` = `off` (default) | `all` | comma list of `nominate,relic,vocab,qa,stub`.
+Every slot returns to today's behaviour on slot-off / no `OPENROUTER_API_KEY` / any error; nothing raises into a
+forge. Usage lands in the ledger as role `jev:<slot>` with Jev's reported `usage.cost`. Live probe
+(`tools/jev_slots_probe.py`, 7 requests, $0.00047 total) confirmed the answer shapes: choice =
+`{choice, confidence, probabilities}`, noul = `{noul}`, score = 0-based `{score, legend, probabilities}` (parser adds 1).
+
+| Slot | Where | Behaviour | Probe |
+|---|---|---|---|
+| `nominate` | `coverage.sanitize_nominations`, `frontend/builder._snap_featured` | unknown slug-shaped nomination / `featured_resonance` id -> ONE batched choice over the menu + `none_of_these`; snapped at p >= 0.6 (`SNAP_MIN_P`), position kept, caps respected; logged | `on_exhasut` -> `on_exhaust` p=0.97; `zzz_quux` -> none 0.99; `reactive_playd` -> `reactive_played` 0.95 |
+| `vocab` | `class_forge.triage_vocab_misses` at the demand-log site | choice over the schema enum of that kind + `genuinely_new`; `near:<tok>` at p >= 0.8 else `new`; annotates the demand entry (`triage` key, also written to the droplet gaps JSONL and VOCABULARY_GAPS.md); never drops an entry | `apply_posion` -> near `apply_status` 0.92; `time_rewind` -> new 0.80 |
+| `relic` | relic stage after a valid relic | choice over the ten `relic_forms()` bullet names (parsed at runtime) + a deterministic guess from hooks/every_n/modifiers; `res.stats["jev_relic"]` = {form, p, guess, agree}; signal only | canned Counter relic -> `Counter relic` 0.99, guess agrees |
+| `qa` | card loop after each OK card | one request: noul `name_fits`, noul `reads_like_sts`, score `power` 1-5 over {name, cost, type, rarity, rendered text with numbers filled, effects JSON, brief}; `res.stats["jev_qa"]` rows next to the validator score; log only | 1-cost Deal 4 + Vulnerable: name 0.88, reads 0.52, power 3.5 (level 4) |
+| `stub` | `OpenAICompatGenerator` stub loop (OpenRouter only) | noul "is this a placeholder?" beside `looks_like_stub`; `last_meta["jev_stub"]` = {p, string_stub}; retry decision unchanged | `{"name":"","effects":[]}` -> 0.95; real card -> 0.02 |
+
+Two bugs fixed alongside (no Jev): (1) the card stage now rejects a card whose `type`/`rarity` differs from the
+blueprint brief (`pipeline._brief_mismatch`, opt-in via `Brief.enforce_type_rarity`, set by class_forge +
+character_pipeline; the error rides the existing single repair call; the offline `_CardFake` is exempt because it
+picks type from the theme). Expect a few more repair calls per forge. (2) `web/forge.py _tagged` overwrote
+`_role`/`_model` on every usage payload, so the gate's `gate` rows (and now `jev:*`) were booked as `cards` on BYOK
+forges; it now keeps a role the payload carries.
+
+Known, left alone: the BYOK post-forge summary and `forge_estimate` averages include `gate`/`jev:*` calls (made on
+OUR OpenRouter key); admin hosted-cost excludes BYOK-mode rows so Jev spend during BYOK forges is not in it. Jev
+cost is < $0.01/forge at these sizes (featured snap is the biggest request, ~5k tokens = $0.0002).
+
+Rollout: ship with `BTS_JEV_SLOTS=nominate,vocab,relic,qa` (log-only slots are free signal); `stub` only matters on
+the OpenRouter route and adds ~0.3 s per call, so leave it off until a stub incident needs the agreement data.
+After a week compare `jev_qa` rows against the validator score and `_relic_balance_errors` before trusting them.
+Tests: generation 658 pass, web 330 pass (2026-10-18).
 
 ## 4b. LATER, unrelated to Jev: an `on_retain` trigger (Ryan, 2026-09-25: "I kind of like that idea")
 

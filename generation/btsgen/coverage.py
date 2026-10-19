@@ -20,9 +20,13 @@ menus and quotas stay byte-for-byte so the live A/B baseline is untouched.
 """
 from __future__ import annotations
 
+import logging
+import re
 from dataclasses import dataclass, field
 
 from . import bridges, census
+
+_log = logging.getLogger(__name__)
 
 # --- quotas (measured over the NON-basic pool; basics/blade excluded; reprint exempt from plain-share) ---
 MAX_PLAIN_SHARE = 0.30            # plain-stat-line cards / pool
@@ -284,10 +288,57 @@ KEY_KIND = {k: kind for k, _d, kind in (WHEN_MENU_KIND + SCALE_MENU_KIND)}
 KEY_KIND["on_evoke"] = "orb"  # Phase BP (v67, gap #77): the evoke trigger is dealt to orb classes only
 
 
-def sanitize_nominations(raw) -> dict:
+# Jev Phase 2 slot "nominate" (docs/plans/JEV_EVALUATION_PLAN.md 3b): an unknown slug-shaped nomination is
+# snapped to its menu's nearest key when Jev is at least this sure (and did not pick none_of_these).
+SNAP_MIN_P = 0.6
+_SLUG = re.compile(r"^[a-z][a-z0-9_]{1,31}$")
+_SNAP_CONTEXT = ("These are mechanic ids a card-game blueprint nominated for a Slay-the-Spire-like deckbuilder; "
+                 "some are misspelled or invented. Map each to the matching menu id.")
+
+
+def _snap_unknown(unknown: list[tuple[str, str]], known: dict, *, on_usage=None, log=None) -> dict:
+    """{(cat, key): menu key} for the unknown nominations Jev confidently maps; {} when the slot is off / no key /
+    any error (jev.choices never raises; this guard covers the rest)."""
+    try:
+        from . import jev
+        if not unknown or not jev.enabled("nominate"):
+            return {}
+        qnames = {f"q{i}": ck for i, ck in enumerate(unknown)}
+        asks = {q: (sorted(known[cat]), f"Which menu id does the nomination `{k}` (category {cat}) mean? "
+                                        "Pick none_of_these if nothing matches.")
+                for q, (cat, k) in qnames.items()}
+        state = {"context": _SNAP_CONTEXT, "nominations": [f"{cat}: {k}" for cat, k in unknown]}
+        got = jev.choices("nominate", state, asks, on_usage=on_usage) or {}
+        out: dict = {}
+        for q, (cat, k) in qnames.items():
+            if q not in got:
+                continue
+            best, prob = got[q]
+            if best != "none_of_these" and best in known[cat] and prob >= SNAP_MIN_P:
+                out[(cat, k)] = best
+                msg = f"coverage: snapped nomination `{k}` -> `{best}` ({cat}, p={prob:.2f})"
+                _log.info(msg)
+                if log is not None:
+                    try:
+                        log(msg)
+                    except Exception:  # noqa: BLE001 — a broken note sink must never break a forge
+                        pass
+            else:
+                _log.debug("coverage: nomination `%s` (%s) not snapped (best=%s, p=%.2f)", k, cat, best, prob)
+        return out
+    except Exception as e:  # noqa: BLE001
+        _log.warning("coverage: nomination snapping skipped (%s)", str(e)[:200])
+        return {}
+
+
+def sanitize_nominations(raw, *, on_usage=None, log=None) -> dict:
     """Normalize a blueprint's optional `coverage_nominations` ({reactive:[..], when:[..], exotic:[..],
     sections:[..]}) to known directive keys only, per-category capped. Unknown/malformed input -> {} (the
-    seeded-shuffle default)."""
+    seeded-shuffle default).
+
+    Jev slot "nominate" ($BTS_JEV_SLOTS): unknown slug-shaped keys are snapped to the nearest menu key in ONE
+    batched Jev request (p >= SNAP_MIN_P, not none_of_these), in their nominated position; `log(str)` gets one line
+    per snap, `on_usage` the request's usage. Slot off / no key / any error = the plain filter."""
     if not isinstance(raw, dict):
         return {}
     known = {"reactive": {k for k, _ in REACTIVE_MENU_V2},
@@ -296,6 +347,15 @@ def sanitize_nominations(raw) -> dict:
              "scale": {k for k, _ in SCALE_MENU} | {k for k, _d, _kind in SCALE_MENU_KIND},
              "keyword": {k for k, _ in KEYWORD_MENU},
              "sections": set(SECTION_KEYS)}
+    unknown: list[tuple[str, str]] = []
+    for cat in NOMINATION_CATEGORIES:
+        vals = raw.get(cat)
+        if isinstance(vals, list):
+            for v in vals:
+                k = str(v).strip().lower()
+                if k not in known[cat] and _SLUG.match(k) and (cat, k) not in unknown:
+                    unknown.append((cat, k))
+    snaps = _snap_unknown(unknown, known, on_usage=on_usage, log=log) if unknown else {}
     out: dict = {}
     for cat in NOMINATION_CATEGORIES:
         vals = raw.get(cat)
@@ -304,6 +364,7 @@ def sanitize_nominations(raw) -> dict:
         keep: list[str] = []
         for v in vals:
             k = str(v).strip().lower()
+            k = snaps.get((cat, k), k)
             if k in known[cat] and k not in keep:
                 keep.append(k)
         if keep:

@@ -493,7 +493,9 @@ def append_vocab_gaps(entries: list[dict]) -> int:
             f"- **Mechanic sketch:** {str(e.get('sketch', '')).strip()}\n"
             f"- **Buildable today?** No — surfaced as off-vocabulary by the map stage.\n"
             f"- **Priority:** unset (triage).\n"
-            f"- **Status:** captured\n"
+            + (f"- **Jev triage:** {e['triage'].get('verdict')} (nearest `{e['triage'].get('nearest')}`, "
+               f"p={e['triage'].get('p')})\n" if isinstance(e.get("triage"), dict) else "")
+            + f"- **Status:** captured\n"
         )
         blocks.append(block)
         existing_titles.append((next_num, title))  # so a later dup in THIS batch dedups too

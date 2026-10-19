@@ -81,6 +81,8 @@ class BlueprintBuilder:
         # Creative harness v2 (Fix C): the per-forge catalog window + the cold set (populated per build()).
         self._cold_ids: set = set()
         self._window_ids: list = []
+        # The usage sink of the cloud stage's generator, borrowed by the Jev "nominate" slot (_snap_featured).
+        self._usage_sink = None
 
     # --- progress + the universal per-stage loop ------------------------------------------------
     def _note(self, m: str) -> None:
@@ -370,8 +372,13 @@ class BlueprintBuilder:
 
         # stage 1+2: cloud -> clusters
         self._note(f"[1/6] cloud: brainstorming free associations on '{concept}'...")
-        cloud = self._run_stage(self._make_gen(_CloudClusterContract(), max_tokens=8000),
-                                brief, validate_cloud, "cloud/cluster")
+        cloud_gen = self._make_gen(_CloudClusterContract(), max_tokens=8000)
+        try:
+            from ..class_forge import usage_sink
+            self._usage_sink = usage_sink(cloud_gen)
+        except Exception:  # noqa: BLE001
+            self._usage_sink = None
+        cloud = self._run_stage(cloud_gen, brief, validate_cloud, "cloud/cluster")
         dossier.facets = list(cloud.get("facets") or [])
         dossier.concepts = list(cloud.get("concepts") or [])
         dossier.clusters = list(cloud.get("clusters") or [])
@@ -668,6 +675,8 @@ class BlueprintBuilder:
             raw = [e for e in (cloud.get("featured_resonance") or [])
                    if isinstance(e, dict) and str(e.get("id", "")).strip()]
             known = {f.id for f in featured_mod.resolve([str(e["id"]) for e in raw])}
+            raw = self._snap_featured(raw, known, featured_mod)
+            known = {f.id for f in featured_mod.resolve([str(e["id"]) for e in raw])}
             entries = [e for e in raw if str(e["id"]) in known]
             dossier.featured_resonance = entries
             try:
@@ -689,6 +698,45 @@ class BlueprintBuilder:
                 self._note("      (no resonance shortlist from the cloud stage — all slots rolled wild)")
         except Exception as e:  # noqa: BLE001 — never break the forge over the featured re-roll
             self._note(f"      featured re-roll skipped ({e}); keeping the concept-hash roll")
+
+    def _snap_featured(self, raw: list, known: set, featured_mod) -> list:
+        """Jev slot "nominate" (plan 3b): an unknown slug-shaped `featured_resonance` id is snapped to the nearest
+        menu id (FEATURED_MENU + CLASS_KIND_MENU) in ONE batched request, at p >= coverage.SNAP_MIN_P and not
+        none_of_these; its `why` is kept. Returns `raw` unchanged when the slot is off / no key / any error."""
+        try:
+            from .. import coverage, jev
+            if not jev.enabled("nominate"):
+                return raw
+            unknown = []
+            for e in raw:
+                k = str(e["id"]).strip().lower()
+                if str(e["id"]) not in known and coverage._SLUG.match(k) and k not in unknown:
+                    unknown.append(k)
+            if not unknown:
+                return raw
+            menu = {f.id: f.injection[:80] for f in list(featured_mod.FEATURED_MENU) + list(featured_mod.CLASS_KIND_MENU)}
+            qn = {f"q{i}": k for i, k in enumerate(unknown)}
+            asks = {q: (menu, f"Which featured-mechanic menu id does the nomination `{k}` mean? Pick none_of_these "
+                              "if nothing matches.") for q, k in qn.items()}
+            state = {"context": "These are featured-mechanic ids a card-game designer nominated for a "
+                                "Slay-the-Spire-like deckbuilder class; some are misspelled or invented. Map each "
+                                "to the matching menu id.", "nominations": unknown}
+            got = jev.choices("nominate", state, asks, on_usage=self._usage_sink) or {}
+            snap = {}
+            for q, k in qn.items():
+                best, prob = got.get(q, ("none_of_these", 0.0))
+                if best != "none_of_these" and best in menu and prob >= coverage.SNAP_MIN_P:
+                    snap[k] = best
+                    self._note(f"      featured: snapped nomination `{k}` -> `{best}` (p={prob:.2f})")
+            if not snap:
+                return raw
+            out = []
+            for e in raw:
+                k = str(e["id"]).strip().lower()
+                out.append({**e, "id": snap[k]} if str(e["id"]) not in known and k in snap else e)
+            return out
+        except Exception:  # noqa: BLE001 — the re-roll promises any failure keeps the blind roll
+            return raw
 
     def _enrich_archetypes(self, bp: dict, dossier: Dossier) -> None:
         """Stamp the map stage's player-facing skin (themed title + strategy pitch) onto bp["archetypes"] so

@@ -93,6 +93,25 @@ def test_usage_is_booked_per_role_and_model(recording):
     assert rows[("cards", "claude-haiku-4-5")]["input_tokens"] == 300
 
 
+def test_a_payload_that_names_its_role_keeps_it(recording):
+    """Side calls made on a generator's behalf (the vocab gate's "gate", the Jev slots' "jev:<slot>") carry their
+    own _role/_model; _tagged must not re-book them as that generator's "cards" call on the user's model."""
+    import forge
+    meter = forge.UsageMeter(default_model="ignored", default_role="byok")
+    forge._build_generators(dict(COMPAT_KEY), hosted=False, fake=False, on_usage=meter)[1]()
+    card_sink = recording[-1]["on_usage"]
+    card_sink({"prompt_tokens": 500, "completion_tokens": 50})
+    card_sink({"_role": "jev:qa", "_model": "typesafe/jev-1.13", "input_tokens": 120, "output_tokens": 0,
+               "cost": 0.0002})
+    card_sink({"_role": "gate", "_model": "typesafe/jev-1.13", "input_tokens": 80, "output_tokens": 0})
+    rows = {(r["role"], r["model"]): r for r in meter.rows()}
+    assert set(rows) == {("cards", "openai/gpt-4o-mini"), ("jev:qa", "typesafe/jev-1.13"),
+                         ("gate", "typesafe/jev-1.13")}
+    assert rows[("jev:qa", "typesafe/jev-1.13")]["input_tokens"] == 120
+    assert rows[("jev:qa", "typesafe/jev-1.13")]["cost_usd"] == pytest.approx(0.0002)
+    assert rows[("cards", "openai/gpt-4o-mini")]["input_tokens"] == 500
+
+
 def test_the_route_passes_the_card_model_through(client, app_module, stub_forge):
     login(client, "two-models@example.com")
     for body in ({"concept": "x", "mode": "anthropic",

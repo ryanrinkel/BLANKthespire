@@ -444,7 +444,7 @@ def _generate_set_card(plan: dict, bp: dict, class_id: str, made: list[dict],
     brief = contract.Brief(
         card_type=plan["type"], rarity=plan["rarity"],
         target_cost=None if (cost == -1 or isinstance(cost, str)) else int(cost),  # -1 / "X" ⇒ X-cost
-        theme=theme, context="\n".join(lines),
+        theme=theme, context="\n".join(lines), enforce_type_rarity=True,
     )
     pres = generate_card(brief, gen=gen, validator=validator)
     for line in pres.log:

@@ -1,5 +1,5 @@
 """Card-stage vocabulary gate (btsgen/gate.py; docs/plans/JEV_EVALUATION_PLAN.md Phase 1a). Offline: Jev is
-stubbed at gate._jev_post, the chat endpoint at OpenAICompatGenerator._complete_once."""
+stubbed at jev.post, the chat endpoint at OpenAICompatGenerator._complete_once."""
 from __future__ import annotations
 
 import json
@@ -11,7 +11,7 @@ from btsgen.class_forge import point_btsgen_at_mod_contract
 
 point_btsgen_at_mod_contract()
 
-from btsgen import contract, gate, paths, pipeline  # noqa: E402
+from btsgen import contract, gate, jev, paths, pipeline  # noqa: E402
 from btsgen.generator import OpenAICompatGenerator  # noqa: E402
 
 SIMPLE = contract.Brief(card_type="attack", rarity="common", target_cost=1,
@@ -147,8 +147,8 @@ def _fake_jev(monkeypatch, *, fail=False, calls=None):
             ans[q] = {"noul": 0.9 if name in ("triggers", "scry") else 0.01}
         return {"model": "typesafe/jev-x", "answers": ans, "usage": {"input_tokens": 100, "cost": 0.00001}}
 
-    monkeypatch.setattr(gate, "_jev_post", post)
-    monkeypatch.setattr(gate, "_jev_key", lambda: "k")
+    monkeypatch.setattr(jev, "post", post)
+    monkeypatch.setattr(jev, "key", lambda: "k")
 
 
 def test_jev_union_and_usage_role(monkeypatch):

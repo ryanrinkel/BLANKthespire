@@ -63,8 +63,8 @@ def generate_card(brief: Brief, gen: AnthropicGenerator | None = None,
     if card is not None:
         card["source"] = "llm"  # provenance is the harness's call, not model compliance
         vr = validator.validate(card)
-        errors = vr.errors
-        if vr.ok:
+        errors = vr.errors + _brief_mismatch(brief, card, gen)  # one repair fixes both
+        if vr.ok and not errors:
             res.ok, res.card, res.result = True, card, vr
             res.log.append("attempt 1: valid")
             _maybe_balance_repair(res, messages, gen, validator)
@@ -82,6 +82,9 @@ def generate_card(brief: Brief, gen: AnthropicGenerator | None = None,
         return res
     card2["source"] = "llm"
     vr2 = validator.validate(card2)
+    mismatch2 = _brief_mismatch(brief, card2, gen) if vr2.ok else []
+    if mismatch2:  # a type/rarity mismatch the repair didn't fix fails like any other validation error
+        vr2 = ValidationResult(ok=False, errors=mismatch2, warnings=list(vr2.warnings), score=vr2.score)
     if vr2.ok:
         res.ok, res.card, res.result = True, card2, vr2
         res.log.append("repair: valid")
@@ -91,6 +94,31 @@ def generate_card(brief: Brief, gen: AnthropicGenerator | None = None,
     res.all_errors += vr2.errors
     res.log.append(f"repair: still {len(vr2.errors)} error(s) -> discarded")
     return res
+
+
+_BRIEF_TYPES = ("attack", "skill", "power")
+_BRIEF_RARITIES = ("basic", "common", "uncommon", "rare", "token")
+
+
+def _brief_mismatch(brief: Brief, card: dict, gen=None) -> list[str]:
+    """Validation errors for a card whose `type` / `rarity` is not the brief's (the class forge's blueprint
+    decides both; nothing else checked them). Only when the brief opts in (Brief.enforce_type_rarity) and only
+    for a brief value inside the card schema's enum, so a placeholder or free-text brief never rejects a card.
+    An offline fake that picks its card's type from the THEME (class_forge._CardFake, `brief_meta_exempt`) is
+    exempt: its shapes are valid by construction only under the type it chose."""
+    if (not getattr(brief, "enforce_type_rarity", False) or not isinstance(card, dict)
+            or getattr(gen, "brief_meta_exempt", False)):
+        return []
+    errs = []
+    for key, want, legal in (("type", getattr(brief, "card_type", None), _BRIEF_TYPES),
+                             ("rarity", getattr(brief, "rarity", None), _BRIEF_RARITIES)):
+        want = str(want or "").strip().lower()
+        if want not in legal:
+            continue
+        got = card.get(key)
+        if str(got or "").strip().lower() != want:
+            errs.append(f"card '{key}' must be '{want}' (the brief's {key}); got '{got}'")
+    return errs
 
 
 def _note_gate(res: PipelineResult, gen) -> None:

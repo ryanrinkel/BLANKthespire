@@ -261,7 +261,10 @@ def _tagged(on_usage, role: str, model: str):
             u = {"input_tokens": getattr(u, "input_tokens", 0) or 0,
                  "output_tokens": getattr(u, "output_tokens", 0) or 0,
                  "cache_read_input_tokens": getattr(u, "cache_read_input_tokens", 0) or 0}
-        on_usage({**u, "_role": role, "_model": model})
+        # A payload that already names its role/model keeps them: a side call made on this generator's behalf
+        # (the card-stage vocab gate's "gate", the Jev quality slots' "jev:<slot>", both on OUR OpenRouter key
+        # and the Jev model) must not be booked as this generator's "cards"/"structure" call on the user's model.
+        on_usage({**u, "_role": u.get("_role") or role, "_model": u.get("_model") or model})
     return cb
 
 
@@ -358,7 +361,9 @@ def _append_captured_gaps(entries: list[dict]) -> int:
             for e in entries:
                 f.write(json.dumps({"ts": ts, "title": e.get("title", ""),
                                     "surfaced_by": e.get("surfaced_by", ""),
-                                    "fantasy": e.get("fantasy", ""), "sketch": e.get("sketch", "")},
+                                    "fantasy": e.get("fantasy", ""), "sketch": e.get("sketch", ""),
+                                    # Jev slot "vocab" (card-stage demand only): typo/synonym vs genuinely new
+                                    **({"triage": e["triage"]} if e.get("triage") else {})},
                                    ensure_ascii=False) + "\n")
         return len(entries)
     except OSError:
