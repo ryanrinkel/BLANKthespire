@@ -36,6 +36,7 @@ MIN_EXOTIC_STATUSES = 2          # distinct statuses from census.EXOTIC_STATUSES
 MAX_GENERIC_DEBUFF_SHARE = 0.25   # pool cards applying vulnerable/weak
 MIN_SCALED_OR_X = 1              # cards with any `scale` or X-cost
 MIN_KEYWORD_KINDS = 2            # W2.2 (v2 only): distinct card-shape keywords (retain/innate/ethereal/exhaust/multi_hit)
+MIN_RETAIN_SOURCES = 3           # retain-source coherence (2026-10-22): cards that can Retain, IF any card reads retention
 REPAIR_BUDGET = 6               # max card regenerations, ONE round
 
 
@@ -214,6 +215,17 @@ KEYWORD_MENU = [
     ("ethereal", 'REQUIRED: give this card op "ethereal" (it exhausts if still in hand at end of turn) and over-stat it.'),
     ("hits", 'REQUIRED: make this a MULTI-HIT attack: ONE damage effect carrying "hits": 2-4 (deal amount damage that many times).'),
 ]
+# Retain-source coherence (2026-10-22): a class whose cards READ retention (scale cards_retained / when
+# retained_last_turn) but that has fewer than MIN_RETAIN_SOURCES cards able to Retain gets plain victims turned into
+# Retain sources. Three distinct phrasings (one per missing source) so the repair round's directive de-dup keeps them.
+RETAIN_SOURCE_DIRECTIVES = [
+    'REQUIRED: give this card op "retain" (a cheap card the player can hold back) - the class has payoffs that read '
+    'retained cards but too few cards that Retain.',
+    'REQUIRED: give this card op "retain" (a cheap Block or utility skill worth holding for a later turn) - the class '
+    'has payoffs that read retained cards but too few cards that Retain.',
+    'REQUIRED: give this card op "retain" (an attack you can hold until the right turn) - the class has payoffs that '
+    'read retained cards but too few cards that Retain.',
+]
 NONPLAIN_DIRECTIVE = ('REQUIRED: this card must NOT be a plain stat line - build it around a distinctive '
                       'mechanic (an add_trigger, a `when` gate, an exotic status, or a scaled amount), '
                       'not just damage / block / apply Vulnerable or Weak.')
@@ -230,6 +242,9 @@ for _k, _d, _kind in (WHEN_MENU_KIND + SCALE_MENU_KIND):
 for _k, _d in (SCALE_MENU + EXOTIC_NOMINATE_ONLY + KEYWORD_MENU):
     DIRECTIVE_BY_KEY.setdefault(_k, _d)
 _KEY_BY_DIRECTIVE = {d: k for k, d in DIRECTIVE_BY_KEY.items()}
+# Retain-source coherence: a quota-only repair (not a roulette/nomination key, so not in DIRECTIVE_BY_KEY).
+for _d in RETAIN_SOURCE_DIRECTIVES:
+    _KEY_BY_DIRECTIVE[_d] = "retain_source"
 
 
 # W2.2: one census DETECTOR per menu key — callable(census.CardCensus) -> bool, "this card carries the mechanic
@@ -445,6 +460,8 @@ class PoolReport:
     scaled_or_x: int = 0
     scale_kinds: set = field(default_factory=set)     # W2.2: distinct scale sources in use
     keyword_kinds: set = field(default_factory=set)   # W2.2: distinct card-shape keywords (census.keyword_kinds)
+    retain_sources: int = 0            # cards that can Retain (base retain / retain_hand / grant_keyword retain)
+    retain_readers: int = 0            # cards that READ retention (scale cards_retained / when retained_last_turn)
     violations: list = field(default_factory=list)   # human-readable
 
     @property
@@ -559,6 +576,26 @@ def victim_indices(made: list[dict]) -> list[int]:
     return cands
 
 
+def is_retain_source(card: dict) -> bool:
+    """Retain-source coherence (2026-10-22): can this card make a card Retain? Its BASE effects carry op `retain`
+    (itself), `retain_hand` (the whole hand), or `grant_keyword` keyword retain (a chosen hand card)."""
+    for e in (card or {}).get("effects") or []:
+        if not isinstance(e, dict):
+            continue
+        op = e.get("op")
+        if op in ("retain", "retain_hand"):
+            return True
+        if op == "grant_keyword" and str(e.get("keyword") or "").strip().lower() == "retain":
+            return True
+    return False
+
+
+def reads_retention(cc: "census.CardCensus") -> bool:
+    """Does this card READ retention — a `cards_retained` scale (card effect, upgrade or trigger payload) or a
+    `when: retained_last_turn` gate? Those payoffs are dead text in a pool with too few Retain sources."""
+    return "cards_retained" in cc.scales or "retained_last_turn" in cc.whens
+
+
 def measure(made: list[dict]) -> PoolReport:
     """Census the non-basic pool and record every quota violation."""
     rep = PoolReport()
@@ -578,6 +615,10 @@ def measure(made: list[dict]) -> PoolReport:
             rep.scaled_or_x += 1
         rep.scale_kinds |= set(cc.scales) | ({"hits_scale"} if cc.hits_scale else set())  # Phase BK (v63)
         rep.keyword_kinds |= cc.keyword_kinds
+        if is_retain_source(card):
+            rep.retain_sources += 1
+        if reads_retention(cc):
+            rep.retain_readers += 1
         if not _is_reprint(plan):
             rep.plain_denom += 1
             if cc.plain:
@@ -598,7 +639,17 @@ def measure(made: list[dict]) -> PoolReport:
         v.append(f"{rep.scaled_or_x} scaled/X card(s) < {MIN_SCALED_OR_X}")
     if _keyword_quota_on() and len(rep.keyword_kinds) < MIN_KEYWORD_KINDS:
         v.append(f"only {len(rep.keyword_kinds)} keyword kind(s) < {MIN_KEYWORD_KINDS}")
+    if rep.retain_readers >= 1 and rep.retain_sources < MIN_RETAIN_SOURCES:  # retain-source coherence (2026-10-22)
+        v.append(f"{rep.retain_readers} card(s) read cards_retained / retained_last_turn but only "
+                 f"{rep.retain_sources} card(s) can Retain (min {MIN_RETAIN_SOURCES})")
     return rep
+
+
+def _retain_note(rep: PoolReport) -> str:
+    """The summary-line suffix for the retain-source quota — only for a class that actually reads retention."""
+    if not rep.retain_readers:
+        return ""
+    return f", retain sources {rep.retain_sources} (min {MIN_RETAIN_SOURCES}; {rep.retain_readers} reader(s))"
 
 
 def _keyword_quota_on() -> bool:
@@ -626,6 +677,17 @@ def plan_repairs(rep: PoolReport, budget: int = REPAIR_BUDGET, *, nominated: dic
 
     def room() -> bool:
         return len(directives) < budget
+
+    # Retain-source coherence (2026-10-22) goes FIRST: a payoff that reads retention with nothing to retain is a
+    # correctness bug, not a breadth shortfall. Each new source also projects the `retain` keyword kind.
+    if rep.retain_readers >= 1:
+        proj_sources = rep.retain_sources
+        for d in RETAIN_SOURCE_DIRECTIVES:
+            if proj_sources >= MIN_RETAIN_SOURCES or not room():
+                break
+            directives.append(d)
+            proj_sources += 1
+            proj_keyword.add("retain")
 
     for key, d in reactive_menu:
         if len(proj_reactive) >= MIN_REACTIVE_TRIGGER_KINDS or not room():
@@ -714,7 +776,7 @@ def enforce_coverage(made: list[dict], regen_card, note, *, featured=None, bridg
          f"`when` kinds {len(before.when_kinds)} (min {MIN_WHEN_KINDS}), "
          f"exotic {len(before.exotic_kinds)} (min {MIN_EXOTIC_STATUSES}), "
          f"debuff {before.generic_debuff_share:.0%} (max {MAX_GENERIC_DEBUFF_SHARE:.0%}), "
-         f"scaled/X {before.scaled_or_x} (min {MIN_SCALED_OR_X})" + kw)
+         f"scaled/X {before.scaled_or_x} (min {MIN_SCALED_OR_X})" + kw + _retain_note(before))
 
     feat_missing = _featured_missing(made, featured)
     if featured:
@@ -813,5 +875,6 @@ def enforce_coverage(made: list[dict], regen_card, note, *, featured=None, bridg
     note(f"coverage: after repair - plain {after.plain_share:.0%}, reactive kinds {len(after.reactive_kinds)}, "
          f"`when` kinds {len(after.when_kinds)}, exotic {len(after.exotic_kinds)}, "
          f"debuff {after.generic_debuff_share:.0%}, scaled/X {after.scaled_or_x}"
-         + (f", keywords {len(after.keyword_kinds)}" if _keyword_quota_on() else ""))
+         + (f", keywords {len(after.keyword_kinds)}" if _keyword_quota_on() else "")
+         + (f", retain sources {after.retain_sources}" if after.retain_readers else ""))
     return summary

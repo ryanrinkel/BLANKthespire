@@ -429,6 +429,8 @@ instead of a fixed number by adding `"scale": "<source>"` (keep a nominal "amoun
 back for a big release. Hit counts (v63): "hits_scale" on a damage = one hit per unit ("x" Whirlwind, \
 "attacks_played_this_turn" Finisher, "skills_in_hand" Flechettes). A signature Retain archetype = cheap/zero-cost cards with `retain`, payoffs that `scale` to \
 cards_retained or are gated `when:{{"kind":"retained_last_turn"}}` / `when:{{"kind":"hand_size_ge","value":N}}`. \
+A retained_last_turn card must itself carry `retain`; cards_retained needs 3+ pool cards that Retain \
+(retain / retain_hand / grant_keyword retain). \
 At most one scaled damage/block per card. v66: `grant_keyword` gives a hand card Retain (Snap) or Ethereal; \
 `return_to_hand` / `put_back` recycle a key card.
 

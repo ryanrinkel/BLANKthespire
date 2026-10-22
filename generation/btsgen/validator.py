@@ -1208,6 +1208,13 @@ class CardValidator:
             if any(e.get("grow_held", 0) or e.get("op") == "held_discount" for e in lst) \
                     and not any(e.get("op") == "retain" for e in lst):
                 out.append("'grow_held' / 'held_discount' need 'retain' on the same card (they pay off the turns the card is held).")
+            # Retain-source coherence (2026-10-22): `when: retained_last_turn` reads whether THIS card was held into the
+            # turn, so it needs `retain` on the same list too (a trigger's `when` already rejects it as play-local).
+            if (any(isinstance(e.get("when"), dict) and e["when"].get("kind") == "retained_last_turn"
+                    and e.get("op") != "add_trigger" for e in lst)
+                    and not any(e.get("op") == "retain" for e in lst)):
+                out.append("'when: retained_last_turn' needs 'retain' on the same card (it only fires if THIS card "
+                           "was held into the turn; without Retain the gate is dead text).")
             if sum(1 for e in lst if e.get("op") == "held_discount") > 1:
                 out.append("at most one 'held_discount' effect per card.")
         if any(e.get("op") == "held_discount" for e in effects + up_effects):

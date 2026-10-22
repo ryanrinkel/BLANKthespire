@@ -451,6 +451,97 @@ def test_w2_repair_walks_new_menus() -> None:
         check(s["attempted"] > 0, "repairs attempted")
 
 
+# --------------------------------------------------------------- retain-source coherence (2026-10-22)
+_RETAIN_READER = [{"op": "add_trigger", "trigger": "turn_end",
+                   "effects": [{"op": "block", "amount": 1, "scale": "cards_retained"}]}]
+
+
+def _retain_violation(rep) -> list[str]:
+    return [v for v in rep.violations if "can Retain" in v]
+
+
+def test_retain_source_quota() -> None:
+    print("retain-source coherence: cards_retained / retained_last_turn readers need 3+ Retain sources:")
+    for flag in (False, True):
+        with _V2(flag):
+            # a reader with ZERO sources -> violation (exact string pinned)
+            made = _rich_pool() + [_m("rare", _RETAIN_READER, rarity="rare", name="reader")]
+            rep = coverage.measure(made)
+            check(rep.retain_readers == 1 and rep.retain_sources == 0, f"1 reader / 0 sources: {rep}")
+            check(_retain_violation(rep) == ["1 card(s) read cards_retained / retained_last_turn but only 0 card(s) "
+                                             "can Retain (min 3)"], f"v2={flag}: the violation: {rep.violations}")
+            # three sources of the three shapes -> no violation
+            ok = made + [_m("common", [{"op": "block", "amount": 5}, {"op": "retain"}], name="s_ret"),
+                         _m("uncommon", [{"op": "retain_hand"}, {"op": "block", "amount": 4}], name="s_hand"),
+                         _m("common", [{"op": "grant_keyword", "keyword": "retain", "cards": "choose"},
+                                       {"op": "draw", "amount": 1}], name="s_grant")]
+            rep_ok = coverage.measure(ok)
+            check(rep_ok.retain_sources == 3 and not _retain_violation(rep_ok),
+                  f"v2={flag}: 3 sources clear the quota: {rep_ok.retain_sources} {rep_ok.violations}")
+            # a retained_last_turn card carrying retain is itself one source (still short of 3)
+            gated = _rich_pool() + [_m("common", [{"op": "retain"}, {"op": "block", "amount": 4},
+                                                  {"op": "draw", "amount": 1, "when": {"kind": "retained_last_turn"}}],
+                                       name="gated")]
+            rg = coverage.measure(gated)
+            check(rg.retain_readers == 1 and rg.retain_sources == 1 and len(_retain_violation(rg)) == 1,
+                  f"v2={flag}: a gated card is reader + source: {rg.retain_readers}/{rg.retain_sources}")
+            # a class that never reads retention and never retains -> no violation, no note
+            plain_rep = coverage.measure(_rich_pool())
+            check(plain_rep.retain_readers == 0 and not _retain_violation(plain_rep),
+                  f"v2={flag}: no readers -> no retain violation: {plain_rep.violations}")
+            # grant_keyword ethereal / an upgrade-only retain are NOT sources
+            not_src = made + [_m("common", [{"op": "grant_keyword", "keyword": "ethereal", "cards": "choose"}],
+                                 name="ns_eth")]
+            check(coverage.measure(not_src).retain_sources == 0, f"v2={flag}: grant_keyword ethereal is not a source")
+            up_only = {"plan": {"role": "common", "rarity": "common", "theme": "", "type": "skill", "cost": 1},
+                       "card": {"id": "c_up", "name": "up", "type": "skill", "rarity": "common", "cost": 1,
+                                "target": "self", "effects": [{"op": "block", "amount": 5}],
+                                "upgrade": {"effects": [{"op": "block", "amount": 5}, {"op": "retain"}]}}}
+            check(coverage.measure(made + [up_only]).retain_sources == 0, f"v2={flag}: upgrade-only retain is not a source")
+
+    print("retain-source coherence: plan_repairs deals the missing sources first, budget-capped:")
+    with _V2(True):
+        made = _rich_pool() + [_m("rare", _RETAIN_READER, rarity="rare", name="reader"),
+                               _m("common", [{"op": "block", "amount": 5}, {"op": "retain"}], name="s_ret")]
+        rep = coverage.measure(made)
+        ds = coverage.plan_repairs(rep, kinds={""})
+        rs = [d for d in ds if d in coverage.RETAIN_SOURCE_DIRECTIVES]
+        check(len(rs) == 2 and ds[:2] == rs, f"2 missing sources -> 2 retain directives at the head: {ds}")
+        check(all('give this card op "retain"' in d and "too few cards that Retain" in d for d in rs),
+              f"directive wording: {rs}")
+        check(all(coverage.directive_key(d) == "retain_source" for d in rs), "directive_key -> retain_source")
+        check(len(coverage.plan_repairs(rep, budget=1, kinds={""})) == 1, "budget=1 still caps the list")
+        check(not [d for d in coverage.plan_repairs(coverage.measure(_rich_pool()), kinds={""})
+                   if d in coverage.RETAIN_SOURCE_DIRECTIVES], "no readers -> no retain directive")
+
+    print("retain-source coherence: enforce_coverage repairs plain victims and re-measures the quota:")
+    with _V2(True):
+        made = _rich_pool() + [_m("rare", _RETAIN_READER, rarity="rare", name="reader"),
+                               _m("common", [{"op": "block", "amount": 5}], name="p1"),
+                               _m("common", [{"op": "damage", "amount": 6}], name="p2"),
+                               _m("common", [{"op": "block", "amount": 7}], name="p3")]
+        log: list[str] = []
+        seen: list[str] = []
+
+        def regen(plan, old_card, directive):
+            seen.append(directive)
+            if directive in coverage.RETAIN_SOURCE_DIRECTIVES:
+                return {**old_card, "id": old_card["id"] + "_r", "effects": [{"op": "retain"}] + old_card["effects"]}
+            return None
+
+        s = coverage.enforce_coverage(made, regen, log.append, kinds={""})
+        check(sum(1 for d in seen if d in coverage.RETAIN_SOURCE_DIRECTIVES) == 3, f"3 retain repairs dealt: {seen}")
+        check(s["after"].retain_sources == 3 and not _retain_violation(s["after"]),
+              f"after re-measure clears the quota: {s['after'].retain_sources} {s['after'].violations}")
+        check(any("retain sources 0 (min 3; 1 reader(s))" in l for l in log), f"before line carries the quota: {log}")
+        check(any("after repair" in l and "retain sources 3" in l for l in log), f"after line carries it: {log}")
+        check(any("can Retain (min 3)" in l and "shortfall(s)" in l for l in log), "the shortfall line names it")
+        # a class with no readers never mentions retain sources
+        log2: list[str] = []
+        coverage.enforce_coverage(_rich_pool(), lambda p, o, d: None, log2.append, kinds={""})
+        check(not any("retain sources" in l for l in log2), f"no readers -> no retain note: {log2}")
+
+
 def main() -> int:
     test_measure_math()
     test_measure_clean_pool()
@@ -461,6 +552,7 @@ def main() -> int:
     test_w2_menu_keys_wired()
     test_w2_nominations_and_gating()
     test_w2_repair_walks_new_menus()
+    test_retain_source_quota()
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return 1 if _FAIL else 0
 
