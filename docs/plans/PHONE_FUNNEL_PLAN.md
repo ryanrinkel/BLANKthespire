@@ -150,7 +150,9 @@ Files: `web/static/index.html`, `web/static/app.js`, `web/static/deck.html`, `we
 - **Say "PC" early.** Under the board: *"A free mod for Slay the Spire 2 on Steam. Forge on any device;
   play on your PC."* One line; it also stops people who do not own the game before they cost a sign-in.
 - **Phone hero order**: featured classes first (something to look at in 2 seconds), the CTA second. On
-  desktop keep the current order.
+  desktop keep the current order. *Reverted 2026-10-22: on a real phone it read as a layout mistake (the
+  "How will you fill in the Blank?" question with its button pushed under the strip), so phones now keep
+  the document order too: board, tagline, CTA, then the strip.*
 - **Ad-side lever, no code**: in Google Ads set the mobile device bid adjustment to -100% (or run a
   desktop-only campaign) for the next test, or if the point IS phones, make the ad's own story "forge on
   your phone, play tonight on PC" so the landing page and the ad agree. Either way phase 1 is still worth

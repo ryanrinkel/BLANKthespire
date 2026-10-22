@@ -467,21 +467,6 @@ body.landing {
 .splash-note { margin: 14px auto 0; font-size: 13px; max-width: 46ch; }
 body.landing a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 @media (max-width: 520px) { .splash-actions .btn { width: 100%; max-width: 320px; text-align: center; } }
-/* Phone hero order: board + PC line, then the featured classes (something to look at in two seconds), THEN the
-   CTA. The splash box dissolves (display: contents) so its children and the featured section become siblings
-   in one flex column that `order` can interleave; desktop keeps the plain document order. */
-@media (max-width: 520px) {
-  body.landing { display: flex; flex-direction: column; }
-  body.landing > * { order: 4; }
-  body.landing .splash { display: contents; }
-  .splash > * { order: 1; padding-left: 20px; padding-right: 20px; text-align: center; }
-  .splash > .board { margin-top: 32px; }
-  .splash > .splash-actions, .splash > .splash-note { order: 3; }
-  .splash > .splash-note { margin-bottom: 36px; }
-  body.landing > .featured { order: 2; border-top: none; padding-bottom: 8px; width: 100%; }
-  .featured .how-title { margin-top: 24px; }
-  .featured .how-sub { margin-bottom: 14px; }
-}
 
 /* --- landing: how it works -------------------------------------------------------------------- */
 .how {
@@ -516,6 +501,18 @@ body.landing a:focus-visible { outline: 2px solid var(--accent); outline-offset:
                    /* bleed to the screen edge so the next tile visibly peeks in */
                    margin: 0 -20px; padding-left: 20px; padding-right: 20px; scroll-padding: 0 20px; }
   .featured-tile { scroll-snap-align: start; }
+}
+/* Phones keep the document order: board, tagline, CTA, then the featured strip. (2026-10-13 to 2026-10-22 the
+   strip was slotted between the tagline and the CTA via flex `order`; it read as a mistake, with the "How will
+   you fill in the Blank?" question separated from its button, so that rule is gone.) The hero is shorter than
+   on a laptop so the strip's title still peeks above the fold, and the section gaps are tightened. This block
+   sits after the .how / .featured base rules it overrides. */
+@media (max-width: 520px) {
+  .splash { min-height: auto; padding: 36px 20px 40px; }
+  .how { padding-bottom: 56px; }
+  .how-title { margin-top: 28px; }
+  .how-sub { margin-bottom: 22px; }
+  .featured { padding-bottom: 40px; }
 }
 .featured-tile {
   display: flex; flex-direction: column; overflow: hidden; text-decoration: none; color: var(--ink);
