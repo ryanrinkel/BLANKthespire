@@ -50,6 +50,28 @@ def test_tested_models_lead_and_dupes_collapse():
     assert out["recommended"] == ["glm-5.3"] and out["hidden"] == 0
 
 
+def test_list_models_sends_the_btsgen_user_agent(monkeypatch):
+    """Cloudflare in front of api.groq.com 403s urllib's default UA — the model list must send btsgen's."""
+    import io
+    import json
+    import urllib.request
+
+    import forge
+    from btsgen.generator import USER_AGENT
+    seen = []
+
+    def fake_urlopen(req, timeout=None):
+        seen.append(req)
+        return io.BytesIO(json.dumps({"data": [{"id": "glm-5.3"}]}).encode())
+
+    monkeypatch.setattr(forge, "_guard_outbound_url", lambda u: None)
+    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+    out = forge.list_models("https://api.groq.com/openai/v1", "k")
+    assert out["models"] == ["glm-5.3"]
+    assert seen[0].get_header("User-agent") == USER_AGENT
+    assert seen[0].full_url == "https://api.groq.com/openai/v1/models"
+
+
 def test_api_models_returns_filtered_listing(client, app_module, monkeypatch):
     import forge
     monkeypatch.setattr(app_module, "list_models",

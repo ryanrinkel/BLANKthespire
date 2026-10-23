@@ -531,6 +531,36 @@ def test_overload_retries_kwarg_beats_env() -> None:
     assert ns.delays == [], "no backoff when the kwarg disables it"
 
 
+def test_user_agent_header_sent() -> None:
+    print("every chat request carries the btsgen User-Agent...")
+    seen: list = []
+
+    def fake(req, timeout=None):
+        seen.append(req)
+        return _FakeResp(_sse([{"choices": [{"delta": {"content": "ok"}}]}, "[DONE]"]))
+
+    _with_urlopen(fake, lambda: _gen().first_attempt("x"))
+    ua = seen[0].get_header("User-agent")  # urllib stores header names capitalize()d
+    assert ua == _generator.USER_AGENT and ua.startswith("btsgen/"), f"User-Agent must be btsgen's (got {ua!r})"
+
+
+def test_html_error_body_is_summarised() -> None:
+    print("an HTML error page becomes a one-line message...")
+    page = ("<!DOCTYPE html>\n<html><head><title>Access denied | api.groq.com used Cloudflare to restrict access"
+            "</title></head><body><div>lots of markup</div></body></html>")
+    e = _generator.EndpointHTTPError(403, page)
+    msg = str(e)
+    assert msg.startswith("endpoint returned HTTP 403:"), msg
+    assert "edge/CDN blocked" in msg, msg
+    assert "Access denied | api.groq.com used Cloudflare to restrict access" in msg, msg
+    assert "<html" not in msg.lower() and "<title" not in msg.lower(), msg
+    assert e.detail == page and e.code == 403, "the raw body must stay on .detail"
+    plain = _generator.EndpointHTTPError(503, _GEMINI_503)
+    assert str(plain) == f"endpoint returned HTTP 503: {_GEMINI_503}", "a JSON body keeps the old format"
+    untitled = str(_generator.EndpointHTTPError(403, "  <html><body>blocked</body></html>"))
+    assert "edge/CDN blocked" in untitled and "<html" not in untitled, untitled
+
+
 def main() -> int:
     test_looks_like_stub()
     test_stub_answer_blocks_provider_and_retries()
@@ -548,6 +578,8 @@ def main() -> int:
     test_429_not_retried()
     test_overload_retries_env_zero()
     test_overload_retries_kwarg_beats_env()
+    test_user_agent_header_sent()
+    test_html_error_body_is_summarised()
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return 1 if _FAIL else 0
 

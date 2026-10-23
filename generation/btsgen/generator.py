@@ -5,6 +5,7 @@ about validation or quarantine — that's the pipeline's job. The engine never t
 """
 from __future__ import annotations
 
+import html
 import json
 import logging
 import os
@@ -20,6 +21,8 @@ from . import contract, paths
 from .contract import Brief
 
 DEFAULT_MODEL = "claude-opus-4-8"
+# Sent on every outbound HTTP call: Cloudflare in front of api.groq.com 403s Python-urllib's default UA.
+USER_AGENT = "btsgen/1.0 (+https://blankthespire.com)"
 
 
 def _model_features(model_id: str) -> dict:
@@ -314,13 +317,27 @@ def _overload_retries() -> int:
         return OVERLOAD_RETRIES
 
 
+def _html_error_summary(detail: str) -> str | None:
+    """A one-line stand-in for an HTML error body (a CDN/WAF block page, not an API error), or None when
+    `detail` isn't HTML. Pulls the page <title> in when present so the user still sees who blocked it."""
+    text = (detail or "").lstrip()
+    head = text[:16].lower()
+    if not (head.startswith("<!doctype") or head.startswith("<html")):
+        return None
+    msg = "the provider's edge/CDN blocked the request (HTML error page, no API error)"
+    m = re.search(r"<title[^>]*>(.*?)</title>", text, re.I | re.S)
+    title = " ".join(html.unescape(m.group(1)).split())[:120] if m else ""
+    return f'{msg}: "{title}"' if title else msg
+
+
 class EndpointHTTPError(RuntimeError):
     """A non-adaptable HTTP status from an OpenAI-compatible endpoint. Subclasses RuntimeError with the
     same message the forge log always showed, but keeps `.code` so callers can react to the status —
     the ollama_mix failover uses it to tell quota exhaustion (429/402) from a misconfiguration (401)."""
 
     def __init__(self, code: int, detail: str) -> None:
-        super().__init__(f"endpoint returned HTTP {code}: {detail[:400]}")
+        summary = _html_error_summary(detail)  # never paste a block page's markup into the forge log
+        super().__init__(f"endpoint returned HTTP {code}: {summary or detail[:400]}")
         self.code = code
         self.detail = detail
 
@@ -439,7 +456,7 @@ class OpenAICompatGenerator:
         req = urllib.request.Request(
             f"{self.base_url}/chat/completions", data=body, method="POST",
             headers={"Authorization": f"Bearer {self._api_key}", "Content-Type": "application/json",
-                     "Accept": "text/event-stream"},
+                     "Accept": "text/event-stream", "User-Agent": USER_AGENT},
         )
         parts: list[str] = []
         usage: dict | None = None

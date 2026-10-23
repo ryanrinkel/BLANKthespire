@@ -82,7 +82,9 @@ def _knob(name: str, default: float) -> float:
 def fetch_usage(api_key: str, timeout: float = 10.0) -> dict:
     """One GET of the usage endpoint; raises on transport/HTTP/JSON trouble (the caller decides what a
     failed poll means)."""
-    req = urllib.request.Request(USAGE_URL, headers={"Authorization": f"Bearer {api_key}"})
+    from .generator import USER_AGENT  # lazy: keep this module import-light
+    req = urllib.request.Request(USAGE_URL, headers={"Authorization": f"Bearer {api_key}",
+                                                     "User-Agent": USER_AGENT})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.loads(resp.read().decode("utf-8"))
 

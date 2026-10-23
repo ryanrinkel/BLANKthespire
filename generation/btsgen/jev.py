@@ -43,9 +43,11 @@ SLOTS = ("nominate", "relic", "vocab", "qa", "stub")
 
 # ------------------------------------------------------------------------------------------------ transport
 def post(key: str, state, questions: dict) -> dict:
+    from .generator import USER_AGENT  # lazy, like load_env below: generator imports this module lazily too
     body = json.dumps({"model": JEV_MODEL, "state": state, "questions": questions}).encode()
     req = urllib.request.Request(JEV_ENDPOINT, data=body, method="POST",
-                                 headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
+                                 headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json",
+                                          "User-Agent": USER_AGENT})
     with urllib.request.urlopen(req, timeout=JEV_TIMEOUT_S) as r:
         return json.load(r)
 

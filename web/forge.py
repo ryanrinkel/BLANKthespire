@@ -624,11 +624,13 @@ def list_models(base_url: str, api_key: str) -> dict:
     import urllib.error
     import urllib.request
 
+    from btsgen.generator import USER_AGENT  # Cloudflare (api.groq.com) 403s urllib's default UA
+
     if not (base_url and api_key):
         raise ForgeError("base URL and API key are both required to list models.")
     _guard_outbound_url(base_url)
     url = base_url.rstrip("/") + "/models"
-    req = urllib.request.Request(url, headers={"Authorization": f"Bearer {api_key}"})
+    req = urllib.request.Request(url, headers={"Authorization": f"Bearer {api_key}", "User-Agent": USER_AGENT})
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
             data = json.loads(resp.read().decode("utf-8"))
