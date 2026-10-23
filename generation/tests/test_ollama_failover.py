@@ -546,6 +546,104 @@ def test_looks_like_credit_error():
     check(not looks_like_credit_error(500, "credits"), "only 402/429 count")
 
 
+# ------------------------------------------------------------------ overload backoff vs failover
+
+_PRI_URL, _FB_URL = "https://pri.example/v1", "https://fb.example/v1"
+
+
+def _two_tier_real_chain():
+    """build_ollama_mix with REAL OpenAICompatGenerators on two non-Ollama endpoints (no quota gate)."""
+    role_map = {"roles": {"cards": {"model": "m", "api_key": "k", "base_url": _PRI_URL}},
+                "fallbacks": [{"name": "fb", "api_key": "${OLLAMA_TEST_FB_KEY}", "base_url": _FB_URL,
+                               "models": {"cards": "m2"}, "extra_body": None}]}
+    class _PlainContract:  # resolves to the "cards" role; plain-string brief so no Brief object is needed
+        def system_prompt(self):
+            return "SYS"
+
+        def user_brief(self, brief):
+            return f"BRIEF:{brief}"
+
+        def repair_message(self, prev_text, errors):
+            return "REPAIR"
+
+    with _env(OLLAMA_TEST_FB_KEY="sk-test"):
+        _, _, _, make_gen = ollama_mix.build_ollama_mix(role_map)
+        return make_gen(_PlainContract(), max_tokens=100)
+
+
+@contextlib.contextmanager
+def _fake_http(handler):
+    """Swap urlopen for one driven by `handler(url) -> None (answer) | HTTP status (raise)`, and
+    generator._sleep for a recorder; BTS_OVERLOAD_RETRIES is cleared for the block. Restores everything."""
+    import io
+    import urllib.error
+    import urllib.request
+    from btsgen import generator as _g
+    real_open, real_sleep = urllib.request.urlopen, _g._sleep
+    delays: list[float] = []
+    posts: list[str] = []
+
+    class _Resp:
+        headers = {"Content-Type": "application/json"}
+
+        def __init__(self, body: bytes):
+            self._body = body
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def read(self):
+            return self._body
+
+    def fake(req, timeout=None):
+        posts.append(req.full_url)
+        code = handler(req.full_url)
+        if code is None:
+            return _Resp(json.dumps({"choices": [{"message": {"content": "ok-from-fb"}}]}).encode())
+        raise urllib.error.HTTPError(req.full_url, code, "err", {}, io.BytesIO(b"high demand"))
+
+    urllib.request.urlopen, _g._sleep = fake, delays.append
+    old_env = os.environ.pop("BTS_OVERLOAD_RETRIES", None)
+    try:
+        yield posts, delays
+    finally:
+        urllib.request.urlopen, _g._sleep = real_open, real_sleep
+        if old_env is not None:
+            os.environ["BTS_OVERLOAD_RETRIES"] = old_env
+
+
+def test_non_final_tier_fails_over_on_503_without_backoff():
+    _reset_breaker()
+    gen = _two_tier_real_chain()
+    check(gen.tiers[0].gen._overload_retries == 0 and gen.tiers[1].gen._overload_retries is None,
+          "the primary skips the backoff, the last tier keeps the default")
+    with _fake_http(lambda url: 503 if url.startswith(_PRI_URL) else None) as (posts, delays):
+        text, _ = gen.first_attempt("x")
+    check(text == "ok-from-fb", f"a 503 from the primary must land on the fallback (got {text!r})")
+    check(delays == [], f"the primary must not sleep before failing over (got {delays})")
+    check(sum(p.startswith(_PRI_URL) for p in posts) == 1, f"the primary is posted once (got {posts})")
+
+
+def test_last_tier_backs_off_on_503_before_raising():
+    _reset_breaker()
+    from btsgen import generator as _g
+    gen = _two_tier_real_chain()
+    with _fake_http(lambda url: 503) as (posts, delays):
+        try:
+            gen.first_attempt("x")
+            check(False, "503 on every tier must raise")
+        except EndpointHTTPError as e:
+            check(e.code == 503, f"the last tier's 503 surfaces (got {e.code})")
+    check(delays == list(_g.OVERLOAD_BACKOFF_S), f"only the last tier backs off (got {delays})")
+    check(sum(p.startswith(_FB_URL) for p in posts) == _g.OVERLOAD_RETRIES + 1,
+          f"the last tier is retried OVERLOAD_RETRIES times (got {posts})")
+    check(sum(p.startswith(_PRI_URL) for p in posts) == 1, "the primary is still posted once")
+    _reset_breaker()
+
+
 def main() -> int:
     for name, fn in sorted(globals().items()):
         if name.startswith("test_") and callable(fn):

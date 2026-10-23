@@ -353,7 +353,8 @@ class OpenAICompatGenerator:
     def __init__(self, base_url: str, api_key: str, model: str, contract_mod=None,
                  max_tokens: int = 4000, timeout: int = 180,
                  response_format: dict | None = None, temperature: float | None = None,
-                 on_usage=None, extra_body: dict | None = None) -> None:
+                 on_usage=None, extra_body: dict | None = None,
+                 overload_retries: int | None = None) -> None:
         if not (base_url and api_key and model):
             raise RuntimeError("OpenAI-compatible backend needs base_url, api_key, and model.")
         self.base_url = base_url.rstrip("/")
@@ -378,6 +379,9 @@ class OpenAICompatGenerator:
         # a stage re-roll adds the upstream whose answer just failed validation so the fresh sample escapes
         # OpenRouter's prompt-cache affinity instead of being routed straight back to it.
         self.avoid_providers: set[str] = set()
+        # Backoff retries on a transient overload status (OVERLOAD_CODES). None = BTS_OVERLOAD_RETRIES / the
+        # default; a hosted tier with a fallback behind it passes 0 so the failover chain moves on at once.
+        self._overload_retries = overload_retries
         self._contract = contract_mod or contract
         self._system = self._contract.system_prompt()
         self._gate = _make_gate(self._contract, self._system)  # card-stage vocab gate; None = off (see gate.py)
@@ -594,7 +598,7 @@ class OpenAICompatGenerator:
     def _complete_once(self, payload: dict) -> str:
         """`_request_adapted`, with a bounded backoff retry when the endpoint reports a transient overload
         (OVERLOAD_CODES — e.g. Gemini's 503 "high demand", which used to kill a whole BYOK forge)."""
-        retries = _overload_retries()
+        retries = self._overload_retries if self._overload_retries is not None else _overload_retries()
         attempt = 0
         while True:
             try:

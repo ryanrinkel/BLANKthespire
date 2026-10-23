@@ -511,6 +511,26 @@ def test_overload_retries_env_zero() -> None:
     assert ns.delays == [], "no backoff when retries are disabled"
 
 
+def test_overload_retries_kwarg_beats_env() -> None:
+    print("overload_retries=0 on the constructor beats BTS_OVERLOAD_RETRIES=3...")
+    calls = {"n": 0}
+
+    def fake(req, timeout=None):
+        calls["n"] += 1
+        raise _http_error(503, _GEMINI_503)
+
+    gen = OpenAICompatGenerator("https://fake.test/v1", "sk-x", "m1", contract_mod=_Contract(),
+                                max_tokens=100, overload_retries=0)
+    with _NoSleep(retries_env="3") as ns:
+        try:
+            _with_urlopen(fake, lambda: gen.first_attempt("x"))
+            raise AssertionError("a 503 with overload_retries=0 must raise")
+        except _generator.EndpointHTTPError as e:
+            assert e.code == 503, f"code must be 503 (got {e.code})"
+    assert calls["n"] == 1, f"the kwarg must win over the env (got {calls['n']} posts)"
+    assert ns.delays == [], "no backoff when the kwarg disables it"
+
+
 def main() -> int:
     test_looks_like_stub()
     test_stub_answer_blocks_provider_and_retries()
@@ -527,6 +547,7 @@ def main() -> int:
     test_overload_503_exhausted_raises()
     test_429_not_retried()
     test_overload_retries_env_zero()
+    test_overload_retries_kwarg_beats_env()
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return 1 if _FAIL else 0
 

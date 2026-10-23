@@ -226,6 +226,8 @@ class _FailoverGenerator:
 
     A call walks the list: tiers whose endpoint breaker is open are skipped outright; a tier that raises a
     skip-class error (404/408/5xx) or trips its breaker (402/429/transport) hands the call to the next tier.
+    Non-final tiers are built with overload_retries=0, so a 5xx fails over at once; only the last tier
+    applies the generator's overload backoff before the error surfaces.
     If every tier's breaker is open the LAST tier is still attempted — a cooling-down route is better than no
     route, and it keeps the pre-tier behavior where the final fallback was never itself gated."""
 
@@ -522,7 +524,7 @@ def build_ollama_mix(role_map: dict | None = None, *, on_usage=None):
         if spec.get("max_tokens_floor"):
             eff = max(eff, int(spec["max_tokens_floor"]))
 
-        def _build(base_url: str, api_key: str, model: str, extra_body):
+        def _build(base_url: str, api_key: str, model: str, extra_body, overload_retries: int | None = None):
             # Every tier differs ONLY in endpoint, model slug and extra_body — same contract, JSON pin,
             # temperature, token budget and timeout — so a failed-over call exercises the identical harness.
             return OpenAICompatGenerator(
@@ -532,16 +534,20 @@ def build_ollama_mix(role_map: dict | None = None, *, on_usage=None):
                 temperature=spec.get("temperature"),
                 on_usage=_tagged(role, model),
                 extra_body=extra_body,
+                overload_retries=overload_retries,
             )
 
-        primary = _build(spec["base_url"], spec["api_key"], spec["model"], spec.get("extra_body"))
+        # A tier with another tier behind it skips the generator's 503/5xx backoff (overload_retries=0): the
+        # failover chain is the faster recovery. Only the LAST tier (or a lone primary) waits and retries.
+        primary = _build(spec["base_url"], spec["api_key"], spec["model"], spec.get("extra_body"),
+                         0 if fbs else None)
         if not fbs:
             return primary
         tiers = [_Tier(primary, PRIMARY_COOLDOWN_S, name="primary")]
-        for fb in fbs:
+        for i, fb in enumerate(fbs):
             tiers.append(_Tier(
                 _build(fb["base_url"], fb["api_key"], fb["models"][role],
-                       _tier_extra_body(fb, role, spec)),
+                       _tier_extra_body(fb, role, spec), 0 if i < len(fbs) - 1 else None),
                 fb["cooldown_s"], name=fb["name"]))
         return _FailoverGenerator(tiers)
 
