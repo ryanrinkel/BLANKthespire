@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import sys
 import urllib.error
 import urllib.request
@@ -410,6 +411,106 @@ def test_stub_block_expires_after_an_hour() -> None:
         _generator._reset_ignored_providers()
 
 
+class _NoSleep:
+    """Swap generator._sleep for a recorder (and optionally set BTS_OVERLOAD_RETRIES); always restore."""
+
+    def __init__(self, retries_env: str | None = None) -> None:
+        self.delays: list[float] = []
+        self._env = retries_env
+
+    def __enter__(self):
+        self._real = _generator._sleep
+        self._old_env = os.environ.pop("BTS_OVERLOAD_RETRIES", None)
+        if self._env is not None:
+            os.environ["BTS_OVERLOAD_RETRIES"] = self._env
+        _generator._sleep = self.delays.append
+        return self
+
+    def __exit__(self, *a):
+        _generator._sleep = self._real
+        os.environ.pop("BTS_OVERLOAD_RETRIES", None)
+        if self._old_env is not None:
+            os.environ["BTS_OVERLOAD_RETRIES"] = self._old_env
+        return False
+
+
+_GEMINI_503 = ('{"error":{"code":503,"message":"This model is currently experiencing high demand...",'
+               '"status":"UNAVAILABLE"}}')
+
+
+def test_overload_503_retried_then_succeeds() -> None:
+    print("503 overload -> backoff retry, then success...")
+    calls = {"n": 0}
+
+    def fake(req, timeout=None):
+        calls["n"] += 1
+        if calls["n"] <= 2:
+            raise _http_error(503, _GEMINI_503)
+        return _FakeResp(_sse([{"choices": [{"delta": {"content": "survived"}}]}, "[DONE]"]))
+
+    with _NoSleep() as ns:
+        text, _ = _with_urlopen(fake, lambda: _gen().first_attempt("x"))
+    assert text == "survived", f"the post-backoff answer must be returned (got {text!r})"
+    assert calls["n"] == 3, f"two 503s + one success = 3 posts (got {calls['n']})"
+    assert ns.delays == [5.0, 15.0], f"backoff must follow OVERLOAD_BACKOFF_S (got {ns.delays})"
+
+
+def test_overload_503_exhausted_raises() -> None:
+    print("503 on every attempt -> EndpointHTTPError after OVERLOAD_RETRIES...")
+    calls = {"n": 0}
+
+    def fake(req, timeout=None):
+        calls["n"] += 1
+        raise _http_error(503, _GEMINI_503)
+
+    with _NoSleep() as ns:
+        try:
+            _with_urlopen(fake, lambda: _gen().first_attempt("x"))
+            raise AssertionError("a persistent 503 must raise")
+        except _generator.EndpointHTTPError as e:
+            assert e.code == 503, f"code must be kept (got {e.code})"
+            assert str(e).startswith("endpoint returned HTTP 503:"), f"message format must not change (got {e})"
+    want = _generator.OVERLOAD_RETRIES + 1
+    assert calls["n"] == want, f"expected {want} posts (got {calls['n']})"
+    assert ns.delays == list(_generator.OVERLOAD_BACKOFF_S), f"each retry sleeps its backoff (got {ns.delays})"
+
+
+def test_429_not_retried() -> None:
+    print("429 quota -> surfaces immediately, no retry...")
+    calls = {"n": 0}
+
+    def fake(req, timeout=None):
+        calls["n"] += 1
+        raise _http_error(429, "rate limited")
+
+    with _NoSleep() as ns:
+        try:
+            _with_urlopen(fake, lambda: _gen().first_attempt("x"))
+            raise AssertionError("a 429 must raise")
+        except _generator.EndpointHTTPError as e:
+            assert e.code == 429, f"code must be 429 (got {e.code})"
+    assert calls["n"] == 1, f"a 429 must not be retried (got {calls['n']} posts)"
+    assert ns.delays == [], "no backoff on a 429"
+
+
+def test_overload_retries_env_zero() -> None:
+    print("BTS_OVERLOAD_RETRIES=0 -> one post, immediate raise...")
+    calls = {"n": 0}
+
+    def fake(req, timeout=None):
+        calls["n"] += 1
+        raise _http_error(503, _GEMINI_503)
+
+    with _NoSleep(retries_env="0") as ns:
+        try:
+            _with_urlopen(fake, lambda: _gen().first_attempt("x"))
+            raise AssertionError("a 503 with retries disabled must raise")
+        except _generator.EndpointHTTPError as e:
+            assert e.code == 503, f"code must be 503 (got {e.code})"
+    assert calls["n"] == 1, f"retries=0 must post once (got {calls['n']})"
+    assert ns.delays == [], "no backoff when retries are disabled"
+
+
 def main() -> int:
     test_looks_like_stub()
     test_stub_answer_blocks_provider_and_retries()
@@ -422,6 +523,10 @@ def main() -> int:
     test_stream_options_dropped_on_400()
     test_extra_body_and_last_meta()
     test_extra_body_dropped_on_400()
+    test_overload_503_retried_then_succeeds()
+    test_overload_503_exhausted_raises()
+    test_429_not_retried()
+    test_overload_retries_env_zero()
     print(f"\n{_PASS} passed, {_FAIL} failed")
     return 1 if _FAIL else 0
 

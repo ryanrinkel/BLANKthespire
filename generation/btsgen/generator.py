@@ -6,6 +6,7 @@ about validation or quarantine — that's the pipeline's job. The engine never t
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import threading
@@ -293,6 +294,26 @@ def _jev_stub_verdict(text: str, string_stub: bool, on_usage=None) -> dict:
     return {"p": None if p is None else round(float(p), 3), "string_stub": bool(string_stub)}
 
 
+# Transient overload statuses worth a backoff retry: 503 (Gemini "high demand" / UNAVAILABLE), 529
+# (overloaded) and 502/504 gateway blips. 429/402 (quota/credit) are deliberately NOT here — the hosted
+# failover + credit alert in ollama_mix depend on those surfacing at once; 4xx are never transient.
+OVERLOAD_CODES = frozenset({502, 503, 504, 529})
+OVERLOAD_RETRIES = 3  # extra attempts after the first; BTS_OVERLOAD_RETRIES overrides
+OVERLOAD_BACKOFF_S = (5.0, 15.0, 30.0)  # ~50 s worst case before the error surfaces
+_sleep = time.sleep  # indirection so tests can no-op the backoff and assert the delays
+_log = logging.getLogger(__name__)
+
+
+def _overload_retries() -> int:
+    raw = os.environ.get("BTS_OVERLOAD_RETRIES", "").strip()
+    if not raw:
+        return OVERLOAD_RETRIES
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        return OVERLOAD_RETRIES
+
+
 class EndpointHTTPError(RuntimeError):
     """A non-adaptable HTTP status from an OpenAI-compatible endpoint. Subclasses RuntimeError with the
     same message the forge log always showed, but keeps `.code` so callers can react to the status —
@@ -557,18 +578,36 @@ class OpenAICompatGenerator:
             self.last_meta = {**self.last_meta, "stubs": stubs}
         return text
 
-    def _complete_once(self, payload: dict) -> str:
-        """One request (plus the single param-adaptation retry on a 400); `payload` is adapted in place."""
+    def _request_adapted(self, payload: dict) -> dict:
+        """One request plus the single param-adaptation retry on a 400; `payload` is adapted in place."""
         try:
-            data = self._post_translated(payload)
+            return self._post_translated(payload)
         except urllib.error.HTTPError as e:
             detail = e.read().decode("utf-8", "replace")
             if not self._adapt_params(e.code, detail, payload):
                 raise EndpointHTTPError(e.code, detail) from e
             try:
-                data = self._post_translated(payload)
+                return self._post_translated(payload)
             except urllib.error.HTTPError as e2:
                 raise EndpointHTTPError(e2.code, e2.read().decode("utf-8", "replace")) from e2
+
+    def _complete_once(self, payload: dict) -> str:
+        """`_request_adapted`, with a bounded backoff retry when the endpoint reports a transient overload
+        (OVERLOAD_CODES — e.g. Gemini's 503 "high demand", which used to kill a whole BYOK forge)."""
+        retries = _overload_retries()
+        attempt = 0
+        while True:
+            try:
+                data = self._request_adapted(payload)
+                break
+            except EndpointHTTPError as e:
+                if e.code not in OVERLOAD_CODES or attempt >= retries:
+                    raise
+                delay = OVERLOAD_BACKOFF_S[min(attempt, len(OVERLOAD_BACKOFF_S) - 1)]
+                attempt += 1
+                _log.warning("endpoint returned HTTP %d (attempt %d/%d); retrying in %.0fs",
+                             e.code, attempt, retries + 1, delay)
+                _sleep(delay)
         if self._on_usage is not None and isinstance(data.get("usage"), dict):
             try:
                 self._on_usage(data["usage"])
