@@ -22,7 +22,7 @@ OPENAI_429_RATE = ('front-end failed: endpoint returned HTTP 429: {"error": {"me
 def test_mistyped_model_names_the_model_and_the_fix():
     why = forge.explain_provider_error(OPENAI_404)
     assert "“gtp-5”" in why
-    assert "Load my model list" in why
+    assert "Reload model list" in why
 
 
 def test_model_name_falls_back_to_the_requested_one():

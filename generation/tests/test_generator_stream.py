@@ -389,6 +389,41 @@ def test_provider_field_only_on_openrouter() -> None:
     check(captured[0].get("reasoning") == {"effort": "low"}, "other extra_body keys are untouched")
 
 
+def test_provider_blocklist_off_sends_no_ignore() -> None:
+    # BYOK keys route through the user's OWN OpenRouter account: our hosted block lists must not ride along
+    # (they made single-provider models 404 "All providers have been ignored", 2026-10-01).
+    print("provider_blocklist=False -> no provider.ignore from our lists...")
+    captured: list[dict] = []
+
+    def fake(req, timeout=None):
+        captured.append(json.loads(req.data.decode()))
+        return _answer('{"ok": 1}', "Wafer")
+
+    try:
+        gen = _or_gen(provider_blocklist=False)
+        _generator.ignore_provider("X")
+        gen.avoid_provider("Y")
+        _with_urlopen(fake, lambda: gen.first_attempt("x"))
+        check("provider" not in captured[0], f"no `provider` field when the block list is off (got {captured[0]})")
+
+        captured.clear()
+        gen2 = OpenAICompatGenerator("https://openrouter.ai/api/v1", "sk-x", "m1", contract_mod=_Contract(),
+                                     max_tokens=100, provider_blocklist=False,
+                                     extra_body={"provider": {"order": ["Wafer"]}})
+        _with_urlopen(fake, lambda: gen2.first_attempt("x"))
+        check(captured[0].get("provider") == {"order": ["Wafer"]},
+              f"the caller's own provider config is still sent as-is (got {captured[0].get('provider')})")
+
+        captured.clear()
+        gen3 = OpenAICompatGenerator("https://openrouter.ai/api/v1", "sk-x", "m1", contract_mod=_Contract(),
+                                     max_tokens=100)
+        _with_urlopen(fake, lambda: gen3.first_attempt("x"))
+        check(captured[0].get("provider") == {"ignore": ["ModelRun", "X"]},
+              f"the default still injects the block list (got {captured[0].get('provider')})")
+    finally:
+        _generator._reset_ignored_providers()
+
+
 def test_stub_block_expires_after_an_hour() -> None:
     # BH-1 audit: the live rule is "blocked for 1 h, then another chance" — pin the TTL and the expiry.
     print("a stub-blocked provider is skipped for exactly PROVIDER_IGNORE_TTL_S (1 h), then released...")
@@ -566,6 +601,7 @@ def main() -> int:
     test_stub_answer_blocks_provider_and_retries()
     test_stub_block_expires_after_an_hour()
     test_provider_field_only_on_openrouter()
+    test_provider_blocklist_off_sends_no_ignore()
     test_sse_reassembly_and_usage()
     test_plain_json_fallback()
     test_transient_retry()

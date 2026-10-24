@@ -7,7 +7,7 @@
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png" />
   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/static/style.css?v=20261022" />
+  <link rel="stylesheet" href="/static/style.css?v=20261023" />
 </head>
 <body>
   <header>
@@ -157,8 +157,10 @@
           never written to our database or our logs.</p>
 
         <!-- Two models, split where the money is (forge._key_models): the design model makes the few calls
-             that shape the class, the card model writes every card (~95% of the tokens). Blank card model =
-             the design model does both. Both inputs share one suggestion list. -->
+             that shape the class, the card model writes every card (~95% of the tokens). Card model "" =
+             the design model does both. Both are selects filled from the provider's own /models listing
+             (app.js loadModels, auto-run once a key is entered); the forge route re-checks the ids against
+             that listing. Only "Other" falls back to typed ids when its endpoint can't list models. -->
         <div class="byok-models-head">
           <span class="lbl small">Models</span>
           <button id="load-models" class="linkish" type="button">Load my model list</button>
@@ -166,16 +168,15 @@
         <div class="byok-grid">
           <div>
             <label class="lbl small" for="model">Design</label>
-            <input id="model" class="in" placeholder="Model" list="model-list" autocomplete="off" />
+            <select id="model" class="in" disabled><option value="">Enter your key, then load models</option></select>
             <p class="hint">A few calls that shape the class. Use your smartest model.</p>
           </div>
           <div>
             <label class="lbl small" for="card_model">Card coding</label>
-            <input id="card_model" class="in" placeholder="Same as design" list="model-list" autocomplete="off" />
+            <select id="card_model" class="in" disabled><option value="">Same as design</option></select>
             <p class="hint">Writes every card in strict JSON — most of the cost. A reliable coder is enough.</p>
           </div>
         </div>
-        <datalist id="model-list"></datalist>
 
         <div class="byok-foot">
           <span id="byok-art" class="chip"></span>
@@ -427,7 +428,7 @@
 
   <!-- ?v= busts the 1-hour static cache on deploy: bump both whenever either file changes. render.js holds
        the class renderers shared with the public /deck page and must load first. -->
-  <script src="/static/render.js?v=20261013"></script>
-  <script src="/static/app.js?v=20261013"></script>
+  <script src="/static/render.js?v=20261023"></script>
+  <script src="/static/app.js?v=20261023"></script>
 </body>
 </html>

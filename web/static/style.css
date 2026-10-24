@@ -42,6 +42,13 @@ textarea, .in {
   border-radius: 10px; padding: 11px 13px; font: inherit; resize: vertical;
 }
 .in { margin-bottom: 8px; }
+/* Selects (provider, the BYOK model pickers) match the text boxes: same box, native arrow. color-scheme
+   makes the native drop-down list dark too; the explicit option/optgroup colours cover browsers that
+   ignore it (Windows Chrome paints optgroup labels from these). */
+select.in { color-scheme: dark; cursor: pointer; text-overflow: ellipsis; }
+select.in:disabled { color: var(--muted); cursor: not-allowed; opacity: 0.75; }
+select.in option, select.in optgroup { background: var(--panel2); color: var(--ink); }
+select.in optgroup { color: var(--muted); font-style: normal; font-weight: 600; }
 input[type="range"] { width: 100%; accent-color: var(--accent); }
 
 .btn, .ghost {

@@ -41,7 +41,8 @@ import auth as _auth  # noqa: E402  (module attrs: tests swap the mailer / mail_
 from billing import init_billing  # noqa: E402
 from db import db_ping, init_db, session_scope  # noqa: E402
 from forge import (ELEMENT_KINDS, VALID_FEEDBACK_CATEGORIES, ForgeError, UsageMeter,  # noqa: E402
-                   append_card_feedback, append_element_feedback, forge_to_bundle, list_models)
+                   append_card_feedback, append_element_feedback, forge_to_bundle, list_models,
+                   verify_byok_models)
 from models import (AdminAction, ForgeJob, ForgeUsage, ForgedCard, ForgedClass, Identity,  # noqa: E402
                     Purchase, User, new_slug, spend_token, unspend_token)
 
@@ -1254,6 +1255,15 @@ def forge_class_route():
         return jsonify({"error": "unknown forge mode."}), 400
     if mode == "fake" and not os.environ.get("BTSWEB_DEV_AUTH", "").strip() in ("1", "true", "yes"):
         return jsonify({"error": "the offline demo forge is dev-only."}), 403
+
+    # BYOK model check, BEFORE anything is queued or registered: a mistyped or hidden model id ("gtp-5", a
+    # claude id sent to OpenAI, an unlisted route) 400s here with a plain sentence instead of dying on the
+    # first provider call. A provider with no /models listing skips the check (see verify_byok_models).
+    if mode == "byok" and isinstance(key, dict):
+        bad = verify_byok_models(str(key.get("base_url") or "").strip(), str(key.get("api_key") or "").strip(),
+                                 str(key.get("model") or "").strip(), str(key.get("card_model") or "").strip())
+        if bad:
+            return jsonify({"error": bad}), 400
 
     fake = mode == "fake"
     hosted = False

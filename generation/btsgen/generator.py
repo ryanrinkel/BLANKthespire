@@ -371,7 +371,7 @@ class OpenAICompatGenerator:
                  max_tokens: int = 4000, timeout: int = 180,
                  response_format: dict | None = None, temperature: float | None = None,
                  on_usage=None, extra_body: dict | None = None,
-                 overload_retries: int | None = None) -> None:
+                 overload_retries: int | None = None, provider_blocklist: bool = True) -> None:
         if not (base_url and api_key and model):
             raise RuntimeError("OpenAI-compatible backend needs base_url, api_key, and model.")
         self.base_url = base_url.rstrip("/")
@@ -399,6 +399,11 @@ class OpenAICompatGenerator:
         # Backoff retries on a transient overload status (OVERLOAD_CODES). None = BTS_OVERLOAD_RETRIES / the
         # default; a hosted tier with a fallback behind it passes 0 so the failover chain moves on at once.
         self._overload_retries = overload_retries
+        # False = never add OUR block lists (static ModelRun, process-wide stub blocks, avoid_providers) to
+        # OpenRouter's `provider.ignore`. BYOK keys route through the user's own OpenRouter account; our hosted
+        # stub block list made single-provider models 404 "All providers have been ignored" for them
+        # (2026-10-01, 4 forges). An extra_body `provider` config of the caller's own is still sent as-is.
+        self._provider_blocklist = provider_blocklist
         self._contract = contract_mod or contract
         self._system = self._contract.system_prompt()
         self._gate = _make_gate(self._contract, self._system)  # card-stage vocab gate; None = off (see gate.py)
@@ -427,7 +432,7 @@ class OpenAICompatGenerator:
     def _provider_field(self, payload: dict) -> None:
         """Merge the block lists into OpenRouter's `provider` request field (any static `provider` config from
         extra_body — routing order, quantization, … — is kept and only its `ignore` list is extended)."""
-        if not self._is_openrouter():
+        if not self._is_openrouter() or not self._provider_blocklist:
             return
         block = set(ignored_providers()) | self.avoid_providers
         base = payload.get("provider") if isinstance(payload.get("provider"), dict) else {}

@@ -4,7 +4,7 @@
 //     STRIPE_SECRET_KEY=sk_test_smoke PORT=5077 uv run --project ../generation python app.py
 // (the dummy Stripe key only flips /api/billing to {enabled:true} so the donate tiers + custom-amount row
 //  render; nothing in these scenarios ever hits Stripe)
-// then, from web/tools:  node ui_smoke.mjs http://127.0.0.1:5077 <outdir> forge|library|account|pages|art|lost|featured|webview|phone
+// then, from web/tools:  node ui_smoke.mjs http://127.0.0.1:5077 <outdir> forge|byok-narrow|byok-models|library|account|pages|art|lost|featured|webview|phone
 // (`featured` also needs BTSWEB_FEATURED_FILE=<json whose slugs exist in that server's DB>, see the scenario)
 // (needs a package.json with {"type":"module"} next to it, or rename to .mjs — it is already .mjs).
 
@@ -74,6 +74,13 @@ const check = (ok, name, detail = "") => {
   if (!ok) errors.push("assertion failed: " + name);
 };
 const json = async (expr) => JSON.parse(await evaluate(`JSON.stringify(${expr})`));
+// The BYOK model fields are <select>s filled from the provider's own listing (2026-10-23). Scenarios that
+// drive them by hand call this first: it turns the auto-load off (no real /api/models calls on smoke keys)
+// and installs window.__pickModel(id, value), which adds the option as if the list had loaded.
+const MANUAL_MODELS = `(() => { window.loadModels = async () => {};
+  window.__pickModel = (id, v) => { const s = document.getElementById(id);
+    if (s.tagName === 'SELECT' && v && ![...s.options].some(o => o.value === v)) s.add(new Option(v, v));
+    s.disabled = false; s.value = v; }; })()`;
 
 await send("Page.enable"); await send("Runtime.enable"); await send("Log.enable");
 await nav(`${base}/dev-login?email=unlimited@example.com`);
@@ -152,10 +159,11 @@ if (scenario === "forge") {
   await shot("forge-fresh");
 
   // (b) open the key box and fill it in: the button enables and says whose money it spends.
+  await evaluate(MANUAL_MODELS);
   await evaluate(`document.getElementById('forge-byok').open = true`); await sleep(300);
   const keyed = await json(`(() => {
     const k = document.getElementById('api_key'); k.value = 'sk-ant-smoke'; k.dispatchEvent(new Event('input'));
-    const m = document.getElementById('model'); m.value = 'claude-sonnet-4-6'; m.dispatchEvent(new Event('input'));
+    __pickModel('model', 'claude-sonnet-4-6'); document.getElementById('model').dispatchEvent(new Event('input'));
     return {disabled: document.getElementById('forge-btn').disabled,
             label: document.getElementById('forge-btn').textContent,
             token_open: document.getElementById('forge-token').open,
@@ -180,7 +188,7 @@ if (scenario === "forge") {
     const before = box.classList.contains('hidden') && !btn.classList.contains('hidden');
     btn.click();
     const shown = !box.classList.contains('hidden') && btn.classList.contains('hidden') && box.textContent.includes('Estimated cost');
-    const m = document.getElementById('model'); m.value = 'gpt-5'; m.dispatchEvent(new Event('input'));
+    __pickModel('model', 'gpt-5'); document.getElementById('model').dispatchEvent(new Event('input'));
     const folded = box.classList.contains('hidden') && !btn.classList.contains('hidden');
     return JSON.stringify({before, shown, folded, text: box.textContent.slice(0, 120)}); })()`));
   check(est.before && est.shown && est.folded, "estimate hidden behind its button, folds on a settings change", JSON.stringify(est));
@@ -198,10 +206,10 @@ if (scenario === "forge") {
   const pickProvider = (id, model, cardModel = "") => `(() => {
     const p = document.getElementById('provider'); p.value = ${JSON.stringify(id)};
     p.dispatchEvent(new Event('change'));
-    const m = document.getElementById('model'); m.value = ${JSON.stringify(model)};
-    m.dispatchEvent(new Event('input'));
-    const c = document.getElementById('card_model'); c.value = ${JSON.stringify(cardModel)};
-    c.dispatchEvent(new Event('input'));
+    __pickModel('model', ${JSON.stringify(model)});
+    document.getElementById('model').dispatchEvent(new Event('input'));
+    __pickModel('card_model', ${JSON.stringify(cardModel)});
+    document.getElementById('card_model').dispatchEvent(new Event('input'));
     document.getElementById('estimate-btn').click();
     const box = document.getElementById('byok-estimate');
     return JSON.stringify({labels: [...box.querySelectorAll('.est-table th')].map(e => e.textContent),
@@ -286,11 +294,11 @@ if (scenario === "forge") {
   await send("Emulation.setDeviceMetricsOverride", { width: 390, height: 1400, deviceScaleFactor: 1, mobile: true });
   await nav(`${base}/dev-login?email=smoke-narrow@example.com`);
   await nav(`${base}/app`);
+  await evaluate(MANUAL_MODELS);
   await evaluate(`(() => { document.getElementById('forge-byok').open = true;
     const p = document.getElementById('provider'); p.value = 'openrouter'; p.dispatchEvent(new Event('change'));
     const k = document.getElementById('api_key'); k.value = 'sk-or-smoke'; k.dispatchEvent(new Event('input'));
-    const m = document.getElementById('model'); m.value = 'anthropic/claude-sonnet-4.6'; m.dispatchEvent(new Event('input'));
-    const c = document.getElementById('card_model'); c.value = 'openai/gpt-4o'; c.dispatchEvent(new Event('input'));
+    __pickModel('model', 'anthropic/claude-sonnet-4.6'); __pickModel('card_model', 'openai/gpt-4o');
     document.getElementById('estimate-btn').click(); })()`);
   await sleep(300);
   const narrow = await json(`({scrollW: document.documentElement.scrollWidth, w: window.innerWidth,
@@ -300,6 +308,113 @@ if (scenario === "forge") {
         JSON.stringify(narrow));
   await evaluate(`document.getElementById('forge-byok').scrollIntoView()`);
   await shot("byok-narrow");
+} else if (scenario === "byok-models") {
+  // 2026-10-23: the model fields are selects filled from the provider's own listing. /api/models is
+  // stubbed in the page (window.fetch, installed before app.js on every load): "nolist" URLs 404 like an
+  // endpoint without /models, everything else returns two models, one of them tested.
+  await send("Page.addScriptToEvaluateOnNewDocument", { source: `(() => {
+    const real = window.fetch.bind(window);
+    window.__modelCalls = 0;
+    window.fetch = (u, o) => {
+      if (String(u).includes('/api/models')) {
+        window.__modelCalls++;
+        const body = JSON.parse((o && o.body) || '{}');
+        const r = (body.base_url || '').includes('nolist')
+          ? new Response(JSON.stringify({error: 'endpoint returned HTTP 404 — check the key, URL, and model access.'}), {status: 400, headers: {'Content-Type': 'application/json'}})
+          : new Response(JSON.stringify({models: ['gpt-6.1-sol', 'gpt-5.6-sol'], recommended: ['gpt-6.1-sol'], hidden: 3}), {status: 200, headers: {'Content-Type': 'application/json'}});
+        return Promise.resolve(r);
+      }
+      return real(u, o);
+    };
+  })()` });
+  await nav(`${base}/dev-login?email=smoke-models@example.com`);
+  await nav(`${base}/app`);
+  await evaluate(`localStorage.clear()`);
+  await nav(`${base}/app`);
+  const state = `(() => { const m = document.getElementById('model'), c = document.getElementById('card_model');
+    const groups = (s) => s.tagName === 'SELECT' ? [...s.querySelectorAll('optgroup')].map(g => g.label + ':' + g.children.length) : null;
+    return {tag: m.tagName, disabled: m.disabled, value: m.value, card_value: c.value, card_disabled: c.disabled,
+      options: m.tagName === 'SELECT' ? [...m.options].map(o => o.value + '=' + o.textContent) : null,
+      card_options: c.tagName === 'SELECT' ? [...c.options].map(o => o.value + '=' + o.textContent) : null,
+      groups: groups(m), card_groups: groups(c),
+      load: document.getElementById('load-models').textContent,
+      load_shown: document.getElementById('load-models').style.display !== 'none',
+      btn_disabled: document.getElementById('forge-btn').disabled, calls: window.__modelCalls,
+      toast: document.getElementById('toast').textContent,
+      saved: JSON.parse(localStorage.getItem('bts_byok') || '{}')}; })()`;
+
+  // (a) OpenAI, no key yet: both pickers disabled on their placeholders, nothing fetched.
+  await evaluate(`(() => { document.getElementById('forge-byok').open = true;
+    const p = document.getElementById('provider'); p.value = 'openai'; p.dispatchEvent(new Event('change')); })()`);
+  await sleep(600);
+  const pre = await json(state);
+  check(pre.tag === "SELECT" && pre.disabled && pre.options.join() === "=Enter your key, then load models"
+        && pre.card_disabled && pre.card_options.join() === "=Same as design" && pre.calls === 0
+        && pre.load_shown && pre.load === "Load my model list" && pre.btn_disabled,
+        "openai before a key: pickers disabled on their placeholders, no listing fetched", JSON.stringify(pre));
+  // The submit guard refuses a forge with no model picked.
+  await evaluate(`(() => { document.getElementById('concept').value = 'a smoke test class'; forge(); })()`);
+  await sleep(200);
+  check((await evaluate(`document.getElementById('toast').textContent`)) === "Load your model list and pick a model first.",
+        "forge() refuses while the picker is on its placeholder");
+
+  // (b) typing a key (input + the blur's change) auto-loads the list: Tested group first, tested model picked.
+  await evaluate(`(() => { const k = document.getElementById('api_key'); k.value = 'sk-smoke-openai';
+    k.dispatchEvent(new Event('input')); k.dispatchEvent(new Event('change')); })()`);
+  await sleep(900);
+  const loaded = await json(state);
+  check(loaded.tag === "SELECT" && !loaded.disabled && loaded.value === "gpt-6.1-sol" && loaded.calls === 1
+        && loaded.groups.join() === "Tested:1,All models:1" && loaded.card_groups.join() === "Tested:1,All models:1"
+        && !loaded.card_disabled && loaded.card_value === "" && loaded.load === "Reload model list"
+        && !loaded.btn_disabled && loaded.saved.model === "gpt-6.1-sol" && loaded.saved.card_model === "",
+        "key entered: list auto-loaded, two optgroups, gpt-6.1-sol selected, card = same as design", JSON.stringify(loaded));
+  await evaluate(`document.getElementById('forge-byok').scrollIntoView()`);
+  await shot("byok-models-loaded", false);
+  // Same URL + key again: no second request.
+  await evaluate(`document.getElementById('api_key').dispatchEvent(new Event('change'))`); await sleep(900);
+  check((await evaluate(`window.__modelCalls`)) === 1, "the same URL + key is not listed twice");
+  // A pick sticks and is saved.
+  await evaluate(`(() => { const c = document.getElementById('card_model'); c.value = 'gpt-5.6-sol'; c.dispatchEvent(new Event('change')); })()`);
+  check((await json(state)).saved.card_model === "gpt-5.6-sol", "a card-model pick is saved");
+
+  // (c) a saved model the key no longer offers: the tested model is picked instead, with a toast.
+  await evaluate(`localStorage.setItem('bts_byok', JSON.stringify({provider: 'openai', api_key: 'sk-smoke-openai', model: 'gpt-4o', card_model: 'gpt-5.6-sol'}));
+    localStorage.setItem('bts_forge_pref', 'byok')`);
+  await nav(`${base}/app`); await sleep(900);
+  const stale = await json(state);
+  check(stale.value === "gpt-6.1-sol" && stale.card_value === "gpt-5.6-sol" && stale.calls === 1
+        && stale.toast === "Your saved model “gpt-4o” isn't offered on this key any more — pick another.",
+        "reload with a stale saved model: list auto-loads, saved card model kept, stale design model toasted", JSON.stringify(stale));
+
+  // (d) Anthropic: no listing — the static list, enabled at once, no load button.
+  await evaluate(`(() => { const p = document.getElementById('provider'); p.value = 'anthropic'; p.dispatchEvent(new Event('change')); })()`);
+  await sleep(600);
+  const ant = await json(state);
+  check(!ant.disabled && ant.options.join() === "claude-sonnet-5=claude-sonnet-5,claude-opus-5-5=claude-opus-5-5"
+        && ant.value === "claude-sonnet-5" && !ant.load_shown && ant.calls === 1,
+        "anthropic: static models, enabled, no load button, nothing fetched", JSON.stringify(ant));
+
+  // (e) Other, on an endpoint without /models: falls back to typed ids, and the forge button follows them.
+  await evaluate(`(() => { const p = document.getElementById('provider'); p.value = 'custom'; p.dispatchEvent(new Event('change'));
+    const u = document.getElementById('base_url'); u.value = 'https://nolist.example.com/v1';
+    u.dispatchEvent(new Event('input')); u.dispatchEvent(new Event('change')); })()`);
+  await sleep(900);
+  const custom = await json(state);
+  check(custom.tag === "INPUT" && custom.calls === 2 && custom.toast.startsWith("Couldn't list models on this endpoint")
+        && custom.btn_disabled, "custom without /models: typed-id fallback + toast", JSON.stringify(custom));
+  await evaluate(`(() => { const m = document.getElementById('model'); m.value = 'my-local-model';
+    m.dispatchEvent(new Event('input')); m.dispatchEvent(new Event('change')); })()`);
+  const typed = await json(state);
+  check(!typed.btn_disabled && typed.saved.model === "my-local-model", "a typed custom model enables the forge button",
+        JSON.stringify(typed));
+  await shot("byok-models-custom-fallback", false);
+  // ...and an endpoint that does list models swaps the selects back in.
+  await evaluate(`(() => { const u = document.getElementById('base_url'); u.value = 'https://lists.example.com/v1';
+    u.dispatchEvent(new Event('change')); })()`);
+  await sleep(900);
+  const back = await json(state);
+  check(back.tag === "SELECT" && !back.disabled && back.calls === 3 && back.value === "gpt-6.1-sol",
+        "custom endpoint with /models: selects come back", JSON.stringify(back));
 } else if (scenario === "lost") {
   // 2026-09-26: a dropped progress stream (phone locked / network hop -> Chrome's bare "network error") must
   // read as "still forging", then recover on its own by polling /api/forge-jobs/<id>. window.fetch is stubbed

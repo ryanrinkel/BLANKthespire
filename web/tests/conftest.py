@@ -66,6 +66,9 @@ os.environ["BTSWEB_JEV_LOG"] = str(_TMP / "jev_signals.jsonl")
 os.environ["BTSWEB_CARD_FEEDBACK_LOG"] = str(_TMP / "feedback.jsonl")
 os.environ["BTSWEB_TRAFFIC_DIR"] = str(_TMP / "traffic")       # never the droplet /opt/btsweb/traffic
 os.environ.setdefault("BTSGEN_IMAGE_BACKEND", "null")
+# Forge-start BYOK model check (forge.verify_byok_models) would GET the real provider listing from every
+# byok route test; off here, and the tests that cover it turn it back on.
+os.environ["BTSWEB_BYOK_VERIFY_MODELS"] = "0"
 
 # The CSRF header every mutating /api call must carry.
 H = {"X-Requested-With": "fetch"}

@@ -12,9 +12,12 @@ from __future__ import annotations
 import contextlib
 import datetime
 import json
+import logging
 import os
 import re
 from pathlib import Path
+
+_log = logging.getLogger(__name__)
 
 # btsgen is installed non-editable on the droplet (`pip install ./generation`), so its own repo-root
 # guess (`parents[2]`) lands inside the venv, not the repo — and the mod contract (mod/contract/) can't
@@ -316,21 +319,26 @@ def _build_generators(key: dict | None, hosted: bool, fake: bool, model: str | N
         # structure/cards roles, so a json_roles host pins json_object on every one of them.
         prof = _byok_profile(base_url)
         eb = prof["extra_body"] or None
+        # provider_blocklist=False on every BYOK generator: the key routes through the USER's own OpenRouter
+        # account, and our hosted stub block list made single-provider models 404 "All providers have been
+        # ignored" for them (2026-10-01, 4 forges). The hosted mixture (ollama_mix) keeps the list.
         bp_contract, card_contract, relic_contract = _BlueprintContract(triad=False), contract, _RelicContract()
         blueprint_gen = OpenAICompatGenerator(base_url, api_key, model,
                                               contract_mod=bp_contract, max_tokens=8000,
                                               on_usage=_tagged(on_usage, "structure", model), extra_body=eb,
-                                              response_format=_json_format_for(prof, bp_contract))
+                                              response_format=_json_format_for(prof, bp_contract),
+                                              provider_blocklist=False)
         card_usage = _tagged(on_usage, "cards", card_model)
         relic_gen = OpenAICompatGenerator(base_url, api_key, card_model,
                                           contract_mod=relic_contract, max_tokens=4000, on_usage=card_usage,
                                           extra_body=eb,
-                                          response_format=_json_format_for(prof, relic_contract))
+                                          response_format=_json_format_for(prof, relic_contract),
+                                          provider_blocklist=False)
         card_format = _json_format_for(prof, card_contract)
         card_factory = lambda: OpenAICompatGenerator(base_url, api_key, card_model,  # noqa: E731
                                                      contract_mod=card_contract, max_tokens=4000,
                                                      on_usage=card_usage, extra_body=eb,
-                                                     response_format=card_format)
+                                                     response_format=card_format, provider_blocklist=False)
         return blueprint_gen, card_factory, relic_gen
 
     if hosted:  # REMOVED 2026-09-18: the server holds no Anthropic credential for forges. Token forges run on
@@ -541,7 +549,8 @@ def _make_gen_factory(key: dict | None, hosted: bool, fake: bool, model: str | N
             m = cards if role == "cards" else design
             return OpenAICompatGenerator(base_url, api_key, m, contract_mod=contract_mod, max_tokens=max_tokens,
                                          timeout=300, on_usage=_tagged(on_usage, role, m), extra_body=eb,
-                                         response_format=_json_format_for(prof, contract_mod))
+                                         response_format=_json_format_for(prof, contract_mod),
+                                         provider_blocklist=False)  # user's own routing; see _build_generators
         return make_compat
     if hosted:  # see _build_generators: no server-side Anthropic credential, ever
         raise ForgeError("the server-side Anthropic path is retired — use a token or bring your own API key.")
@@ -617,10 +626,9 @@ def filter_models(items: list) -> dict:
     return {"models": recommended + rest, "recommended": recommended, "hidden": len(seen) - len(kept)}
 
 
-def list_models(base_url: str, api_key: str) -> dict:
-    """List the models on any OpenAI-compatible endpoint (`GET {base_url}/models`) that can plausibly run a
-    forge (see filter_models). Used by the website so a BYOK user who doesn't know the model name can pick
-    one. The key is used once, here, and never persisted."""
+def _raw_model_items(base_url: str, api_key: str) -> list:
+    """The raw `GET {base_url}/models` listing items (dicts, unfiltered). Raises ForgeError when the endpoint
+    can't be listed (no key, SSRF guard, HTTP error, unreachable). The key is used once and never persisted."""
     import urllib.error
     import urllib.request
 
@@ -640,7 +648,39 @@ def list_models(base_url: str, api_key: str) -> dict:
     except urllib.error.URLError as e:
         raise ForgeError(f"could not reach the endpoint: {e.reason}") from e
     items = data.get("data") or data.get("models") or (data if isinstance(data, list) else [])
-    return filter_models(items if isinstance(items, list) else [])
+    return items if isinstance(items, list) else []
+
+
+def list_models(base_url: str, api_key: str) -> dict:
+    """List the models on any OpenAI-compatible endpoint (`GET {base_url}/models`) that can plausibly run a
+    forge (see filter_models). Used by the website's BYOK model picker. The key is used once, here, and
+    never persisted."""
+    return filter_models(_raw_model_items(base_url, api_key))
+
+
+def verify_byok_models(base_url: str, api_key: str, model: str, card_model: str | None = None) -> str | None:
+    """Forge-start check that the BYOK models exist on the key: an error sentence for the first one the
+    provider's UNFILTERED listing doesn't name, else None. Existence only — fitness is the picker's job, so a
+    model filter_models hides still passes. Gemini lists "models/<id>" but accepts the bare id, so both
+    sides are compared with that prefix stripped. A listing that can't be fetched (no /models route, 404,
+    network) skips the check rather than block the forge; BTSWEB_BYOK_VERIFY_MODELS=0 turns it off."""
+    if os.environ.get("BTSWEB_BYOK_VERIFY_MODELS", "1").strip().lower() in ("0", "false", "no", "off"):
+        return None
+    try:
+        items = _raw_model_items(base_url, api_key)
+    except ForgeError as e:
+        _log.info("byok model check skipped (listing unavailable): %s", e)
+        return None
+    ids = {str(mid) for m in items if isinstance(m, dict) and (mid := m.get("id") or m.get("name"))}
+    if not ids:  # an empty (or unparseable) listing proves nothing
+        return None
+    known = {i.removeprefix("models/") for i in ids}
+    for m in (model, card_model):
+        m = str(m or "").strip()
+        if m and m.removeprefix("models/") not in known:
+            return (f"Your provider doesn't offer a model called “{m}” on this key. "
+                    "Reload your model list and pick one from it.")
+    return None
 
 
 def forge_to_bundle(concept: str, *, key: dict | None = None, hosted: bool = False,
@@ -738,16 +778,23 @@ def forge_to_bundle(concept: str, *, key: dict | None = None, hosted: bool = Fal
                           triad=triad, gap_log_append=None if fake else _append_captured_gaps)
         if not fake:
             _append_jev_signals(res, user_id=user_id, concept=brief.concept)
-        return _bundle_result(res)
+        return _bundle_result(res, model=(key or {}).get("model") or None)
 
 
 # (pattern, one-sentence explanation) for the provider refusals a BYOK forge dies on at its FIRST call. Order
 # matters: the first match wins, so the specific "no credits" 429 sits above the generic 429.
 _PROVIDER_REFUSALS: list[tuple[re.Pattern, str]] = [
     (re.compile(r"model_not_found|does not exist or you do not have access|not_found_error|unknown model|"
-                r"no such model|model .{0,80}? (?:is )?not found", re.I),
+                r"no such model|model .{0,80}? (?:is )?not found|models?/?[\w./:-]{0,80} (?:is )?not found",
+                re.I),
      "Your provider doesn't offer a model called “{model}” on this key. Open “Bring your own key”, "
-     "click “Load my model list” and pick one from the list (check the provider matches the key, too)."),
+     "click “Reload model list” and pick one from the list (check the provider matches the key, too)."),
+    # OpenRouter's routing refusals (the account's provider allow/ignore lists; free models without
+    # data-sharing providers enabled): above the generic 403/404 so they get their own explanation.
+    (re.compile(r"All providers have been ignored|No allowed providers are available|"
+                r"not in your account's allowed-providers", re.I),
+     "OpenRouter has no provider it is allowed to route this model to on your account. Check Settings → "
+     "Privacy on openrouter.ai (free models need data-sharing providers enabled) or pick another model."),
     (re.compile(r"insufficient_quota|credit_balance_exhausted|no credits remaining|exceeded your current quota|"
                 r"insufficient[_ ]credits|billing_hard_limit", re.I),
      "Your provider account has no credits left, so it refused the request. Add credits on your provider's "
@@ -783,12 +830,12 @@ def explain_provider_error(detail: str, model: str | None = None) -> str | None:
     return None
 
 
-def _bundle_result(res) -> dict:
+def _bundle_result(res, model: str | None = None) -> dict:
     """Turn a forge_class result into the web response dict (encode the BTSC code). Raises ForgeError if the
     class didn't generate. Shared by the Anthropic/BYOK path and the hosted Ollama-mix (token) path."""
     if not res.ok or res.bundle is None:
         tail = res.log[-1] if res.log else "no detail"
-        why = explain_provider_error(tail)
+        why = explain_provider_error(tail, model)
         if why:
             # Plain words first (that's what the toast + log line show), the provider's own text after, on
             # one line and trimmed: the JSON body is for the operator's forge_jobs.error, not the player.

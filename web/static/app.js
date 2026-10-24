@@ -178,7 +178,9 @@ function renderForgeButton() {
     if (el("api_key").value.trim() && el("model").value.trim()) {
       ok = true;
       label = "Forge the class (uses your API key)";
-    } else why = "Enter your API key and a model.";
+    } else why = el("model").tagName === "SELECT" && currentProvider().mode === "byok"
+      ? "Enter your API key, then pick a model from your provider's list."
+      : "Enter your API key and a model.";
   } else if (m === "token") {
     if (!ME || ME.unlimited) {
       ok = true;
@@ -496,8 +498,9 @@ function selectTab(which) {
 // portraits are generated on the user's key; elsewhere a BYOK forge ships without generated art (the mod
 // draws its built-in card doodles) — art is never billed to us.
 //
-// `models` is the suggestion list: a model a forge has actually finished on goes FIRST where the provider has
-// one (it is also the placeholder), then the rest CHEAPEST FIRST. Refreshed 2026-10-01 against each vendor's
+// `models` is a reference list: a model a forge has actually finished on goes FIRST where the provider has
+// one, then the rest CHEAPEST FIRST. Since 2026-10-23 only Anthropic (no listing) offers it as the model
+// picker; every "byok" provider's pickers hold ONLY what its own /models listing confirmed (loadModels). Refreshed 2026-10-01 against each vendor's
 // live model list (OpenAI + Ollama via /models, the rest from their docs or OpenRouter). The estimate
 // under the fields prices whichever one is typed, from /api/forge-estimate's `text_prices`. Every id here
 // MUST have a price in that table — web/tests/test_forge_estimate.py parses this block and fails if one
@@ -548,21 +551,16 @@ function resolvedBaseUrl() {
   return id === "custom" ? el("base_url").value.trim() : (PROVIDERS[id]?.base_url || "");
 }
 
-// Apply the selected provider to the form: show the URL field only for "custom", fill the model
-// suggestions, refresh the hint, and hide "Load models" where it can't work (Anthropic / no URL yet).
+// Apply the selected provider to the form: show the URL field only for "custom", reset the model pickers
+// (Anthropic's static list, or the "load models" placeholder), refresh the hint, and hide "Load models"
+// where it can't work (Anthropic / no URL yet). A key already in the box loads the new provider's list.
 function applyProvider() {
   const id = el("provider").value;
   const p = currentProvider();
   el("base_url").style.display = id === "custom" ? "" : "none";
 
-  const dl = el("model-list");
-  dl.innerHTML = "";
-  for (const m of p.models) { const o = document.createElement("option"); o.value = m; dl.appendChild(o); }
-  el("model").placeholder = p.models[0] ? `e.g. ${p.models[0]}` : "Model";
-
-  // Load-models hits {base_url}/models with a Bearer token — works for OpenAI-compatible providers, not
-  // Anthropic's native API. Hide it when there's no usable URL.
-  el("load-models").style.display = (p.mode === "byok" && (id !== "custom" || resolvedBaseUrl())) ? "" : "none";
+  resetModelPickers(p);
+  renderLoadModelsBtn();
 
   el("byok-hint").textContent = `Get a key at ${p.keyFrom}`;
   // Art is a property of the provider, so it lives in a chip beside the estimate rather than a paragraph;
@@ -574,6 +572,144 @@ function applyProvider() {
     ? "The splash, sprite and card portraits are generated on this key too."
     : `${p.label} can't make images, so classes forged on this key use the game's built-in card doodles.`;
   renderEstimate();
+  scheduleModelLoad();
+}
+
+// --- BYOK model pickers ----------------------------------------------------------------------------
+// Free-text model boxes let typos and hidden routes through (gtp-5, claude ids sent to OpenAI,
+// gemini-3.6-flash-lite, OpenRouter :free), so since 2026-10-23 both models are <select>s filled from the
+// provider's OWN listing (/api/models, filtered server-side to forge-capable ids, "Tested" group first).
+// Only Anthropic (no listing) offers its static PROVIDERS list, and only "Other" falls back to typed ids
+// when its endpoint can't list models (setModelControl("text")). The forge route re-checks the ids.
+
+// The models the user wants back once a list arrives: restoreByok's saved pair, then every pick.
+let SAVED_MODELS = { model: "", card_model: "" };
+let MODELS_LOADED_FOR = "";   // base_url + "\n" + key of the list in the pickers ("" = none loaded)
+let MODELS_LOADING_FOR = "";  // the pair a request is in flight for
+let MODEL_LOAD_TIMER = null;
+
+const modelDisplay = (id) => String(id).replace(/^models\//, "");  // Gemini lists "models/<id>"
+
+function modelPair() { return resolvedBaseUrl() + "\n" + el("api_key").value.trim(); }
+
+// True once el("model").value is a real choice: a filled select, or the typed-id fallback.
+function modelsReady() {
+  const m = el("model");
+  return m.tagName === "INPUT" || !m.disabled;
+}
+
+function newOption(value, text) {
+  const o = document.createElement("option");
+  o.value = value; o.textContent = text;
+  return o;
+}
+
+// Swap both model fields between <select> and the typed <input> fallback, keeping id + class so every
+// el("model").value reader works on either. Handlers are re-attached to the new elements.
+function setModelControl(kind) {
+  const tag = kind === "text" ? "INPUT" : "SELECT";
+  for (const id of ["model", "card_model"]) {
+    const cur = el(id);
+    if (cur.tagName === tag) continue;
+    const next = document.createElement(tag.toLowerCase());
+    next.id = id; next.className = cur.className;
+    if (tag === "INPUT") {
+      next.autocomplete = "off";
+      next.placeholder = id === "model" ? "Model id" : "Same as design";
+      next.value = (id === "model" ? SAVED_MODELS.model : SAVED_MODELS.card_model) || "";
+    } else next.disabled = true;  // empty until filled; modelsReady() then falls back to SAVED_MODELS
+    cur.replaceWith(next);
+  }
+  wireModelFields();
+}
+
+function wireModelFields() {
+  const onPick = () => {
+    SAVED_MODELS = { model: el("model").value.trim(), card_model: el("card_model").value.trim() };
+    saveByok(); showEstimate(false); renderForgeButton();
+  };
+  el("model").onchange = onPick;
+  el("card_model").onchange = onPick;
+  el("model").oninput = () => { showEstimate(false); renderForgeButton(); };
+  el("card_model").oninput = () => showEstimate(false);
+}
+
+// Back to the pre-load state for provider `p`: Anthropic's static list (enabled), or disabled placeholders.
+function resetModelPickers(p) {
+  setModelControl("select");
+  MODELS_LOADED_FOR = "";
+  const m = el("model"), c = el("card_model");
+  m.innerHTML = ""; c.innerHTML = "";
+  c.appendChild(newOption("", "Same as design"));
+  if (p.mode === "anthropic") {
+    for (const id of p.models) { m.appendChild(newOption(id, id)); c.appendChild(newOption(id, id)); }
+    if (p.models.includes(SAVED_MODELS.model)) m.value = SAVED_MODELS.model;
+    c.value = p.models.includes(SAVED_MODELS.card_model) ? SAVED_MODELS.card_model : "";
+    m.disabled = c.disabled = false;
+  } else {
+    m.appendChild(newOption("", "Enter your key, then load models"));
+    m.disabled = c.disabled = true;
+  }
+  renderForgeButton();
+}
+
+// Fill both pickers from an /api/models reply and reselect what the user had.
+function populateModels(d) {
+  const m = el("model"), c = el("card_model");
+  const want = (modelsReady() && m.value) || SAVED_MODELS.model;
+  const wantCard = (modelsReady() ? c.value : SAVED_MODELS.card_model) || "";
+  const ids = d.models || [];
+  const tested = (d.recommended || []).filter((id) => ids.includes(id));
+  const rest = ids.filter((id) => !tested.includes(id));
+  m.innerHTML = ""; c.innerHTML = "";
+  c.appendChild(newOption("", "Same as design"));
+  if (!ids.length) {
+    m.appendChild(newOption("", "No usable models on this key"));
+    m.disabled = c.disabled = true;
+    renderForgeButton();
+    return [];
+  }
+  for (const sel of [m, c]) {
+    for (const [label, group] of [["Tested", tested], ["All models", rest]]) {
+      if (!group.length) continue;
+      const g = document.createElement("optgroup");
+      g.label = label;
+      for (const id of group) g.appendChild(newOption(id, modelDisplay(id)));
+      sel.appendChild(g);
+    }
+  }
+  const gone = [];
+  if (want && ids.includes(want)) m.value = want;
+  else { if (want) gone.push(want); m.value = tested[0] || ids[0]; }
+  if (wantCard && ids.includes(wantCard)) c.value = wantCard;
+  else { if (wantCard) gone.push(wantCard); c.value = ""; }
+  m.disabled = c.disabled = false;
+  SAVED_MODELS = { model: m.value, card_model: c.value };
+  saveByok();
+  showEstimate(false);
+  renderForgeButton();
+  return gone;  // saved ids this list no longer offers (the caller toasts the first)
+}
+
+function renderLoadModelsBtn() {
+  const p = currentProvider(), btn = el("load-models");
+  // Load-models hits {base_url}/models with a Bearer token — works for OpenAI-compatible providers, not
+  // Anthropic's native API. Hidden when there's no usable URL.
+  btn.style.display = (p.mode === "byok" && resolvedBaseUrl()) ? "" : "none";
+  if (!MODELS_LOADING_FOR) btn.textContent = MODELS_LOADED_FOR ? "Reload model list" : "Load my model list";
+}
+
+// Auto-load (debounced) once a byok provider has a URL + key and the BYOK box is open; never twice for
+// the same URL + key.
+function scheduleModelLoad() {
+  clearTimeout(MODEL_LOAD_TIMER);
+  MODEL_LOAD_TIMER = setTimeout(() => {
+    if (currentProvider().mode !== "byok" || !el("forge-byok")?.open) return;
+    if (!resolvedBaseUrl() || !el("api_key").value.trim()) return;
+    const pair = modelPair();
+    if (pair === MODELS_LOADED_FOR || pair === MODELS_LOADING_FOR) return;
+    loadModels({ auto: true });
+  }, 400);
 }
 
 // Auto-select the provider from an unambiguous key prefix (sk-ant-, sk-or-, gsk_, AIza). Plain "sk-"
@@ -591,19 +727,21 @@ function restoreByok() {
   try {
     const saved = JSON.parse(localStorage.getItem("bts_byok") || "{}");
     if (saved.provider && PROVIDERS[saved.provider]) el("provider").value = saved.provider;
-    applyProvider();
     if (saved.base_url) el("base_url").value = saved.base_url;
-    if (saved.model) el("model").value = saved.model;
-    if (saved.card_model) el("card_model").value = saved.card_model;
     if (saved.api_key) el("api_key").value = saved.api_key;
-  } catch (_) { applyProvider(); }
+    // The pickers are filled later (Anthropic now, the rest once the list loads); they reselect these.
+    SAVED_MODELS = { model: String(saved.model || ""), card_model: String(saved.card_model || "") };
+  } catch (_) { /* a corrupt entry just starts blank */ }
+  applyProvider();
 }
 function saveByok() {
+  // Until a list is loaded the pickers hold a placeholder, so the remembered pair is what gets saved.
+  const ready = modelsReady();
   lsSet("bts_byok", JSON.stringify({
     provider: el("provider").value,
     base_url: el("base_url").value.trim(),
-    model: el("model").value.trim(),
-    card_model: el("card_model").value.trim(),
+    model: ready ? el("model").value.trim() : SAVED_MODELS.model,
+    card_model: ready ? el("card_model").value.trim() : SAVED_MODELS.card_model,
     api_key: el("api_key").value.trim(),
   }));
   renderBanner();  // a saved key satisfies the "enter an API key" warning
@@ -654,6 +792,10 @@ async function forge() {
     const p = currentProvider();
     const api_key = el("api_key").value.trim();
     const model = el("model").value.trim();
+    if (p.mode === "byok" && el("model").tagName === "SELECT" && (el("model").disabled || !model)) {
+      toast("Load your model list and pick a model first.");
+      return;
+    }
     if (!api_key || !model) { toast("Enter your API key and a model — or switch to 'Use a token'."); return; }
     if (!confirm(`This forge bills your ${p.label} key.\n\n${estimateText()}\n\nForge this class?`)) return;
     // Blank = the design model codes the cards too; sent only when it differs, so a one-model forge's
@@ -1645,7 +1787,7 @@ el("view-back").onclick = () => selectTab("forge");
 // the next render (open / forge) skips the art entirely.
 el("lib-show-art").onchange = (ev) => { setArtEnabled(ev.target.checked); paintLibrary(); };
 el("signout").onclick = async () => { await fetch("/logout", { method: "POST" }); location.href = "/"; };
-el("load-models").onclick = loadModels;
+el("load-models").onclick = () => loadModels();
 el("choose-byok").onclick = chooseByok;
 el("choose-token").onclick = chooseToken;
 el("v3-banner-x").onclick = () => { lsSet("bts_tutorial_banner_dismissed", "1"); renderBanner(); };
@@ -1659,12 +1801,15 @@ document.addEventListener("keydown", (ev) => {
   if (ev.key === "Escape" && !el("fb-overlay").classList.contains("hidden")) closeFeedback();
 });
 
-async function loadModels() {
+async function loadModels({ auto = false } = {}) {
   const base_url = resolvedBaseUrl();
   const api_key = el("api_key").value.trim();
-  if (!base_url || !api_key) { toast("Pick a provider and enter your API key first."); return; }
+  if (!base_url || !api_key) { if (!auto) toast("Pick a provider and enter your API key first."); return; }
+  const pair = modelPair();
+  if (pair === MODELS_LOADING_FOR) return;
+  MODELS_LOADING_FOR = pair;
   const btn = el("load-models");
-  btn.disabled = true; const label = btn.textContent; btn.textContent = "Loading…";
+  btn.disabled = true; btn.textContent = "Loading…";
   try {
     const r = await fetch("/api/models", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -1672,24 +1817,27 @@ async function loadModels() {
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
+    if (pair !== modelPair()) return;  // the provider or key changed mid-request: that list is stale
     // The server drops models that can't run a forge (embeddings, speech, images, OpenRouter :free routes,
-    // small or short-context models) and lists the ones a forge has finished on first, labelled "tested".
-    const dl = el("model-list");
-    dl.innerHTML = "";
-    const tested = new Set(d.recommended || []);
-    for (const id of d.models) {
-      const o = document.createElement("option"); o.value = id;
-      if (tested.has(id)) o.label = "tested";
-      dl.appendChild(o);
-    }
-    saveByok();
+    // small or short-context models) and lists the ones a forge has finished on first ("recommended").
+    setModelControl("select");
+    const gone = populateModels(d);
+    MODELS_LOADED_FOR = pair;
     const hid = d.hidden ? ` (hid ${d.hidden} that can't run a forge)` : "";
-    toast(`Loaded ${d.models.length} models${hid}. Pick from either model box.`);
-    el("model").focus();
+    if (gone.length) toast(`Your saved model “${gone[0]}” isn't offered on this key any more — pick another.`);
+    else toast(`Loaded ${d.models.length} models${hid}.`);
   } catch (e) {
-    toast(e.message);
+    if (pair !== modelPair()) return;
+    if (el("provider").value === "custom") {
+      // Not every OpenAI-compatible server has /models: let the user type the ids instead.
+      setModelControl("text");
+      renderForgeButton();
+      toast(`Couldn't list models on this endpoint (${e.message}) — type the model ids instead.`);
+    } else toast(e.message);
   } finally {
-    btn.disabled = false; btn.textContent = label;
+    if (MODELS_LOADING_FOR === pair) MODELS_LOADING_FOR = "";
+    btn.disabled = false;
+    renderLoadModelsBtn();
   }
 }
 // --- admin: user management ------------------------------------------------------------------------
@@ -1904,9 +2052,15 @@ el("forge-get-tokens").onclick = () => {
   renderGetTokens();
 };
 
-el("provider").onchange = () => { applyProvider(); saveByok(); showEstimate(false); renderForgeButton(); };
-el("model").oninput = () => { showEstimate(false); renderForgeButton(); };
-el("card_model").oninput = () => showEstimate(false);
+// A provider the USER picks starts its pickers fresh (no "saved model isn't offered" for another vendor's id).
+el("provider").onchange = () => {
+  SAVED_MODELS = { model: "", card_model: "" };
+  applyProvider(); saveByok(); showEstimate(false); renderForgeButton();
+};
+wireModelFields();
+el("base_url").oninput = renderLoadModelsBtn;
+el("base_url").onchange = () => { saveByok(); scheduleModelLoad(); };
+el("forge-byok").addEventListener("toggle", scheduleModelLoad);
 el("estimate-btn").onclick = () => showEstimate(true);
 el("key-safety-btn").onclick = () => el("key-safety").classList.toggle("hidden");
 el("stats-days").onchange = loadStats;
@@ -1920,9 +2074,16 @@ el("admin-users-q").oninput = () => {
 // Sniff an unambiguous key prefix and jump the dropdown to the matching provider.
 el("api_key").oninput = () => {
   const guess = providerFromKey(el("api_key").value.trim());
-  if (guess && guess !== el("provider").value) { el("provider").value = guess; applyProvider(); }
+  if (guess && guess !== el("provider").value) {
+    el("provider").value = guess;
+    SAVED_MODELS = { model: "", card_model: "" };
+    applyProvider();
+  }
   renderForgeButton();
 };
+// A finished key (blur after typing, or a paste) loads that provider's model list.
+el("api_key").onchange = scheduleModelLoad;
+el("api_key").addEventListener("paste", () => setTimeout(scheduleModelLoad, 0));
 
 applyProvider();
 boot();
