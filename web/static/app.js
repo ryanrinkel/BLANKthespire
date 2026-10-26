@@ -66,12 +66,42 @@ async function boot() {
   renderTokens();
   restoreForgePref();
   applyRemixPrefill();
+  DRAFT_RESTORED = restoreDraft();
   renderBanner();
   loadEstimate();
   loadDonation();  // the forge tab's inline tier buttons need /api/billing before the Account tab is opened
   // #account is where a finished "link another sign-in" comes back to (auth._landing), so honour the hash.
   selectTab(location.hash === "#account" ? "account" : "forge");
   handlePurchaseReturn();
+}
+
+// The concept draft that survives a trip to Stripe (FORGE_FIRST_PLAN.md 3.3): donate() / donateCustom() stash
+// {concept, interactive, pref} in bts_draft right before the page unloads to the hosted checkout; boot() puts it
+// back once (after applyRemixPrefill, which wins when both exist) and deletes the key. A tab closed mid-checkout
+// gets the same draft on its next visit.
+let DRAFT_RESTORED = false;  // a draft concept was put back this load (handlePurchaseReturn's toast says so)
+
+function stashDraft() {
+  lsSet("bts_draft", JSON.stringify({ concept: el("concept").value, interactive: !!el("interactive").checked,
+                                      pref: forgePref() }));
+}
+
+function restoreDraft() {
+  const raw = lsGet("bts_draft");
+  if (!raw) return false;
+  lsDel("bts_draft");
+  let d = null;
+  try { d = JSON.parse(raw); } catch (_) { return false; }
+  if (!d || typeof d !== "object") return false;
+  let restored = false;
+  const box = el("concept");
+  if (box && !box.value.trim() && typeof d.concept === "string" && d.concept.trim()) {
+    box.value = d.concept;
+    el("interactive").checked = !!d.interactive;
+    restored = true;
+  }
+  if (d.pref === "byok" || d.pref === "token") { setForgePref(d.pref); setMode(d.pref); }
+  return restored;
 }
 
 // "Forge your own twist" on a /deck/<slug> page stashes {concept, name, from} in bts_prefill and sends the
@@ -93,7 +123,7 @@ function applyRemixPrefill() {
 }
 
 // Reflect the user's token state in the header chip, the "Use a token" balance line and the Account
-// balance. Steering the default path moved into the chooser block below (restoreForgePref).
+// balance. Which box is open by default is restoreForgePref's job (pay step block below).
 function renderTokens() {
   if (!ME) return;
   const unlimited = !!ME.unlimited;
@@ -107,7 +137,7 @@ function renderTokens() {
   if (line) {
     if (unlimited) line.textContent = "\u221E tokens \u2014 your account forges free.";
     else if (paid > 0) line.textContent = `You have ${paid} token${paid === 1 ? "" : "s"}.`;
-    else line.textContent = "You have no tokens \u2014 get some below.";
+    else line.textContent = "You have no tokens. Get a forge token below \u2014 one token forges one class.";
   }
 
   // Keep the Account view's balance in lockstep wherever the numbers change (forge spend, donation).
@@ -116,11 +146,10 @@ function renderTokens() {
 
   renderGetTokens();
   renderForgeButton();
-  renderChooser();
-  renderBanner();  // its wording depends on the balance
+  renderBanner();
 }
 
-// The forge tab's tier buttons sit behind "Get tokens" (2026-09-26): folded for an account that already has
+// The forge tab's tier buttons sit behind "Get a forge token" (2026-09-26): folded for an account that already has
 // tokens to spend, unfolded when the balance is 0 (that's what they came for), and absent for unlimited
 // accounts. null = follow the balance; a click pins the user's choice for the rest of the visit.
 let GET_TOKENS_OPEN = null;
@@ -132,7 +161,7 @@ function renderGetTokens() {
   const open = !unlimited && (GET_TOKENS_OPEN ?? Number(ME.token_balance || 0) <= 0);
   btn.parentElement.classList.toggle("hidden", unlimited);
   wrap.classList.toggle("hidden", !open);
-  btn.textContent = open ? "Hide token options" : "Get tokens";
+  btn.textContent = open ? "Hide token options" : "Get a forge token";
   btn.setAttribute("aria-expanded", String(open));
 }
 
@@ -152,10 +181,9 @@ function onPayBoxToggle(openedId, otherId, mode) {
     // The box restoreForgePref opened by default is not a choice: don't remember it (the event is async,
     // so it arrives here after the fact).
     if (DEFAULT_OPENED === openedId) DEFAULT_OPENED = null;
-    else { setForgePref(mode); CHOOSER_FORCED = false; }
+    else setForgePref(mode);
   }
   renderForgeButton();
-  renderChooser();
   renderBanner();
   renderEstimate();
 }
@@ -164,49 +192,54 @@ function onPayBoxToggle(openedId, otherId, mode) {
 // (token events arrive mid-forge and call renderTokens -> renderForgeButton).
 let FORGING = false;
 
-// The forge button is the gate: it only enables once the open box can actually pay for a forge, and it
-// says what the click will cost. Disabled, it carries a title saying what is missing.
+// Can the open pay box pay for a forge right now? The offline demo always can; a token box needs an unlimited
+// account or a token to spend; a key box needs a key and a selected model.
+function payable() {
+  const m = currentMode();
+  if (m === "fake") return true;
+  if (m === "token") return !!ME && (!!ME.unlimited || spendable() > 0);
+  if (m === "byok") return !!(el("api_key").value.trim() && el("model").value.trim());
+  return false;
+}
+
+// The forge button is never disabled except mid-forge (FORGE_FIRST_PLAN.md D2): a click that can't pay yet
+// reveals the pay step instead. Its label says what the click will cost once a box can pay; until then it is
+// plain "Forge the class" with a title saying what is missing.
 function renderForgeButton() {
   const btn = el("forge-btn");
   if (!btn) return;
   const m = currentMode();
-  let ok = false, label = "Forge the class", why = "";
+  let label = "Forge the class", why = "";
   if (m === "fake") {
-    ok = true;
     label = "Forge the class (offline demo)";
   } else if (m === "byok") {
-    if (el("api_key").value.trim() && el("model").value.trim()) {
-      ok = true;
-      label = "Forge the class (uses your API key)";
-    } else why = el("model").tagName === "SELECT" && currentProvider().mode === "byok"
+    if (payable()) label = "Forge the class (uses your API key)";
+    else why = el("model").tagName === "SELECT" && currentProvider().mode === "byok"
       ? "Enter your API key, then pick a model from your provider's list."
       : "Enter your API key and a model.";
   } else if (m === "token") {
     if (!ME || ME.unlimited) {
-      ok = true;
       label = "Forge the class (free \u2014 unlimited account)";
     } else {
       const paid = Number(ME.token_balance || 0);
-      if (paid > 0) {
-        ok = true;
-        label = `Forge the class (uses 1 of your ${paid} token${paid === 1 ? "" : "s"})`;
-      } else why = "You have no tokens \u2014 get some above or bring a key.";
+      if (paid > 0) label = `Forge the class (uses 1 of your ${paid} token${paid === 1 ? "" : "s"})`;
+      else why = "You have no tokens \u2014 get a forge token below, or bring your own key.";
     }
   } else {
-    why = "Open 'Bring your own key' and enter a key, or 'Use a token'.";
+    why = "Pick how to pay: 'Use a token' or 'Bring your own key'.";
   }
   btn.textContent = label;
-  btn.disabled = FORGING || !ok;
+  btn.disabled = FORGING;
   if (why) btn.title = why; else btn.removeAttribute("title");
 }
 
-// --- onboarding chooser (forge tab) ---------------------------------------------------------------
-// A path is always open on load (token box by default, see restoreForgePref), so the chooser is normally
-// the one-line strip; its "change" link brings back the two cards, "support the forge" then "use my key".
-// The open <details> box stays the source of truth — this only opens one of them and remembers an
-// explicit pick in localStorage.bts_forge_pref.
+// --- the pay step (forge tab, FORGE_FIRST_PLAN.md 3.2-3.3) ------------------------------------------
+// #pay-step wraps the two pay boxes and stays hidden until a Forge click that can't pay yet (or the "How is
+// this paid for?" link); once shown it stays for the rest of the visit. The open <details> box is the choice:
+// restoreForgePref opens one on load (token box unless a key is saved) and an explicit pick is remembered in
+// localStorage.bts_forge_pref.
 
-let CHOOSER_FORCED = false;  // "change" reopens the cards even for an account that now has tokens
+let PAY_STEP_OPEN = false;
 let DEFAULT_OPENED = null;   // id of the box restoreForgePref opened as a default, until its toggle event lands
 
 function forgePref() {
@@ -234,7 +267,7 @@ function setMode(mode) {
 // our hosted compute is the default since 2026-10-12, because a new account's 11 forges on 2026-10-11 all
 // died on made-up API keys — the key path was presented first and looked like the way in. (Before that,
 // both boxes stayed shut and the forge button stayed disabled until one was opened.) The default is not
-// written to bts_forge_pref, so "change" still shows the cards and a key saved later still wins.
+// written to bts_forge_pref, so a key saved later still wins.
 function restoreForgePref() {
   const pref = forgePref();
   if (pref) setMode(pref);
@@ -244,57 +277,44 @@ function restoreForgePref() {
     setMode(mode);
   }
   renderForgeButton();
-  renderChooser();
 }
 
-function renderChooser() {
-  const box = el("chooser");
-  if (!box) return;
-  const paid = Number((ME && ME.token_balance) || 0);
-  const pref = forgePref();
-  // Undecided: "change" was clicked, or (rare now that restoreForgePref always opens a box) nothing to
-  // spend, no key on file, nothing remembered and no box open.
-  const undecided = CHOOSER_FORCED
-    || (!!ME && !ME.unlimited && paid <= 0 && !hasSavedKey() && !pref && !currentMode());
-  const mode = pref || currentMode();
-  // Nothing decided and nothing to decide about (unlimited, offline demo, or no box open on an account
-  // that isn't stuck): no strip to draw.
-  if (!ME || (!undecided && (!mode || ME.unlimited || mode === "fake"))) {
-    box.classList.add("hidden");
-    return;
+// Show the pay step (and keep it shown for the rest of the visit): make sure a box is open, put the one-line
+// reason on top (none for the "How is this paid for?" link), scroll the step under the header and move focus
+// to the first thing to do there: a tier button when the token box is open on an empty balance, the key field
+// when the key box is open, else the Forge button itself.
+function revealPayStep(reason) {
+  const step = el("pay-step");
+  if (!step) return;
+  PAY_STEP_OPEN = true;
+  step.classList.remove("hidden");
+  el("pay-open").classList.add("hidden");
+  if (!el("forge-token").open && !el("forge-byok").open) restoreForgePref();
+  const needTiers = el("forge-token").open && !!ME && !ME.unlimited && spendable() <= 0;
+  if (needTiers) {
+    if (GET_TOKENS_OPEN === false) GET_TOKENS_OPEN = null;  // the tiers are what this click is about: unfold
+    renderGetTokens();                                       // them (they fold by themselves once tokens land)
   }
-  box.classList.remove("hidden");
-  el("chooser-head").classList.toggle("hidden", !undecided);
-  el("chooser-cards").classList.toggle("hidden", !undecided);
-  const strip = el("chooser-strip");
-  strip.classList.toggle("hidden", undecided);
-  if (undecided) return;
-  strip.innerHTML = (mode === "byok" ? "Forging with your key" : "Forging with tokens")
-    + ' · <button id="chooser-change" class="linkish" type="button">change</button>';
-  // innerHTML replaced the node — re-wire on every render.
-  el("chooser-change").onclick = () => { lsDel("bts_forge_pref"); CHOOSER_FORCED = true; renderChooser(); };
+  const line = el("pay-reason");
+  line.textContent = reason || "";
+  line.classList.toggle("hidden", !reason);
+  step.scrollIntoView({ behavior: "smooth", block: "start" });
+  let target = el("forge-btn");
+  if (needTiers) target = document.querySelector("#forge-donate-tiers .donate-tier") || target;
+  else if (el("forge-byok").open) target = el("api_key");
+  target.focus({ preventScroll: true });
+  renderForgeButton();
 }
 
-function chooseByok() {
-  setForgePref("byok");
-  CHOOSER_FORCED = false;
-  setMode("byok");          // opens #forge-byok, where the key fields live
-  el("provider").focus();
-  renderChooser();
-}
-
-function chooseToken() {
-  setForgePref("token");
-  CHOOSER_FORCED = false;
-  setMode("token");         // tiers inline on the forge tab, not a trip to the Account tab
-  el("forge-token").scrollIntoView({ behavior: "smooth", block: "nearest" });
-  renderChooser();
+// What the pay step says when a Forge click can't pay yet.
+function payReason() {
+  return currentMode() === "byok" ? "Enter your API key and pick a model" : "Pick how to pay for this forge";
 }
 
 // --- "how it works" tutorial banner ---------------------------------------------------------------
-// Five steps (subscribe, key-or-token, forge, import, restart) that every signed-in account sees until dismissed; the
-// text is static in index.html. It replaced the 2026-09-28 "subscribe to the mod" warning on 2026-09-30
-// because people were reaching the forge and leaving. New dismiss key so everyone sees it once.
+// One line under the Forge button (describe, Forge, copy, paste in-game) that every signed-in account sees until
+// dismissed; the text is static in index.html. The five-step 2026-09-30 version shrank to this on 2026-10-26
+// (FORGE_FIRST_PLAN.md 3.4): installing the mod is now explained on the result, after the class exists.
 function renderBanner() {
   const bar = el("v3-banner");
   if (!bar) return;
@@ -303,18 +323,6 @@ function renderBanner() {
   // dismissed on its own key.
   el("phone-banner").classList.toggle("hidden", !(ME && IS_PHONE && !lsGet("bts_phone_banner_dismissed")));
 }
-
-// On a phone, step 1 ("Subscribe to the mod on Steam Workshop") reads as a blocker — it can only be done on
-// the PC. Move it last and say so. Runs once at load; the tutorial markup is static.
-function phoneTutorialOrder() {
-  const li = el("tut-subscribe");
-  if (!IS_PHONE || !li) return;
-  li.parentNode.appendChild(li);
-  const later = document.createElement("em");
-  later.textContent = "Later, on your PC: ";
-  li.insertBefore(later, li.firstChild);
-}
-phoneTutorialOrder();
 
 // --- BYOK cost estimate ---------------------------------------------------------------------------
 // Everything here is SERVER-COMPUTED (/api/forge-estimate) — the browser multiplies, it never owns a price
@@ -481,7 +489,7 @@ function selectTab(which) {
   if (which === "forge") {
     show("view-forge");
     el("forge-input").classList.remove("hidden");
-    renderChooser();
+    el("pay-step").classList.toggle("hidden", !PAY_STEP_OPEN);
     renderBanner();
   }
   else if (which === "account") { show("view-account"); loadAccount(); }
@@ -761,12 +769,16 @@ function currentMode() {
 
 async function forge() {
   const concept = el("concept").value.trim();
-  if (!concept) { toast("Describe a class first."); return; }
-  const choice = currentMode();  // "token" | "byok" | "fake" | null
-  if (!choice) {
-    toast("Open 'Bring your own key' and enter a key, or 'Use a token'.");
+  if (!concept) { toast("Describe a class first."); el("concept").focus(); return; }
+  // Nothing armed can pay yet: unfold the pay step instead of forging (FORGE_FIRST_PLAN.md 3.2). A repeat click
+  // re-scrolls, re-focuses and repeats the reason as a toast.
+  if (!payable()) {
+    const reason = payReason();
+    if (PAY_STEP_OPEN) toast(reason);
+    revealPayStep(reason);
     return;
   }
+  const choice = currentMode();  // "token" | "byok" | "fake"
 
   // The wire `mode` is derived: BYOK splits into Anthropic's native path vs the OpenAI-compatible path
   // based on the chosen provider, so the backend routing is unchanged.
@@ -782,7 +794,7 @@ async function forge() {
   if (choice === "token") {
     if (!ME.unlimited) {
       if (spendable() <= 0) {
-        toast("No tokens to spend — get some, or bring your own key.");
+        toast("No tokens to spend — get a forge token below, or bring your own key.");
         return;
       }
       const paid = Number(ME.token_balance || 0);
@@ -834,10 +846,11 @@ async function forge() {
     });
     if (!resp.ok && resp.headers.get("content-type")?.includes("application/json")) {
       const e = await resp.json();
-      // Server says out of tokens (a stale balance slipped past the pre-check) — route to the donate flow.
+      // Server says out of tokens (a stale balance slipped past the pre-check) — unfold the pay step, where
+      // the tiers are (the 402 text says "under the Forge button").
       if (resp.status === 402) {
         if (applyTokenState(e)) renderTokens();
-        selectTab("account");
+        revealPayStep("Pick how to pay for this forge");
       }
       throw new Error(e.error || ("HTTP " + resp.status));
     }
@@ -1002,12 +1015,28 @@ function renderResult(cls) {
   if (IS_PHONE) el("result").scrollIntoView({ block: "start" });
 }
 
+// What "Copy share link" puts on the clipboard (FORGE_FIRST_PLAN.md 5.5): a one-line blurb with the link,
+// `"<name>" — <description>. Play it: <url>`, the description cut to ~140 characters at a word boundary.
+function shareText(name, description, url) {
+  let d = String(description || "").replace(/\s+/g, " ").trim();
+  if (d.length > 140) {
+    const cut = d.slice(0, 140);
+    const sp = cut.lastIndexOf(" ");
+    d = (sp > 60 ? cut.slice(0, sp) : cut).replace(/[\s.,;:!?\u2014-]+$/, "") + "\u2026";
+  } else {
+    d = d.replace(/[.!?]+$/, "");
+  }
+  const head = `"${String(name || "A forged class").trim()}"`;
+  return d ? `${head} \u2014 ${d}. Play it: ${url}` : `${head}. Play it: ${url}`;
+}
+
 // The bar above a rendered class: a share link (the public /deck/<slug> page) and, when the class was opened
 // from the library, a way back to the forge. Classes without a slug simply get no share button.
 function renderShareBar(cls, viewing) {
   const share = el("share-link");
   const url = cls.share_url || (cls.slug ? `${location.origin}/deck/${cls.slug}` : "");
   share.dataset.url = url;
+  share.dataset.text = url ? shareText(cls.name || cls.character?.name, cls.character?.description || cls.concept, url) : "";
   share.classList.toggle("hidden", !url);
   wireHandoff(el("send-pc"), el("email-me"), cls, url);
   const why = emailBlocker();
@@ -1222,7 +1251,8 @@ function libRow(c) {
     li.insertBefore(art, li.firstChild);
   }
   const share = li.querySelector('[data-act="share"]');
-  if (c.slug) share.onclick = () => copy(`${location.origin}/deck/${c.slug}`);
+  // List rows carry no description (ForgedClass.summary), so the concept stands in for it.
+  if (c.slug) share.onclick = () => copy(shareText(c.name, c.description || c.concept, `${location.origin}/deck/${c.slug}`));
   else share.remove();  // classes without a slug (none since the backfill) simply get no share button
   wireHandoff(li.querySelector('[data-act="sendpc"]'), li.querySelector('[data-act="email"]'), c,
               c.slug ? `${location.origin}/deck/${c.slug}` : "");
@@ -1248,7 +1278,6 @@ async function openClass(id) {
   el("nav-account").classList.remove("active");
   show("view-forge");
   el("forge-input").classList.add("hidden");
-  el("chooser").classList.add("hidden");    // viewing a saved class: the forge furniture gets out of the way
   el("v3-banner").classList.add("hidden");
   el("phone-banner").classList.add("hidden");
   el("progress").classList.add("hidden");
@@ -1486,6 +1515,7 @@ async function startCheckout(payload, btn) {
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
+    stashDraft();           // the concept survives the round trip (restoreDraft on the way back)
     location.href = d.url;  // off to Stripe's hosted checkout page
   } catch (e) {
     toast(e.message);
@@ -1542,13 +1572,19 @@ async function handlePurchaseReturn() {
       if (d.status === "paid") {
         applyTokenState(d);
         renderTokens();
+        const added = `${d.tokens} token${d.tokens === 1 ? "" : "s"} added`;
         toast(d.tokens > 0
-          ? `Thank you! ${d.tokens} token${d.tokens === 1 ? "" : "s"} added — you're ready to forge.`
-          : "Thank you for supporting the forge!");
-        // They came here to forge, not to read the Account tab: land on the forge, token path armed.
+          ? (DRAFT_RESTORED ? `Thank you! ${added} — your class is ready to forge.`
+                            : `Thank you! ${added} — you're ready to forge.`)
+          : "Thank you for your donation!");
+        // They came here to forge, not to read the Account tab: land on the forge, token path armed, the pay
+        // step open on "You have N tokens" and the Forge button in view.
         setForgePref("token");
         setMode("token");
         selectTab("forge");
+        revealPayStep("");
+        el("forge-btn").scrollIntoView({ behavior: "smooth", block: "center" });
+        el("forge-btn").focus({ preventScroll: true });
         return;
       }
     } catch (e) {
@@ -1781,15 +1817,14 @@ el("forge-btn").onclick = forge;
 el("choice-go").onclick = () => sendChoice([...(choiceState?.picked || [])]);
 el("choice-skip").onclick = () => sendChoice([]);
 el("copy-code").onclick = () => copy(el("r-code").value);
-el("share-link").onclick = () => copy(el("share-link").dataset.url);
+el("share-link").onclick = () => copy(el("share-link").dataset.text || el("share-link").dataset.url);
 el("view-back").onclick = () => selectTab("forge");
 // "Show art" repaints the list in place; an open class view follows via the body.no-art CSS rule, and
 // the next render (open / forge) skips the art entirely.
 el("lib-show-art").onchange = (ev) => { setArtEnabled(ev.target.checked); paintLibrary(); };
 el("signout").onclick = async () => { await fetch("/logout", { method: "POST" }); location.href = "/"; };
 el("load-models").onclick = () => loadModels();
-el("choose-byok").onclick = chooseByok;
-el("choose-token").onclick = chooseToken;
+el("pay-open").onclick = () => revealPayStep("");
 el("v3-banner-x").onclick = () => { lsSet("bts_tutorial_banner_dismissed", "1"); renderBanner(); };
 el("phone-banner-x").onclick = () => { lsSet("bts_phone_banner_dismissed", "1"); renderBanner(); };
 
@@ -2045,7 +2080,7 @@ async function loadAdminActions() {
 // Which box is open IS the choice: opening one closes the other and is remembered for next visit.
 el("forge-byok").addEventListener("toggle", () => onPayBoxToggle("forge-byok", "forge-token", "byok"));
 el("forge-token").addEventListener("toggle", () => onPayBoxToggle("forge-token", "forge-byok", "token"));
-el("mode-fake").onchange = () => { renderForgeButton(); renderChooser(); };
+el("mode-fake").onchange = () => renderForgeButton();
 for (const id of ["forge-byok", "forge-token"]) el(id).querySelector("summary").addEventListener("click", onPaySummaryClick);
 el("forge-get-tokens").onclick = () => {
   GET_TOKENS_OPEN = el("forge-donate-wrap").classList.contains("hidden");

@@ -7,7 +7,7 @@
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png" />
   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/static/style.css?v=20261023" />
+  <link rel="stylesheet" href="/static/style.css?v=20261026" />
 </head>
 <body>
   <header>
@@ -19,7 +19,7 @@
       <a class="tab" href="/download">Get the mod ⬇</a>
       <a class="tab" href="/help" title="Where do I paste my class code?">Help ?</a>
       <span class="spacer"></span>
-      <span id="tokens" class="tokens hidden" title="Tokens are spent by the 'Use a token' forge option. Account tab to get more."></span>
+      <span id="tokens" class="tokens hidden" title="Tokens are spent by the 'Use a token' forge option. Press Forge to get one."></span>
       <span id="who" class="who"></span>
       <button id="signout" class="ghost hidden">Sign out</button>
     </nav>
@@ -38,157 +38,141 @@
 
   <!-- Forge view -->
   <main id="view-forge" class="hidden">
-    <!-- Phone banner (PHONE_FUNNEL_PLAN.md 5.1): phones only (render.js IS_PHONE), until dismissed
-         (bts_phone_banner_dismissed). Forging on a phone is fine; playing needs the PC. -->
-    <div id="phone-banner" class="banner phone hidden" role="status">
-      <span class="banner-icon" aria-hidden="true">📱</span>
-      <p class="phone-banner-text">On a phone? Forge away — the class is saved to My Classes. Open
-        blankthespire.com on the PC that runs Slay the Spire 2 to grab the code, or send it to yourself below.</p>
-      <button id="phone-banner-x" class="banner-x" aria-label="Dismiss">×</button>
-    </div>
-    <!-- Welcome banner (2026-09-30): a five-step "how it works" tutorial, shown to every signed-in account
-         until it is dismissed (bts_tutorial_banner_dismissed). It replaced the 2026-09-28 "subscribe to the
-         mod" warning: people were reaching this page and leaving, so the whole flow is spelled out up front.
-         The full illustrated version lives on /help. -->
-    <div id="v3-banner" class="banner tutorial hidden" role="status">
-      <span class="banner-icon" aria-hidden="true">⚒</span>
-      <div id="v3-banner-text" class="tutorial-body">
-        <strong>How it works</strong>
-        <ol class="tutorial-steps">
-          <!-- On a phone app.js moves this step last and prefixes "Later, on your PC:" — it is not a blocker there. -->
-          <li id="tut-subscribe"><a href="/workshop" target="_blank" rel="noopener">Subscribe to the mod</a> on Steam Workshop (once).</li>
-          <li>Pick how to pay: paste your own API key (free) or get a forge token (one token = one forge). The Forge button stays off until you do.</li>
-          <li>Describe a class below and press Forge. You get a code.</li>
-          <li>In Slay the Spire 2: Mods → BLANK the spire → <em>Import a class code</em> → paste → Import.</li>
-          <li>Restart the game and pick your class.</li>
-        </ol>
-        <a class="tutorial-more" href="/help">Full guide with screenshots</a>
-      </div>
-      <button id="v3-banner-x" class="banner-x" aria-label="Dismiss">×</button>
-    </div>
-
-    <!-- Chooser: our tokens vs your key. Since 2026-10-12 a fresh visit opens the token box by default, so this
-         normally shows only the one-line strip ("Forging with tokens · change"); "change" brings back the two
-         cards, token card first. A click on a card or box is remembered in localStorage bts_forge_pref (the
-         default never is); whichever <details> box below is open stays the source of truth. -->
-    <section id="chooser" class="card chooser hidden">
-      <h2 id="chooser-head">How will you fill in the blank?</h2>
-      <div id="chooser-cards" class="chooser-cards">
-        <div class="chooser-card">
-          <h3>Use a token</h3>
-          <p class="hint">We run it on our models. Each token is one forge: $3 → 2 tokens, $5 → 4, $10 → 10,
-            or any whole amount from $11 at one token per dollar.</p>
-          <button id="choose-token" class="btn primary">Support the forge</button>
-        </div>
-        <div class="chooser-card">
-          <h3>I have an API key</h3>
-          <p class="hint">Forging is free (but compute is not). Paste a key from Anthropic, OpenAI, OpenRouter and more — it stays in your browser.</p>
-          <button id="choose-byok" class="btn">Use my key</button>
-        </div>
-      </div>
-      <p id="chooser-strip" class="chooser-strip hidden"></p>
-    </section>
-
+    <!-- Forge-first screen (2026-10-26, docs/plans/FORGE_FIRST_PLAN.md sections 3-4): the concept box is the
+         first thing under the header and the Forge button is never disabled (except mid-forge). Nothing about
+         payment shows until the first Forge click: if the open pay box can pay, the click forges; otherwise
+         app.js revealPayStep() un-hides #pay-step (the two boxes, unchanged inside), scrolls it into view and
+         puts the one-line reason on top. The "How is this paid for?" link opens the step without forging.
+         Under the button: the one-line tutorial, the phone banner (phones only), Advanced options. The old
+         chooser cards/strip and the five-step tutorial are gone; installing the mod is explained on the
+         result ("Play it", below the code) instead of before the first forge. -->
     <section id="forge-input" class="card">
       <label class="lbl" for="concept">Describe your class</label>
       <!-- can we add a few more contrasting examples and select one at random so the user doesn't always see the same sample text? another example might be 'the bravest toaster in the world' -->
       <textarea id="concept" rows="3" placeholder="e.g. a venomous plague doctor who sacrifices health to stack poison, then turns blood into armor"></textarea>
 
-      <!-- Whose compute runs this forge: exactly one of the two boxes is open (app.js currentMode()) — "Use a
-           token" by default since 2026-10-12, "Bring your own key" when a key is saved or that was the last
-           pick. They behave like a radio pair: the open one is highlighted with a filled dot, and clicking its
-           own header does not close it (app.js onPaySummaryClick) — switch by opening the other. The token box
-           sits first, the key box under it (same 2026-10-12 change). -->
-      <p class="lbl pay-lbl">Who provides your compute? <span class="muted">Pick one.</span></p>
-      <!-- Tokens without leaving the forge: the balance, then the same tier + custom-amount buttons the
-           Account tab builds (app.js renderDonatePanel). -->
-      <details id="forge-token" class="settings pay">
-        <summary>Use a token</summary>
-        <p class="hint" id="token-balance-line"></p>
-        <!-- The tiers fold behind "Get tokens" (2026-09-26) so someone spending a token they already hold
-             isn't looking at a price list. Open by default only when the balance is 0 (app.js
-             renderGetTokens); unlimited accounts never see either. -->
-        <div class="get-tokens-row">
-          <button id="forge-get-tokens" class="btn" type="button" aria-expanded="false"
-                  aria-controls="forge-donate-wrap">Get tokens</button>
-        </div>
-        <div id="forge-donate-wrap" class="hidden">
-          <div id="forge-donate-box" class="donate hidden">
-            <div id="forge-donate-tiers" class="donate-tiers"></div>
-            <div id="forge-donate-custom" class="donate-custom hidden"></div>
+      <!-- The pay step (2026-10-26): hidden until the first Forge click that can't pay yet (or the "How is this
+           paid for?" link), then open for the rest of the visit (app.js PAY_STEP_OPEN). #pay-reason is the
+           one-line "why am I seeing this" set by revealPayStep(). -->
+      <div id="pay-step" class="pay-step hidden">
+        <p id="pay-reason" class="hint pay-reason hidden"></p>
+        <!-- Whose compute runs this forge: exactly one of the two boxes is open (app.js currentMode()) — "Use a
+             token" by default since 2026-10-12, "Bring your own key" when a key is saved or that was the last
+             pick. They behave like a radio pair: the open one is highlighted with a filled dot, and clicking its
+             own header does not close it (app.js onPaySummaryClick) — switch by opening the other. The token box
+             sits first, the key box under it (same 2026-10-12 change). -->
+        <p class="lbl pay-lbl">Who provides your compute? <span class="muted">Pick one.</span></p>
+        <!-- Tokens without leaving the forge: the balance, then the same tier + custom-amount buttons the
+             Account tab builds (app.js renderDonatePanel). -->
+        <details id="forge-token" class="settings pay">
+          <summary>Use a token</summary>
+          <p class="hint" id="token-balance-line"></p>
+          <!-- The tiers fold behind "Get a forge token" (2026-09-26) so someone spending a token they already
+               hold isn't looking at a price list. Open by default only when the balance is 0 (app.js
+               renderGetTokens); unlimited accounts never see either. -->
+          <div class="get-tokens-row">
+            <button id="forge-get-tokens" class="btn" type="button" aria-expanded="false"
+                    aria-controls="forge-donate-wrap">Get a forge token</button>
           </div>
-          <p id="forge-donate-note" class="hint hidden">Donations aren't available right now — bring your own API key to keep forging.</p>
-        </div>
-        <p class="hint">Have an API key? Forging with it is free — open “Bring your own key” below.</p>
-      </details>
+          <div id="forge-donate-wrap" class="hidden">
+            <div id="forge-donate-box" class="donate hidden">
+              <div id="forge-donate-tiers" class="donate-tiers"></div>
+              <div id="forge-donate-custom" class="donate-custom hidden"></div>
+            </div>
+            <p id="forge-donate-note" class="hint hidden">Donations aren't available right now — bring your own API key to keep forging.</p>
+          </div>
+          <p class="hint">Have an API key? Forging with it is free — open “Bring your own key” below.</p>
+        </details>
 
-      <details id="forge-byok" class="settings pay">
-        <summary>Bring your own key</summary>
-        <div class="byok-grid">
-          <div>
-            <label class="lbl small" for="provider">Provider</label>
-            <select id="provider" class="in">
-              <option value="anthropic" selected>Anthropic (Claude)</option>
-              <option value="openai">OpenAI</option>
-              <option value="ollama">Ollama Cloud</option>
-              <option value="openrouter">OpenRouter</option>
-              <option value="groq">Groq</option>
-              <option value="google">Google Gemini</option>
-              <option value="xai">xAI (Grok)</option>
-              <option value="deepseek">DeepSeek</option>
-              <option value="together">Together</option>
-              <option value="custom">Other (OpenAI-compatible URL)</option>
-            </select>
+        <details id="forge-byok" class="settings pay">
+          <summary>Bring your own key</summary>
+          <div class="byok-grid">
+            <div>
+              <label class="lbl small" for="provider">Provider</label>
+              <select id="provider" class="in">
+                <option value="anthropic" selected>Anthropic (Claude)</option>
+                <option value="openai">OpenAI</option>
+                <option value="ollama">Ollama Cloud</option>
+                <option value="openrouter">OpenRouter</option>
+                <option value="groq">Groq</option>
+                <option value="google">Google Gemini</option>
+                <option value="xai">xAI (Grok)</option>
+                <option value="deepseek">DeepSeek</option>
+                <option value="together">Together</option>
+                <option value="custom">Other (OpenAI-compatible URL)</option>
+              </select>
+            </div>
+            <div>
+              <label class="lbl small" for="api_key">API key</label>
+              <input id="api_key" class="in" type="password" placeholder="Paste your key" autocomplete="off" />
+            </div>
           </div>
-          <div>
-            <label class="lbl small" for="api_key">API key</label>
-            <input id="api_key" class="in" type="password" placeholder="Paste your key" autocomplete="off" />
-          </div>
-        </div>
-        <input id="base_url" class="in" placeholder="Base URL — e.g. https://api.openai.com/v1" style="display:none" />
-        <!-- One line: where to get a key, then the key-handling answer behind a link. Keep the answer TRUE:
-             the key is saved in this browser's localStorage (bts_byok) so it survives a reload, travels to
-             our server only inside the forge / model-list request, and is never written to the database or
-             the logs. -->
-        <p class="hint byok-line"><span id="byok-hint"></span> ·
-          <button id="key-safety-btn" class="linkish" type="button">Your key stays in this browser</button></p>
-        <p class="hint hidden" id="key-safety">We never store it. It's kept in this browser so you don't have to
-          retype it (clear the box to forget it), and when you forge it goes straight to your provider — it's
-          never written to our database or our logs.</p>
+          <input id="base_url" class="in" placeholder="Base URL — e.g. https://api.openai.com/v1" style="display:none" />
+          <!-- One line: where to get a key, then the key-handling answer behind a link. Keep the answer TRUE:
+               the key is saved in this browser's localStorage (bts_byok) so it survives a reload, travels to
+               our server only inside the forge / model-list request, and is never written to the database or
+               the logs. -->
+          <p class="hint byok-line"><span id="byok-hint"></span> ·
+            <button id="key-safety-btn" class="linkish" type="button">Your key stays in this browser</button></p>
+          <p class="hint hidden" id="key-safety">We never store it. It's kept in this browser so you don't have to
+            retype it (clear the box to forget it), and when you forge it goes straight to your provider — it's
+            never written to our database or our logs.</p>
 
-        <!-- Two models, split where the money is (forge._key_models): the design model makes the few calls
-             that shape the class, the card model writes every card (~95% of the tokens). Card model "" =
-             the design model does both. Both are selects filled from the provider's own /models listing
-             (app.js loadModels, auto-run once a key is entered); the forge route re-checks the ids against
-             that listing. Only "Other" falls back to typed ids when its endpoint can't list models. -->
-        <div class="byok-models-head">
-          <span class="lbl small">Models</span>
-          <button id="load-models" class="linkish" type="button">Load my model list</button>
-        </div>
-        <div class="byok-grid">
-          <div>
-            <label class="lbl small" for="model">Design</label>
-            <select id="model" class="in" disabled><option value="">Enter your key, then load models</option></select>
-            <p class="hint">A few calls that shape the class. Use your smartest model.</p>
+          <!-- Two models, split where the money is (forge._key_models): the design model makes the few calls
+               that shape the class, the card model writes every card (~95% of the tokens). Card model "" =
+               the design model does both. Both are selects filled from the provider's own /models listing
+               (app.js loadModels, auto-run once a key is entered); the forge route re-checks the ids against
+               that listing. Only "Other" falls back to typed ids when its endpoint can't list models. -->
+          <div class="byok-models-head">
+            <span class="lbl small">Models</span>
+            <button id="load-models" class="linkish" type="button">Load my model list</button>
           </div>
-          <div>
-            <label class="lbl small" for="card_model">Card coding</label>
-            <select id="card_model" class="in" disabled><option value="">Same as design</option></select>
-            <p class="hint">Writes every card in strict JSON — most of the cost. A reliable coder is enough.</p>
+          <div class="byok-grid">
+            <div>
+              <label class="lbl small" for="model">Design</label>
+              <select id="model" class="in" disabled><option value="">Enter your key, then load models</option></select>
+              <p class="hint">A few calls that shape the class. Use your smartest model.</p>
+            </div>
+            <div>
+              <label class="lbl small" for="card_model">Card coding</label>
+              <select id="card_model" class="in" disabled><option value="">Same as design</option></select>
+              <p class="hint">Writes every card in strict JSON — most of the cost. A reliable coder is enough.</p>
+            </div>
           </div>
-        </div>
 
-        <div class="byok-foot">
-          <span id="byok-art" class="chip"></span>
-          <!-- The quote is on demand: a link, then the table in its place. Changing the provider or either
-               model folds it back so a stale number is never on screen. -->
-          <button id="estimate-btn" class="linkish" type="button">Estimate cost</button>
-        </div>
-        <div class="estimate hidden" id="byok-estimate"></div>
-      </details>
+          <div class="byok-foot">
+            <span id="byok-art" class="chip"></span>
+            <!-- The quote is on demand: a link, then the table in its place. Changing the provider or either
+                 model folds it back so a stale number is never on screen. -->
+            <button id="estimate-btn" class="linkish" type="button">Estimate cost</button>
+          </div>
+          <div class="estimate hidden" id="byok-estimate"></div>
+        </details>
+      </div>
 
       <div class="forge-actions">
         <button id="forge-btn" class="btn primary">Forge the class</button>
+      </div>
+      <p class="pay-open-row"><button id="pay-open" class="linkish" type="button">How is this paid for?</button></p>
+
+      <!-- One-line "how it works" (2026-10-26, FORGE_FIRST_PLAN.md 3.4), shown until dismissed
+           (bts_tutorial_banner_dismissed). It replaced the five-step 2026-09-30 tutorial whose first step sent
+           people to Steam before they had a class; the illustrated version lives on /help. -->
+      <div id="v3-banner" class="banner tutorial hidden" role="status">
+        <span class="banner-icon" aria-hidden="true">⚒</span>
+        <p id="v3-banner-text" class="tutorial-body">Describe a class, press Forge, copy the code, paste it in-game
+          (Mods → BLANK the spire → Import a class code → Import → restart).
+          <a class="tutorial-more" href="/help">Full guide with screenshots</a></p>
+        <button id="v3-banner-x" class="banner-x" aria-label="Dismiss">×</button>
+      </div>
+      <!-- Phone banner (PHONE_FUNNEL_PLAN.md 5.1; under the Forge button since 2026-10-26, FORGE_FIRST_PLAN.md
+           D10): phones only (render.js IS_PHONE), until dismissed (bts_phone_banner_dismissed). Forging on a
+           phone is fine; playing needs the PC. -->
+      <div id="phone-banner" class="banner phone hidden" role="status">
+        <span class="banner-icon" aria-hidden="true">📱</span>
+        <p class="phone-banner-text">On a phone? Forge away — the class is saved to My Classes. Open
+          blankthespire.com on the PC that runs Slay the Spire 2 to grab the code, or send it to yourself below.</p>
+        <button id="phone-banner-x" class="banner-x" aria-label="Dismiss">×</button>
       </div>
 
       <!-- Options most people never touch, folded under the button. The interactive toggle is a property of
@@ -262,8 +246,17 @@
         <label class="lbl small">Class import code</label>
         <textarea id="r-code" rows="3" readonly></textarea>
         <button id="copy-code" class="btn">Copy code</button>
-        <p class="hint">Paste in-game → mod settings → <em>Import a class code</em> → Import → Restart.
-          <a href="/help">Where do I paste this?</a></p>
+        <!-- "Play it" (2026-10-26, FORGE_FIRST_PLAN.md 3.5): the install steps live here, after the class exists,
+             instead of in a pre-forge tutorial. Same three steps and markup classes as deck.html's block. -->
+        <div class="play-how">
+          <h3 class="play-title">Play it</h3>
+          <ol class="play-steps">
+            <li><a href="/workshop" target="_blank" rel="noopener">Subscribe to the mod on Steam Workshop</a> (once).</li>
+            <li>In Slay the Spire 2: Mods → BLANK the spire → <em>Import a class code</em> → paste → Import.</li>
+            <li>Restart the game and pick your class.</li>
+          </ol>
+          <p class="hint"><a href="/help">Where do I paste this?</a></p>
+        </div>
         <p id="r-usage" class="hint hidden"></p>
       </div>
     </section>
@@ -293,7 +286,7 @@
     </section>
 
     <section class="card">
-      <h2>Support the forge</h2>
+      <h2>Get a forge token</h2>
       <p class="hint">BLANK the spire is free and open source, but every hosted forge costs me real money. Your donations cover the cost of our compute.</p>
       <div id="donate" class="donate hidden">
         <div id="donate-tiers" class="donate-tiers"></div>
@@ -428,7 +421,7 @@
 
   <!-- ?v= busts the 1-hour static cache on deploy: bump both whenever either file changes. render.js holds
        the class renderers shared with the public /deck page and must load first. -->
-  <script src="/static/render.js?v=20261023"></script>
-  <script src="/static/app.js?v=20261023"></script>
+  <script src="/static/render.js?v=20261026"></script>
+  <script src="/static/app.js?v=20261026"></script>
 </body>
 </html>

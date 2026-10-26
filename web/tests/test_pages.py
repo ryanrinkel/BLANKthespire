@@ -7,6 +7,7 @@ unescaped.
 from __future__ import annotations
 
 import json
+import re
 
 from conftest import login
 
@@ -76,6 +77,45 @@ def test_help_page_explains_where_the_code_goes(client):
 
 def test_help_needs_no_login(client):
     assert client.get("/help").status_code == 200
+
+
+def test_help_step_two_says_subscribe_on_the_workshop_first(client):
+    """FORGE_FIRST_PLAN.md 3.5: the Workshop step left the pre-forge tutorial, so /help step 2 carries it."""
+    body = client.get("/help").get_data(as_text=True)
+    assert "the mod must be subscribed on" in body
+    assert 'href="/workshop"' in body
+    assert "Steam Workshop" in body
+
+
+# --- /app (index.html) ----------------------------------------------------------------------------
+
+def test_app_is_forge_first_with_a_hidden_pay_step_and_a_play_it_block(client):
+    """FORGE_FIRST_PLAN.md Phase A: the concept box leads, the pay boxes sit in a hidden #pay-step with a
+    "How is this paid for?" opener, the chooser is gone, and the result carries the "Play it" install steps."""
+    login(client)
+    r = client.get("/app")
+    assert r.status_code == 200
+    body = r.get_data(as_text=True)
+    assert 'id="pay-step" class="pay-step hidden"' in body
+    assert 'id="pay-open"' in body
+    assert 'id="pay-reason"' in body
+    # The concept box comes before the pay step, which holds both boxes and comes before the one Forge button.
+    assert body.index('id="concept"') < body.index('id="pay-step"') < body.index('id="forge-btn"')
+    assert body.index('id="pay-step"') < body.index('id="forge-token"') < body.index('id="forge-byok"')
+    assert body.index('id="forge-byok"') < body.index('id="forge-btn"') < body.index('id="pay-open"')
+    assert body.count('id="forge-btn"') == 1
+    # "Play it" under the code, with the Workshop link.
+    assert '<h3 class="play-title">Play it</h3>' in body
+    assert body.index('id="copy-code"') < body.index('class="play-how"')
+    play = body[body.index('class="play-how"'):]
+    play = play[:play.index("</div>")]
+    assert 'href="/workshop"' in play and "Subscribe to the mod on Steam Workshop" in play
+    assert "Import a class code" in play and 'href="/help"' in play
+    # Retired: the chooser cards, the five-step tutorial's subscribe step, the old wording.
+    assert 'id="chooser"' not in body
+    assert 'id="tut-subscribe"' not in body
+    assert not re.search(r"support\s+the\s+forge", body, re.I)  # the D5 wording sweep
+    assert "Get a forge token" in body
 
 
 # --- /deck/<slug> ---------------------------------------------------------------------------------

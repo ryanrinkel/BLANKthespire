@@ -1306,13 +1306,13 @@ def forge_class_route():
     if ollama_mix and not unlimited:
         if not has_any:
             _user_end(user["id"])
-            return jsonify({"error": "you're out of tokens — get more on the Account tab, or bring your own "
+            return jsonify({"error": "you're out of tokens — get a forge token under the Forge button, or bring your own "
                                      "API key to keep forging.",
                             "token_balance": 0}), 402
         res = _reserve_token(user["id"])
         if res is None:  # lost a race for the last token
             _user_end(user["id"])
-            return jsonify({"error": "you're out of tokens — get more on the Account tab, or bring your own "
+            return jsonify({"error": "you're out of tokens — get a forge token under the Forge button, or bring your own "
                                      "API key to keep forging.",
                             "token_balance": 0}), 402
         token_kind, token_state = res

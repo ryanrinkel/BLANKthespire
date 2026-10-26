@@ -43,7 +43,7 @@ One free token a day on our models, for every account. One token forges one clas
 ```
 NEW
 ```
-<b>Or let us run it.</b> Support the forge and get tokens as a thank-you: $3 → 2 tokens, $5 → 4, $10 → 10 (card fee added at checkout). One token forges one class on our models.
+<b>Or let us run it.</b> Get a forge token: donate and get tokens as a thank-you: $3 → 2 tokens, $5 → 4, $10 → 10 (card fee added at checkout). One token forges one class on our models.
 ```
 
 ### 3. Pricing bullet 3
@@ -122,8 +122,9 @@ We run it on our models. Each token is one forge: $3 → 2 tokens, $5 → 4 toke
 
 NEW
 ```
-Support the forge
+Get a forge token
 ```
+(2026-10-26: the card itself was retired, see FORGE_FIRST_PLAN.md; the wording lives on the #forge-get-tokens button and the Account tab heading)
 
 ### 12. Collapsed strip after a choice is made (two variants; "change" is a link)
 
@@ -182,8 +183,9 @@ Forges on our models. Uses 1 of your N tokens.
 
 CURRENT
 ```
-Today's free token is spent — another arrives tomorrow (UTC). Until then, <b>bring your own key</b> below (free, unlimited), or support the forge.
+Today's free token is spent — another arrives tomorrow (UTC). Until then, <b>bring your own key</b> below (free, unlimited), or get a forge token.
 ```
+(2026-10-26: the last words of this retired CURRENT line were reworded in the FORGE_FIRST_PLAN.md wording sweep.)
 NEW
 ```
 You have no tokens. <b>Bring your own key</b> below (free, unlimited), or account page to get some.
@@ -273,7 +275,7 @@ NEW
 One token forges one class on our models. Bring your own API key and forging is free and unlimited — no token needed.
 ```
 
-### 25. "Support the forge" blurb
+### 25. "Get a forge token" blurb
 
 CURRENT
 ```

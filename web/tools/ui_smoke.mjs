@@ -4,7 +4,7 @@
 //     STRIPE_SECRET_KEY=sk_test_smoke PORT=5077 uv run --project ../generation python app.py
 // (the dummy Stripe key only flips /api/billing to {enabled:true} so the donate tiers + custom-amount row
 //  render; nothing in these scenarios ever hits Stripe)
-// then, from web/tools:  node ui_smoke.mjs http://127.0.0.1:5077 <outdir> forge|byok-narrow|byok-models|library|account|pages|art|lost|featured|webview|phone
+// then, from web/tools:  node ui_smoke.mjs http://127.0.0.1:5077 <outdir> forge|v3|byok-narrow|byok-models|library|account|pages|art|lost|featured|webview|phone
 // (`featured` also needs BTSWEB_FEATURED_FILE=<json whose slugs exist in that server's DB>, see the scenario)
 // (needs a package.json with {"type":"module"} next to it, or rename to .mjs — it is already .mjs).
 
@@ -86,18 +86,19 @@ await send("Page.enable"); await send("Runtime.enable"); await send("Log.enable"
 await nav(`${base}/dev-login?email=unlimited@example.com`);
 
 if (scenario === "forge") {
-  // 2026-09-21: the mode radios are gone. The forge card is textarea -> interactive toggle -> two
-  // <details> payment boxes (#forge-byok / #forge-token, mutually exclusive) -> the centred #forge-btn,
-  // which is DISABLED until the open box can pay for a forge. Sign in as a plain (non-unlimited) address
-  // so the gating is real, on a fresh browser profile so nothing is remembered.
+  // 2026-10-26 forge-first screen (docs/plans/FORGE_FIRST_PLAN.md Phase A): the card is the concept textarea,
+  // then #pay-step (HIDDEN until the first Forge click that can't pay; inside it the two <details> payment
+  // boxes #forge-token / #forge-byok, mutually exclusive, unchanged), then the one #forge-btn, which is NEVER
+  // disabled (except mid-forge). Sign in as a plain (non-unlimited) address so the 0-token path is real, on a
+  // fresh browser profile so nothing is remembered.
   await nav(`${base}/dev-login?email=smoke-forge@example.com`);
   await nav(`${base}/app`);
   await evaluate(`localStorage.clear()`);
   await nav(`${base}/app`);
+  await sleep(500);  // /api/billing (the tier buttons) lands after boot
 
-  // (a) fresh account, no tokens, nothing remembered: since 2026-10-12 the token box opens by default (a new
-  // account's forges all died on made-up keys when the key path came first), the chooser is just its strip,
-  // and the default is NOT written to bts_forge_pref. With 0 tokens the button is still disabled.
+  // (a) fresh account, no tokens, nothing remembered: the token box is the armed default (since 2026-10-12;
+  // not written to bts_forge_pref), the pay step is hidden, the button is enabled and says plain "Forge the class".
   const fresh = await json(`({unlimited: !!ME.unlimited, balance: ME.token_balance,
     disabled: document.getElementById('forge-btn').disabled,
     label: document.getElementById('forge-btn').textContent,
@@ -105,37 +106,95 @@ if (scenario === "forge") {
     byok_open: document.getElementById('forge-byok').open,
     token_open: document.getElementById('forge-token').open,
     pref: localStorage.getItem('bts_forge_pref'),
-    chooser_hidden: document.getElementById('chooser').classList.contains('hidden'),
-    cards_hidden: document.getElementById('chooser-cards').classList.contains('hidden'),
-    strip_hidden: document.getElementById('chooser-strip').classList.contains('hidden'),
-    strip: document.getElementById('chooser-strip').textContent,
-    pay_lbl: document.querySelector('.pay-lbl').textContent,
+    step_hidden: document.getElementById('pay-step').classList.contains('hidden'),
+    step_visible: document.getElementById('pay-step').offsetParent !== null,
+    chooser: !!document.getElementById('chooser'),
+    pay_open: document.getElementById('pay-open').offsetParent !== null && document.getElementById('pay-open').textContent,
+    pay_lbl: document.querySelector('#pay-step .pay-lbl').textContent,
     key_hint: [...document.querySelectorAll('#forge-token > .hint')].map(p => p.textContent).join(' | '),
     token_first: !!(document.getElementById('forge-token').compareDocumentPosition(document.getElementById('forge-byok')) & Node.DOCUMENT_POSITION_FOLLOWING),
+    step_above_btn: !!(document.getElementById('pay-step').compareDocumentPosition(document.getElementById('forge-btn')) & Node.DOCUMENT_POSITION_FOLLOWING),
+    banner: document.getElementById('v3-banner').textContent.replace(/\\s+/g, ' ').trim(),
     balance_line: document.getElementById('token-balance-line').textContent})`);
-  check(!fresh.unlimited && fresh.balance === 0 && fresh.disabled && !fresh.byok_open && fresh.token_open
+  check(!fresh.unlimited && fresh.balance === 0 && fresh.disabled === false && fresh.token_open && !fresh.byok_open
         && fresh.label === "Forge the class" && fresh.title.includes("no tokens") && fresh.pref === null,
-        "fresh 0-token account: token box open by default, key box closed, no pref stored", JSON.stringify(fresh));
-  check(!fresh.chooser_hidden && fresh.cards_hidden && !fresh.strip_hidden && fresh.strip.startsWith("Forging with tokens")
-        && fresh.pay_lbl.startsWith("Who provides your compute?")
-        && fresh.token_first && fresh.key_hint.includes("Have an API key? Forging with it is free — open “Bring your own key” below."),
-        "chooser collapsed to the tokens strip; compute label, token box above the key box, key hint inside it", JSON.stringify(fresh));
-  // "change" brings back the cards, token card first and primary, key card second and secondary.
-  const cards = await json(`(() => { document.getElementById('chooser-change').click();
-    const ids = [...document.querySelectorAll('#chooser-cards .chooser-card button')].map(b => b.id + ':' + b.className);
-    return {ids, cards_hidden: document.getElementById('chooser-cards').classList.contains('hidden'),
-            pref: localStorage.getItem('bts_forge_pref')}; })()`);
-  check(!cards.cards_hidden && cards.ids.join() === "choose-token:btn primary,choose-byok:btn" && cards.pref === null,
-        "change shows the cards, token first", JSON.stringify(cards));
-  await shot("forge-change-cards");
-  // A saved key with no stored pref still lands on the key box (and still writes no pref).
-  await evaluate(`localStorage.setItem('bts_byok', JSON.stringify({provider: 'anthropic', api_key: 'sk-ant-saved', model: 'claude-sonnet-4-6'}))`);
+        "fresh 0-token account: Forge enabled, token box armed by default, no pref stored", JSON.stringify(fresh));
+  check(fresh.step_hidden && !fresh.step_visible && !fresh.chooser && fresh.pay_open === "How is this paid for?",
+        "pay step hidden, no #chooser, 'How is this paid for?' link under the button", JSON.stringify(fresh));
+  check(fresh.pay_lbl.startsWith("Who provides your compute?") && fresh.token_first && fresh.step_above_btn
+        && fresh.key_hint.includes("Have an API key? Forging with it is free — open “Bring your own key” below."),
+        "inside the step: compute label, token box above the key box, key hint; step above the button", JSON.stringify(fresh));
+  check(fresh.banner.includes("press Forge") && fresh.banner.includes("Full guide with screenshots"),
+        "one-line tutorial under the button", JSON.stringify(fresh.banner));
+  await shot("forge-first-screen", false);
+
+  // Empty concept: a toast, no pay step.
+  const empty = await json(`(() => { document.getElementById('concept').value = '';
+    document.getElementById('forge-btn').click();
+    return {toast: document.getElementById('toast').textContent,
+            step_hidden: document.getElementById('pay-step').classList.contains('hidden')}; })()`);
+  check(empty.toast === "Describe a class first." && empty.step_hidden, "empty concept: toast, step stays hidden", JSON.stringify(empty));
+
+  // Text + Forge on 0 tokens: the step unfolds on the token box with the tiers open, the reason on top, focus on
+  // the first tier button, and the Forge button still enabled.
+  await evaluate(`(() => { const c = document.getElementById('concept'); c.value = 'a smoke-test lighthouse keeper who hoards light';
+    document.getElementById('forge-btn').click(); })()`);
+  await sleep(900);
+  const rev = await json(`(() => { const step = document.getElementById('pay-step'), r = step.getBoundingClientRect();
+    return {step_visible: !step.classList.contains('hidden') && step.offsetParent !== null,
+      token_open: document.getElementById('forge-token').open, byok_open: document.getElementById('forge-byok').open,
+      wrap_visible: document.getElementById('forge-donate-wrap').offsetParent !== null,
+      tiers: document.querySelectorAll('#forge-donate-tiers .donate-tier').length,
+      reason: document.getElementById('pay-reason').textContent,
+      reason_visible: document.getElementById('pay-reason').offsetParent !== null,
+      active_tier: !!document.activeElement && document.activeElement.classList.contains('donate-tier'),
+      active: document.activeElement && (document.activeElement.id || document.activeElement.className),
+      disabled: document.getElementById('forge-btn').disabled,
+      step_top: Math.round(r.top), inner: window.innerHeight,
+      pay_open_hidden: document.getElementById('pay-open').offsetParent === null,
+      concept: document.getElementById('concept').value}; })()`);
+  check(rev.step_visible && rev.token_open && !rev.byok_open && rev.wrap_visible && rev.tiers >= 3,
+        "Forge on 0 tokens: pay step visible, token box open, tier buttons shown", JSON.stringify(rev));
+  check(rev.reason === "Pick how to pay for this forge" && rev.reason_visible && rev.active_tier && rev.disabled === false,
+        "reason line, focus on the first tier, Forge still enabled", JSON.stringify(rev));
+  check(rev.step_top >= 0 && rev.step_top < rev.inner / 2 && rev.pay_open_hidden && rev.concept.includes("lighthouse"),
+        "step scrolled into view near the top, opener link gone, concept intact", JSON.stringify(rev));
+  await shot("forge-pay-step", false);
+  // Pressing Forge again while unsatisfied repeats the reason as a toast.
+  const again = await json(`(() => { document.getElementById('toast').textContent = '';
+    document.getElementById('forge-btn').click();
+    return {toast: document.getElementById('toast').textContent, disabled: document.getElementById('forge-btn').disabled}; })()`);
+  check(again.toast === "Pick how to pay for this forge" && again.disabled === false, "second click: reason as a toast", JSON.stringify(again));
+  // Opening the key box inside the step closes the token box and remembers the pick.
+  await evaluate(`document.getElementById('forge-byok').open = true`); await sleep(300);
+  const sw = await json(`({token_open: document.getElementById('forge-token').open, byok_open: document.getElementById('forge-byok').open,
+    pref: localStorage.getItem('bts_forge_pref'), disabled: document.getElementById('forge-btn').disabled,
+    step_visible: document.getElementById('pay-step').offsetParent !== null})`);
+  check(!sw.token_open && sw.byok_open && sw.pref === "byok" && sw.disabled === false && sw.step_visible,
+        "key box opened in the step: token box closed, pref byok, step stays", JSON.stringify(sw));
+  // Forge with the key box open but no key: the reason changes and focus goes to the key field.
+  const kr = await json(`(() => { document.getElementById('forge-btn').click();
+    return {reason: document.getElementById('pay-reason').textContent, active: document.activeElement && document.activeElement.id}; })()`);
+  check(kr.reason === "Enter your API key and pick a model" && kr.active === "api_key", "key box, no key: reason + focus on the key field", JSON.stringify(kr));
+
+  // A saved key with no stored pref still lands on the key box (and still writes no pref); the step stays
+  // hidden on load, and with a model picked the click goes straight to the confirm dialog (no unfold).
+  await evaluate(`localStorage.clear(); localStorage.setItem('bts_byok', JSON.stringify({provider: 'anthropic', api_key: 'sk-ant-saved', model: 'claude-sonnet-4-6'}))`);
   await nav(`${base}/app`);
   const saved = await json(`({byok_open: document.getElementById('forge-byok').open,
     token_open: document.getElementById('forge-token').open, pref: localStorage.getItem('bts_forge_pref'),
-    strip: document.getElementById('chooser-strip').textContent})`);
-  check(saved.byok_open && !saved.token_open && saved.pref === null && saved.strip.startsWith("Forging with your key"),
-        "saved key + no pref: key box open by default", JSON.stringify(saved));
+    step_hidden: document.getElementById('pay-step').classList.contains('hidden')})`);
+  check(saved.byok_open && !saved.token_open && saved.pref === null && saved.step_hidden,
+        "saved key + no pref: key box armed by default, step hidden", JSON.stringify(saved));
+  await evaluate(MANUAL_MODELS);
+  const direct = await json(`(() => { __pickModel('model', 'claude-sonnet-4-6'); document.getElementById('model').dispatchEvent(new Event('input'));
+    window.__confirmed = null; window.confirm = (m) => { window.__confirmed = m; return false; };
+    document.getElementById('concept').value = 'a saved-key smoke class';
+    document.getElementById('forge-btn').click();
+    return {confirmed: window.__confirmed, label: document.getElementById('forge-btn').textContent,
+            step_hidden: document.getElementById('pay-step').classList.contains('hidden')}; })()`);
+  check(!!direct.confirmed && direct.confirmed.includes("bills your") && direct.step_hidden && direct.label.includes("uses your API key"),
+        "saved key + model: Forge goes straight to the confirm dialog, step stays hidden", JSON.stringify(direct));
   // A stored "byok" pref (no saved key) still restores the key box.
   await evaluate(`localStorage.clear(); localStorage.setItem('bts_forge_pref', 'byok')`);
   await nav(`${base}/app`);
@@ -144,6 +203,14 @@ if (scenario === "forge") {
   check(pb.byok_open && !pb.token_open && pb.pref === "byok", "stored byok pref restores the key box", JSON.stringify(pb));
   await evaluate(`localStorage.clear()`);
   await nav(`${base}/app`);
+  await sleep(400);
+  // The rest of this scenario drives the boxes directly: "How is this paid for?" opens the step with no reason
+  // line and no forge.
+  const po = await json(`(() => { document.getElementById('pay-open').click();
+    return {step_visible: document.getElementById('pay-step').offsetParent !== null,
+      reason_hidden: document.getElementById('pay-reason').classList.contains('hidden'),
+      progress_hidden: document.getElementById('progress').classList.contains('hidden')}; })()`);
+  check(po.step_visible && po.reason_hidden && po.progress_hidden, "'How is this paid for?' opens the step, no reason, no forge", JSON.stringify(po));
 
   // (d) the interactive toggle is a property of the forge, not of how it is paid for: it sits in the card
   // but inside neither box.
@@ -236,8 +303,8 @@ if (scenario === "forge") {
   const confirmText = await evaluate(`estimateText()`);
   check(confirmText.includes("Design: claude-opus-4-8 · Cards: claude-haiku-4-5") && confirmText.includes("≈ $"),
         "confirm text names both models and a total", JSON.stringify(confirmText));
-  // (c) opening the token box closes the key box; with no tokens the button goes back to disabled, and
-  // the custom-amount row prices a typed $25 live.
+  // (c) opening the token box closes the key box; with no tokens the button stays ENABLED (2026-10-26: a click
+  // would unfold the pay step) with plain "Forge the class", and the custom-amount row prices a typed $25 live.
   await evaluate(`document.getElementById('forge-token').open = true`); await sleep(400);
   const tok = await json(`({byok_open: document.getElementById('forge-byok').open,
     disabled: document.getElementById('forge-btn').disabled,
@@ -246,10 +313,10 @@ if (scenario === "forge") {
     balance_line: document.getElementById('token-balance-line').textContent,
     tiers: [...document.querySelectorAll('#forge-donate-tiers .donate-tier')].map(b => b.textContent.replace(/\\s+/g, ' ').trim()),
     custom_hidden: document.getElementById('forge-donate-custom').classList.contains('hidden')})`);
-  check(!tok.byok_open && tok.disabled && tok.label === "Forge the class"
+  check(!tok.byok_open && tok.disabled === false && tok.label === "Forge the class"
         && tok.title.includes("no tokens"),
-        "token box open with 0 tokens: byok closed, button disabled", JSON.stringify(tok));
-  // "Get tokens" (2026-09-26): with 0 tokens the tiers are already unfolded; with tokens in hand they fold
+        "token box open with 0 tokens: byok closed, button enabled with plain label", JSON.stringify(tok));
+  // "Get a forge token" (2026-09-26, renamed 2026-10-26): with 0 tokens the tiers are already unfolded; with tokens in hand they fold
   // behind the button, which unfolds them on click.
   const gt = await json(`(() => {
     const wrap = document.getElementById('forge-donate-wrap'), b = document.getElementById('forge-get-tokens');
@@ -260,8 +327,8 @@ if (scenario === "forge") {
     const clicked = {shown: !wrap.classList.contains('hidden'), label: b.textContent};
     ME.token_balance = 0; GET_TOKENS_OPEN = null; renderTokens();
     return {zero, some, clicked}; })()`);
-  check(gt.zero.shown && gt.zero.label === "Hide token options" && !gt.some.shown && gt.some.label === "Get tokens"
-        && gt.clicked.shown, "tier buttons fold behind Get tokens when the account has tokens", JSON.stringify(gt));
+  check(gt.zero.shown && gt.zero.label === "Hide token options" && !gt.some.shown && gt.some.label === "Get a forge token"
+        && gt.clicked.shown, "tier buttons fold behind 'Get a forge token' when the account has tokens", JSON.stringify(gt));
   if (tok.custom_hidden) {
     check(false, "custom-amount row rendered (needs /api/billing enabled + custom block)", "row hidden");
   } else {
@@ -524,7 +591,20 @@ if (scenario === "forge") {
   await nav(`${base}/app`);
   await evaluate(`document.getElementById('nav-library').click()`); await sleep(800);
   await shot("library");
+  // Share link copies a blurb + the URL (2026-10-26, FORGE_FIRST_PLAN.md 5.5): copy() is stubbed to capture it.
+  const blurb = /^".+"( — .+)?\. Play it: https?:\/\/\S+\/deck\/[A-Za-z0-9_-]{20,}$/;
+  const rowShare = await evaluate(`(() => { window.__copied = null; window.copy = async (t) => { window.__copied = t; };
+    document.querySelector('#lib-list [data-act=share]').click(); return window.__copied; })()`);
+  check(blurb.test(rowShare || ""), "library row share copies a blurb + link", JSON.stringify(rowShare));
   await evaluate(`document.querySelector('[data-act=open]').click()`); await sleep(1000);
+  const barShare = await evaluate(`(() => { window.__copied = null; document.getElementById('share-link').click(); return window.__copied; })()`);
+  check(blurb.test(barShare || ""), "result bar share copies a blurb + link", JSON.stringify(barShare));
+  const play = await json(`(() => { const p = document.querySelector('#result .play-how');
+    return {visible: !!p && p.offsetParent !== null, title: p && p.querySelector('.play-title').textContent,
+      steps: p ? p.querySelectorAll('ol.play-steps li').length : 0, workshop: !!(p && p.querySelector('a[href="/workshop"]')),
+      after_copy: !!(document.getElementById('copy-code').compareDocumentPosition(p) & Node.DOCUMENT_POSITION_FOLLOWING)}; })()`);
+  check(play.visible && play.title === "Play it" && play.steps === 3 && play.workshop && play.after_copy,
+        "result: 'Play it' block under the code with the Workshop link", JSON.stringify(play));
   console.log(await evaluate(`JSON.stringify({input_hidden: document.getElementById('forge-input').classList.contains('hidden'), title: document.getElementById('view-title').textContent, share: document.getElementById('share-link').dataset.url, share_hidden: document.getElementById('share-link').classList.contains('hidden'), fb_buttons: document.querySelectorAll('#result .cc-fb').length})`));
   await shot("viewing");
   await evaluate(`document.getElementById('view-back').click()`); await sleep(300);
@@ -555,24 +635,52 @@ if (scenario === "forge") {
   console.log(await evaluate(`loadStats().then(() => 'loadStats ok: hidden=' + document.getElementById('stats').classList.contains('hidden') + ' tiles=' + document.querySelectorAll('.stat-tile').length).catch(e => 'loadStats threw: ' + e.message)`));
   await shot("account2");
 } else if (scenario === "v3") {
-  // Pricing v3: a fresh (0-token, non-unlimited) account sees the launch banner and, since 2026-10-12, the
-  // token box open by default with the chooser collapsed to its "Forging with tokens · change" strip;
-  // "Support the forge" opens the inline tier buttons; the Account tab shows the same tiers; public pages.
+  // Pricing v3 on the forge-first screen (2026-10-26, FORGE_FIRST_PLAN.md): a fresh (0-token, non-unlimited)
+  // account sees the concept box, the enabled Forge button and the one-line tutorial; the pay step is hidden
+  // until "How is this paid for?" (or a Forge click) opens it on the token box with the inline tiers; the
+  // Account tab shows the same tiers under "Get a forge token"; public pages.
   await nav(`${base}/dev-login?email=newbie@example.com`);
   await nav(`${base}/app`); await sleep(1200);
-  console.log(await evaluate(`JSON.stringify({balance: ME.token_balance, chip: document.getElementById('tokens').textContent, chooser_hidden: document.getElementById('chooser').classList.contains('hidden'), banner_hidden: document.getElementById('v3-banner').classList.contains('hidden'), head: document.getElementById('chooser-head')?.textContent, forge_btn: document.getElementById('forge-btn').textContent, balance_line: document.getElementById('token-balance-line').textContent})`));
-  await shot("v3-chooser");
-  await evaluate(`document.getElementById('choose-token').click()`); await sleep(1200);
-  console.log(await evaluate(`JSON.stringify({pref: localStorage.getItem('bts_forge_pref'), strip: document.getElementById('chooser-strip')?.textContent, token_open: document.getElementById('forge-token').open, tiers: [...document.querySelectorAll('#forge-donate-tiers .donate-tier')].map(b => b.textContent.trim().replace(/\\s+/g,' '))})`));
+  const v0 = await json(`({balance: ME.token_balance, chip: document.getElementById('tokens').textContent,
+    chip_title: document.getElementById('tokens').title, chooser: !!document.getElementById('chooser'),
+    step_hidden: document.getElementById('pay-step').classList.contains('hidden'),
+    banner_hidden: document.getElementById('v3-banner').classList.contains('hidden'),
+    banner: document.getElementById('v3-banner').textContent.replace(/\\s+/g, ' ').trim(),
+    forge_btn: document.getElementById('forge-btn').textContent, disabled: document.getElementById('forge-btn').disabled,
+    balance_line: document.getElementById('token-balance-line').textContent})`);
+  check(v0.balance === 0 && !v0.chooser && v0.step_hidden && !v0.banner_hidden && v0.banner.includes("press Forge")
+        && v0.forge_btn === "Forge the class" && v0.disabled === false && v0.chip_title.includes("Press Forge to get one"),
+        "fresh account: no chooser, step hidden, one-line banner, Forge enabled", JSON.stringify(v0));
+  await shot("v3-forge-first");
+  await evaluate(`document.getElementById('pay-open').click()`); await sleep(1200);
+  const v1 = await json(`({pref: localStorage.getItem('bts_forge_pref'), token_open: document.getElementById('forge-token').open,
+    step_visible: document.getElementById('pay-step').offsetParent !== null,
+    get_btn: document.getElementById('forge-get-tokens').textContent,
+    tiers: [...document.querySelectorAll('#forge-donate-tiers .donate-tier')].map(b => b.textContent.trim().replace(/\\s+/g,' '))})`);
+  check(v1.step_visible && v1.token_open && v1.tiers.length >= 3 && v1.get_btn === "Hide token options" && v1.pref === null,
+        "'How is this paid for?': token box open with the inline tiers", JSON.stringify(v1));
   await shot("v3-inline-donate");
-  await evaluate(`document.getElementById('choose-byok')?.click()`); await sleep(500);
-  console.log("after byok:", await evaluate(`JSON.stringify({pref: localStorage.getItem('bts_forge_pref'), strip: document.getElementById('chooser-strip')?.textContent, byok_open: document.getElementById('forge-byok').open, token_open: document.getElementById('forge-token').open})`));
+  await evaluate(`document.getElementById('forge-byok').open = true`); await sleep(500);
+  const v2 = await json(`({pref: localStorage.getItem('bts_forge_pref'), byok_open: document.getElementById('forge-byok').open,
+    token_open: document.getElementById('forge-token').open})`);
+  check(v2.pref === "byok" && v2.byok_open && !v2.token_open, "opening the key box switches the pick", JSON.stringify(v2));
+  await evaluate(`document.getElementById('forge-token').open = true`); await sleep(500);
+  check(await evaluate(`localStorage.getItem('bts_forge_pref') === 'token' && !document.getElementById('forge-byok').open`),
+        "and back to the token box");
   await evaluate(`document.getElementById('nav-account').click()`); await sleep(1500);
-  console.log(await evaluate(`JSON.stringify({acct_tiers: document.querySelectorAll('#donate-tiers .donate-tier').length, custom_reveal: document.getElementById('donate-custom-open')?.textContent, history: document.getElementById('purchases-empty').textContent})`));
+  const acct = await json(`({acct_tiers: document.querySelectorAll('#donate-tiers .donate-tier').length,
+    custom_reveal: document.getElementById('donate-custom-open')?.textContent,
+    heading: [...document.querySelectorAll('#view-account h2')].map(h => h.textContent),
+    history: document.getElementById('purchases-empty').textContent})`);
+  check(acct.acct_tiers >= 3 && acct.heading.includes("Get a forge token") && !acct.heading.some((h) => /support/i.test(h)),
+        "Account tab: tiers under 'Get a forge token'", JSON.stringify(acct));
   await shot("v3-account");
   await evaluate(`document.getElementById('nav-forge').click()`); await sleep(300);
+  const back = await evaluate(`document.getElementById('pay-step').offsetParent !== null`);
+  check(back, "back on the forge tab the pay step stays open for the visit");
   await evaluate(`document.getElementById('v3-banner-x').click()`); await sleep(300);
-  console.log("banner dismissed:", await evaluate(`document.getElementById('v3-banner').classList.contains('hidden') + ' ' + localStorage.getItem('bts_tutorial_banner_dismissed')`));
+  const dism = await evaluate(`document.getElementById('v3-banner').classList.contains('hidden') + ' ' + localStorage.getItem('bts_tutorial_banner_dismissed')`);
+  check(dism === "true 1", "banner dismissed and remembered", dism);
   for (const p of ["terms", "privacy", ""]) { await nav(`${base}/${p}`); await sleep(500); await shot("v3-page-" + (p || "landing")); }
   console.log("landing pricing:", await evaluate(`[...document.querySelectorAll('.pricing li')].map(l => l.innerText.replace(/\\s+/g, ' ')).join(' || ')`));
 } else if (scenario === "pages") {
@@ -825,8 +933,8 @@ if (scenario === "forge") {
   await send("Fetch.disable");
 } else if (scenario === "phone") {
   // 2026-10-13 (docs/plans/PHONE_FUNNEL_PLAN.md phase 2): iPhone Safari at 390 px with touch emulation (so
-  // `pointer: coarse` matches). The app shows the one-line phone banner (dismissible), moves the tutorial's
-  // "subscribe" step last; a forged class's result page carries "Send to my PC" + "Email it to me" ABOVE the
+  // `pointer: coarse` matches). The app leads with the concept box and shows the one-line phone banner
+  // (dismissible) UNDER the Forge button (2026-10-26, FORGE_FIRST_PLAN.md D10); a forged class's result page carries "Send to my PC" + "Email it to me" ABOVE the
   // art and the card gallery; every library row carries both; /deck/<slug> carries the share-sheet button.
   // The dev server has no mail, so the email button is first checked disabled-with-a-reason, then /api/me is
   // rewritten (Fetch response stage) to say mail is configured and the POST is stubbed. navigator.share is
@@ -842,20 +950,56 @@ if (scenario === "forge") {
   const noScroll = `document.documentElement.scrollWidth <= window.innerWidth`;
   const top = `(e) => e ? e.getBoundingClientRect().top + window.scrollY : -1`;
 
-  // (a) phone banner + tutorial order
+  // (a0) a fresh 0-token account at 390 (the common case, FORGE_FIRST_PLAN.md case d): Forge with text unfolds the
+  // pay step on the tiers, scrolled so the step's top sits under the header area, focus on the first tier.
+  await nav(`${base}/dev-login?email=smoke-phone0@example.com`);
+  await evaluate(`localStorage.clear()`);
+  await nav(`${base}/app`); await sleep(800);
+  await shot("phone-0token-390-fold", false);
+  await evaluate(`(() => { document.getElementById('concept').value = 'a phone-smoke tide witch'; document.getElementById('forge-btn').click(); })()`);
+  await sleep(1200);
+  const p0 = await json(`(() => { const s = document.getElementById('pay-step'), r = s.getBoundingClientRect();
+    return {visible: s.offsetParent !== null, top: Math.round(r.top), inner: window.innerHeight,
+      tier_focus: !!document.activeElement && document.activeElement.classList.contains('donate-tier'),
+      reason: document.getElementById('pay-reason').textContent, disabled: document.getElementById('forge-btn').disabled,
+      no_scroll: ${noScroll}}; })()`);
+  check(p0.visible && p0.top >= 0 && p0.top < 200 && p0.tier_focus && p0.reason === "Pick how to pay for this forge"
+        && p0.disabled === false && p0.no_scroll, "phone 0-token: Forge unfolds the step at the top, focus on a tier", JSON.stringify(p0));
+  await shot("phone-0token-pay-step-390-fold", false);
+  await nav(`${base}/dev-login?email=unlimited@example.com`);
+  await evaluate(`localStorage.clear()`);
+  await nav(`${base}/app`); await sleep(500);
+
+  // (a) the concept box is the first thing under the header; the phone banner sits under the Forge button
   const b = await json(`(() => { const vis = ${vis};
-    const steps = [...document.querySelectorAll('#v3-banner .tutorial-steps li')].map(li => li.textContent.trim());
+    const rect = (id) => document.getElementById(id).getBoundingClientRect();
+    const concept = rect('concept').top;
+    // every other visible block in the forge view (sections, banners, the pay step, the button row)
+    const others = [...document.querySelectorAll('#view-forge > section, #view-forge .banner, #pay-step, .forge-actions, #forge-advanced')]
+      .filter((e) => vis(e) && !e.contains(document.getElementById('concept')))
+      .map((e) => ({id: e.id || e.className, top: Math.round(e.getBoundingClientRect().top)}));
     return {coarse: matchMedia('(pointer: coarse)').matches, is_phone: document.body.classList.contains('is-phone'),
       banner: vis(document.getElementById('phone-banner')), text: document.querySelector('#phone-banner p').textContent.replace(/\\s+/g, ' ').trim(),
-      above_forge: !!(document.getElementById('phone-banner').compareDocumentPosition(document.getElementById('forge-input')) & Node.DOCUMENT_POSITION_FOLLOWING),
-      first: steps[0], last: steps[steps.length - 1], no_scroll: ${noScroll}}; })()`);
+      banner_top: Math.round(rect('phone-banner').top), btn_top: Math.round(rect('forge-btn').top),
+      concept_top: Math.round(concept), concept_first: others.every((o) => o.top > concept), others,
+      header_bottom: Math.round(document.querySelector('header').getBoundingClientRect().bottom),
+      step_hidden: document.getElementById('pay-step').classList.contains('hidden'),
+      btn_disabled: document.getElementById('forge-btn').disabled,
+      tutorial: document.getElementById('v3-banner').textContent.replace(/\\s+/g, ' ').trim(),
+      no_scroll: ${noScroll}}; })()`);
   check(b.coarse && b.is_phone, "touch emulation: pointer coarse + body.is-phone", JSON.stringify(b));
-  check(b.banner && b.above_forge && b.text.startsWith("On a phone? Forge away") && b.text.includes("send it to yourself below"),
-        "phone banner visible above the forge box", JSON.stringify(b));
-  check(b.last.startsWith("Later, on your PC: Subscribe to the mod") && b.first.startsWith("Pick how to pay"),
-        "tutorial: subscribe step moved last, labelled for the PC", JSON.stringify(b));
+  check(b.banner && b.banner_top > b.btn_top && b.text.startsWith("On a phone? Forge away") && b.text.includes("send it to yourself below"),
+        "phone banner visible, below the Forge button", JSON.stringify(b));
+  check(b.concept_first && b.concept_top > b.header_bottom && b.step_hidden && b.btn_disabled === false,
+        "phone: concept box first under the header, pay step hidden, Forge enabled", JSON.stringify(b));
+  check(b.tutorial.includes("press Forge") && !/Subscribe/.test(b.tutorial), "tutorial is the one-liner (no subscribe step)", JSON.stringify(b.tutorial));
   check(b.no_scroll, "app at 390: no sideways scroll");
   await shot("phone-app-390-fold", false);
+  // the pay step at 390: open it, no sideways scroll, then reload so the rest starts from a fresh visit
+  await evaluate(`document.getElementById('pay-open').click()`); await sleep(800);
+  check(await evaluate(`document.getElementById('pay-step').offsetParent !== null && ${noScroll}`), "phone: pay step opens, no sideways scroll");
+  await shot("phone-pay-step-390-fold", false);
+  await nav(`${base}/app`); await sleep(300);
   await evaluate(`document.getElementById('phone-banner-x').click()`); await sleep(200);
   const dis = await json(`({hidden: document.getElementById('phone-banner').classList.contains('hidden'),
     key: localStorage.getItem('bts_phone_banner_dismissed'), tutorial: !document.getElementById('v3-banner').classList.contains('hidden')})`);
@@ -867,7 +1011,7 @@ if (scenario === "forge") {
   await evaluate(`(() => { document.getElementById('forge-advanced').open = true;
     document.getElementById('mode-fake').checked = true;
     document.getElementById('concept').value = 'a phone-smoke lighthouse keeper';
-    document.getElementById('forge-btn').disabled = false; document.getElementById('forge-btn').click(); })()`);
+    document.getElementById('forge-btn').click(); })()`);
   let done = false;
   for (let i = 0; i < 90 && !done; i++) {
     await sleep(1000);
@@ -973,11 +1117,11 @@ if (scenario === "forge") {
   await evaluate(`localStorage.clear()`); await nav(`${base}/app`); await sleep(500);
   const desk = await json(`(() => { const vis = ${vis}; return {is_phone: document.body.classList.contains('is-phone'),
     banner: vis(document.getElementById('phone-banner')),
-    first: document.querySelector('#v3-banner .tutorial-steps li').textContent.trim()}; })()`);
+    tutorial: document.getElementById('v3-banner').textContent.replace(/\\s+/g, ' ').trim()}; })()`);
   await evaluate(`document.getElementById('nav-library').click()`); await sleep(1000);
   const deskLib = await evaluate(`[...document.querySelectorAll('#lib-list [data-act=sendpc], #lib-list [data-act=email]')].some(e => e.offsetParent !== null)`);
-  check(!desk.is_phone && !desk.banner && desk.first.startsWith("Subscribe to the mod") && !deskLib,
-        "desktop: no phone banner, tutorial order unchanged, no hand-off buttons", JSON.stringify(desk));
+  check(!desk.is_phone && !desk.banner && desk.tutorial.includes("press Forge") && !deskLib,
+        "desktop: no phone banner, one-line tutorial, no hand-off buttons", JSON.stringify(desk));
   await nav(`${base}/deck/${slug}`); await sleep(800);
   check(!(await evaluate(`document.getElementById('send-pc').offsetParent !== null`)), "desktop /deck: no share-sheet button");
 }
