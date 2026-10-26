@@ -91,7 +91,7 @@ def test_help_step_two_says_subscribe_on_the_workshop_first(client):
 
 def test_app_is_forge_first_with_a_hidden_pay_step_and_a_play_it_block(client):
     """FORGE_FIRST_PLAN.md Phase A: the concept box leads, the pay boxes sit in a hidden #pay-step with a
-    "How is this paid for?" opener, the chooser is gone, and the result carries the "Play it" install steps."""
+    "Change my tokens provider" opener, the chooser is gone, and the result carries the "Play it" install steps."""
     login(client)
     r = client.get("/app")
     assert r.status_code == 200

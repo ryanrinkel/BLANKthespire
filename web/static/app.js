@@ -234,8 +234,8 @@ function renderForgeButton() {
 }
 
 // --- the pay step (forge tab, FORGE_FIRST_PLAN.md 3.2-3.3) ------------------------------------------
-// #pay-step wraps the two pay boxes and stays hidden until a Forge click that can't pay yet (or the "How is
-// this paid for?" link); once shown it stays for the rest of the visit. The open <details> box is the choice:
+// #pay-step wraps the two pay boxes and stays hidden until a Forge click that can't pay yet (or the "Change
+// my tokens provider" link); once shown it stays for the rest of the visit. The open <details> box is the choice:
 // restoreForgePref opens one on load (token box unless a key is saved) and an explicit pick is remembered in
 // localStorage.bts_forge_pref.
 
@@ -280,7 +280,7 @@ function restoreForgePref() {
 }
 
 // Show the pay step (and keep it shown for the rest of the visit): make sure a box is open, put the one-line
-// reason on top (none for the "How is this paid for?" link), scroll the step under the header and move focus
+// reason on top (none for the "Change my tokens provider" link), scroll the step under the header and move focus
 // to the first thing to do there: a tier button when the token box is open on an empty balance, the key field
 // when the key box is open, else the Forge button itself.
 function revealPayStep(reason) {

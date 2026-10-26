@@ -124,7 +124,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 /* The forge button (app.js renderForgeButton): centred, never disabled except mid-forge (2026-10-26). */
 .forge-actions { display: flex; justify-content: center; margin-top: 16px; }
 .forge-actions .btn { margin-top: 0; }
-/* "How is this paid for?" under the button: opens the pay step without forging. Hidden once the step shows. */
+/* "Change my tokens provider" under the button: opens the pay step without forging. Hidden once the step shows. */
 .pay-open-row { text-align: center; margin: 8px 0 0; font-size: 13px; }
 .pay-open-row .linkish { font-weight: 500; color: var(--muted); }
 .pay-open-row .linkish:hover { color: var(--ink); }

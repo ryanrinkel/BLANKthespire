@@ -7,7 +7,7 @@
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png" />
   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/static/style.css?v=20261026b" />
+  <link rel="stylesheet" href="/static/style.css?v=20261026c" />
 </head>
 <body>
   <header>
@@ -43,7 +43,7 @@
          first thing under the header and the Forge button is never disabled (except mid-forge). Nothing about
          payment shows until the first Forge click: if the open pay box can pay, the click forges; otherwise
          app.js revealPayStep() un-hides #pay-step (the two boxes, unchanged inside), scrolls it into view and
-         puts the one-line reason on top. The "How is this paid for?" link opens the step without forging.
+         puts the one-line reason on top. The "Change my tokens provider" link opens the step without forging.
          Under the button: the one-line tutorial, the phone banner (phones only), Advanced options. The old
          chooser cards/strip and the five-step tutorial are gone; installing the mod is explained on the
          result ("Play it", below the code) instead of before the first forge. -->
@@ -52,8 +52,8 @@
       <!-- can we add a few more contrasting examples and select one at random so the user doesn't always see the same sample text? another example might be 'the bravest toaster in the world' -->
       <textarea id="concept" rows="3" placeholder="e.g. a venomous plague doctor who sacrifices health to stack poison, then turns blood into armor"></textarea>
 
-      <!-- The pay step (2026-10-26): hidden until the first Forge click that can't pay yet (or the "How is this
-           paid for?" link), then open for the rest of the visit (app.js PAY_STEP_OPEN). #pay-reason is the
+      <!-- The pay step (2026-10-26): hidden until the first Forge click that can't pay yet (or the "Change my
+           tokens provider" link), then open for the rest of the visit (app.js PAY_STEP_OPEN). #pay-reason is the
            one-line "why am I seeing this" set by revealPayStep(). -->
       <div id="pay-step" class="pay-step hidden">
         <p id="pay-reason" class="hint pay-reason hidden"></p>
@@ -154,7 +154,7 @@
       <div class="forge-actions">
         <button id="forge-btn" class="btn primary">Forge the class</button>
       </div>
-      <p class="pay-open-row"><button id="pay-open" class="linkish" type="button">How is this paid for?</button></p>
+      <p class="pay-open-row"><button id="pay-open" class="linkish" type="button">Change my tokens provider</button></p>
 
       <!-- One-line "how it works" (2026-10-26, FORGE_FIRST_PLAN.md 3.4), shown until dismissed
            (bts_tutorial_banner_dismissed). It replaced the five-step 2026-09-30 tutorial whose first step sent
@@ -439,7 +439,7 @@
 
   <!-- ?v= busts the 1-hour static cache on deploy: bump both whenever either file changes. render.js holds
        the class renderers shared with the public /deck page and must load first. -->
-  <script src="/static/render.js?v=20261026b"></script>
-  <script src="/static/app.js?v=20261026b"></script>
+  <script src="/static/render.js?v=20261026c"></script>
+  <script src="/static/app.js?v=20261026c"></script>
 </body>
 </html>

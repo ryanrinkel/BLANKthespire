@@ -130,8 +130,8 @@ if (scenario === "forge") {
   check(!fresh.unlimited && fresh.balance === 0 && fresh.disabled === false && fresh.token_open && !fresh.byok_open
         && fresh.label === "Forge the class" && fresh.title.includes("no tokens") && fresh.pref === null,
         "fresh 0-token account: Forge enabled, token box armed by default, no pref stored", JSON.stringify(fresh));
-  check(fresh.step_hidden && !fresh.step_visible && !fresh.chooser && fresh.pay_open === "How is this paid for?",
-        "pay step hidden, no #chooser, 'How is this paid for?' link under the button", JSON.stringify(fresh));
+  check(fresh.step_hidden && !fresh.step_visible && !fresh.chooser && fresh.pay_open === "Change my tokens provider",
+        "pay step hidden, no #chooser, 'Change my tokens provider' link under the button", JSON.stringify(fresh));
   check(fresh.pay_lbl.startsWith("Who provides your compute?") && fresh.token_first && fresh.step_above_btn
         && fresh.key_hint.includes("Have an API key? Forging with it is free — open “Bring your own key” below."),
         "inside the step: compute label, token box above the key box, key hint; step above the button", JSON.stringify(fresh));
@@ -215,13 +215,13 @@ if (scenario === "forge") {
   await evaluate(`localStorage.clear()`);
   await nav(`${base}/app`);
   await sleep(400);
-  // The rest of this scenario drives the boxes directly: "How is this paid for?" opens the step with no reason
+  // The rest of this scenario drives the boxes directly: "Change my tokens provider" opens the step with no reason
   // line and no forge.
   const po = await json(`(() => { document.getElementById('pay-open').click();
     return {step_visible: document.getElementById('pay-step').offsetParent !== null,
       reason_hidden: document.getElementById('pay-reason').classList.contains('hidden'),
       progress_hidden: document.getElementById('progress').classList.contains('hidden')}; })()`);
-  check(po.step_visible && po.reason_hidden && po.progress_hidden, "'How is this paid for?' opens the step, no reason, no forge", JSON.stringify(po));
+  check(po.step_visible && po.reason_hidden && po.progress_hidden, "'Change my tokens provider' opens the step, no reason, no forge", JSON.stringify(po));
 
   // (d) the interactive toggle is a property of the forge, not of how it is paid for: it sits in the card
   // but inside neither box.
@@ -648,7 +648,7 @@ if (scenario === "forge") {
 } else if (scenario === "v3") {
   // Pricing v3 on the forge-first screen (2026-10-26, FORGE_FIRST_PLAN.md): a fresh (0-token, non-unlimited)
   // account sees the concept box, the enabled Forge button and the one-line tutorial; the pay step is hidden
-  // until "How is this paid for?" (or a Forge click) opens it on the token box with the inline tiers; the
+  // until "Change my tokens provider" (or a Forge click) opens it on the token box with the inline tiers; the
   // Account tab shows the same tiers under "Get a forge token"; public pages.
   await nav(`${base}/dev-login?email=newbie@example.com`);
   await nav(`${base}/app`); await sleep(1200);
@@ -669,7 +669,7 @@ if (scenario === "forge") {
     get_btn: document.getElementById('forge-get-tokens').textContent,
     tiers: [...document.querySelectorAll('#forge-donate-tiers .donate-tier')].map(b => b.textContent.trim().replace(/\\s+/g,' '))})`);
   check(v1.step_visible && v1.token_open && v1.tiers.length >= 3 && v1.get_btn === "Hide token options" && v1.pref === null,
-        "'How is this paid for?': token box open with the inline tiers", JSON.stringify(v1));
+        "'Change my tokens provider': token box open with the inline tiers", JSON.stringify(v1));
   await shot("v3-inline-donate");
   await evaluate(`document.getElementById('forge-byok').open = true`); await sleep(500);
   const v2 = await json(`({pref: localStorage.getItem('bts_forge_pref'), byok_open: document.getElementById('forge-byok').open,
