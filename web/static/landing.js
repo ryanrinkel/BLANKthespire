@@ -117,96 +117,15 @@ async function run() {
   }
 }
 
-// --- featured classes strip -------------------------------------------------------------------
-// Curated, account-free classes from /api/featured. Any failure (or an empty list) leaves the section
-// hidden, so the page degrades to the plain splash.
-const FEATURED_DESC_MAX = 110;
-function clip(text, max) {
-  text = (text || "").trim();
-  if (text.length <= max) return text;
-  const cut = text.slice(0, max);
-  const sp = cut.lastIndexOf(" ");
-  return (sp > max * 0.6 ? cut.slice(0, sp) : cut).replace(/[\s,;:.—-]+$/, "") + "…";
-}
-
-function featuredPlaceholder(word) {
-  const ph = document.createElement("div");
-  ph.className = "featured-art featured-ph";
-  ph.setAttribute("aria-hidden", "true");
-  ph.textContent = word;
-  return ph;
-}
-
-function featuredTile(item) {
-  const word = String(item.word || "").toUpperCase();
-  const name = item.name || item.blurb || word;
-  const a = document.createElement("a");
-  a.className = "featured-tile";
-  a.href = item.share_url;
-
-  if (item.splash_thumb_url) {
-    const img = document.createElement("img");
-    img.className = "featured-art";
-    img.src = item.splash_thumb_url;
-    img.alt = "Splash art for " + name;
-    img.loading = "lazy";
-    img.decoding = "async";
-    img.width = 320;
-    img.height = 180;
-    img.addEventListener("error", () => img.replaceWith(featuredPlaceholder(word)), { once: true });
-    a.appendChild(img);
-  } else {
-    a.appendChild(featuredPlaceholder(word));
-  }
-
-  const body = document.createElement("div");
-  body.className = "featured-body";
-  const cap = document.createElement("p");
-  cap.className = "featured-cap";
-  const w = document.createElement("span");
-  w.className = "featured-word";
-  w.textContent = word;
-  cap.append(w, " the spire");
-  const h = document.createElement("h3");
-  h.className = "featured-name";
-  h.textContent = name;
-  body.append(cap, h);
-  const desc = clip(item.description, FEATURED_DESC_MAX);
-  if (desc) {
-    const p = document.createElement("p");
-    p.className = "featured-desc";
-    p.textContent = desc;
-    body.appendChild(p);
-  }
-  if (item.card_count) {
-    const n = document.createElement("p");
-    n.className = "featured-meta";
-    n.textContent = item.card_count + " cards";
-    body.appendChild(n);
-  }
-  a.appendChild(body);
-
-  // Board tie-in: only 5-letter A-Z words fit the five tiles.
-  if (/^[A-Z]{5}$/.test(word)) {
-    a.addEventListener("pointerenter", () => hold("pointer", word));
-    a.addEventListener("pointerleave", () => release("pointer"));
-    a.addEventListener("focus", () => hold("focus", word));
-    a.addEventListener("blur", () => release("focus"));
-  }
-  return a;
-}
-
+// --- The Archive strip ------------------------------------------------------------------------
+// The newest four classes from The Archive (/api/featured?limit=4), tiles built by featured.js. Any failure
+// (or an empty Archive) leaves the section hidden, so the page degrades to the plain splash.
 (async () => {
-  let items = [];
-  try {
-    const r = await fetch("/api/featured");
-    if (r.ok) items = ((await r.json()) || {}).featured || [];
-  } catch (_) { /* no strip */ }
-  items = items.filter((it) => it && it.share_url && it.word);
+  const items = await fetchArchive(4);
   if (!items.length) return;
 
   const grid = document.getElementById("featured-grid");
-  for (const it of items) grid.appendChild(featuredTile(it));
+  for (const it of items) grid.appendChild(featuredTile(it, { onHold: hold, onRelease: release }));
   document.getElementById("featured").classList.remove("hidden");
   // Arrived via /#featured (e.g. from the sign-in page): the section was hidden at load, so jump now.
   if (location.hash === "#featured") document.getElementById("featured").scrollIntoView();

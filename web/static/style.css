@@ -556,6 +556,20 @@ body.landing a:focus-visible { outline: 2px solid var(--accent); outline-offset:
 .featured-desc { margin: 0; font-size: 13px; color: var(--muted); }
 .featured-meta { margin: auto 0 0; padding-top: 6px; font-size: 12px; color: var(--accent); }
 .signin-try { margin: 18px 0 0; font-size: 14px; }
+/* "Browse The Archive →" under the landing strip */
+.featured-more { margin: 18px 0 0; text-align: center; font-size: 15px; }
+
+/* --- The Archive page (/archive; tiles built by archive.js + featured.js) --------------------------- */
+/* Wider than the 760px app column, and a wrapping grid instead of the landing's fixed four columns. Phones
+   get one column (not the landing's swipe row) inside main's 16px gutters. */
+main.archive { max-width: 1100px; }
+.archive-lede { margin: 0 0 22px; }
+.archive .featured-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+@media (max-width: 520px) {
+  .archive .featured-grid { grid-template-columns: 1fr; grid-auto-flow: row; grid-auto-columns: auto;
+                            overflow-x: visible; scroll-snap-type: none; margin: 0; padding: 0; }
+}
+#archive-empty { margin-top: 24px; }
 
 
 /* --- 2026-09-17: BYOK cost warning, class view bar, admin forge stats -------------------------- */
@@ -618,6 +632,11 @@ body.landing a:focus-visible { outline: 2px solid var(--accent); outline-offset:
 .admin-log { list-style: none; margin: 0; padding: 0; font-size: 12px; color: var(--muted); }
 .admin-log li { padding: 3px 0; border-bottom: 1px solid var(--line); }
 .admin-log li:last-child { border-bottom: none; }
+/* Archive nominations card (#admin-archive): same grid as the user panel; concept/note cells may wrap. */
+.admin-archive-table .wrap-cell { white-space: normal; min-width: 120px; max-width: 220px; }
+.admin-archive-table .flags { font-variant-numeric: tabular-nums; letter-spacing: 1px; }
+.admin-archive-table .row-actions { display: flex; flex-direction: column; gap: 4px; }
+.admin-archive-table .row-actions .btn { margin: 0; }
 
 /* --- phones: forge here, play on the PC (docs/plans/PHONE_FUNNEL_PLAN.md section 5) --------------- */
 /* render.js sets body.is-phone (coarse pointer or a phone UA); .phone-only furniture never shows on a desktop. */

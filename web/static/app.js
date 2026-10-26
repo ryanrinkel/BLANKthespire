@@ -1038,6 +1038,9 @@ function renderShareBar(cls, viewing) {
   share.dataset.url = url;
   share.dataset.text = url ? shareText(cls.name || cls.character?.name, cls.character?.description || cls.concept, url) : "";
   share.classList.toggle("hidden", !url);
+  const nom = el("nominate");
+  nom.classList.toggle("hidden", cls.id == null || !ME);
+  if (cls.id != null && ME) paintNominate(nom, cls);
   wireHandoff(el("send-pc"), el("email-me"), cls, url);
   const why = emailBlocker();
   el("r-handoff-note").textContent = why;
@@ -1045,6 +1048,50 @@ function renderShareBar(cls, viewing) {
   el("view-back").classList.toggle("hidden", !viewing);
   el("view-title").textContent = viewing ? "Viewing a saved class" : "Your new class";
   el("view-bar").classList.remove("hidden");
+}
+
+// --- The Archive: nominate a class (FORGE_FIRST_PLAN.md 5.2) -----------------------------------------
+// One control in three states, on the result bar (#nominate) and on every My Classes row: not nominated ->
+// "☆ Nominate for The Archive" (asks for an optional note, POST); nominated -> "★ Nominated · withdraw"
+// (DELETE); featured -> "★ In The Archive" (disabled; only an admin takes a class out). `c` is the class
+// object the button was painted from (a /api/classes row or a detail/result payload); it is updated in place.
+function paintNominate(btn, c) {
+  const featured = !!c.featured, nominated = !featured && !!c.nominated;
+  btn.disabled = featured;
+  btn.textContent = featured ? "★ In The Archive" : nominated ? "★ Nominated · withdraw" : "☆ Nominate for The Archive";
+  btn.title = featured ? "Picked for The Archive"
+    : nominated ? "Waiting for review — click to withdraw the nomination"
+      : "Ask for this class to be featured in The Archive, the public showcase";
+  btn.classList.toggle("on", featured || nominated);
+  btn.onclick = featured ? null : () => toggleNomination(btn, c);
+}
+
+async function toggleNomination(btn, c) {
+  const withdraw = !!c.nominated;
+  let body;
+  if (!withdraw) {
+    const note = prompt("Nominate this class for The Archive?\n\nOptional: why should it be picked? "
+      + "(up to 200 characters; only the reviewer sees it)", "");
+    if (note === null) return;  // cancelled
+    body = JSON.stringify({ note: String(note).trim().slice(0, 200) });
+  }
+  btn.disabled = true;
+  try {
+    const r = await fetch(`/api/classes/${c.id}/nominate`, {
+      method: withdraw ? "DELETE" : "POST", headers: { "Content-Type": "application/json" }, body,
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.status === 409) c.featured = true;  // picked meanwhile
+    if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
+    for (const t of [c, libClasses.find((x) => x.id === c.id)]) {
+      if (t) { t.nominated = !!d.nominated; t.featured = !!d.featured; t.featured_word = d.featured_word; }
+    }
+    toast(withdraw ? "Nomination withdrawn." : "Nominated — you'll see it in The Archive if it's picked.");
+  } catch (e) {
+    toast(e.message || "That didn't go through — try again.");
+  } finally {
+    paintNominate(btn, c);
+  }
 }
 
 // --- phone -> PC hand-off (PHONE_FUNNEL_PLAN.md 5.2) -------------------------------------------------
@@ -1238,6 +1285,7 @@ function libRow(c) {
     + `<button data-act="sendpc" class="phone-only">📲 Send to my PC</button>`
     + `<button data-act="email" class="phone-only">✉️ Email it to me</button>`
     + `<button data-act="code" title="Copy the in-game import code">Copy code</button>`
+    + `<button data-act="nominate"></button>`
     + `<button data-act="rename">Rename</button>`
     + `<button data-act="open">Open</button>`
     + `<button data-act="delete" class="danger">Delete</button></div>`;
@@ -1257,6 +1305,7 @@ function libRow(c) {
   wireHandoff(li.querySelector('[data-act="sendpc"]'), li.querySelector('[data-act="email"]'), c,
               c.slug ? `${location.origin}/deck/${c.slug}` : "");
   li.querySelector('[data-act="code"]').onclick = () => copyClassCode(c.id);
+  paintNominate(li.querySelector('[data-act="nominate"]'), c);
   li.querySelector('[data-act="rename"]').onclick = () => renameClass(c.id, c.name);
   li.querySelector('[data-act="open"]').onclick = () => openClass(c.id);
   li.querySelector('[data-act="delete"]').onclick = () => deleteClass(c.id, c.name);
@@ -1323,6 +1372,7 @@ async function loadAccount() {
   loadStats();
   loadTraffic();
   loadAdminUsers();
+  loadAdminArchive();
 }
 
 // Which sign-ins reach this account, and what is left to add. No unlinking in v1 (see index.html).
@@ -1639,6 +1689,11 @@ function renderStats(d) {
     { k: "People forging", v: fmtInt(u.forgers), s: `${fmtInt(u.accounts)} accounts total` },
     { k: "Hosted LLM spend", v: fmtUsd(h.est_cost_usd), s: `${fmtInt(h.calls)} calls · ${fmtTokens(h.input_tokens)} in (${fmtTokens(h.cached_tokens)} cached) · ${fmtTokens(h.output_tokens)} out` },
     { k: "Donations", v: fmtMoney(dn.amount_cents || 0, "usd"), s: `${fmtInt(dn.count)} donations · ${fmtInt(dn.tokens)} tokens granted` },
+    // The Archive's queue and showcase: current counts, not windowed.
+    ...(d.archive ? [
+      { k: "Nominations pending", v: fmtInt(d.archive.pending), s: "waiting in Archive nominations (Account tab)" },
+      { k: "In The Archive", v: fmtInt(d.archive.featured), s: "classes on /archive right now" },
+    ] : []),
   ];
   el("stats-tiles").innerHTML = tiles.map((t) =>
     `<div class="stat-tile"><div class="k">${esc(t.k)}</div><div class="v">${esc(t.v)}</div><div class="s">${esc(t.s)}</div></div>`).join("");
@@ -1768,6 +1823,8 @@ function renderTraffic(d) {
     ...(dv ? [{ k: "On a phone", v: pct(Number(dv.phone || 0) + Number(dv.phone_webview || 0), w.humans),
                 s: deviceChips(dv) }] : []),
     { k: "Shared deck pages", v: fmtInt(w.deck), s: "unique visitors to /deck/…" },
+    // Summaries written before The Archive shipped (2026-10-26) have no archive bucket.
+    { k: "Archive page", v: w.archive !== undefined ? fmtInt(w.archive) : "—", s: "unique visitors to /archive" },
     // The mod fetching a class's art from /static/forged/ is the only trace a code was imported.
     { k: "Imported into the game", v: fmtInt(w.imports), s: `classes the mod fetched art for · ${fmtInt(w.import_fetches)} fetches · all-time ${fmtInt(Object.keys(d.imports || {}).length)}` },
     { k: "Requests", v: fmtInt(w.requests), s: `${botShare} from crawlers and scanners` },
@@ -2056,6 +2113,10 @@ async function saveAdminUnlimited(row, box) {
 }
 
 const ADMIN_ACTION_VERB = { set_tokens: "tokens", set_unlimited: "unlimited" };
+// The Archive's actions target the class OWNER; which class (and the word / note) rides in a.note.
+const ARCHIVE_ACTION_LABEL = {
+  feature_class: "featured", pass_nomination: "passed on", unfeature_class: "unfeatured",
+};
 
 async function loadAdminActions() {
   const list = el("admin-actions");
@@ -2066,6 +2127,11 @@ async function loadAdminActions() {
     const rows = (await r.json()).actions || [];
     list.innerHTML = rows.length
       ? rows.map((a) => {
+        const when0 = a.created_at ? new Date(a.created_at + "Z").toLocaleString() : "";
+        if (ARCHIVE_ACTION_LABEL[a.action]) {
+          return `<li>${esc(a.actor_email || "?")} ${ARCHIVE_ACTION_LABEL[a.action]} ${esc(a.note || "a class")}`
+            + ` (owner ${esc(a.target_email || "?")})<span class="sub"> · ${esc(when0)}</span></li>`;
+        }
         const what = ADMIN_ACTION_VERB[a.action] || a.action;
         const from = a.action === "set_unlimited" ? (a.old_value ? "on" : "off") : a.old_value;
         const to = a.action === "set_unlimited" ? (a.new_value ? "on" : "off") : a.new_value;
@@ -2075,6 +2141,96 @@ async function loadAdminActions() {
       }).join("")
       : `<li class="muted">Nothing changed yet.</li>`;
   } catch (_) { /* the audit trail is context, never a blocker */ }
+}
+
+// --- admin: The Archive queue ----------------------------------------------------------------------
+// Same gate as the Users card. /api/admin/nominations -> two tables: pending nominations (Feature / Pass) and
+// what is in The Archive now (Unfeature). Writes answer 403 + reauth when the sign-in is older than 4h; the
+// message says so and lands in the card's note, like the Users card's row notes.
+async function loadAdminArchive() {
+  const card = el("admin-archive");
+  if (!card) return;
+  if (!ME || !ME.admin) { card.classList.add("hidden"); return; }
+  card.classList.remove("hidden");
+  try {
+    const r = await fetch("/api/admin/nominations");
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    renderAdminArchive(await r.json());
+  } catch (e) {
+    el("admin-archive-note").textContent = "Couldn't load nominations: " + e.message;
+  }
+}
+
+function archiveWhen(iso) { return iso ? String(iso).slice(0, 16).replace("T", " ") + " UTC" : "—"; }
+// Name (linking to its /deck page in a new tab), then the owner and the one-line description underneath, so
+// the pending table fits the 760px card without scrolling the Feature / Pass buttons out of sight.
+function archiveClassCell(c, withOwner) {
+  const name = esc(c.name || "(unnamed)");
+  const link = c.share_url ? `<a href="${esc(c.share_url)}" target="_blank" rel="noopener">${name}</a>` : name;
+  return link + (withOwner ? `<div class="sub">${esc(c.owner_email)}</div>` : "")
+    + (c.description ? `<div class="sub">${esc(c.description)}</div>` : "");
+}
+
+function renderAdminArchive(d) {
+  const pending = d.pending || [], featured = d.featured || [];
+  const flag = (on) => (on ? "✓" : "–");
+  el("admin-nominations").innerHTML = `<tr><th class="wrap-cell">Class · owner</th><th class="wrap-cell">Concept</th>`
+    + `<th class="num">Cards</th><th title="splash · sprite · card art">Art S·P·C</th><th class="wrap-cell">Note</th>`
+    + `<th>Nominated</th><th></th></tr>`
+    + (pending.map((c) => `<tr data-cid="${c.id}" data-name="${esc(c.name || "")}">`
+      + `<td class="wrap-cell">${archiveClassCell(c, true)}</td>`
+      + `<td class="wrap-cell">${esc(c.concept)}</td><td class="num">${fmtInt(c.card_count)}</td>`
+      + `<td class="flags" title="splash ${c.has_splash ? "yes" : "no"} · sprite ${c.has_sprite ? "yes" : "no"} · card art ${c.has_card_art ? "yes" : "no"}">`
+      + `${flag(c.has_splash)} ${flag(c.has_sprite)} ${flag(c.has_card_art)}</td>`
+      + `<td class="wrap-cell">${c.nomination_note ? esc(c.nomination_note) : `<span class="muted">—</span>`}</td>`
+      + `<td title="${esc(archiveWhen(c.nominated_at))}">${esc(String(c.nominated_at || "—").slice(0, 10))}</td>`
+      + `<td><div class="row-actions"><button class="btn" type="button" data-act="feature">Feature</button>`
+      + `<button class="btn ghost" type="button" data-act="pass">Pass</button></div></td></tr>`).join("")
+      || `<tr><td colspan="7" class="muted">No nominations waiting.</td></tr>`);
+  el("admin-featured").innerHTML = `<tr><th>Word</th><th class="wrap-cell">Class</th><th>Owner</th><th>Featured</th><th></th></tr>`
+    + (featured.map((c) => `<tr data-cid="${c.id}" data-name="${esc(c.name || "")}">`
+      + `<td><span class="featured-word">${esc(c.featured_word || "?")}</span></td>`
+      + `<td class="wrap-cell">${archiveClassCell(c)}</td><td>${esc(c.owner_email)}</td>`
+      + `<td>${esc(archiveWhen(c.featured_at))}</td>`
+      + `<td><button class="btn ghost" type="button" data-act="unfeature">Unfeature</button></td></tr>`).join("")
+      || `<tr><td colspan="5" class="muted">Nothing in The Archive yet.</td></tr>`);
+  const card = el("admin-archive");
+  card.onclick = (ev) => {
+    const btn = ev.target.closest("button[data-act]");
+    const row = btn && btn.closest("tr[data-cid]");
+    if (row) adminArchiveAct(btn, row.dataset.cid, btn.dataset.act, row.dataset.name);
+  };
+}
+
+async function adminArchiveAct(btn, id, act, name) {
+  let body;
+  if (act === "feature") {
+    const first = String(name || "").trim().split(/\s+/)[0].toUpperCase();
+    const word = prompt(`The five-letter board word for "${name}" (A–Z), shown as "<WORD> the spire":`,
+      /^[A-Z]{5}$/.test(first) ? first : "");
+    if (word === null) return;
+    const w = String(word).trim().toUpperCase();
+    if (!/^[A-Z]{5}$/.test(w)) { el("admin-archive-note").textContent = "The word must be exactly five letters A–Z."; return; }
+    body = JSON.stringify({ word: w });
+  } else if (act === "unfeature" && !confirm(`Take "${name}" out of The Archive?`)) {
+    return;
+  }
+  btn.disabled = true;
+  const note = el("admin-archive-note");
+  try {
+    const r = await fetch(`/api/admin/classes/${id}/${act}`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: body || "{}",
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
+    note.textContent = act === "feature" ? `“${name}” is in The Archive as ${d.featured_word}.`
+      : act === "pass" ? `Passed on “${name}”.` : `“${name}” is out of The Archive.`;
+    await loadAdminArchive();
+    loadAdminActions();
+  } catch (e) {
+    note.textContent = e.message;
+    btn.disabled = false;
+  }
 }
 
 // Which box is open IS the choice: opening one closes the other and is remembered for next visit.

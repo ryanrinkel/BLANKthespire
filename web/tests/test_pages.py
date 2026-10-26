@@ -118,6 +118,56 @@ def test_app_is_forge_first_with_a_hidden_pay_step_and_a_play_it_block(client):
     assert "Get a forge token" in body
 
 
+# --- The Archive (FORGE_FIRST_PLAN.md Phase B) ------------------------------------------------------------
+
+def test_archive_page_is_public_and_csp_clean(client):
+    r = client.get("/archive")
+    assert r.status_code == 200 and "text/html" in r.headers["Content-Type"]
+    body = r.get_data(as_text=True)
+    assert 'id="archive-grid"' in body and 'id="archive-empty"' in body
+    assert "<h1>The Archive</h1>" in body and "<title>The Archive — BLANK the spire</title>" in body
+    assert '<meta property="og:title" content="The Archive — BLANK the spire" />' in body
+    assert "/static/archive.js" in body and "/static/featured.js" in body
+    assert body.index("/static/featured.js") < body.index("/static/archive.js")
+    assert 'href="/app"' in body and 'href="/download"' in body and 'href="/help"' in body
+    # CSP: no inline script body, no on*= handlers.
+    assert not re.search(r"<script(?![^>]*\ssrc=)[^>]*>\s*\S", body)
+    assert not re.search(r"\son\w+\s*=\s*[\"']", body)
+
+
+def test_every_header_links_the_archive(client, app_module):
+    login(client)
+    assert 'href="/archive"' in client.get("/app").get_data(as_text=True)
+    for path in ("/help", "/download"):
+        assert '<a class="tab" href="/archive">The Archive</a>' in client.get(path).get_data(as_text=True), path
+    slug = _make_class(app_module, client)
+    deck = client.get(f"/deck/{slug}").get_data(as_text=True)
+    assert '<a class="tab" href="/archive">The Archive</a>' in deck
+    assert "nav-more" not in deck and "More featured classes" not in deck
+
+
+def test_landing_promotes_the_archive(client):
+    body = client.get("/").get_data(as_text=True)
+    assert '<h2 class="how-title">The Archive</h2>' in body
+    assert 'href="/archive">Browse The Archive' in body
+    assert "Or play a class from The Archive — no account needed." in body
+    assert "Try a featured class" not in body and "featured class right now" not in body
+    assert "Create Your Own Class" in body
+    assert body.index("/static/featured.js") < body.index("/static/landing.js")
+
+
+def test_app_has_the_nominate_button_and_the_admin_archive_card(client):
+    login(client)
+    body = client.get("/app").get_data(as_text=True)
+    assert 'id="nominate" class="btn hidden"' in body and "Nominate for The Archive" in body
+    assert body.index('id="share-link"') < body.index('id="nominate"')
+    assert 'id="admin-archive" class="card hidden"' in body
+    assert 'id="admin-nominations"' in body and 'id="admin-featured"' in body
+    assert body.index('id="admin-users"') < body.index('id="admin-archive"')
+    nav = body[body.index("<nav>"):body.index("</nav>")]
+    assert nav.index('id="nav-library"') < nav.index('href="/archive"') < nav.index('id="nav-account"')
+
+
 # --- /deck/<slug> ---------------------------------------------------------------------------------
 
 def test_deck_unknown_slug_is_404(client):

@@ -143,6 +143,13 @@ class ForgedClass(Base):
     # Unguessable public handle for /api/deck/<slug> sharing (the numeric id is enumerable and stays
     # internal). 22 url-safe chars = 128 bits. Backfilled onto existing rows by db._ensure_class_columns.
     slug: Mapped[str | None] = mapped_column(String(32), default=None, nullable=True, unique=True, index=True)
+    # The Archive (docs/plans/FORGE_FIRST_PLAN.md section 5): the owner nominates (nominated_at + an optional
+    # admin-only note), an admin approves (featured_at + the five-letter board word for its tile). Only
+    # featured_at IS NOT NULL is public. All four are nullable and patched in by db._ensure_class_columns.
+    nominated_at: Mapped[datetime | None] = mapped_column(DateTime, default=None, nullable=True)
+    nomination_note: Mapped[str | None] = mapped_column(String(200), default=None, nullable=True)
+    featured_at: Mapped[datetime | None] = mapped_column(DateTime, default=None, nullable=True)
+    featured_word: Mapped[str | None] = mapped_column(String(5), default=None, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now())
@@ -161,6 +168,10 @@ class ForgedClass(Base):
             "vocab_version": self.vocab_version,
             "slug": self.slug,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            # The Archive: nominated = waiting in the admin queue; featured = in The Archive (public).
+            "nominated": self.nominated_at is not None and self.featured_at is None,
+            "featured": self.featured_at is not None,
+            "featured_word": self.featured_word if self.featured_at is not None else None,
         }
 
     def detail(self) -> dict:
@@ -340,7 +351,9 @@ class AdminAction(Base):
     target_user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), index=True, nullable=True)
     target_email: Mapped[str] = mapped_column(String(320), default="")
-    action: Mapped[str] = mapped_column(String(32))          # set_tokens | set_unlimited
+    # set_tokens | set_unlimited | feature_class | pass_nomination | unfeature_class (the last three target the
+    # class OWNER; the class id + name ride in `note`)
+    action: Mapped[str] = mapped_column(String(32))
     old_value: Mapped[int] = mapped_column(Integer, default=0)
     new_value: Mapped[int] = mapped_column(Integer, default=0)
     note: Mapped[str] = mapped_column(String(200), default="")

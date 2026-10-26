@@ -4,8 +4,9 @@
 //     STRIPE_SECRET_KEY=sk_test_smoke PORT=5077 uv run --project ../generation python app.py
 // (the dummy Stripe key only flips /api/billing to {enabled:true} so the donate tiers + custom-amount row
 //  render; nothing in these scenarios ever hits Stripe)
-// then, from web/tools:  node ui_smoke.mjs http://127.0.0.1:5077 <outdir> forge|v3|byok-narrow|byok-models|library|account|pages|art|lost|featured|webview|phone
-// (`featured` also needs BTSWEB_FEATURED_FILE=<json whose slugs exist in that server's DB>, see the scenario)
+// then, from web/tools:  node ui_smoke.mjs http://127.0.0.1:5077 <outdir> forge|v3|byok-narrow|byok-models|library|account|pages|art|lost|archive|featured|webview|phone
+// (`archive` needs BTSWEB_ADMIN_EMAILS=unlimited@example.com and is best run first on a fresh DB: it puts a class
+//  in The Archive through the UI, which is what `featured` then shows on the landing strip)
 // (needs a package.json with {"type":"module"} next to it, or rename to .mjs — it is already .mjs).
 
 // Minimal Chrome DevTools Protocol driver (Node 24 has a global WebSocket). Usage:
@@ -63,6 +64,16 @@ const evaluate = async (expr) => {
 const nav = async (url) => { await send("Page.navigate", { url }); await sleep(1500); };
 const shot = async (name, fullPage = true) => {
   const r = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: fullPage });
+  writeFileSync(join(outdir, name + ".png"), Buffer.from(r.data, "base64"));
+  console.log("shot", name);
+};
+// Screenshot one element (page coordinates, so it works below the fold).
+const shotEl = async (name, sel) => {
+  const b = JSON.parse(await evaluate(`(() => { const e = document.querySelector(${JSON.stringify(sel)});
+    e.scrollIntoView({block: 'start'}); const r = e.getBoundingClientRect();
+    return JSON.stringify({x: r.left + scrollX, y: r.top + scrollY, w: r.width, h: r.height}); })()`));
+  const r = await send("Page.captureScreenshot", { format: "png", captureBeyondViewport: true,
+    clip: { x: b.x, y: b.y, width: Math.max(1, b.w), height: Math.max(1, b.h), scale: 1 } });
   writeFileSync(join(outdir, name + ".png"), Buffer.from(r.data, "base64"));
   console.log("shot", name);
 };
@@ -752,11 +763,130 @@ if (scenario === "forge") {
     loaded: [...document.querySelectorAll('#r-cards .cc-art')].filter((i) => i.complete && i.naturalWidth > 0).length})`);
   check(pub.strip && pub.splash_w > 0 && pub.portraits === pub.cards && pub.loaded === pub.portraits, "public deck page shows the art", JSON.stringify(pub));
   await shot("art-deck");
+} else if (scenario === "archive") {
+  // 2026-10-26 The Archive (docs/plans/FORGE_FIRST_PLAN.md Phase B): an owner nominates a class from the result
+  // bar (and withdraws one from My Classes), the operator features it from the Account tab's "Archive
+  // nominations" card, and it shows on /archive and as "from The Archive" on its /deck page. window.prompt is
+  // stubbed for the note and the five-letter word. Needs BTSWEB_ADMIN_EMAILS=unlimited@example.com.
+  const OWNER = "smoke-archive@example.com";
+  await nav(`${base}/dev-login?email=${OWNER}`);
+  await nav(`${base}/app`);
+  const seeded = JSON.parse(await evaluate(`(async () => {
+    for (const concept of ['a goose knight who honks at the spire', 'a moose monk with antler wards']) {
+      await (await fetch('/api/forge-class', {method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({concept, mode: 'fake'})})).text();
+    }
+    return (await (await fetch('/api/classes')).json()).classes.slice(0, 2); })().then(JSON.stringify)`));
+  check(seeded.length === 2 && seeded.every((c) => c.id && c.slug && c.nominated === false && c.featured === false),
+        "two fake classes, neither nominated nor featured", JSON.stringify(seeded.map((c) => [c.id, c.name, c.nominated, c.featured])));
+  const [target, other] = seeded;   // newest first: target = the moose monk, other = the goose knight
+
+  // (a) result bar: open the class, nominate it with a note
+  await evaluate(`document.getElementById('nav-library').click()`); await sleep(800);
+  await evaluate(`document.querySelector('#lib-list .lib-row [data-act=open]').click()`); await sleep(1200);
+  const bar0 = await json(`(() => { const b = document.getElementById('nominate');
+    return {visible: b.offsetParent !== null, text: b.textContent, disabled: b.disabled,
+      next_to_share: b.previousElementSibling && b.previousElementSibling.id === 'share-link'}; })()`);
+  check(bar0.visible && bar0.text === "☆ Nominate for The Archive" && !bar0.disabled && bar0.next_to_share,
+        "result bar: '☆ Nominate for The Archive' next to the share button", JSON.stringify(bar0));
+  await evaluate(`window.prompt = () => 'great class'; document.getElementById('nominate').click()`); await sleep(900);
+  const bar1 = await json(`({text: document.getElementById('nominate').textContent, toast: document.getElementById('toast').textContent})`);
+  check(bar1.text === "★ Nominated · withdraw" && bar1.toast === "Nominated — you'll see it in The Archive if it's picked.",
+        "nominated from the result bar: button flips, toast", JSON.stringify(bar1));
+  await shotEl("archive-nominate-result", "#view-bar");
+
+  // (b) My Classes rows carry the same control; the other class: nominate then withdraw from its row
+  await evaluate(`document.getElementById('nav-library').click()`); await sleep(900);
+  const rows0 = await json(`[...document.querySelectorAll('#lib-list .lib-row')].map((li) => ({
+    name: li.querySelector('.lr-name').textContent, nom: li.querySelector('[data-act=nominate]').textContent}))`);
+  check(rows0.length >= 2 && rows0[0].nom === "★ Nominated · withdraw" && rows0[1].nom === "☆ Nominate for The Archive",
+        "library rows: nominated / not-nominated states", JSON.stringify(rows0));
+  await evaluate(`document.querySelectorAll('#lib-list .lib-row')[1].querySelector('[data-act=nominate]').click()`); await sleep(800);
+  const rowNom = await evaluate(`document.querySelectorAll('#lib-list .lib-row')[1].querySelector('[data-act=nominate]').textContent`);
+  await evaluate(`document.querySelectorAll('#lib-list .lib-row')[1].querySelector('[data-act=nominate]').click()`); await sleep(800);
+  const rowW = await json(`({text: document.querySelectorAll('#lib-list .lib-row')[1].querySelector('[data-act=nominate]').textContent,
+    toast: document.getElementById('toast').textContent})`);
+  check(rowNom === "★ Nominated · withdraw" && rowW.text === "☆ Nominate for The Archive" && rowW.toast === "Nomination withdrawn.",
+        "library row: nominate then withdraw", JSON.stringify({rowNom, rowW}));
+  await shot("archive-library", false);
+
+  // (c) the operator's queue
+  await nav(`${base}/dev-login?email=unlimited@example.com`);
+  await nav(`${base}/app`); await evaluate(`document.getElementById('nav-account').click()`); await sleep(1800);
+  const q0 = await json(`(() => { const card = document.getElementById('admin-archive');
+    const row = document.querySelector('#admin-nominations tr[data-cid="${target.id}"]');
+    return {visible: card.offsetParent !== null, heading: card.querySelector('h2').textContent,
+      pending: document.querySelectorAll('#admin-nominations tr[data-cid]').length,
+      other_pending: !!document.querySelector('#admin-nominations tr[data-cid="${other.id}"]'),
+      row: row ? row.innerText.replace(/\\s+/g, ' ') : null,
+      link: row ? row.querySelector('a')?.getAttribute('href') : null,
+      target: row ? row.querySelector('a')?.getAttribute('target') : null}; })()`);
+  check(q0.visible && q0.heading === "Archive nominations" && q0.row && q0.row.includes("great class")
+        && q0.row.includes(OWNER) && q0.link === `/deck/${target.slug}` && q0.target === "_blank" && !q0.other_pending,
+        "admin card: the nomination is pending with its note, owner and deck link; the withdrawn one is not", JSON.stringify(q0));
+  const tiles0 = await evaluate(`[...document.querySelectorAll('#stats-tiles .stat-tile')].map((t) => t.querySelector('.k').textContent + '=' + t.querySelector('.v').textContent).join(' | ')`);
+  check(/Nominations pending=\d+/.test(tiles0) && /In The Archive=\d+/.test(tiles0), "forge stats: Archive tiles", tiles0);
+  await shotEl("archive-admin-pending", "#admin-archive");
+
+  // Feature it as GOOSE
+  await evaluate(`window.prompt = () => 'GOOSE';
+    document.querySelector('#admin-nominations tr[data-cid="${target.id}"] [data-act=feature]').click()`); await sleep(1500);
+  const q1 = await json(`(() => { const f = document.querySelector('#admin-featured tr[data-cid="${target.id}"]');
+    return {still_pending: !!document.querySelector('#admin-nominations tr[data-cid="${target.id}"]'),
+      featured_row: f ? f.innerText.replace(/\\s+/g, ' ') : null,
+      note: document.getElementById('admin-archive-note').textContent,
+      log: document.getElementById('admin-actions').firstElementChild?.innerText || ''}; })()`);
+  check(!q1.still_pending && q1.featured_row && q1.featured_row.includes("GOOSE") && q1.note.includes("GOOSE"),
+        "Feature moves the row to 'In The Archive' with its word", JSON.stringify(q1));
+  check(/featured class #\d+ .*GOOSE/.test(q1.log) && q1.log.includes(OWNER), "audit trail shows the feature", q1.log);
+  await shotEl("archive-admin-featured", "#admin-archive");
+
+  // (d) /archive, desktop then phone
+  await nav(`${base}/archive`); await sleep(1500);
+  const api = JSON.parse(await evaluate(`fetch('/api/featured').then((r) => r.json()).then((d) => JSON.stringify(d.featured.map((f) => f.word)))`));
+  const page = await json(`(() => { const tiles = [...document.querySelectorAll('#archive-grid .featured-tile')];
+    return {title: document.title, h1: document.querySelector('h1').textContent, tiles: tiles.length,
+      words: tiles.map((t) => t.querySelector('.featured-word').textContent),
+      hrefs: tiles.map((t) => t.getAttribute('href')),
+      empty_hidden: document.getElementById('archive-empty').classList.contains('hidden'),
+      nav: [...document.querySelectorAll('header nav a')].map((a) => a.textContent.trim())}; })()`);
+  check(page.title === "The Archive — BLANK the spire" && page.h1 === "The Archive" && page.tiles >= 1
+        && page.words[0] === "GOOSE" && page.hrefs[0] === `/deck/${target.slug}` && page.tiles === api.length && page.empty_hidden,
+        "/archive: newest tile is GOOSE, one tile per featured class", JSON.stringify(page));
+  console.log("archive tiles:", page.tiles, JSON.stringify(page.words));
+  check(page.nav.join("|") === "Forge your own →|Get the mod ⬇|Help", "/archive header nav", JSON.stringify(page.nav));
+  await shot("archive-desktop");
+  await send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+  await nav(`${base}/archive`); await sleep(1500);
+  const phone = await json(`(() => { const tiles = [...document.querySelectorAll('#archive-grid .featured-tile')];
+    const g = document.getElementById('archive-grid').getBoundingClientRect();
+    return {overflow: document.documentElement.scrollWidth > innerWidth, gutter: Math.round(g.left),
+      lefts: tiles.map((t) => Math.round(t.getBoundingClientRect().left)),
+      widths: tiles.map((t) => Math.round(t.getBoundingClientRect().width))}; })()`);
+  check(!phone.overflow && phone.gutter === 16 && phone.lefts.every((l) => l === 16), "/archive at 390: one column, 16px gutters, no sideways scroll", JSON.stringify(phone));
+  await shot("archive-phone");
+  await send("Emulation.clearDeviceMetricsOverride"); await sleep(300);
+
+  // (e) its /deck page now speaks as The Archive
+  await nav(`${base}/deck/${target.slug}`); await sleep(1500);
+  const deck = await json(`({lede: document.getElementById('lede').textContent.trim(), sub: document.querySelector('header .sub').textContent.trim(),
+    tab: !!document.querySelector('header nav a[href="/archive"]') && document.querySelector('header nav a[href="/archive"]').offsetParent !== null})`);
+  check(deck.lede.includes("from The Archive") && deck.sub === "from The Archive" && deck.tab,
+        "deck page: 'A class from The Archive' lede + header, The Archive tab", JSON.stringify(deck));
+
+  // (f) the owner now sees "★ In The Archive", disabled
+  await nav(`${base}/dev-login?email=${OWNER}`);
+  await nav(`${base}/app`); await evaluate(`document.getElementById('nav-library').click()`); await sleep(900);
+  const own = await json(`(() => { const b = document.querySelectorAll('#lib-list .lib-row')[0].querySelector('[data-act=nominate]');
+    return {text: b.textContent, disabled: b.disabled, title: b.title}; })()`);
+  check(own.text === "★ In The Archive" && own.disabled && own.title === "Picked for The Archive",
+        "owner's row: '★ In The Archive', disabled", JSON.stringify(own));
 } else if (scenario === "featured") {
   // 2026-10-05: the landing's featured strip (/api/featured), the deck page's featured mode + "Forge your own
-  // twist" prefill, and the sign-in page's no-account escape hatch. Boot the server with BTSWEB_FEATURED_FILE
-  // pointing at slugs that exist in ITS database (docs/plans/FEATURED_FORGES_PLAN.md); the harness's own
-  // sign-in is undone first because the strip is for strangers.
+  // twist" prefill, and the sign-in page's no-account escape hatch. Since 2026-10-26 the strip is "The Archive"
+  // (the newest four, ?limit=4) and the list lives in the DB: run `archive` first (or boot a DB whose classes
+  // featured.json names) so there is something to show. The harness's own sign-in is undone first because the
+  // strip is for strangers.
   await send("Network.clearBrowserCookies");
   await nav(`${base}/`); await sleep(2500);
   const hero = await json(`({primary: document.getElementById('signin')?.textContent.trim(), href: document.getElementById('signin')?.getAttribute('href'),
@@ -770,10 +900,18 @@ if (scenario === "forge") {
   const strip = await json(`(() => { const s = document.getElementById('featured'); const tiles = [...document.querySelectorAll('#featured-grid .featured-tile')];
     return {hidden: s.classList.contains('hidden'), tiles: tiles.length, hrefs: tiles.map(t => t.getAttribute('href')),
       words: tiles.map(t => t.querySelector('.featured-word')?.textContent),
-      imgs: tiles.map(t => { const i = t.querySelector('img'); return !!i && i.complete && i.naturalWidth > 0; })}; })()`);
-  check(!strip.hidden && strip.tiles > 0 && strip.hrefs.every((h) => /^\/deck\/[A-Za-z0-9_-]{20,}$/.test(h)),
-        "featured strip rendered with deck links", JSON.stringify(strip));
-  check(strip.imgs.length > 0 && strip.imgs.every(Boolean), "featured splash thumbs loaded", JSON.stringify(strip.imgs));
+      heading: s.querySelector('h2')?.textContent, sub: s.querySelector('.how-sub')?.textContent,
+      more: s.querySelector('.featured-more a')?.getAttribute('href'), more_text: s.querySelector('.featured-more a')?.textContent,
+      // a tile with art must have loaded it; a tile without art shows the word placeholder instead
+      imgs: tiles.map(t => { const i = t.querySelector('img'); return i ? (i.complete && i.naturalWidth > 0) : !!t.querySelector('.featured-ph'); }),
+      with_art: tiles.filter(t => t.querySelector('img')).length}; })()`);
+  check(!strip.hidden && strip.tiles > 0 && strip.tiles <= 4 && strip.hrefs.every((h) => /^\/deck\/[A-Za-z0-9_-]{20,}$/.test(h)),
+        "Archive strip rendered (at most 4) with deck links", JSON.stringify(strip));
+  check(strip.heading === "The Archive" && strip.sub === "Classes other players forged. Play one now — no account needed."
+        && strip.more === "/archive" && strip.more_text === "Browse The Archive →",
+        "strip heading, sub-line and 'Browse The Archive' link", JSON.stringify(strip));
+  check(strip.imgs.length > 0 && strip.imgs.every(Boolean), "tile art loaded (or the placeholder where a class has none)",
+        JSON.stringify({imgs: strip.imgs, with_art: strip.with_art}));
   await shot("featured-landing");
 
   // hovering a tile flips the split-flap board to its word
@@ -786,13 +924,13 @@ if (scenario === "forge") {
   await sleep(600); await shot("featured-landing-phone");
   await send("Emulation.clearDeviceMetricsOverride"); await sleep(300);
 
-  // the deck page in featured mode: lede + header swap, "More featured" link, code above the cards, checklist
+  // the deck page in featured mode: lede + header swap, The Archive tab, code above the cards, checklist
   await nav(`${base}${strip.hrefs[0]}`); await sleep(1500);
   const deck = await json(`({lede: document.getElementById('lede')?.textContent.trim(), sub: document.querySelector('header .sub')?.textContent.trim(),
-    more: !document.getElementById('nav-more')?.classList.contains('hidden'), remix: !!document.getElementById('remix'),
+    more: !!document.querySelector('header nav a[href="/archive"]'), remix: !!document.getElementById('remix'),
     code_first: !!(document.getElementById('r-code').compareDocumentPosition(document.getElementById('r-cards')) & Node.DOCUMENT_POSITION_FOLLOWING),
     cards: document.querySelectorAll('#r-cards .cardchip').length, steps: document.querySelectorAll('.play-steps li').length})`);
-  check(deck.lede.startsWith("A featured class") && deck.sub === "a featured class" && deck.more, "deck page featured mode", JSON.stringify(deck));
+  check(deck.lede.startsWith("A class from The Archive") && deck.sub === "from The Archive" && deck.more, "deck page featured mode", JSON.stringify(deck));
   check(deck.remix && deck.code_first && deck.cards > 0 && deck.steps === 3, "deck page: code above cards, remix + checklist", JSON.stringify(deck));
   await shot("featured-deck");
 
@@ -816,8 +954,10 @@ if (scenario === "forge") {
     d.classes.map((c) => c.slug).find((s) => !${JSON.stringify(strip.hrefs)}.some((h) => h.endsWith(s))) || '')`);
   if (plain) {
     await nav(`${base}/deck/${plain}`); await sleep(1200);
-    const p = await json(`({lede: document.getElementById('lede')?.textContent.trim(), more_hidden: document.getElementById('nav-more')?.classList.contains('hidden')})`);
-    check(p.lede.startsWith("Someone forged") && p.more_hidden, "non-featured deck keeps the plain lede", JSON.stringify(p));
+    const p = await json(`({lede: document.getElementById('lede')?.textContent.trim(), sub: document.querySelector('header .sub')?.textContent.trim(),
+      tab: !!document.querySelector('header nav a[href="/archive"]')})`);
+    check(p.lede.startsWith("Someone forged") && p.sub === "a forged class" && p.tab,
+          "non-featured deck keeps the plain lede (The Archive tab is always there)", JSON.stringify(p));
   } else {
     console.log("skip: no non-featured class in this DB");
   }

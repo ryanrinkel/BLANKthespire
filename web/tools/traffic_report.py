@@ -19,7 +19,7 @@ How a visitor is counted (all per UTC day, by client IP, so every number here is
                    floor for humans.
   * landing      — GET / answered 200: the public splash.
   * clicked      — a landing visitor who ALSO fetched a page past the splash that day (/login, /app,
-                   /help, /download, /deck/…, /terms, /privacy, /auth/…, /api/…, /workshop). Not
+                   /help, /download, /deck/…, /archive, /terms, /privacy, /auth/…, /api/…, /workshop). Not
                    /api/featured or /api/me: the splash's own JS (landing.js) fetches both on every load,
                    so either would make every landing look engaged.
   * browser      — GET /api/me answered 200. landing.js (splash), signin.js (/login) and app.js (/app)
@@ -44,6 +44,7 @@ How a visitor is counted (all per UTC day, by client IP, so every number here is
                    the webview hand-off to real Safari, keeps its first-seen class). Shown on the
                    window's humans line and on each tagged-link row.
   * deck         — GET /deck/<slug> 200: a shared class page opened (unique IPs).
+  * archive      — GET /archive 200: The Archive page opened (unique IPs; since 2026-10-26).
   Overlays (unique IPs, NOT depth buckets — an IP here is also in one of the buckets above, or in none):
   * featured     — GET /api/deck/<slug> 200 (exactly; not the /api/deck/<slug>/art/… thumbs): the deck
                    page's JS loaded a class, i.e. the visitor tried a featured/shared class.
@@ -102,7 +103,7 @@ BOT_UA_RE = re.compile(
     r"preview|monitor|uptime|feedfetcher|fetch|http-client|axios|node|dart|ruby|perl|php",
     re.IGNORECASE)
 # Pages past the splash. /api covers the app's own calls (a real browser on /app), /auth the OAuth hops.
-ENGAGED_RE = re.compile(r"^/(login|app|help|download|deck/|terms|privacy|auth/|api/|workshop$)")
+ENGAGED_RE = re.compile(r"^/(login|app|help|download|deck/|archive$|terms|privacy|auth/|api/|workshop$)")
 # ...minus what the splash's own JS (landing.js) fetches on every load.
 SPLASH_API_PATHS = {"/api/featured", "/api/me"}
 BROWSER_PATH = "/api/me"
@@ -110,6 +111,7 @@ BROWSER_PATH = "/api/me"
 # /api/forge-estimate once /api/me reports a user; /api/classes is the library tab.
 SIGNED_IN_PATHS = {"/api/forge-estimate", "/api/classes"}
 DECK_RE = re.compile(r"^/deck/[^/?]+$")
+ARCHIVE_PATH = "/archive"
 FEATURED_RE = re.compile(r"^/api/deck/[^/?]+$")
 WORKSHOP_PATH = "/workshop"
 WORKSHOP_STATUSES = ("200", "302")
@@ -232,6 +234,7 @@ class Tally:
         # Per day, ip -> device_class of that IP's FIRST non-bot request that day.
         self.device: dict[str, dict[str, str]] = defaultdict(dict)
         self.deck: dict[str, set] = defaultdict(set)
+        self.archive: dict[str, set] = defaultdict(set)
         self.featured: dict[str, set] = defaultdict(set)
         self.workshop: dict[str, set] = defaultdict(set)
         self.referers: dict[str, dict[str, set]] = defaultdict(lambda: defaultdict(set))
@@ -289,6 +292,8 @@ class Tally:
             self.signed_in[day].add(ip)
         if DECK_RE.match(path):
             self.deck[day].add(ip)
+        if path == ARCHIVE_PATH:
+            self.archive[day].add(ip)
         if FEATURED_RE.match(path):
             self.featured[day].add(ip)
         if not PAGE_SKIP_RE.match(path):
@@ -351,7 +356,7 @@ class Tally:
                 "signed_in": len(signed_in),
                 "humans": len(landing_only) + len(browser) + len(clicked) + len(signed_in),
                 "landing": len(self.landing[day]),
-                "deck": len(self.deck[day]),
+                "deck": len(self.deck[day]), "archive": len(self.archive[day]),
                 "featured": len(self.featured[day]), "workshop": len(self.workshop[day]),
                 "imports": len(self.imported[day]), "import_fetches": self.import_fetches[day],
                 "tagged_clicks": sum(self.campaign_hits[day].values()),
@@ -367,7 +372,7 @@ class Tally:
             cutoff = _shift_day(today, -(days - 1))
             keys = [k for k in keys if k >= cutoff]
         signed_in: set = set(); clicked: set = set(); browser: set = set(); landing_only: set = set()
-        deck: set = set()
+        deck: set = set(); archive: set = set()
         device: dict[str, str] = {}   # ip -> class; the earliest day in the window wins
         featured: set = set(); workshop: set = set(); imported: set = set()
         refs: dict[str, set] = defaultdict(set)
@@ -386,7 +391,7 @@ class Tally:
             for key, n in self.campaign_hits[day].items():
                 camp_hits[key] += n
                 camp_ips[key] |= self.campaign_ips[day][key]
-            deck |= self.deck[day]
+            deck |= self.deck[day]; archive |= self.archive[day]
             featured |= self.featured[day]; workshop |= self.workshop[day]
             imported |= self.imported[day]; import_fetches += self.import_fetches[day]
             requests += self.requests[day]; bots += self.bot_requests[day]
@@ -413,7 +418,7 @@ class Tally:
             "signed_in": len(signed_in), "clicked": len(clicked), "browser": len(browser),
             "landing_only": len(landing_only),
             "devices": devices(humans),
-            "deck": len(deck), "featured": len(featured), "workshop": len(workshop),
+            "deck": len(deck), "archive": len(archive), "featured": len(featured), "workshop": len(workshop),
             "imports": len(imported), "import_fetches": import_fetches,
             "requests": requests, "bot_requests": bots,
             "referers": [{"source": s, "visitors": len(ips)} for s, ips in

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>The Archive — BLANK the spire</title>
+  <meta name="description" content="Classes forged with BLANK the spire, free to play." />
+  <link rel="icon" href="/favicon.ico" sizes="any" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png" />
+  <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="BLANK the spire" />
+  <meta property="og:title" content="The Archive — BLANK the spire" />
+  <meta property="og:description" content="Classes forged with BLANK the spire, free to play." />
+  <meta property="og:url" content="https://blankthespire.com/archive" />
+  <meta property="og:image" content="https://blankthespire.com/static/img/og-landing.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="The Archive — BLANK the spire" />
+  <meta name="twitter:description" content="Classes forged with BLANK the spire, free to play." />
+  <meta name="twitter:image" content="https://blankthespire.com/static/img/og-landing.png" />
+  <link rel="stylesheet" href="/static/style.css?v=20261026b" />
+</head>
+<body class="archive-page">
+  <header>
+    <div class="brand">⚒ <strong>BLANK the spire</strong> <span class="sub">The Archive</span></div>
+    <nav>
+      <a class="tab" href="/app">Forge your own →</a>
+      <a class="tab" href="/download">Get the mod ⬇</a>
+      <a class="tab" href="/help">Help</a>
+    </nav>
+  </header>
+
+  <!-- Tiles are built by archive.js (featured.js) from /api/featured, newest featured first. The CSP forbids
+       inline JS, so everything dynamic lives in those two files. -->
+  <main class="archive">
+    <h1>The Archive</h1>
+    <p class="muted archive-lede">Classes forged with BLANK the spire, free to play. Copy a code, paste it in-game, or
+      <a href="/app">forge your own</a>.</p>
+    <div id="archive-grid" class="featured-grid"></div>
+    <p id="archive-empty" class="muted hidden">Nothing in The Archive yet.</p>
+  </main>
+
+  <footer class="foot">
+    <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> ·
+    <a href="/help">Help</a> ·
+    <a href="https://github.com/ryanrinkel/BLANKthespire" target="_blank" rel="noopener">GitHub</a> ·
+    <a href="mailto:ryan.r.rinkel@gmail.com">Support</a>
+    <p class="foot-note">Unofficial fan project — not affiliated with or endorsed by Mega Crit.</p>
+  </footer>
+
+  <script src="/static/featured.js?v=20261026b"></script>
+  <script src="/static/archive.js?v=20261026b"></script>
+</body>
+</html>

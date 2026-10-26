@@ -7,7 +7,7 @@
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png" />
   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/static/style.css?v=20261026" />
+  <link rel="stylesheet" href="/static/style.css?v=20261026b" />
 </head>
 <body>
   <header>
@@ -15,6 +15,7 @@
     <nav>
       <button id="nav-forge" class="tab active">Forge</button>
       <button id="nav-library" class="tab">My Classes</button>
+      <a class="tab" href="/archive">The Archive</a>
       <button id="nav-account" class="tab">Account</button>
       <a class="tab" href="/download">Get the mod ⬇</a>
       <a class="tab" href="/help" title="Where do I paste my class code?">Help ?</a>
@@ -221,6 +222,8 @@
         <span id="view-title" class="muted"></span>
         <span class="spacer"></span>
         <button id="share-link" class="btn hidden" title="Copy a public link to this class">🔗 Copy share link</button>
+        <!-- The Archive (FORGE_FIRST_PLAN.md 5.2): three states painted by app.js paintNominate(). -->
+        <button id="nominate" class="btn hidden" type="button">☆ Nominate for The Archive</button>
         <button id="view-back" class="btn ghost hidden">← Back to the forge</button>
       </div>
       <h2 id="r-name"></h2>
@@ -377,6 +380,21 @@
       <ul id="admin-actions" class="admin-log"></ul>
     </section>
 
+    <!-- Admin-only, same gate as the Users card: The Archive's queue. Owners nominate their classes; Feature
+         (asks for the five-letter board word) puts one in The Archive, Pass declines it, Unfeature takes one
+         out. Built by app.js loadAdminArchive(); writes need a sign-in younger than 4h, like the Users card. -->
+    <section id="admin-archive" class="card hidden">
+      <div class="stats-head">
+        <h2>Archive nominations</h2>
+        <span class="spacer"></span>
+        <a class="hint" href="/archive" target="_blank" rel="noopener">Open The Archive ↗</a>
+      </div>
+      <table id="admin-nominations" class="stats-table admin-users-table admin-archive-table"></table>
+      <h4 class="admin-log-head">In The Archive</h4>
+      <table id="admin-featured" class="stats-table admin-users-table admin-archive-table"></table>
+      <p id="admin-archive-note" class="hint" role="status"></p>
+    </section>
+
     <section class="card">
       <h2>Donation history</h2>
       <p id="purchases-empty" class="muted hidden">No donations yet.</p>
@@ -421,7 +439,7 @@
 
   <!-- ?v= busts the 1-hour static cache on deploy: bump both whenever either file changes. render.js holds
        the class renderers shared with the public /deck page and must load first. -->
-  <script src="/static/render.js?v=20261026"></script>
-  <script src="/static/app.js?v=20261026"></script>
+  <script src="/static/render.js?v=20261026b"></script>
+  <script src="/static/app.js?v=20261026b"></script>
 </body>
 </html>

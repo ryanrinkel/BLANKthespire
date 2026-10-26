@@ -65,16 +65,14 @@
     if (remix) { remix.addEventListener("click", () => startRemix(cls, name)); }
   }
 
-  // Featured classes are curated, so the page speaks to a stranger rather than "someone shared this".
+  // Classes in The Archive are curated, so the page speaks to a stranger rather than "someone shared this".
   function markFeatured() {
     const lede = document.getElementById("lede");
     if (lede) {
-      lede.textContent = "A featured class, free to play. Copy the code, paste it in-game — or make your own.";
+      lede.textContent = "A class from The Archive, free to play. Copy the code, paste it in-game — or make your own.";
     }
     const sub = document.querySelector("header .sub");
-    if (sub) { sub.textContent = "a featured class"; }
-    const more = document.getElementById("nav-more");
-    if (more) { more.classList.remove("hidden"); }
+    if (sub) { sub.textContent = "from The Archive"; }
   }
 
   // "Forge your own twist": hand the concept to the app via localStorage (app.js boot() reads bts_prefill

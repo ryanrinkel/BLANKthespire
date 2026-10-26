@@ -67,7 +67,8 @@ def test_admin_gets_the_documented_shape(client, app_module):
     login(client, ADMIN)
     body = client.get("/api/admin/stats").get_json()
     assert set(body) == {"days", "since", "forges", "users", "daily", "hosted", "models", "providers",
-                         "donations"}
+                         "donations", "archive"}
+    assert set(body["archive"]) == {"pending", "featured"}
     assert body["days"] == 30 and isinstance(body["since"], str)
     assert set(body["forges"]) == {"total", "ok", "failed", "refunded", "by_mode", "by_token_kind"}
     assert set(body["forges"]["by_mode"]) == {"token", "byok", "fake"}

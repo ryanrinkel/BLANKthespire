@@ -158,6 +158,27 @@ def test_windows_count_each_ip_once_at_its_deepest(logs):
     assert empty["humans"] == 0 and empty["since"] is None and empty["referers"] == []
 
 
+def test_archive_page_bucket():
+    """GET /archive 200 = The Archive page opened (unique IPs per day and per window); it also counts as
+    clicking past the splash. /api/featured (which the page fetches) is not a page view."""
+    t = tr.Tally({"blankthespire.com"})
+    for ln in (
+        line("40.40.40.40", "26/Oct/2026", "/"),
+        line("40.40.40.40", "26/Oct/2026", "/archive"),
+        line("40.40.40.40", "26/Oct/2026", "/archive"),             # same IP twice
+        line("41.41.41.41", "26/Oct/2026", "/archive?utm_source=x"),
+        line("42.42.42.42", "26/Oct/2026", "/archive", status=304),  # not a 200
+        line("43.43.43.43", "26/Oct/2026", "/archive", ua=GOOGLEBOT),
+        line("44.44.44.44", "26/Oct/2026", "/api/featured"),
+        line("41.41.41.41", "27/Oct/2026", "/archive"),
+    ):
+        t.add(ln)
+    daily = {r["day"]: r for r in t.daily()}
+    assert daily["2026-10-26"]["archive"] == 2 and daily["2026-10-27"]["archive"] == 1
+    assert daily["2026-10-26"]["clicked"] == 1      # 40.40.40.40: splash, then /archive
+    assert t.window(0, "2026-10-27")["archive"] == 2
+
+
 def test_campaign_key():
     assert tr.campaign_key("/?utm_source=youtube&utm_medium=video-ad&utm_campaign=promo-oct26") == "youtube/promo-oct26"
     assert tr.campaign_key("/app?utm_source=Reddit&utm_campaign=sts2") == "reddit/sts2"

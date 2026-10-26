@@ -39,7 +39,9 @@ from auth import (current_user, init_auth, is_admin, is_production, is_unlimited
 import alerts as _alerts  # noqa: E402
 import auth as _auth  # noqa: E402  (module attrs: tests swap the mailer / mail_configured)
 from billing import init_billing  # noqa: E402
-from db import db_ping, init_db, session_scope  # noqa: E402
+from db import FEATURED_WORD_RE as _FEATURED_WORD_RE  # noqa: E402
+from db import db_ping, init_db, load_featured_file, session_scope, set_class_fields  # noqa: E402
+from db import seed_featured_from_file as _db_seed_featured  # noqa: E402
 from forge import (ELEMENT_KINDS, VALID_FEEDBACK_CATEGORIES, ForgeError, UsageMeter,  # noqa: E402
                    append_card_feedback, append_element_feedback, forge_to_bundle, list_models,
                    verify_byok_models)
@@ -343,6 +345,12 @@ def download():
 def help_page():
     """Public "where do I paste my code?" walkthrough (no login) — the page every in-game step links to."""
     return send_from_directory(app.static_folder, "help.html")
+
+
+@app.route("/archive")
+def archive_page():
+    """The Archive: the public showcase of featured classes (no login). archive.js fills it from /api/featured."""
+    return send_from_directory(app.static_folder, "archive.html")
 
 
 @app.route("/terms")
@@ -1944,101 +1952,127 @@ def deck_resolve(slug: str):
         detail = cls.detail()
         detail.pop("id", None)  # public shape: never leak the internal enumerable id
         detail.update(_art_fields(cls, f"/api/deck/{slug}", detail.get("cards")))
-        detail["featured"] = slug in _FEATURED_SLUGS
+        # `featured` / `featured_word` come from summary() (featured_at IS NOT NULL); a pending nomination
+        # is the owner's and the operator's business, not the public page's.
+        detail.pop("nominated", None)
         return jsonify(detail)
 
 
-# --- featured forges (public) ------------------------------------------------------------------------
-# A short, ordered showcase of shared classes for the landing page. The OPERATOR curates web/featured.json by
-# hand (a list of {word, slug, blurb}: a 5-letter display word, a /deck slug, a one-line blurb) and a deploy
-# publishes it — the file is read once at boot, so editing it on the droplet needs a restart to take effect.
-# Only already-public data goes out (the same fields /api/deck/<slug> exposes); a slug whose class was deleted
-# simply drops out of the list. BTSWEB_FEATURED_FILE overrides the path (tests point it at a temp file).
+# --- The Archive (public) ----------------------------------------------------------------------------
+# The curated showcase of shared classes (docs/plans/FORGE_FIRST_PLAN.md section 5). The DATABASE is the
+# source of truth: a class is in The Archive while classes.featured_at is set, newest featured first, with
+# classes.featured_word as the five-letter board word on its tile. Owners nominate (POST
+# /api/classes/<id>/nominate), an admin approves from the Account tab (/api/admin/classes/<id>/feature).
+#
+# web/featured.json (a list of {word, slug, blurb}) is now only the SEED: at boot, if no class is featured yet,
+# seed_featured_from_file() applies it once (the first row gets the newest timestamp, so newest-first keeps
+# the file's order). After that a deploy never edits the showcase. BTSWEB_FEATURED_FILE overrides the path
+# (the smoke harness points it at a temp file). Only already-public data goes out (the same fields
+# /api/deck/<slug> exposes); deleting a class removes it with its row.
 
 FEATURED_FILE = Path(os.environ.get("BTSWEB_FEATURED_FILE", "").strip() or (WEB_DIR / "featured.json"))
-_FEATURED_WORD_RE = re.compile(r"^[A-Z]{5}$")
+FEATURED_LIMIT_MAX = 50   # /api/featured?limit= ceiling (and the page's default)
+NOMINATION_NOTE_MAX = 200
 
 
 def _load_featured(path: Path) -> list[dict]:
-    """Parse the curated featured list: an ordered list of {word, slug, blurb}. A missing or unparseable file
-    is an empty list (with a warning) — never a boot failure. Rows with a word that isn't exactly 5 letters
-    A-Z, or a slug outside 1..32 chars, are skipped (and logged) so one typo can't hide the rest."""
+    """Parse the seed list (db.load_featured_file): an ordered list of {word, slug, blurb}. A missing or
+    unparseable file is an empty list (with a warning) — never a boot failure; bad rows are skipped."""
+    return load_featured_file(path, warn=app.logger.warning)
+
+
+def _utcnow_naive():
+    """Naive UTC — the one convention for the DateTime columns (see admin_stats)."""
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def seed_featured_from_file(path: Path | None = None, *, force: bool = False) -> int:
+    """Apply the seed file (default FEATURED_FILE) to the database; returns how many classes it featured.
+    Without `force` only while NO class is featured (safe on every boot); see db.seed_featured_from_file.
+    The logic lives in db.py so tools/migrate_featured.py can run it without importing this module (whose
+    import-time boot work, e.g. _reconcile_forge_jobs, must never run beside the live service)."""
+    return _db_seed_featured(Path(path) if path is not None else FEATURED_FILE, force=force,
+                             warn=app.logger.warning, info=app.logger.info)
+
+
+try:
+    seed_featured_from_file()
+except Exception:  # a bad seed must never stop the site booting
+    app.logger.exception("featured: seeding The Archive from %s failed", FEATURED_FILE)
+
+
+def _bundle_character(cls: ForgedClass) -> tuple[dict, list | None]:
+    """(character dict, cards list or None) from a class's bundle, tolerating a malformed bundle."""
     try:
-        raw = json.loads(Path(path).read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        app.logger.warning("featured: %s not found — no featured forges", path)
-        return []
-    except (OSError, ValueError) as e:
-        app.logger.warning("featured: could not read %s: %s — no featured forges", path, e)
-        return []
-    if not isinstance(raw, list):
-        app.logger.warning("featured: %s is not a JSON list — no featured forges", path)
-        return []
-    out: list[dict] = []
-    for i, row in enumerate(raw):
-        if not isinstance(row, dict):
-            app.logger.warning("featured: row %d is not an object — skipped", i)
-            continue
-        word = row.get("word")
-        slug = row.get("slug")
-        blurb = row.get("blurb")
-        slug = slug.strip() if isinstance(slug, str) else ""
-        if not (isinstance(word, str) and _FEATURED_WORD_RE.match(word)) or not (1 <= len(slug) <= 32):
-            app.logger.warning("featured: row %d (%r) has a bad word or slug — skipped", i, row)
-            continue
-        out.append({"word": word, "slug": slug, "blurb": blurb.strip() if isinstance(blurb, str) else ""})
-    return out
+        bundle = json.loads(cls.bundle_json or "{}")
+    except ValueError:
+        bundle = {}
+    character = bundle.get("character") if isinstance(bundle, dict) else None
+    cards = bundle.get("cards") if isinstance(bundle, dict) else None
+    return (character if isinstance(character, dict) else {}), (cards if isinstance(cards, list) else None)
 
 
-FEATURED: list[dict] = _load_featured(FEATURED_FILE)
-
-
-class _FeaturedSlugs:
-    """`slug in _FEATURED_SLUGS` against the CURRENT module-level FEATURED (tests monkeypatch the list)."""
-
-    def __contains__(self, slug: object) -> bool:
-        return any(f.get("slug") == slug for f in FEATURED)
-
-
-_FEATURED_SLUGS = _FeaturedSlugs()
+def _clip_text(text, n: int = 140) -> str:
+    text = " ".join(str(text or "").split())
+    return text if len(text) <= n else text[:n - 1].rstrip() + "…"
 
 
 @app.route("/api/featured")
 def featured_list():
-    """The curated showcase, in file order: identity + art thumbs + the /deck share link for each class that
-    still resolves. Public; no id or owner data. Cacheable for 5 minutes (the list only changes on deploy)."""
-    items = list(FEATURED)
+    """The Archive, newest featured first: identity + art thumbs + the /deck share link per class. ?limit=N
+    (1..50; the landing strip asks for 4). Public; no id or owner data. Cacheable for 5 minutes."""
+    try:
+        limit = int(request.args.get("limit", FEATURED_LIMIT_MAX))
+    except (TypeError, ValueError):
+        limit = FEATURED_LIMIT_MAX
+    limit = max(1, min(limit, FEATURED_LIMIT_MAX))
     out: list[dict] = []
-    if items:
-        with session_scope() as s:
-            rows = s.query(ForgedClass).filter(ForgedClass.slug.in_([f["slug"] for f in items])).all()
-            by_slug = {c.slug: c for c in rows}
-            for f in items:
-                cls = by_slug.get(f["slug"])
-                if cls is None:
-                    continue  # deleted (or mistyped) — drop silently
-                try:
-                    bundle = json.loads(cls.bundle_json or "{}")
-                except ValueError:
-                    bundle = {}
-                character = bundle.get("character") if isinstance(bundle, dict) else None
-                character = character if isinstance(character, dict) else {}
-                cards = bundle.get("cards") if isinstance(bundle, dict) else None
-                slug = f["slug"]
-                item = {
-                    "word": f["word"],
-                    "slug": slug,
-                    "blurb": f["blurb"],
-                    "name": cls.name or str(character.get("name") or ""),
-                    "description": str(character.get("description") or ""),
-                    "card_count": len(cards) if isinstance(cards, list) else 0,
-                    "share_url": f"/deck/{slug}",
-                }
-                item.update(_art_fields(cls, f"/api/deck/{slug}"))
-                out.append(item)
+    with session_scope() as s:
+        rows = (s.query(ForgedClass).filter(ForgedClass.featured_at.isnot(None))
+                .order_by(ForgedClass.featured_at.desc(), ForgedClass.id.desc()).limit(limit).all())
+        for cls in rows:
+            if not cls.slug:
+                continue
+            character, cards = _bundle_character(cls)
+            name = cls.name or str(character.get("name") or "")
+            item = {
+                "word": cls.featured_word or "",
+                "slug": cls.slug,
+                "blurb": name,
+                "name": name,
+                "description": str(character.get("description") or ""),
+                "card_count": len(cards) if cards is not None else 0,
+                "share_url": f"/deck/{cls.slug}",
+            }
+            item.update(_art_fields(cls, f"/api/deck/{cls.slug}"))
+            out.append(item)
     resp = jsonify({"featured": out})
     resp.headers["Cache-Control"] = "public, max-age=300"
     return resp
+
+
+@app.route("/api/classes/<int:class_id>/nominate", methods=["POST", "DELETE"])
+@require_login
+def nominate_class(class_id: int):
+    """Owner nominates their class for The Archive (POST {note?}: an optional admin-only "why", trimmed to
+    200 chars) or withdraws the nomination (DELETE). 404 unless it is the caller's class; 409 once the class
+    is already in The Archive (only an admin can take it out — or the owner deleting the class)."""
+    user = current_user()
+    body = request.get_json(silent=True) or {}
+    with session_scope() as s:
+        cls = _owned(s, user["id"], class_id)
+        if cls is None:
+            return jsonify({"error": "not found"}), 404
+        if cls.featured_at is not None:
+            return jsonify({"error": "already in The Archive"}), 409
+        if request.method == "POST":
+            raw = body.get("note") if isinstance(body, dict) else None
+            note = (raw.strip() if isinstance(raw, str) else "")[:NOMINATION_NOTE_MAX]
+            set_class_fields(s, cls, nominated_at=_utcnow_naive(), nomination_note=note or None)
+        else:
+            set_class_fields(s, cls, nominated_at=None, nomination_note=None)
+        return jsonify({**cls.summary(), **_art_fields(cls, f"/api/classes/{cls.id}")})
 
 
 def _deck_class(slug: str):
@@ -2239,6 +2273,10 @@ def admin_stats():
             pq = pq.filter(Purchase.created_at >= since)
         jobs, usage, purchases = jq.all(), uq.all(), pq.all()
         accounts = s.query(User).count()
+        # The Archive (not windowed: a queue and a showcase, not events).
+        archive_pending = (s.query(ForgedClass.id)
+                           .filter(ForgedClass.nominated_at.isnot(None), ForgedClass.featured_at.is_(None)).count())
+        archive_featured = s.query(ForgedClass.id).filter(ForgedClass.featured_at.isnot(None)).count()
 
     by_mode = {"token": 0, "byok": 0, "fake": 0}
     by_token_kind = {"free": 0, "paid": 0, "unlimited": 0}
@@ -2311,6 +2349,7 @@ def admin_stats():
         "hosted": hosted,
         "models": model_rows,
         "providers": provider_rows,
+        "archive": {"pending": archive_pending, "featured": archive_featured},
         "donations": {"count": len(purchases),
                       "amount_cents": sum(int(p.amount_cents or 0) for p in purchases),
                       "tokens": sum(int(p.tokens or 0) for p in purchases)},
@@ -2613,6 +2652,127 @@ def admin_set_unlimited(user_id: int):
             _log_admin_action(s, actor, target, "set_unlimited", old, want,
                               note=str(body.get("note") or "").strip())
     return jsonify({"id": user_id, "unlimited": bool(want), "unlimited_env": env})
+
+
+# --- operator dashboard: The Archive queue -----------------------------------------------------------
+# Owners nominate (nominate_class above); the operator features, passes or unfeatures here. Same gate as the
+# user panel: reads need admin, writes also need a sign-in younger than ADMIN_WRITE_MAX_AGE_S. Every write is
+# an admin_actions row whose TARGET is the class owner (the table is keyed on users) with the class id and
+# name in the note, old/new as 0/1 (featured / nominated before -> after).
+
+def _archive_row(cls: ForgedClass, owner_email: str) -> dict:
+    character, cards = _bundle_character(cls)
+    return {
+        "id": cls.id,
+        "name": cls.name or str(character.get("name") or ""),
+        "slug": cls.slug,
+        "share_url": f"/deck/{cls.slug}" if cls.slug else "",
+        "owner_email": owner_email or "",
+        "concept": _clip_text(cls.concept),
+        "description": _clip_text(character.get("description") or ""),
+        "card_count": len(cards) if cards is not None else 0,
+        "has_splash": bool(cls.splash_hash),
+        "has_sprite": bool(cls.sprite_hash),
+        "has_card_art": bool(cls.card_art_hash),
+        "nomination_note": cls.nomination_note or "",
+        "nominated_at": cls.nominated_at.isoformat() if cls.nominated_at else None,
+        "featured_at": cls.featured_at.isoformat() if cls.featured_at else None,
+        "featured_word": cls.featured_word or "",
+    }
+
+
+@app.route("/api/admin/nominations")
+@require_login
+def admin_nominations():
+    """{pending: nominated and not featured, newest nomination first; featured: in The Archive, newest
+    featured first}. Read-only."""
+    denied = _admin_or_403()
+    if denied:
+        return denied
+    with session_scope() as s:
+        base = s.query(ForgedClass, User.email).join(User, User.id == ForgedClass.user_id)
+        pending = (base.filter(ForgedClass.nominated_at.isnot(None), ForgedClass.featured_at.is_(None))
+                   .order_by(ForgedClass.nominated_at.desc(), ForgedClass.id.desc()).all())
+        featured = (base.filter(ForgedClass.featured_at.isnot(None))
+                    .order_by(ForgedClass.featured_at.desc(), ForgedClass.id.desc()).all())
+        return jsonify({"pending": [_archive_row(c, e) for c, e in pending],
+                        "featured": [_archive_row(c, e) for c, e in featured]})
+
+
+def _archive_target(s, class_id: int):
+    """(class, owner) or None."""
+    row = (s.query(ForgedClass, User).join(User, User.id == ForgedClass.user_id)
+           .filter(ForgedClass.id == class_id).one_or_none())
+    return row
+
+
+def _archive_note(cls: ForgedClass, extra: str = "") -> str:
+    return (f"class #{cls.id} {cls.name or ''}".strip() + (f" · {extra}" if extra else ""))[:200]
+
+
+@app.route("/api/admin/classes/<int:class_id>/feature", methods=["POST"])
+@require_login
+def admin_feature_class(class_id: int):
+    """Put a class in The Archive: {word} = the five-letter board word (upper-cased; must be A-Z x5). Works on
+    any class, nominated or not; featuring an already-featured class just changes its word and moves it to the
+    top. Clears nominated_at (the note stays, as the record of why)."""
+    denied = _admin_or_403(write=True)
+    if denied:
+        return denied
+    body = request.get_json(silent=True) or {}
+    raw = body.get("word") if isinstance(body, dict) else None
+    word = raw.strip().upper() if isinstance(raw, str) else ""
+    if not _FEATURED_WORD_RE.match(word):
+        return jsonify({"error": "the word must be exactly five letters A-Z"}), 400
+    actor = current_user() or {}
+    with session_scope() as s:
+        row = _archive_target(s, class_id)
+        if row is None:
+            return jsonify({"error": "no such class"}), 404
+        cls, owner = row
+        was = 1 if cls.featured_at is not None else 0
+        set_class_fields(s, cls, featured_at=_utcnow_naive(), featured_word=word, nominated_at=None)
+        _log_admin_action(s, actor, owner, "feature_class", was, 1, note=_archive_note(cls, word))
+        return jsonify(_archive_row(cls, owner.email))
+
+
+@app.route("/api/admin/classes/<int:class_id>/pass", methods=["POST"])
+@require_login
+def admin_pass_nomination(class_id: int):
+    """Decline a nomination: clears nominated_at and the note. The audit row keeps the record, so a repeat
+    nomination is visible. 404 when the class isn't waiting in the queue."""
+    denied = _admin_or_403(write=True)
+    if denied:
+        return denied
+    actor = current_user() or {}
+    with session_scope() as s:
+        row = _archive_target(s, class_id)
+        if row is None or row[0].nominated_at is None or row[0].featured_at is not None:
+            return jsonify({"error": "no pending nomination for that class"}), 404
+        cls, owner = row
+        note = _archive_note(cls, f"note: {cls.nomination_note}" if cls.nomination_note else "")
+        set_class_fields(s, cls, nominated_at=None, nomination_note=None)
+        _log_admin_action(s, actor, owner, "pass_nomination", 1, 0, note=note)
+        return jsonify(_archive_row(cls, owner.email))
+
+
+@app.route("/api/admin/classes/<int:class_id>/unfeature", methods=["POST"])
+@require_login
+def admin_unfeature_class(class_id: int):
+    """Take a class out of The Archive (clears featured_at and featured_word). 404 when it isn't in it."""
+    denied = _admin_or_403(write=True)
+    if denied:
+        return denied
+    actor = current_user() or {}
+    with session_scope() as s:
+        row = _archive_target(s, class_id)
+        if row is None or row[0].featured_at is None:
+            return jsonify({"error": "that class isn't in The Archive"}), 404
+        cls, owner = row
+        note = _archive_note(cls, cls.featured_word or "")
+        set_class_fields(s, cls, featured_at=None, featured_word=None)
+        _log_admin_action(s, actor, owner, "unfeature_class", 1, 0, note=note)
+        return jsonify(_archive_row(cls, owner.email))
 
 
 @app.route("/api/admin/actions")

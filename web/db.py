@@ -5,14 +5,17 @@
 """
 from __future__ import annotations
 
+import json
 import os
+import re
 from contextlib import contextmanager
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from sqlalchemy import create_engine, event, inspect, text
 from sqlalchemy.orm import sessionmaker
 
-from models import INITIAL_TOKENS, Base, new_slug
+from models import INITIAL_TOKENS, Base, ForgedClass, new_slug
 
 WEB_DIR = Path(__file__).resolve().parent
 
@@ -97,7 +100,8 @@ def _ensure_user_columns() -> None:
 def _ensure_class_columns() -> None:
     """Same tiny forward-only migration as _ensure_user_columns, for the `classes` table: add the
     splash_hash (Track 2 splash art), sprite_hash (combat-model sprite) and card_art_hash (the per-card
-    portrait zip) columns to DBs created before them. Idempotent; SQLite + MySQL."""
+    portrait zip) columns, the share slug, and The Archive's four columns to DBs created before them.
+    Idempotent; SQLite + MySQL."""
     insp = inspect(engine)
     if "classes" not in insp.get_table_names():
         return  # create_all will make it fresh with the columns already present
@@ -115,6 +119,14 @@ def _ensure_class_columns() -> None:
         _backfill_slugs()
         with engine.begin() as conn:
             conn.execute(text("CREATE UNIQUE INDEX ix_classes_slug ON classes (slug)"))
+    # The Archive (FORGE_FIRST_PLAN.md 5.2): nomination + featured state. All nullable, no default — every
+    # existing class starts "not nominated, not featured"; app.seed_featured_from_file() then applies
+    # web/featured.json once if nothing is featured yet.
+    for col, ddl in (("nominated_at", "DATETIME"), ("nomination_note", "VARCHAR(200)"),
+                     ("featured_at", "DATETIME"), ("featured_word", "VARCHAR(5)")):
+        if col not in cols:
+            with engine.begin() as conn:
+                conn.execute(text(f"ALTER TABLE classes ADD COLUMN {col} {ddl}"))
 
 
 def _ensure_purchase_columns() -> None:
@@ -228,3 +240,80 @@ def session_scope():
         raise
     finally:
         s.close()
+
+
+# --- The Archive: the featured.json seed ------------------------------------------------------------------
+# Lives here (not in app.py) so tools/migrate_featured.py can apply it without importing the app, whose
+# import-time boot work (forge-job reconciliation refunds every "running" forge) must never run beside the
+# live service. app.seed_featured_from_file() is the boot-time caller.
+
+FEATURED_WORD_RE = re.compile(r"^[A-Z]{5}$")
+
+
+def load_featured_file(path, warn=None) -> list[dict]:
+    """Parse a featured seed file: an ordered JSON list of {word, slug, blurb}. A missing or unparseable file
+    is an empty list (with a warning) — never a boot failure. Rows with a word that isn't exactly 5 letters
+    A-Z, or a slug outside 1..32 chars, are skipped (and warned about) so one typo can't hide the rest."""
+    warn = warn or (lambda *a: None)
+    try:
+        raw = json.loads(Path(path).read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        warn("featured: %s not found — nothing to seed", path)
+        return []
+    except (OSError, ValueError) as e:
+        warn("featured: could not read %s: %s — nothing to seed", path, e)
+        return []
+    if not isinstance(raw, list):
+        warn("featured: %s is not a JSON list — nothing to seed", path)
+        return []
+    out: list[dict] = []
+    for i, row in enumerate(raw):
+        if not isinstance(row, dict):
+            warn("featured: row %d is not an object — skipped", i)
+            continue
+        word, slug, blurb = row.get("word"), row.get("slug"), row.get("blurb")
+        slug = slug.strip() if isinstance(slug, str) else ""
+        if not (isinstance(word, str) and FEATURED_WORD_RE.match(word)) or not (1 <= len(slug) <= 32):
+            warn("featured: row %d (%r) has a bad word or slug — skipped", i, row)
+            continue
+        out.append({"word": word, "slug": slug, "blurb": blurb.strip() if isinstance(blurb, str) else ""})
+    return out
+
+
+def set_class_fields(s, cls, **fields) -> None:
+    """UPDATE some of a class's columns WITHOUT bumping updated_at (its onupdate would otherwise fire), so
+    nominating, featuring or passing never reorders the owner's My Classes list (sorted by updated_at).
+    Refreshes `cls` so the caller sees the new values."""
+    values = {getattr(ForgedClass, k): v for k, v in fields.items()}
+    values[ForgedClass.updated_at] = ForgedClass.updated_at
+    s.query(ForgedClass).filter(ForgedClass.id == cls.id).update(values, synchronize_session=False)
+    s.refresh(cls)
+
+
+def seed_featured_from_file(path, *, force: bool = False, warn=None, info=None) -> int:
+    """Feature the classes a seed file names; returns how many it featured.
+
+    Without `force` it runs only while NO class is featured, which makes it safe on every boot: the first
+    boot after the Phase B deploy (or of a fresh deploy) applies the file, every later boot is a no-op. With
+    `force` it applies the file even though something is featured, but only to rows whose class is not
+    featured yet. Row i gets featured_at = now - i seconds, so The Archive's newest-first order reproduces the
+    file order; featured_word = the row's word. Slugs that don't resolve are skipped."""
+    rows = load_featured_file(path, warn=warn)
+    if not rows:
+        return 0
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    applied = 0
+    with session_scope() as s:
+        if not force and s.query(ForgedClass.id).filter(ForgedClass.featured_at.isnot(None)).first() is not None:
+            return 0
+        by_slug = {c.slug: c for c in
+                   s.query(ForgedClass).filter(ForgedClass.slug.in_([r["slug"] for r in rows])).all()}
+        for pos, r in enumerate(rows):
+            cls = by_slug.get(r["slug"])
+            if cls is None or cls.featured_at is not None:
+                continue
+            set_class_fields(s, cls, featured_at=now - timedelta(seconds=pos), featured_word=r["word"])
+            applied += 1
+    if applied and info:
+        info("featured: seeded %d class(es) into The Archive from %s", applied, path)
+    return applied
