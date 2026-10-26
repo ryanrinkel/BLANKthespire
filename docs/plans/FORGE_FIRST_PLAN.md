@@ -1,6 +1,9 @@
 # Forge-first signed-in screen + The Archive
 
-Status: PLAN, written 2026-10-26, open questions answered by Ryan the same day (section 9). Nothing built.
+Status: SHIPPED + DEPLOYED 2026-10-26 17:28Z. Phase A = 8e774e2, Phase B = 80200ac (374 web tests green on the
+droplet; `/api/featured` seeded BRAVE/CRAVE/GOOSE/MOOSE from featured.json into classes.featured_at). Written
+2026-10-26, open questions answered by Ryan the same day (section 9). Still unverified on prod: a real Stripe
+donation round trip with the concept draft, and one nominate -> Feature cycle from the admin card.
 Decisions below marked **Ryan 2026-10-26** are his; everything else is a recommendation with the reasoning
 attached.
 
