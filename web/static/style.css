@@ -608,24 +608,39 @@ main.archive { max-width: 1100px; }
 .stats-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
 .stats-tables { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
 .stats-tables h4 { margin: 0 0 6px; font-size: 13px; color: var(--muted); font-weight: 500; }
+/* A table too wide for half the card (Models, Tagged links) takes a whole row of the grid. */
+.stats-tables .wide { grid-column: 1 / -1; }
 .stats-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .stats-table th, .stats-table td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--line); }
 .stats-table th { color: var(--muted); font-weight: 500; font-size: 12px; }
-.stats-table td.num, .stats-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.stats-table td.num, .stats-table th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Long model ids ("black-forest-labs/flux.2-klein-4b") break anywhere rather than widening the table. */
+.stats-table td.id { overflow-wrap: anywhere; }
+/* Fallback for a table that still can't fit: it scrolls inside the card instead of running past its edge. */
+.table-scroll { overflow-x: auto; margin-top: 12px; }
+.stats-tables .table-scroll { margin-top: 0; }
 .stats-wrap { overflow-x: auto; }
 
 /* Operator user panel (#admin-users). Reuses .stats-table for the grid; these rules only add what a row of
-   editable controls needs. The table scrolls sideways on a narrow window rather than crushing the inputs. */
+   editable controls needs. Sized to fit the 686px card at desktop width; on a narrow window the
+   .table-scroll wrapper scrolls it sideways rather than crushing the inputs. */
 .stats-head input.in { width: auto; flex: 0 1 260px; margin-bottom: 0; padding: 6px 10px; font-size: 13px; }
-.admin-users-table { display: block; overflow-x: auto; white-space: nowrap; margin-top: 12px; }
-.admin-users-table .who-cell { white-space: normal; min-width: 180px; }
+.admin-users-table { width: 100%; white-space: nowrap; }
+/* Long emails break inside the cell instead of widening the whole table. */
+.admin-users-table .who-cell { white-space: normal; min-width: 170px; max-width: 230px; overflow-wrap: anywhere; }
 .admin-users-table .sub { font-size: 12px; color: var(--muted); }
-.admin-users-table input.tok { width: 78px; margin-bottom: 0; padding: 4px 6px; font-size: 13px;
+.admin-users-table input.tok { width: 64px; margin-bottom: 0; padding: 4px 6px; font-size: 13px;
                                text-align: right; font-variant-numeric: tabular-nums; }
 .admin-users-table input.tok:disabled { opacity: .45; }
 .admin-users-table .btn { padding: 4px 10px; font-size: 12px; }
+/* Tokens input + Save share one cell; the row's status note sits under them. */
+.admin-users-table .tok-cell { white-space: nowrap; }
+.admin-users-table .tok-cell .tok-save { margin: 0 0 0 4px; padding: 4px 8px; }
+.admin-users-table .joined { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .admin-users-table .unl { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; }
-.admin-users-table .row-note { font-size: 12px; color: var(--muted); }
+/* Empty until a save reports, then a short line or two that never widens the cell much. */
+.admin-users-table .row-note { display: block; white-space: normal; max-width: 150px; min-height: 0;
+                               font-size: 12px; color: var(--muted); }
 .admin-users-table .row-note.ok { color: var(--accent); }
 .admin-users-table .row-note.err { color: var(--danger); }
 .admin-log-head { margin: 16px 0 6px; font-size: 13px; color: var(--muted); font-weight: 500; }
@@ -637,6 +652,11 @@ main.archive { max-width: 1100px; }
 .admin-archive-table .flags { font-variant-numeric: tabular-nums; letter-spacing: 1px; }
 .admin-archive-table .row-actions { display: flex; flex-direction: column; gap: 4px; }
 .admin-archive-table .row-actions .btn { margin: 0; }
+/* Phones: the operator tables scroll sideways, so pin the first column (account / class) in place. */
+@media (max-width: 700px) {
+  .table-scroll .admin-users-table th:first-child,
+  .table-scroll .admin-users-table td:first-child { position: sticky; left: 0; background: var(--panel); z-index: 1; }
+}
 
 /* --- phones: forge here, play on the PC (docs/plans/PHONE_FUNNEL_PLAN.md section 5) --------------- */
 /* render.js sets body.is-phone (coarse pointer or a phone UA); .phone-only furniture never shows on a desktop. */

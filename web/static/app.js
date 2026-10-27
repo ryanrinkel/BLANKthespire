@@ -1734,7 +1734,7 @@ function renderStats(d) {
     + (provRows || `<tr><td colspan="3" class="muted">No usage rows in this window.</td></tr>`);
 
   const modelRows = (d.models || []).map((m) =>
-    `<tr><td>${esc(m.model || "?")}<div class="muted">${esc(m.provider || "")} · ${esc(m.mode || "")}</div></td>`
+    `<tr><td class="id">${esc(m.model || "?")}<div class="muted">${esc(m.provider || "")} · ${esc(m.mode || "")}</div></td>`
     + `<td class="num">${fmtInt(m.forges)}</td><td class="num">${fmtInt(m.calls)}</td>`
     + `<td class="num">${fmtTokens(m.input_tokens)}</td><td class="num">${fmtTokens(m.output_tokens)}</td></tr>`).join("");
   el("stats-models").innerHTML = `<tr><th>Model</th><th class="num">Forges</th><th class="num">Calls</th><th class="num">In</th><th class="num">Out</th></tr>`
@@ -1781,7 +1781,9 @@ function renderStatsChart(daily, series = STATS_SERIES, boxId = "stats-chart",
     }
     svg += `</g>`;
     const labelEvery = Math.max(1, Math.ceil(daily.length / 8));
-    if (i % labelEvery === 0 || i === daily.length - 1) {
+    // The last day is labelled too, unless it would sit on top of the previous label ("10-2610-27").
+    const sincePrev = i % labelEvery;
+    if (sincePrev === 0 || (i === daily.length - 1 && sincePrev >= Math.ceil(labelEvery / 2))) {
       svg += `<text class="axis" x="${(x + barW / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle">${esc(r.day.slice(5))}</text>`;
     }
   });
@@ -1984,12 +1986,11 @@ async function loadAdminUsers() {
 
 function renderAdminUsers(d) {
   const users = d.users || [];
-  // The per-row status note gets a column of its own at the END: parked next to Save it would widen that
-  // cell the moment it said anything and shunt every column after it sideways mid-edit.
-  const head = `<tr><th class="who-cell">Account</th><th class="num">Tokens</th><th></th>`
-    + `<th>Unlimited</th><th class="num" title="Forges that finished and saved a class. Attempts that died (a bad key, a mistyped model, no credits) are listed separately — hover the count for the latest error">Forges</th><th class="num" title="Classes the game has fetched art for = codes imported into the mod (from the nginx log, refreshed every 15 min)">Imported</th>`
-    + `<th class="num">Donated</th><th>Joined</th>`
-    + `<th></th></tr>`;
+  // Tokens input + Save share one cell and the per-row status note sits UNDER them (a capped-width block),
+  // so it can't shunt the columns sideways mid-edit. Seven columns, sized to fit the card without scrolling.
+  const head = `<tr><th class="who-cell">Account</th><th>Tokens</th>`
+    + `<th title="Unlimited hosted forging">∞</th><th class="num" title="Forges that finished and saved a class. Attempts that died (a bad key, a mistyped model, no credits) are listed separately — hover the count for the latest error">Forges</th><th class="num" title="Classes the game has fetched art for = codes imported into the mod (from the nginx log, refreshed every 15 min)">Imported</th>`
+    + `<th class="num">Donated</th><th>Joined</th></tr>`;
   const rows = users.map((u) => {
     // On the env master list ⇒ the toggle can't change anything, so it is checked and disabled with a
     // reason rather than silently ignoring the click.
@@ -2004,10 +2005,11 @@ function renderAdminUsers(d) {
       + (u.promo_label ? `<div class="sub">🎁 ${esc(u.promo_label)} (+${Number(u.promo_tokens || 0)})</div>` : "");
     return `<tr data-uid="${u.id}">`
       + `<td class="who-cell">${who}</td>`
-      + `<td class="num"><input class="in tok" type="number" min="0" max="100000" step="1"`
+      + `<td class="tok-cell"><input class="in tok" type="number" min="0" max="100000" step="1"`
       + ` value="${Number(u.token_balance || 0)}" data-orig="${Number(u.token_balance || 0)}"`
-      + ` aria-label="Token balance for ${esc(u.email || ("user " + u.id))}" /></td>`
-      + `<td><button class="btn tok-save" type="button">Save</button></td>`
+      + ` aria-label="Token balance for ${esc(u.email || ("user " + u.id))}" />`
+      + `<button class="btn tok-save" type="button">Save</button>`
+      + `<div class="row-note" role="status"></div></td>`
       + `<td><label class="unl"><input type="checkbox" class="unl-box"${checked}`
       + `${envLocked ? " disabled" : ""} /> ∞</label>`
       + (envLocked ? `<div class="sub">via env list</div>` : "")
@@ -2015,11 +2017,10 @@ function renderAdminUsers(d) {
       + `<td class="num">${forgesCell(u)}</td>`
       + `<td class="num">${importedCell(u, d.imports_known)}</td>`
       + `<td class="num">${u.donated_cents ? fmtMoney(u.donated_cents, "usd") : "—"}</td>`
-      + `<td>${esc(joined)}</td>`
-      + `<td><span class="row-note" role="status"></span></td></tr>`;
+      + `<td class="joined" title="${esc(String(u.created_at || ""))}">${esc(joined)}</td></tr>`;
   }).join("");
   el("admin-users-table").innerHTML = head
-    + (rows || `<tr><td colspan="9" class="muted">No accounts match that search.</td></tr>`);
+    + (rows || `<tr><td colspan="7" class="muted">No accounts match that search.</td></tr>`);
 
   el("admin-users-note").textContent = (users.length < (d.total || 0)
     ? `Showing ${users.length} of ${d.total} accounts — narrow the search to see the rest.`

@@ -7,7 +7,7 @@
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png" />
   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/static/style.css?v=20261026d" />
+  <link rel="stylesheet" href="/static/style.css?v=20261027a" />
 </head>
 <body>
   <header>
@@ -327,9 +327,10 @@
           <h4>Where the calls go</h4>
           <table id="stats-providers" class="stats-table"></table>
         </div>
-        <div>
+        <!-- .wide = a full row of the grid: five columns and long model ids don't fit a half-width cell. -->
+        <div class="wide">
           <h4>Models</h4>
-          <table id="stats-models" class="stats-table"></table>
+          <div class="table-scroll"><table id="stats-models" class="stats-table"></table></div>
         </div>
       </div>
       <p id="stats-note" class="hint"></p>
@@ -361,11 +362,11 @@
           <h4>Pages opened</h4>
           <table id="traffic-pages" class="stats-table"></table>
         </div>
-        <div>
+        <div class="wide">
           <!-- Links carrying ?utm_source=…&utm_campaign=… (ads, tracked posts), with how far those
-               visitors got. See tools/traffic_report.py "tagged". -->
+               visitors got. See tools/traffic_report.py "tagged". Seven columns, so a full row (.wide). -->
           <h4>Tagged links (ads, tracked posts)</h4>
-          <table id="traffic-campaigns" class="stats-table"></table>
+          <div class="table-scroll"><table id="traffic-campaigns" class="stats-table"></table></div>
         </div>
       </div>
       <p id="traffic-note" class="hint"></p>
@@ -382,7 +383,7 @@
         <input id="admin-users-q" class="in small" type="search" placeholder="Search email or name"
                autocomplete="off" aria-label="Search users by email or name" />
       </div>
-      <table id="admin-users-table" class="stats-table admin-users-table"></table>
+      <div class="table-scroll"><table id="admin-users-table" class="stats-table admin-users-table"></table></div>
       <p id="admin-users-note" class="hint"></p>
       <h4 class="admin-log-head">Recent changes</h4>
       <ul id="admin-actions" class="admin-log"></ul>
@@ -397,9 +398,9 @@
         <span class="spacer"></span>
         <a class="hint" href="/archive" target="_blank" rel="noopener">Open The Archive ↗</a>
       </div>
-      <table id="admin-nominations" class="stats-table admin-users-table admin-archive-table"></table>
+      <div class="table-scroll"><table id="admin-nominations" class="stats-table admin-users-table admin-archive-table"></table></div>
       <h4 class="admin-log-head">In The Archive</h4>
-      <table id="admin-featured" class="stats-table admin-users-table admin-archive-table"></table>
+      <div class="table-scroll"><table id="admin-featured" class="stats-table admin-users-table admin-archive-table"></table></div>
       <p id="admin-archive-note" class="hint" role="status"></p>
     </section>
 
@@ -414,7 +415,7 @@
         <button id="admin-events-new" class="btn" type="button">New event</button>
       </div>
       <p id="admin-events-tz" class="hint"></p>
-      <table id="admin-events-table" class="stats-table admin-users-table admin-events-table"></table>
+      <div class="table-scroll"><table id="admin-events-table" class="stats-table admin-users-table admin-events-table"></table></div>
       <p id="admin-events-note" class="hint" role="status"></p>
       <form id="admin-event-form" class="admin-event-form hidden" novalidate>
         <h4 id="admin-event-form-title" class="admin-log-head">New event</h4>
@@ -492,7 +493,7 @@
 
   <!-- ?v= busts the 1-hour static cache on deploy: bump both whenever either file changes. render.js holds
        the class renderers shared with the public /deck page and must load first. -->
-  <script src="/static/render.js?v=20261026d"></script>
-  <script src="/static/app.js?v=20261026d"></script>
+  <script src="/static/render.js?v=20261027a"></script>
+  <script src="/static/app.js?v=20261027a"></script>
 </body>
 </html>
