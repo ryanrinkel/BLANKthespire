@@ -7,7 +7,7 @@
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png" />
   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/static/style.css?v=20261026c" />
+  <link rel="stylesheet" href="/static/style.css?v=20261026d" />
 </head>
 <body>
   <header>
@@ -39,6 +39,14 @@
 
   <!-- Forge view -->
   <main id="view-forge" class="hidden">
+    <!-- Sign-up event welcome (docs/plans/SIGNUP_EVENTS_PLAN.md): shown once, when /api/me carries
+         user.welcome_grant (the server marks it seen on that read) or landing.js / signin.js parked one in
+         bts_welcome_grant. Filled by app.js renderWelcome(); hidden for everyone else. -->
+    <div id="welcome-banner" class="banner welcome hidden" role="status">
+      <span class="banner-icon" aria-hidden="true">🎁</span>
+      <p id="welcome-text"></p>
+      <button id="welcome-x" class="banner-x" aria-label="Dismiss">×</button>
+    </div>
     <!-- Forge-first screen (2026-10-26, docs/plans/FORGE_FIRST_PLAN.md sections 3-4): the concept box is the
          first thing under the header and the Forge button is never disabled (except mid-forge). Nothing about
          payment shows until the first Forge click: if the open pay box can pay, the click forges; otherwise
@@ -395,6 +403,51 @@
       <p id="admin-archive-note" class="hint" role="status"></p>
     </section>
 
+    <!-- Admin-only, same gate as the Users card: sign-up events (docs/plans/SIGNUP_EVENTS_PLAN.md). Every
+         account created inside an event's window starts with its tokens, until the cap of accounts is reached;
+         one event at a time. Built by app.js loadAdminEvents() from /api/admin/promos; writes need a sign-in
+         younger than 4h, like the Users card. -->
+    <section id="admin-events" class="card hidden">
+      <div class="stats-head">
+        <h2>Sign-up events</h2>
+        <span class="spacer"></span>
+        <button id="admin-events-new" class="btn" type="button">New event</button>
+      </div>
+      <p id="admin-events-tz" class="hint"></p>
+      <table id="admin-events-table" class="stats-table admin-users-table admin-events-table"></table>
+      <p id="admin-events-note" class="hint" role="status"></p>
+      <form id="admin-event-form" class="admin-event-form hidden" novalidate>
+        <h4 id="admin-event-form-title" class="admin-log-head">New event</h4>
+        <div class="admin-event-grid">
+          <div>
+            <label class="lbl small" for="ev-label">Label (shown to visitors)</label>
+            <input id="ev-label" class="in" maxlength="120" placeholder="e.g. Launch weekend" autocomplete="off" />
+          </div>
+          <div>
+            <label class="lbl small" for="ev-tokens">Tokens per signup</label>
+            <input id="ev-tokens" class="in" type="number" min="1" max="10" step="1" value="1" />
+          </div>
+          <div>
+            <label class="lbl small" for="ev-start">Starts (your time)</label>
+            <input id="ev-start" class="in" type="datetime-local" />
+          </div>
+          <div>
+            <label class="lbl small" for="ev-end">Ends (your time)</label>
+            <input id="ev-end" class="in" type="datetime-local" />
+          </div>
+          <div>
+            <label class="lbl small" for="ev-cap">Cap (accounts)</label>
+            <input id="ev-cap" class="in" type="number" min="0" max="10000" step="1" />
+          </div>
+        </div>
+        <div class="form-actions">
+          <button id="admin-event-save" class="btn primary" type="submit">Create event</button>
+          <button id="admin-event-cancel" class="btn ghost" type="button">Cancel</button>
+        </div>
+        <p id="admin-event-note" class="hint" role="status"></p>
+      </form>
+    </section>
+
     <section class="card">
       <h2>Donation history</h2>
       <p id="purchases-empty" class="muted hidden">No donations yet.</p>
@@ -439,7 +492,7 @@
 
   <!-- ?v= busts the 1-hour static cache on deploy: bump both whenever either file changes. render.js holds
        the class renderers shared with the public /deck page and must load first. -->
-  <script src="/static/render.js?v=20261026c"></script>
-  <script src="/static/app.js?v=20261026c"></script>
+  <script src="/static/render.js?v=20261026d"></script>
+  <script src="/static/app.js?v=20261026d"></script>
 </body>
 </html>

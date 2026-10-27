@@ -4,7 +4,7 @@
 //     STRIPE_SECRET_KEY=sk_test_smoke PORT=5077 uv run --project ../generation python app.py
 // (the dummy Stripe key only flips /api/billing to {enabled:true} so the donate tiers + custom-amount row
 //  render; nothing in these scenarios ever hits Stripe)
-// then, from web/tools:  node ui_smoke.mjs http://127.0.0.1:5077 <outdir> forge|v3|byok-narrow|byok-models|library|account|pages|art|lost|archive|featured|webview|phone
+// then, from web/tools:  node ui_smoke.mjs http://127.0.0.1:5077 <outdir> forge|v3|byok-narrow|byok-models|library|account|pages|art|lost|archive|featured|webview|phone|events
 // (`archive` needs BTSWEB_ADMIN_EMAILS=unlimited@example.com and is best run first on a fresh DB: it puts a class
 //  in The Archive through the UI, which is what `featured` then shows on the landing strip)
 // (needs a package.json with {"type":"module"} next to it, or rename to .mjs — it is already .mjs).
@@ -1264,6 +1264,143 @@ if (scenario === "forge") {
         "desktop: no phone banner, one-line tutorial, no hand-off buttons", JSON.stringify(desk));
   await nav(`${base}/deck/${slug}`); await sleep(800);
   check(!(await evaluate(`document.getElementById('send-pc').offsetParent !== null`)), "desktop /deck: no share-sheet button");
+} else if (scenario === "events") {
+  // Sign-up events (docs/plans/SIGNUP_EVENTS_PLAN.md). Needs BTSWEB_ADMIN_EMAILS=unlimited@example.com and a
+  // FRESH DB (no events). (a) no event: no ribbon anywhere; (b) a live event: the ribbon on the splash and
+  // /login for a signed-out visitor only; (c) a new account made during it gets the welcome banner once, and a
+  // welcome consumed by the splash is still shown by the app; (d) the admin Events card with an ended, a live
+  // and a scheduled event; (e) End now from the card: the ribbon is gone. The browser cache is off, so the
+  // 60 s Cache-Control on /api/promo/active does not hold the old answer between steps.
+  await send("Network.enable");
+  await send("Network.setCacheDisabled", { cacheDisabled: true });
+  const phone = () => send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+  const desktop = () => send("Emulation.clearDeviceMetricsOverride");
+  const signOut = async () => {
+    await evaluate(`fetch('/logout', {method: 'POST', headers: {'X-Requested-With': 'fetch'}}).then(() => 1)`);
+  };
+  const ribbonState = `(() => { const r = document.querySelector('.event-ribbon');
+    return {ribbon: r ? r.textContent.replace(/\\s+/g, ' ').trim() : null,
+            overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+            cta_top: Math.round(document.querySelector('.splash-actions, #providers').getBoundingClientRect().top + scrollY)}; })()`;
+  const api = async (path, body) => JSON.parse(await evaluate(`(async () => { const r = await fetch(${JSON.stringify(path)}, {method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'fetch'}, body: ${JSON.stringify(JSON.stringify(body || {}))}});
+    return JSON.stringify({status: r.status, body: await r.json()}); })()`));
+
+  // (a) no event
+  await signOut();
+  await phone();
+  await nav(`${base}/`); await sleep(800);
+  const noneLanding = await json(ribbonState);
+  check(noneLanding.ribbon === null && !noneLanding.overflow, "(a) splash, no event: no ribbon, no sideways scroll", JSON.stringify(noneLanding));
+  await shot("events-a-landing-none-390", false);
+  await nav(`${base}/login`); await sleep(800);
+  const noneLogin = await json(ribbonState);
+  check(noneLogin.ribbon === null, "(a) /login, no event: no ribbon", JSON.stringify(noneLogin));
+  await shot("events-a-signin-none-390", false);
+  await desktop();
+  await nav(`${base}/`); await sleep(800);
+  check((await json(ribbonState)).ribbon === null, "(a) splash desktop, no event: no ribbon");
+  await shot("events-a-landing-none-desktop", false);
+
+  // (d, setup) an ended, a live and a scheduled event, through the admin API
+  await nav(`${base}/dev-login?email=unlimited@example.com`);
+  const iso = (ms) => new Date(Date.now() + ms).toISOString();
+  const H = 3600 * 1000;
+  const ended = await api("/api/admin/promos", { label: "Soft launch", tokens_per_signup: 1, max_grants: 10,
+    starts_at: iso(-2 * H), ends_at: iso(H) });
+  await api(`/api/admin/promos/${ended.body.id}/end`);
+  const live = await api("/api/admin/promos", { label: "Launch weekend", tokens_per_signup: 1, max_grants: 50,
+    starts_at: iso(-10 * 60 * 1000), ends_at: iso(48 * H) });
+  const sched = await api("/api/admin/promos", { label: "Holiday forge", tokens_per_signup: 2, max_grants: 25,
+    starts_at: iso(72 * H), ends_at: iso(96 * H) });
+  check(ended.status === 201 && live.status === 201 && sched.status === 201, "(d) three events created",
+        JSON.stringify([ended.status, live.status, sched.status, live.body.error || "", sched.body.error || ""]));
+
+  // (b) live: ribbon for a signed-out visitor, never for a signed-in one
+  await nav(`${base}/`); await sleep(800);
+  check((await json(ribbonState)).ribbon === null, "(b) signed-in visitor on the splash: no ribbon");
+  await signOut();
+  await phone();
+  await nav(`${base}/`); await sleep(800);
+  const liveLanding = await json(ribbonState);
+  check(liveLanding.ribbon && liveLanding.ribbon.includes("Launch weekend: sign up before")
+        && liveLanding.ribbon.endsWith("your first forge is on us.") && !liveLanding.overflow,
+        "(b) splash 390: ribbon, no sideways scroll", JSON.stringify(liveLanding));
+  await shot("events-b-landing-live-390", false);
+  await nav(`${base}/login`); await sleep(800);
+  const liveLogin = await json(ribbonState);
+  check(liveLogin.ribbon && liveLogin.ribbon.includes("Launch weekend"), "(b) /login 390: ribbon", JSON.stringify(liveLogin));
+  await shot("events-b-signin-live-390", false);
+  await desktop();
+  await nav(`${base}/`); await sleep(800);
+  await shot("events-b-landing-live-desktop", false);
+
+  // (c) a new account during the event: the banner once, balance 1; a reload has no banner
+  await nav(`${base}/dev-login?email=newbie-${Date.now()}@example.com`); await sleep(800);
+  const c1 = await json(`({banner: document.getElementById('welcome-banner').offsetParent !== null,
+    text: document.getElementById('welcome-text').textContent, balance: ME.token_balance,
+    chip: document.getElementById('tokens').textContent})`);
+  check(c1.banner && c1.text.startsWith("Welcome! Launch weekend gave you 1 free forge token.") && c1.balance === 1,
+        "(c) new account: welcome banner, balance 1", JSON.stringify(c1));
+  await shot("events-c-welcome-desktop", false);
+  await nav(`${base}/app`); await sleep(800);
+  const c2 = await json(`({banner: document.getElementById('welcome-banner').offsetParent !== null, balance: ME.token_balance})`);
+  check(!c2.banner && c2.balance === 1, "(c) reload: banner gone, balance still 1", JSON.stringify(c2));
+  // The splash reads /api/me first (here: before the app ever does) -> signup-event.js parks the grant.
+  await signOut();
+  await phone();
+  await evaluate(`localStorage.clear()`);
+  // fetch (not a navigation): the cookie is set and the redirect to /app is fetched as text, so no app.js runs.
+  await evaluate(`fetch('/dev-login?email=newbie3-${Date.now()}@example.com').then(() => 1)`);
+  await nav(`${base}/`); await sleep(800);
+  const parked = await evaluate(`localStorage.getItem('bts_welcome_grant')`);
+  await nav(`${base}/app`); await sleep(800);
+  const c3 = await json(`({banner: document.getElementById('welcome-banner').offsetParent !== null,
+    text: document.getElementById('welcome-text').textContent, left: localStorage.getItem('bts_welcome_grant')})`);
+  check(!!parked && c3.banner && c3.text.includes("Launch weekend") && c3.left === null,
+        "(c) welcome consumed by the splash is shown by the app, then cleared", JSON.stringify({ parked, ...c3 }));
+  await shot("events-c-welcome-390", false);
+
+  // (d) the admin card
+  await signOut();
+  await desktop();
+  await nav(`${base}/dev-login?email=unlimited@example.com`); await sleep(500);
+  await evaluate(`document.getElementById('nav-account').click()`); await sleep(1500);
+  const d1 = await json(`({rows: [...document.querySelectorAll('#admin-events-table tr[data-id]')].map(r => r.querySelector('.ev-pill').textContent),
+    ends: document.querySelectorAll('#admin-events-table [data-act=end]').length})`);
+  check(JSON.stringify(d1.rows) === JSON.stringify(["scheduled", "live", "ended"]) && d1.ends === 2,
+        "(d) Events card: scheduled, live, ended; End now on the two open ones", JSON.stringify(d1));
+  await shotEl("events-d-admin-card-desktop", "#admin-events");
+  // An overlapping create answers 409; the message lands in the form.
+  await evaluate(`document.getElementById('admin-events-new').click()`);
+  await evaluate(`document.getElementById('ev-label').value = 'Clash'; document.getElementById('ev-cap').value = '5';
+    document.getElementById('admin-event-save').click()`);
+  await sleep(800);
+  const err = await evaluate(`document.getElementById('admin-event-note').textContent`);
+  check(err.includes("overlaps event"), "(d) overlapping create: the 409 message inline", err);
+  await shotEl("events-d-admin-form-error", "#admin-events");
+  await evaluate(`document.getElementById('admin-event-cancel').click()`);
+  await phone();
+  await sleep(300);
+  await shotEl("events-d-admin-card-390", "#admin-events");
+  await desktop();
+
+  // (e) End now on the live event, then the splash has no ribbon
+  await evaluate(`window.confirm = () => true`);
+  await evaluate(`document.querySelector('#admin-events-table tr[data-id="${live.body.id}"] [data-act=end]').click()`);
+  await sleep(1000);
+  const e1 = await json(`({pill: document.querySelector('#admin-events-table tr[data-id="${live.body.id}"] .ev-pill').textContent,
+    note: document.getElementById('admin-events-note').textContent,
+    log: document.getElementById('admin-actions').textContent})`);
+  check(e1.pill === "ended" && e1.note.startsWith("Ended") && e1.log.includes("ended sign-up event #"),
+        "(e) End now: row ended, note, audit line", JSON.stringify(e1));
+  await signOut();
+  await phone();
+  await nav(`${base}/`); await sleep(800);
+  const after = await json(ribbonState);
+  check(after.ribbon === null, "(e) after End now: no ribbon", JSON.stringify(after));
+  await shot("events-e-landing-ended-390", false);
+  await desktop();
 }
 console.log(errors.length ? "CONSOLE ERRORS:\n" + errors.join("\n") : "no console errors");
 ws.close(); chrome.kill();

@@ -46,7 +46,8 @@ from forge import (ELEMENT_KINDS, VALID_FEEDBACK_CATEGORIES, ForgeError, UsageMe
                    append_card_feedback, append_element_feedback, forge_to_bundle, list_models,
                    verify_byok_models)
 from models import (AdminAction, ForgeJob, ForgeUsage, ForgedCard, ForgedClass, Identity,  # noqa: E402
-                    Purchase, User, new_slug, spend_token, unspend_token)
+                    PromoGrant, Promotion, Purchase, User, new_slug, spend_token, unspend_token)
+import promo as _promo  # noqa: E402
 
 # Generated art (Track 2/3): the class splash, the combat sprite, the relic icon and the per-card portrait
 # pack (cards.zip) are all made at persist time, written to static/forged/<id>/, served by nginx, and their
@@ -2052,6 +2053,20 @@ def featured_list():
     return resp
 
 
+@app.route("/api/promo/active")
+def promo_active():
+    """The sign-up event paying out right now, for the landing ribbon: {active: {label, tokens_per_signup,
+    ends_at}} or {active: null}. Public. A capped event reads as null, and the remaining count is never
+    exposed (it would invite a race for the last slots). Short cache: an End now should show within a minute."""
+    with session_scope() as s:
+        p = _promo.active_promotion(s)
+        active = None if p is None else {"label": p.label, "tokens_per_signup": int(p.tokens_per_signup),
+                                         "ends_at": _promo.iso_utc(p.ends_at)}
+    resp = jsonify({"active": active})
+    resp.headers["Cache-Control"] = "public, max-age=60"
+    return resp
+
+
 @app.route("/api/classes/<int:class_id>/nominate", methods=["POST", "DELETE"])
 @require_login
 def nominate_class(class_id: int):
@@ -2391,16 +2406,19 @@ def _admin_or_403(write: bool = False):
 def _log_admin_action(s, actor, target, action: str, old_value: int, new_value: int, note: str = "") -> None:
     """Append one audit row inside the caller's transaction, so the edit and its record commit together — and
     write the same line to the app log, so the record also lives in journald/Sentry, independent of the
-    database (a restore or a bad migration must not erase "who moved this balance")."""
+    database (a restore or a bad migration must not erase "who moved this balance").
+
+    `target` may be None for an action on no particular account (the sign-up event routes: promo_*)."""
     actor_email = (actor.get("email") or "").strip().lower()
-    target_email = (target.email or "").strip().lower()
+    target_email = ((target.email if target is not None else "") or "").strip().lower()
+    target_id = target.id if target is not None else None
     ip = _client_ip()
     s.add(AdminAction(
         actor_user_id=actor.get("id"), actor_email=actor_email,
-        target_user_id=target.id, target_email=target_email,
+        target_user_id=target_id, target_email=target_email,
         action=action, old_value=int(old_value), new_value=int(new_value), note=note[:200], ip=ip[:64]))
     app.logger.info("admin action: %s by %s (uid %s) from %s on %s (uid %s): %s -> %s note=%r",
-                    action, actor_email, actor.get("id"), ip, target_email, target.id,
+                    action, actor_email, actor.get("id"), ip, target_email, target_id,
                     int(old_value), int(new_value), note[:200])
 
 
@@ -2523,7 +2541,12 @@ def admin_users():
         imports_by_class = _class_imports()
         imported: dict[int, list[dict]] = {}
         classes_n: dict[int, int] = {}
+        promo_of: dict[int, dict] = {}       # sign-up event bonus, so a balance with no donation is explainable
         if ids:
+            for uid, label, tokens in (s.query(PromoGrant.user_id, Promotion.label, PromoGrant.tokens)
+                                       .join(Promotion, Promotion.id == PromoGrant.promo_id)
+                                       .filter(PromoGrant.user_id.in_(ids)).order_by(PromoGrant.id).all()):
+                promo_of.setdefault(uid, {"label": label or "", "tokens": int(tokens or 0)})
             for cid, uid, name, created in (s.query(ForgedClass.id, ForgedClass.user_id, ForgedClass.name,
                                                     ForgedClass.created_at)
                                             .filter(ForgedClass.user_id.in_(ids)).all()):
@@ -2577,6 +2600,9 @@ def admin_users():
             # Empty means "none seen" — or "no traffic summary yet"; `imports_known` tells those apart.
             "imported": sorted(imported.get(u.id, []), key=lambda r: r.get("last") or "", reverse=True),
             "donated_cents": donated.get(u.id, 0),
+            # The sign-up event that granted this account its starting tokens (None = it never got one).
+            "promo_label": promo_of[u.id]["label"] if u.id in promo_of else None,
+            "promo_tokens": promo_of[u.id]["tokens"] if u.id in promo_of else 0,
             "created_at": u.created_at.isoformat() if u.created_at else None,
         } for u in rows]
 
@@ -2773,6 +2799,179 @@ def admin_unfeature_class(class_id: int):
         set_class_fields(s, cls, featured_at=None, featured_word=None)
         _log_admin_action(s, actor, owner, "unfeature_class", 1, 0, note=note)
         return jsonify(_archive_row(cls, owner.email))
+
+
+# --- operator dashboard: sign-up events ----------------------------------------------------------------
+# A time-boxed window in which every NEW account starts with N free hosted-forge tokens, up to a hard cap of
+# accounts (promo.py has the rules; the grant itself happens in auth._resolve_identity). A deliberate,
+# temporary exception to pricing v3's "no free tokens". Same gates as the rest of the panel: reads need admin,
+# writes also need a fresh sign-in, and every write is an admin_actions row (promo_create / promo_edit /
+# promo_end) with no target account, old/new = the cap before -> after (end: 1 -> 0), the event in the note.
+
+def _promo_note(p: Promotion, extra: str = "") -> str:
+    return (f"event #{p.id} {p.label}" + (f" · {extra}" if extra else ""))[:200]
+
+
+def _promo_stats(s, promo_ids: list[int]) -> dict[int, dict]:
+    """Per event: who it granted and what they did AFTER the grant — finished forges, the hosted (our) cost of
+    their token forges (metered, falling back to the rate-table estimate per row, as admin_stats does) and
+    paid donations. An account belongs to at most one event, so per-user facts never double count."""
+    out = {pid: {"granted": 0, "tokens_granted": 0, "forged_after": 0, "hosted_cost_usd": None,
+                 "donated_after": 0, "donated_cents_after": 0} for pid in promo_ids}
+    if not promo_ids:
+        return out
+    grants = (s.query(PromoGrant.promo_id, PromoGrant.user_id, PromoGrant.tokens, PromoGrant.created_at)
+              .filter(PromoGrant.promo_id.in_(promo_ids)).all())
+    since = {g.user_id: (g.promo_id, g.created_at) for g in grants}
+    for g in grants:
+        out[g.promo_id]["granted"] += 1
+        out[g.promo_id]["tokens_granted"] += int(g.tokens or 0)
+    uids = list(since)
+    if not uids:
+        return out
+
+    def after(uid, at) -> bool:
+        return at is not None and since[uid][1] is not None and at >= since[uid][1]
+
+    forged: set[int] = set()
+    for uid, at in (s.query(ForgeJob.user_id, ForgeJob.started_at)
+                    .filter(ForgeJob.user_id.in_(uids), ForgeJob.status == "done").all()):
+        if after(uid, at):
+            forged.add(uid)
+    cost: dict[int, int] = {}
+    for uid, at, metered, est in (s.query(ForgeUsage.user_id, ForgeUsage.created_at,
+                                          ForgeUsage.metered_cost_micros, ForgeUsage.est_cost_micros)
+                                  .filter(ForgeUsage.user_id.in_(uids), ForgeUsage.mode == "token").all()):
+        billed = metered if metered is not None else est
+        if billed is not None and after(uid, at):
+            pid = since[uid][0]
+            cost[pid] = cost.get(pid, 0) + int(billed)
+    donors: set[int] = set()
+    for uid, at, cents in (s.query(Purchase.user_id, Purchase.created_at, Purchase.amount_cents)
+                           .filter(Purchase.user_id.in_(uids), Purchase.status == "paid").all()):
+        if after(uid, at):
+            donors.add(uid)
+            out[since[uid][0]]["donated_cents_after"] += int(cents or 0)
+    for uid in forged:
+        out[since[uid][0]]["forged_after"] += 1
+    for uid in donors:
+        out[since[uid][0]]["donated_after"] += 1
+    for pid, micros in cost.items():
+        out[pid]["hosted_cost_usd"] = round(micros / 1_000_000, 6)
+    return out
+
+
+def _promo_row(p: Promotion, stats: dict, now) -> dict:
+    return {**p.summary(), "status": _promo.status_of(p, stats["granted"], now), "stats": stats}
+
+
+@app.route("/api/admin/promos")
+@require_login
+def admin_promos():
+    """Every sign-up event, newest first, with status (scheduled | live | capped | ended) and outcome stats."""
+    denied = _admin_or_403()
+    if denied:
+        return denied
+    now = _promo._now()
+    with session_scope() as s:
+        rows = s.query(Promotion).order_by(Promotion.id.desc()).all()
+        stats = _promo_stats(s, [p.id for p in rows])
+        return jsonify({"promos": [_promo_row(p, stats[p.id], now) for p in rows],
+                        "now": _promo.iso_utc(now)})
+
+
+def _promo_overlap_error(s, fields: dict, exclude_id: int | None, now):
+    clash = _promo.overlapping(s, fields["starts_at"], fields["ends_at"], exclude_id=exclude_id, now=now)
+    if clash is None:
+        return None
+    return jsonify({"error": f"overlaps event #{clash.id} \"{clash.label}\" "
+                             f"({_promo.iso_utc(clash.starts_at)} to {_promo.iso_utc(clash.ends_at)}); only one "
+                             "sign-up event may run at a time, so end or move that one first",
+                    "conflict_id": clash.id}), 409
+
+
+@app.route("/api/admin/promos", methods=["POST"])
+@require_login
+def admin_create_promo():
+    """Create a sign-up event. JSON {label, tokens_per_signup (default 1, <= 10), starts_at, ends_at (ISO 8601
+    WITH an offset), max_grants (required, >= 0)}. 400 on bad input, 409 when the window overlaps another
+    event that has not ended."""
+    denied = _admin_or_403(write=True)
+    if denied:
+        return denied
+    now = _promo._now()
+    try:
+        fields = _promo.parse_promo_body(request.get_json(silent=True), now)
+    except _promo.PromoInputError as e:
+        return jsonify({"error": str(e)}), 400
+    actor = current_user() or {}
+    with session_scope() as s:
+        clash = _promo_overlap_error(s, fields, None, now)
+        if clash:
+            return clash
+        p = Promotion(**fields, created_by_email=(actor.get("email") or "").strip().lower(),
+                      created_at=now.replace(microsecond=0))
+        s.add(p)
+        s.flush()
+        _log_admin_action(s, actor, None, "promo_create", 0, p.max_grants,
+                          note=_promo_note(p, f"{p.tokens_per_signup}/signup"))
+        stats = _promo_stats(s, [p.id])[p.id]
+        return jsonify(_promo_row(p, stats, now)), 201
+
+
+@app.route("/api/admin/promos/<int:promo_id>", methods=["POST"])
+@require_login
+def admin_edit_promo(promo_id: int):
+    """Replace an event's fields (same body and rules as create) while it is scheduled, live or capped — e.g.
+    raise the cap mid-event. An ended event (End now, or its window ran out) is history: 409."""
+    denied = _admin_or_403(write=True)
+    if denied:
+        return denied
+    now = _promo._now()
+    actor = current_user() or {}
+    with session_scope() as s:
+        p = s.query(Promotion).filter_by(id=promo_id).one_or_none()
+        if p is None:
+            return jsonify({"error": "no such event"}), 404
+        if _promo.status_of(p, 0, now) == "ended":
+            return jsonify({"error": "that event has ended and can no longer be edited"}), 409
+        try:
+            fields = _promo.parse_promo_body(request.get_json(silent=True), now)
+        except _promo.PromoInputError as e:
+            return jsonify({"error": str(e)}), 400
+        clash = _promo_overlap_error(s, fields, p.id, now)
+        if clash:
+            return clash
+        old_cap = p.max_grants
+        changed = [k for k, v in fields.items() if getattr(p, k) != v]
+        for k, v in fields.items():
+            setattr(p, k, v)
+        if changed:
+            _log_admin_action(s, actor, None, "promo_edit", old_cap, p.max_grants,
+                              note=_promo_note(p, ",".join(changed)))
+        stats = _promo_stats(s, [p.id])[p.id]
+        return jsonify(_promo_row(p, stats, now))
+
+
+@app.route("/api/admin/promos/<int:promo_id>/end", methods=["POST"])
+@require_login
+def admin_end_promo(promo_id: int):
+    """End an event now. Idempotent: an event already ended early keeps its first ended_at and writes no
+    second audit row. Signups after this get an account and no tokens."""
+    denied = _admin_or_403(write=True)
+    if denied:
+        return denied
+    now = _promo._now()
+    actor = current_user() or {}
+    with session_scope() as s:
+        p = s.query(Promotion).filter_by(id=promo_id).one_or_none()
+        if p is None:
+            return jsonify({"error": "no such event"}), 404
+        if p.ended_at is None:
+            p.ended_at = now.replace(microsecond=0)
+            _log_admin_action(s, actor, None, "promo_end", 1, 0, note=_promo_note(p))
+        stats = _promo_stats(s, [p.id])[p.id]
+        return jsonify(_promo_row(p, stats, now))
 
 
 @app.route("/api/admin/actions")

@@ -26,8 +26,9 @@ from datetime import datetime, timedelta, timezone
 import requests
 from flask import jsonify, redirect, request, send_from_directory, session, url_for
 
+import promo
 from db import session_scope
-from models import Identity, LoginLink, User
+from models import Identity, LoginLink, PromoGrant, Promotion, User
 
 GOOGLE_METADATA = "https://accounts.google.com/.well-known/openid-configuration"
 _oauth = None  # set by init_auth when at least one provider's credentials are present
@@ -217,6 +218,10 @@ def _resolve_identity(p: Profile, *, current_user_id: int | None = None) -> dict
                         email=email if p.email_verified else "", name=p.name or "")
             s.add(user)
             s.flush()
+            # Rule 4 is the ONLY place an account is born, so it is the only place a sign-up event pays out
+            # (promo.py). Same transaction, inside a savepoint: a promo failure costs the bonus, never the
+            # sign-in. Rules 1-3 (repeat sign-in, linking a second provider) never reach this line.
+            promo.grant_signup_bonus(s, user)
         elif p.email_verified:
             user.email = email or user.email
             user.name = p.name or user.name
@@ -589,8 +594,20 @@ def init_auth(app) -> None:
                 # Effective unlimited (env list or the operator-granted flag) off the SAME row we just read
                 # for the balance — one query, and it reflects a grant made seconds ago without a re-login.
                 unlimited = user_is_unlimited(row)
+                # A sign-up event bonus the browser has not been told about yet: handed out ONCE (seen_at is
+                # stamped here), so the welcome notice does not reappear on every page load.
+                welcome = None
+                g = (s.query(PromoGrant, Promotion.label)
+                     .join(Promotion, Promotion.id == PromoGrant.promo_id)
+                     .filter(PromoGrant.user_id == user["id"], PromoGrant.seen_at.is_(None))
+                     .order_by(PromoGrant.id).first())
+                if g is not None:
+                    grant, label = g
+                    welcome = {"label": label or "", "tokens": int(grant.tokens or 0)}
+                    grant.seen_at = _utc_naive(_now())
             user = {**user, "token_balance": bal,
                     "unlimited": unlimited,
+                    "welcome_grant": welcome,
                     "admin": is_admin(user.get("email", "")),
                     "identities": _identities_of(user["id"])}
         # email_login gates signin.js's email form: mail configured, or the dev bypass standing in for it.

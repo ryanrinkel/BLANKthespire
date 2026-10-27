@@ -142,14 +142,21 @@ if (WV && WV.any) {
 
 // Point the button at the right place: already signed in → straight to the app; local dev (no OAuth
 // credentials, so the chooser has no buttons) → the dev-login bypass; otherwise → /login, the provider
-// chooser (the default href).
+// chooser (the default href). The same answer drives the sign-up event ribbon (signup-event.js), which goes
+// right above the button and only ever appears for a signed-out visitor while an event is live.
 (async () => {
+  let me = null;
   try {
-    const me = await (await fetch("/api/me")).json();
+    me = await (await fetch("/api/me")).json();
     const go = document.getElementById("signin");
     if (me && me.user) go.href = "/app";
     else if (me && me.dev_auth) go.href = "/dev-login?email=dev@example.com";
   } catch (_) { /* leave the button pointing at /login */ }
+  const EV = window.BTS_EVENT;
+  if (EV) {
+    EV.keepWelcome(me);
+    EV.ribbon(me, (node) => document.querySelector(".splash-actions").before(node));
+  }
 })();
 
 run();

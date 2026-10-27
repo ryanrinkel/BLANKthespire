@@ -285,3 +285,32 @@ def test_the_copy_rule_scanner_catches_a_violation():
     """The scanner above must not pass vacuously."""
     assert _banned_words().search("Bought 4 tokens") and _banned_words().search("purchase more")
     assert not _banned_words().search("buoyant busy")
+
+
+# --- sign-up events (docs/plans/SIGNUP_EVENTS_PLAN.md) ----------------------------------------------------
+
+def test_signup_event_ui_is_invisible_by_default(client, app_module):
+    """The ribbon is built by signup-event.js only when an event is live, so no page ships it in its markup; the
+    app's welcome banner and the admin Events card are present but hidden until app.js reveals them."""
+    for path, page_js in (("/", "/static/landing.js"), ("/login", "/static/signin.js")):
+        body = client.get(path).get_data(as_text=True)
+        assert "/static/signup-event.js?v=" in body, path
+        assert body.index("/static/signup-event.js") < body.index(page_js), path
+        assert "event-ribbon" not in body, path
+    login(client)
+    app_page = client.get("/app").get_data(as_text=True)
+    assert 'id="welcome-banner" class="banner welcome hidden"' in app_page
+    assert 'id="admin-events" class="card hidden"' in app_page
+    assert app_page.index('id="admin-archive"') < app_page.index('id="admin-events"')
+    assert 'id="admin-event-form" class="admin-event-form hidden"' in app_page
+
+
+def test_every_page_loads_the_same_stylesheet_version(app_module):
+    """style.css is shared, so one bump must reach every page (nginx caches /static for an hour)."""
+    static = app_module.WEB_DIR / "static"
+    versions = {}
+    for page in sorted(static.glob("*.html")):
+        m = re.search(r"/static/style\.css\?v=(\w+)", page.read_text(encoding="utf-8"))
+        if m:
+            versions[page.name] = m.group(1)
+    assert len(versions) >= 6 and len(set(versions.values())) == 1, versions

@@ -656,3 +656,37 @@ body:not(.is-phone) .phone-only { display: none !important; }
   main, #gate { padding-left: 16px; padding-right: 16px; }
   .pay-step { padding: 8px 10px; }
 }
+
+/* --- sign-up events (2026-10-26, docs/plans/SIGNUP_EVENTS_PLAN.md) -------------------------------------- */
+/* The ribbon on the splash and /login: built by signup-event.js only while an event is live and only for a
+   signed-out visitor, so nothing here ever reserves space on an ordinary visit. Same purple as .banner. */
+.event-ribbon { display: flex; align-items: flex-start; gap: 8px; max-width: 46ch; margin: 22px auto 0;
+  padding: 10px 14px; border: 1px solid var(--accent2); border-radius: 12px; font-size: 14px; line-height: 1.45;
+  text-align: left; color: var(--ink); background: linear-gradient(135deg, rgba(124,92,255,.18), var(--panel)); }
+.event-ribbon-icon { flex: none; }
+.event-ribbon b { color: var(--accent); }
+/* On /login it sits under the lede, inside the card. */
+.card .event-ribbon { max-width: none; margin: 4px 0 14px; }
+/* The one-time "an event gave you N tokens" notice at the top of the forge tab (app.js renderWelcome). */
+.banner.welcome .banner-icon { color: var(--accent); }
+.banner.welcome p { flex: 1; min-width: 0; margin: 0; line-height: 1.45; }
+/* Admin Events card (#admin-events): the user panel's grid, a status pill, and the create/edit form. */
+.ev-pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 600;
+  border: 1px solid var(--line); color: var(--muted); }
+.ev-pill.live { color: var(--uncommon); border-color: rgba(95, 208, 168, .5); }
+.ev-pill.scheduled { color: var(--accent); border-color: var(--accent2); }
+.ev-pill.capped { color: var(--rare); border-color: rgba(255, 209, 102, .5); }
+#admin-events .stats-head .btn { margin: 0; padding: 6px 12px; font-size: 13px; }
+.admin-events-table .wrap-cell { white-space: normal; min-width: 140px; }
+.admin-events-table .row-actions { display: flex; flex-direction: column; gap: 4px; }
+.admin-events-table .row-actions .btn { margin: 0; }
+.admin-event-form { margin-top: 14px; padding: 12px 14px; background: var(--panel2); border: 1px solid var(--line);
+  border-radius: 10px; }
+.admin-event-form .admin-log-head { margin-top: 0; }
+.admin-event-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0 12px; }
+.admin-event-grid .lbl.small { margin-top: 6px; }
+.admin-event-grid .in { background: var(--panel); color-scheme: dark; }
+.admin-event-form .form-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.admin-event-form .form-actions .btn { margin-top: 4px; }
+#admin-event-note.err, #admin-events-note.err { color: var(--danger); }
+#admin-event-note.ok, #admin-events-note.ok { color: var(--accent); }

@@ -377,3 +377,57 @@ class AdminAction(Base):
             "note": self.note,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
+
+
+class Promotion(Base):
+    """A sign-up event: every NEW account created inside [starts_at, ends_at) starts with `tokens_per_signup`
+    hosted-forge tokens, until `max_grants` accounts have been granted (see promo.py).
+
+    This is a deliberate, time-limited exception to pricing v3's "no free tokens" (INITIAL_TOKENS = 0 above):
+    the operator opens a window with a hard cap, so the most it can cost is max_grants x tokens_per_signup
+    hosted forges. Existing accounts never get anything from it. Datetimes are naive UTC (auth._utc_naive).
+    `ended_at` is set by the admin "End now" route; an event whose window ran out leaves it NULL. Brand-new
+    table ⇒ created by create_all on boot, no _ensure_* migration needed."""
+    __tablename__ = "promotions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    label: Mapped[str] = mapped_column(String(120), default="")
+    tokens_per_signup: Mapped[int] = mapped_column(Integer, default=1)
+    starts_at: Mapped[datetime] = mapped_column(DateTime)
+    ends_at: Mapped[datetime] = mapped_column(DateTime)
+    max_grants: Mapped[int] = mapped_column(Integer, default=0)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime, default=None, nullable=True)
+    created_by_email: Mapped[str] = mapped_column(String(320), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    def summary(self) -> dict:
+        """Admin-list shape. Datetimes go out with an explicit +00:00 so nobody reads them as local time."""
+        def iso(dt):
+            return dt.replace(tzinfo=timezone.utc).isoformat() if dt is not None else None
+        return {
+            "id": self.id,
+            "label": self.label,
+            "tokens_per_signup": self.tokens_per_signup,
+            "starts_at": iso(self.starts_at),
+            "ends_at": iso(self.ends_at),
+            "max_grants": self.max_grants,
+            "ended_at": iso(self.ended_at),
+            "created_by_email": self.created_by_email,
+            "created_at": iso(self.created_at),
+        }
+
+
+class PromoGrant(Base):
+    """One account's sign-up-event bonus: which event, how many tokens, when. UNIQUE (promo_id, user_id) is the
+    no-double-grant guard; COUNT(*) per promo_id is what the cap is checked against. `seen_at` is stamped the
+    first time /api/me hands the grant to the browser as `welcome_grant`, so the welcome notice shows once.
+    Brand-new table ⇒ created by create_all, no boot migration needed."""
+    __tablename__ = "promo_grants"
+    __table_args__ = (UniqueConstraint("promo_id", "user_id", name="uq_promo_grants_promo_user"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    promo_id: Mapped[int] = mapped_column(ForeignKey("promotions.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    tokens: Mapped[int] = mapped_column(Integer, default=0)
+    seen_at: Mapped[datetime | None] = mapped_column(DateTime, default=None, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

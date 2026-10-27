@@ -68,6 +68,7 @@ async function boot() {
   applyRemixPrefill();
   DRAFT_RESTORED = restoreDraft();
   renderBanner();
+  renderWelcome(ME.welcome_grant);
   loadEstimate();
   loadDonation();  // the forge tab's inline tier buttons need /api/billing before the Account tab is opened
   // #account is where a finished "link another sign-in" comes back to (auth._landing), so honour the hash.
@@ -315,6 +316,29 @@ function payReason() {
 // One line under the Forge button (describe, Forge, copy, paste in-game) that every signed-in account sees until
 // dismissed; the text is static in index.html. The five-step 2026-09-30 version shrank to this on 2026-10-26
 // (FORGE_FIRST_PLAN.md 3.4): installing the mod is now explained on the result, after the class exists.
+// Sign-up event welcome (docs/plans/SIGNUP_EVENTS_PLAN.md). /api/me hands out user.welcome_grant ONCE (the
+// server stamps it seen on that read), so whichever read gets it shows it: boot(), or loadAccount() if boot's
+// read came first on another tab. landing.js / signin.js park one THEY consumed in bts_welcome_grant
+// (signup-event.js keepWelcome), tagged with the account id so a different sign-in on this browser never
+// inherits it. Nothing to show -> the banner stays hidden; dismissing only hides it (it is already "seen").
+function renderWelcome(grant) {
+  const raw = lsGet("bts_welcome_grant");
+  if (raw) {
+    lsDel("bts_welcome_grant");
+    if (!grant) {
+      try {
+        const g = JSON.parse(raw);
+        if (g && ME && Number(g.uid) === Number(ME.id)) grant = g;
+      } catch (_) { /* a mangled key is just dropped */ }
+    }
+  }
+  const n = grant ? Number(grant.tokens) || 0 : 0;
+  if (n <= 0) return;
+  el("welcome-text").textContent = `Welcome! ${grant.label || "A sign-up event"} gave you ${n} free forge token`
+    + `${n === 1 ? "" : "s"}. One token forges one class \u2014 describe yours below and press Forge.`;
+  el("welcome-banner").classList.remove("hidden");
+}
+
 function renderBanner() {
   const bar = el("v3-banner");
   if (!bar) return;
@@ -1363,7 +1387,10 @@ async function loadAccount() {
     // the identities: coming back from a link flow lands here and must show the new method.
     const [meR, purR] = await Promise.all([fetch("/api/me"), fetch("/api/purchases")]);
     const meData = await meR.json();
-    if (meData.user) { ME = meData.user; ME_META = meData; renderTokens(); renderSignInMethods(); }
+    if (meData.user) {
+      ME = meData.user; ME_META = meData; renderTokens(); renderSignInMethods();
+      if (ME.welcome_grant) renderWelcome(ME.welcome_grant);
+    }
     await loadDonation();
     renderPurchases((await purR.json()).purchases || []);
   } catch (_) {
@@ -1373,6 +1400,7 @@ async function loadAccount() {
   loadTraffic();
   loadAdminUsers();
   loadAdminArchive();
+  loadAdminEvents();
 }
 
 // Which sign-ins reach this account, and what is left to add. No unlinking in v1 (see index.html).
@@ -1971,7 +1999,9 @@ function renderAdminUsers(d) {
     const who = esc(u.email || "(no email)")
       + (u.admin ? ` <span class="sub">· admin</span>` : "")
       + `<div class="sub">${esc(u.name || "")}${u.name && u.providers.length ? " · " : ""}`
-      + `${esc((u.providers || []).join(", "))}</div>`;
+      + `${esc((u.providers || []).join(", "))}</div>`
+      // A starting balance from a sign-up event, so tokens with no donation behind them are explainable.
+      + (u.promo_label ? `<div class="sub">🎁 ${esc(u.promo_label)} (+${Number(u.promo_tokens || 0)})</div>` : "");
     return `<tr data-uid="${u.id}">`
       + `<td class="who-cell">${who}</td>`
       + `<td class="num"><input class="in tok" type="number" min="0" max="100000" step="1"`
@@ -2113,6 +2143,8 @@ async function saveAdminUnlimited(row, box) {
 }
 
 const ADMIN_ACTION_VERB = { set_tokens: "tokens", set_unlimited: "unlimited" };
+// Sign-up event actions have no target account; old/new are the cap before -> after, the event is in a.note.
+const PROMO_ACTION_LABEL = { promo_create: "created", promo_edit: "edited", promo_end: "ended" };
 // The Archive's actions target the class OWNER; which class (and the word / note) rides in a.note.
 const ARCHIVE_ACTION_LABEL = {
   feature_class: "featured", pass_nomination: "passed on", unfeature_class: "unfeatured",
@@ -2128,6 +2160,12 @@ async function loadAdminActions() {
     list.innerHTML = rows.length
       ? rows.map((a) => {
         const when0 = a.created_at ? new Date(a.created_at + "Z").toLocaleString() : "";
+        if (PROMO_ACTION_LABEL[a.action]) {
+          const cap = a.action === "promo_create" ? ` · cap ${a.new_value}`
+            : a.action === "promo_edit" && a.old_value !== a.new_value ? ` · cap ${a.old_value} → ${a.new_value}` : "";
+          return `<li>${esc(a.actor_email || "?")} ${PROMO_ACTION_LABEL[a.action]} sign-up ${esc(a.note || "event")}`
+            + `${esc(cap)}<span class="sub"> · ${esc(when0)}</span></li>`;
+        }
         if (ARCHIVE_ACTION_LABEL[a.action]) {
           return `<li>${esc(a.actor_email || "?")} ${ARCHIVE_ACTION_LABEL[a.action]} ${esc(a.note || "a class")}`
             + ` (owner ${esc(a.target_email || "?")})<span class="sub"> · ${esc(when0)}</span></li>`;
@@ -2233,6 +2271,183 @@ async function adminArchiveAct(btn, id, act, name) {
   }
 }
 
+// --- admin: sign-up events ----------------------------------------------------------------------------
+// Same gate as the Users card. /api/admin/promos -> one row per event (newest first) with its status
+// (scheduled | live | capped | ended) and what its accounts did after the grant. The form creates or edits
+// (same full body either way; an ended event is history and offers neither Edit nor End now). Times are typed
+// and shown in the browser's zone and sent as ISO with that zone's offset, which the server requires. Writes
+// answer 403 + reauth when the sign-in is older than 4h, 400 on bad input and 409 on an overlapping window;
+// each message lands in the form's note (or the card's note for End now), like the Archive card.
+let ADMIN_EVENTS = [];
+let EDITING_EVENT = null;  // the id the form is editing, or null for a new event
+
+const pad2 = (n) => String(n).padStart(2, "0");
+function localTzName() {
+  try {
+    const part = new Intl.DateTimeFormat(undefined, { timeZoneName: "short" }).formatToParts(new Date())
+      .find((p) => p.type === "timeZoneName");
+    return part ? part.value : "";
+  } catch (_) { return ""; }
+}
+function evWhen(iso) {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString(undefined, {
+    weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
+// "2026-10-30T18:00" (a datetime-local value, the viewer's wall clock) -> "2026-10-30T18:00:00-04:00", the
+// offset taken for THAT date so a window across a DST change keeps the hour that was typed.
+function localInputToIso(v) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(v || "");
+  if (!m) return null;
+  const off = -new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]).getTimezoneOffset();
+  const a = Math.abs(off);
+  return `${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:00${off >= 0 ? "+" : "-"}${pad2(Math.floor(a / 60))}:${pad2(a % 60)}`;
+}
+function isoToLocalInput(iso) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+function noteEl(id, msg, cls) {
+  const n = el(id);
+  n.textContent = msg;
+  n.className = "hint" + (cls ? " " + cls : "");
+}
+
+async function loadAdminEvents() {
+  const card = el("admin-events");
+  if (!card) return;
+  if (!ME || !ME.admin) { card.classList.add("hidden"); return; }
+  card.classList.remove("hidden");
+  const tz = localTzName();
+  el("admin-events-tz").textContent = "Every account created inside an event's window starts with its free tokens, "
+    + "until the cap of accounts is reached. One event at a time. Times are in your time zone"
+    + (tz ? ` (${tz})` : "") + ".";
+  try {
+    const r = await fetch("/api/admin/promos");
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    renderAdminEvents(await r.json());
+  } catch (e) {
+    noteEl("admin-events-note", "Couldn't load sign-up events: " + e.message, "err");
+  }
+}
+
+function renderAdminEvents(d) {
+  ADMIN_EVENTS = d.promos || [];
+  const head = `<tr><th class="wrap-cell">Event</th><th>Status</th><th class="wrap-cell">Window</th>`
+    + `<th class="num" title="Accounts granted / the cap">Granted</th>`
+    + `<th class="num" title="Granted accounts with at least one finished forge after the grant">Forged</th>`
+    + `<th class="num" title="What their hosted (token) forges cost us after the grant, metered where known">Our cost</th>`
+    + `<th class="num" title="Granted accounts that donated after the grant, and how much">Donated</th><th></th></tr>`;
+  const rows = ADMIN_EVENTS.map((p) => {
+    const st = p.stats || {};
+    const n = Number(p.tokens_per_signup || 0);
+    const ended = p.status === "ended";
+    const early = p.ended_at ? `<div class="sub">ended early ${esc(evWhen(p.ended_at))}</div>` : "";
+    return `<tr data-id="${p.id}">`
+      + `<td class="wrap-cell">${esc(p.label)}<div class="sub">#${p.id} · ${n} token${n === 1 ? "" : "s"} per signup`
+      + `${p.created_by_email ? " · " + esc(p.created_by_email) : ""}</div></td>`
+      + `<td><span class="ev-pill ${esc(p.status)}">${esc(p.status)}</span></td>`
+      + `<td class="wrap-cell">${esc(evWhen(p.starts_at))} →<div>${esc(evWhen(p.ends_at))}</div>${early}</td>`
+      + `<td class="num">${fmtInt(st.granted)} / ${fmtInt(p.max_grants)}</td>`
+      + `<td class="num">${fmtInt(st.forged_after)}</td>`
+      + `<td class="num">${fmtUsd(st.hosted_cost_usd)}</td>`
+      + `<td class="num">${fmtInt(st.donated_after)}`
+      + (st.donated_cents_after ? `<div class="sub">${fmtMoney(st.donated_cents_after, "usd")}</div>` : "") + `</td>`
+      + `<td>${ended ? "" : `<div class="row-actions"><button class="btn" type="button" data-act="edit">Edit</button>`
+        + `<button class="btn ghost" type="button" data-act="end">End now</button></div>`}</td></tr>`;
+  }).join("");
+  el("admin-events-table").innerHTML = head
+    + (rows || `<tr><td colspan="8" class="muted">No sign-up events yet.</td></tr>`);
+  el("admin-events-table").onclick = (ev) => {
+    const btn = ev.target.closest("button[data-act]");
+    const row = btn && btn.closest("tr[data-id]");
+    const p = row && ADMIN_EVENTS.find((x) => String(x.id) === row.dataset.id);
+    if (!p) return;
+    if (btn.dataset.act === "edit") openEventForm(p);
+    else endAdminEvent(btn, p);
+  };
+}
+
+function openEventForm(p) {
+  EDITING_EVENT = p ? p.id : null;
+  el("admin-event-form-title").textContent = p ? `Edit event #${p.id}` : "New event";
+  el("admin-event-save").textContent = p ? "Save changes" : "Create event";
+  el("ev-label").value = p ? p.label : "";
+  el("ev-tokens").value = p ? p.tokens_per_signup : 1;
+  el("ev-cap").value = p ? p.max_grants : "";
+  if (p) {
+    el("ev-start").value = isoToLocalInput(p.starts_at);
+    el("ev-end").value = isoToLocalInput(p.ends_at);
+  } else {
+    // A starting point to adjust: the next whole hour, for two days.
+    const start = new Date();
+    start.setMinutes(0, 0, 0);
+    start.setHours(start.getHours() + 1);
+    el("ev-start").value = isoToLocalInput(start.toISOString());
+    el("ev-end").value = isoToLocalInput(new Date(start.getTime() + 48 * 3600 * 1000).toISOString());
+  }
+  noteEl("admin-event-note", "", "");
+  el("admin-event-form").classList.remove("hidden");
+  el("ev-label").focus();
+}
+
+function closeEventForm() {
+  EDITING_EVENT = null;
+  el("admin-event-form").classList.add("hidden");
+}
+
+async function saveAdminEvent(ev) {
+  ev.preventDefault();
+  const starts = localInputToIso(el("ev-start").value), ends = localInputToIso(el("ev-end").value);
+  if (!starts || !ends) { noteEl("admin-event-note", "Pick a start and an end.", "err"); return; }
+  const cap = el("ev-cap").value.trim();
+  const body = {
+    label: el("ev-label").value.trim(),
+    tokens_per_signup: el("ev-tokens").value.trim() || 1,
+    max_grants: cap === "" ? null : cap,
+    starts_at: starts, ends_at: ends,
+  };
+  const editing = EDITING_EVENT;
+  const btn = el("admin-event-save");
+  btn.disabled = true;
+  noteEl("admin-event-note", "Saving…", "");
+  try {
+    const r = await fetch(editing ? `/api/admin/promos/${editing}` : "/api/admin/promos", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
+    closeEventForm();
+    noteEl("admin-events-note", `${editing ? "Saved" : "Created"} event #${d.id} “${d.label}” (${d.status}).`, "ok");
+    await loadAdminEvents();
+    loadAdminActions();
+  } catch (e) {
+    // A 409 names the clashing window in UTC ISO; say it in the same local time as the table.
+    noteEl("admin-event-note", e.message.replace(/\d{4}-\d{2}-\d{2}T[\d:.]+(?:Z|[+-]\d{2}:\d{2})/g, evWhen), "err");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function endAdminEvent(btn, p) {
+  if (!confirm(`End “${p.label}” now? Accounts created after this get no free tokens, and an ended event `
+    + "can't be edited or restarted.")) return;
+  btn.disabled = true;
+  try {
+    const r = await fetch(`/api/admin/promos/${p.id}/end`, { method: "POST" });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
+    if (EDITING_EVENT === p.id) closeEventForm();
+    noteEl("admin-events-note", `Ended “${p.label}”. The public ribbon can take up to a minute to disappear.`, "ok");
+    await loadAdminEvents();
+    loadAdminActions();
+  } catch (e) {
+    noteEl("admin-events-note", e.message, "err");
+    btn.disabled = false;
+  }
+}
+
 // Which box is open IS the choice: opening one closes the other and is remembered for next visit.
 el("forge-byok").addEventListener("toggle", () => onPayBoxToggle("forge-byok", "forge-token", "byok"));
 el("forge-token").addEventListener("toggle", () => onPayBoxToggle("forge-token", "forge-byok", "token"));
@@ -2255,6 +2470,10 @@ el("forge-byok").addEventListener("toggle", scheduleModelLoad);
 el("estimate-btn").onclick = () => showEstimate(true);
 el("key-safety-btn").onclick = () => el("key-safety").classList.toggle("hidden");
 el("stats-days").onchange = loadStats;
+el("welcome-x").onclick = () => el("welcome-banner").classList.add("hidden");
+el("admin-events-new").onclick = () => openEventForm(null);
+el("admin-event-cancel").onclick = closeEventForm;
+el("admin-event-form").onsubmit = saveAdminEvent;
 el("traffic-days").onchange = loadTraffic;
 // Debounced so typing an address doesn't fire a query per keystroke.
 el("admin-users-q").oninput = () => {

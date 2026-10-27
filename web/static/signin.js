@@ -102,6 +102,14 @@ function wireEmailForm() {
     me = await (await fetch("/api/me")).json();
   } catch (_) { /* offline or the API is down — fall through to the "not configured" copy */ }
 
+  // A sign-up event (signup-event.js): park a welcome notice this read may have consumed before bouncing to
+  // the app, and show the event ribbon under the lede to a signed-out visitor only.
+  const EV = window.BTS_EVENT;
+  if (EV) {
+    EV.keepWelcome(me);
+    EV.ribbon(me, (node) => el("lede").after(node));
+  }
+
   if (me && me.user && !LINKING) { window.location.replace("/app"); return; }
 
   const owned = new Set(((me && me.user && me.user.identities) || []).map((i) => i.provider));
