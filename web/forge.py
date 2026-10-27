@@ -800,13 +800,22 @@ _PROVIDER_REFUSALS: list[tuple[re.Pattern, str]] = [
      "Your provider account has no credits left, so it refused the request. Add credits on your provider's "
      "billing page, then forge again — nothing was charged here."),
     (re.compile(r"invalid_api_key|authentication_error|invalid x-api-key|incorrect api key|invalid api key|"
-                r"HTTP 401|Error code: 401|401.{0,40}unauthorized", re.I),
+                r"\bHTTP 401\b|Error code: 401|\b401\b.{0,40}unauthorized", re.I),
      "Your provider rejected the API key. Paste a current key from your provider's dashboard (and check the "
      "provider dropdown matches where the key came from)."),
-    (re.compile(r"HTTP 403|permission_denied|forbidden", re.I),
+    (re.compile(r"\bHTTP 403\b|permission_denied|forbidden", re.I),
      "Your provider says this key isn't allowed to use that model or endpoint. Check the key's permissions "
      "on your provider's dashboard, or pick another model."),
-    (re.compile(r"HTTP 429|rate[_ ]limit|too many requests", re.I),
+    # A SINGLE request bigger than the key's per-minute token cap (Groq free plan: 8K TPM on gpt-oss-120b,
+    # HTTP 413 "Request too large ... Limit 8000, Requested 10549", 2026-10-27). Waiting a minute can't help:
+    # the forge's front-end prompt alone is over the cap and the card prompts are bigger still, so it sits
+    # above the generic 429 wording that tells the player to retry.
+    (re.compile(r"request too large|\bHTTP 413\b|Error code: 413|tokens per minute \(TPM\)|"
+                r"reduce (?:your|the) (?:message|prompt|request) size", re.I),
+     "Your provider's plan caps how many tokens one request may send per minute, and a single forge prompt "
+     "is larger than that cap, so retrying won't help. Upgrade the plan on your provider account (Groq: "
+     "Settings → Billing → Plans → Developer) or forge with a key from another provider."),
+    (re.compile(r"\bHTTP 429\b|rate[_ ]limit|too many requests", re.I),
      "Your provider rate-limited the key. Wait a minute and forge again, or raise the limit on your "
      "provider account."),
 ]

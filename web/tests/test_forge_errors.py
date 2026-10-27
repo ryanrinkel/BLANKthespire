@@ -36,6 +36,29 @@ def test_no_credits_is_not_read_as_a_rate_limit():
     assert "rate-limited" in forge.explain_provider_error(OPENAI_429_RATE)
 
 
+GROQ_413_TPM = ('front-end failed: endpoint returned HTTP 413: {"error":{"message":"Request too large for model '
+                '`openai/gpt-oss-120b` in organization `org_x` service tier `on_demand` on tokens per minute (TPM): '
+                'Limit 8000, Requested 10549, please reduce your message size and try again. Need more tokens? '
+                'Upgrade to Dev Tier today at https://console.groq.com/settings/billing","type":"tokens",'
+                '"code":"rate_limit_exceeded"}}')
+
+
+def test_request_over_the_per_minute_cap_says_upgrade_not_retry():
+    # Groq free plan, 2026-10-27: one prompt is bigger than the whole per-minute allowance, so "wait a
+    # minute" is wrong advice. The body also says rate_limit_exceeded, so this must win over the generic 429.
+    why = forge.explain_provider_error(GROQ_413_TPM)
+    assert "retrying won't help" in why and "Upgrade the plan" in why
+    assert "Wait a minute" not in why
+
+
+def test_bare_http_status_lines_match():
+    # The \bHTTP 4xx\b alternatives were literal backspace bytes from 2026-10-11 to 2026-10-27 and never
+    # matched; a bare status with no recognised code in the body must still get a sentence.
+    assert "rejected the API key" in forge.explain_provider_error("front-end failed: endpoint returned HTTP 401: {}")
+    assert "isn't allowed" in forge.explain_provider_error("front-end failed: endpoint returned HTTP 403: {}")
+    assert "rate-limited" in forge.explain_provider_error("front-end failed: endpoint returned HTTP 429: {}")
+
+
 def test_bad_keys_on_both_wire_shapes():
     for raw in (OPENAI_401, ANTHROPIC_401):
         assert "rejected the API key" in forge.explain_provider_error(raw)
