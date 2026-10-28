@@ -27,6 +27,7 @@ No private rule-0.9 ceiling lives here — the one budget is in tests/test_harne
 """
 from __future__ import annotations
 
+import json
 import pathlib
 import re
 import sys
@@ -307,8 +308,12 @@ def _t_contract() -> None:
     js = (REPO / "web" / "static" / "render.js").read_text(encoding="utf-8")
     check('pool: "potion_pool"' in js, "render.js lists potion_pool among the class mechanics")
     check("function potionLines(" in js, "render.js formats the potion's lines")
-    check("Drops alongside the usual potions" in js, "... and tells the player it is an ADDITION to the table")
-    check('potion: "How\'s this potion?"' in js, "the feedback popout has a potion prompt")
+    en = json.loads((REPO / "web" / "static" / "i18n" / "en.json").read_text(encoding="utf-8"))["strings"]
+    check('"app.mech.potion_drops"' in js
+          and en.get("app.mech.potion_drops", "").startswith("Drops alongside the usual potions"),
+          "... and tells the player it is an ADDITION to the table")
+    check('"potion"' in js.split("FB_TITLE_KINDS", 1)[1].split("\n", 1)[0]
+          and en.get("app.feedback.title_potion") == "How's this potion?", "the feedback popout has a potion prompt")
     fg = (REPO / "web" / "forge.py").read_text(encoding="utf-8")
     check('"potion"' in fg.split("ELEMENT_KINDS", 1)[1].split("\n", 1)[0],
           "the server accepts potion as a rateable element kind")

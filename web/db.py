@@ -127,6 +127,10 @@ def _ensure_class_columns() -> None:
         if col not in cols:
             with engine.begin() as conn:
                 conn.execute(text(f"ALTER TABLE classes ADD COLUMN {col} {ddl}"))
+    # Per-forge language (I18N plan C2): every class forged before it is English.
+    if "lang" not in cols:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE classes ADD COLUMN lang VARCHAR(8) NOT NULL DEFAULT 'en'"))
 
 
 def _ensure_purchase_columns() -> None:

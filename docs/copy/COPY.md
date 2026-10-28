@@ -399,6 +399,30 @@ Notes: the same example sentence opens the Workshop description.
 
     e.g. a venomous plague doctor who sacrifices health to stack poison, then turns blood into armor
 
+### app.concept.lang_label
+Where: static/index.html (label of the per-forge language selector under the concept box)
+Notes: added 2026-10-27 by the i18n build, owner to review
+
+    Class language
+
+### app.concept.lang_en
+Where: static/index.html (option in the per-forge language selector)
+Notes: added 2026-10-27 by the i18n build, owner to review. Each option names its language in that language.
+
+    English
+
+### app.concept.lang_zh
+Where: static/index.html (option in the per-forge language selector)
+Notes: added 2026-10-27 by the i18n build, owner to review. Each option names its language in that language.
+
+    中文（简体）
+
+### app.concept.lang_hint
+Where: static/index.html (hint under the selector; app.js shows it only when the class language is not English)
+Notes: added 2026-10-27 by the i18n build, owner to review
+
+    Names and descriptions are translated after the design; the design itself runs in English.
+
 ### app.pay.label
 Where: static/index.html:73 (p.lbl above the two pay boxes)
 
@@ -1739,34 +1763,40 @@ Where: static/render.js:154 (feedback popup title when the relic has no name)
     Keystone relic
 
 ### app.relic.mod.max_energy
-Where: static/render.js:166 (relic effect line, after "+{amount} ")
+Where: static/render.js fmtMod (relic effect line)
+Notes: {amount} = the signed amount ("+1", "-8": max_hp may be negative). A whole template since 2026-10-27 (was a fragment after "+{amount} "), so a language can put the number where it reads naturally.
 
-    max energy
+    {amount} max energy
 
 ### app.relic.mod.first_attack
-Where: static/render.js:166
+Where: static/render.js fmtMod (relic effect line)
+Notes: {amount} = the signed amount, as app.relic.mod.max_energy.
 
-    first-attack damage
+    {amount} first-attack damage
 
 ### app.relic.mod.cost_reduction
-Where: static/render.js:167
+Where: static/render.js fmtMod (relic effect line)
+Notes: {amount} = the signed amount, as app.relic.mod.max_energy.
 
-    card cost reduction
+    {amount} card cost reduction
 
 ### app.relic.mod.start_combat_block
-Where: static/render.js:167
+Where: static/render.js fmtMod (relic effect line)
+Notes: {amount} = the signed amount, as app.relic.mod.max_energy.
 
-    block at combat start
+    {amount} block at combat start
 
 ### app.relic.mod.attack_base
-Where: static/render.js:168
+Where: static/render.js fmtMod (relic effect line)
+Notes: {amount} = the signed amount, as app.relic.mod.max_energy.
 
-    damage on every attack
+    {amount} damage on every attack
 
 ### app.relic.mod.max_hp
-Where: static/render.js:168
+Where: static/render.js fmtMod (relic effect line)
+Notes: {amount} = the signed amount, as app.relic.mod.max_energy.
 
-    max HP
+    {amount} max HP
 
 ### app.relic.trigger.turn_start
 Where: static/render.js:176 (relic hook line head, followed by ": {effects}")
@@ -1819,16 +1849,16 @@ Where: static/render.js:179
     On HP lost
 
 ### app.relic.trigger.on_type_played
-Where: static/render.js:184
-Notes: {type} = card type with a capital (Attack, Skill, Power).
+Where: static/render.js fmtHook
+Notes: {type} = app.card_type.<type> with its first letter capitalised (Attack, Skill, Power).
 
     On {type} played
 
 ### app.relic.every_nth
-Where: static/render.js:185
-Notes: fragment, starts with a space. {nth} = English ordinal built in code ("3rd", from ordinal() at static/render.js:173 — the st/nd/rd/th suffixes are English-only).
+Where: static/render.js fmtHook
+Notes: fragment, starts with a space. {n} = the count as the language writes it: English gets an ordinal from render.js nthLabel() ("3rd"); every other language gets the bare number, so its template carries the counter word (zh: 每{n}次).
 
-     (every {nth})
+     (every {n})
 
 ### app.relic.once_per_combat
 Where: static/render.js:189
@@ -1975,14 +2005,14 @@ Notes: fragment, starts with a space.
      (+10% per stack, up to double)
 
 ### app.mech.status_decays
-Where: static/render.js:322
-Notes: {decay} = the raw decay value with underscores as spaces (e.g. "end of turn"), not translated today.
+Where: static/render.js statusLines
+Notes: {decay} = app.decay.<value> (an unknown value prints raw, underscores as spaces).
 
     Decays: {decay}
 
 ### app.mech.potion_line
-Where: static/render.js:296-297 (first line of a potion chip)
-Notes: {rarity} = the raw rarity capitalised (Common, Uncommon, Rare), not translated today; {when} = app.mech.potion_any_time or app.mech.potion_in_combat.
+Where: static/render.js potionLines (first line of a potion chip)
+Notes: {rarity} = app.rarity.<rarity> with its first letter capitalised (Common, Uncommon, Rare); {when} = app.mech.potion_any_time or app.mech.potion_in_combat.
 
     {rarity} potion — usable {when}
 
@@ -2039,15 +2069,75 @@ Where: static/render.js:360
     On death: {actions}
 
 ### app.mech.summon_every_nth
-Where: static/render.js:363
-Notes: {n} = a number; "th" is hard-coded English ("Every 3th hit" for 3 today).
+Where: static/render.js summonLines
+Notes: {n} = as app.relic.every_nth (English: an ordinal, "3rd"). Was "Every {n}th hit" with a hard-coded "th" ("Every 3th hit"); the ordinal now comes from render.js nthLabel(), so the English reads "Every 1st / 2nd / 3rd / 4th hit".
 
-    Every {n}th hit: {actions}
+    Every {n} hit: {actions}
 
 ### app.card.show_upgraded
 Where: static/render.js:405 (checkbox label on a card chip)
 
     Show upgraded
+
+### app.card_type.attack
+Where: static/render.js (card type: the card chip's meta line and, capitalised, {type} in app.relic.trigger.on_type_played)
+Notes: added 2026-10-27 by the i18n build, owner to review. Lowercase, as the data value; the code capitalises where the line needs it.
+
+    attack
+
+### app.card_type.skill
+Where: static/render.js (same table as the entry above)
+Notes: added 2026-10-27 by the i18n build, owner to review. Lowercase, as the data value; the code capitalises where the line needs it.
+
+    skill
+
+### app.card_type.power
+Where: static/render.js (same table as the entry above)
+Notes: added 2026-10-27 by the i18n build, owner to review. Lowercase, as the data value; the code capitalises where the line needs it.
+
+    power
+
+### app.rarity.basic
+Where: static/render.js (rarity: the card chip's meta line and, capitalised, {rarity} in app.mech.potion_line)
+Notes: added 2026-10-27 by the i18n build, owner to review. Lowercase, as the data value; the code capitalises where the line needs it.
+
+    basic
+
+### app.rarity.common
+Where: static/render.js (same table as the entry above)
+Notes: added 2026-10-27 by the i18n build, owner to review. Lowercase, as the data value; the code capitalises where the line needs it.
+
+    common
+
+### app.rarity.uncommon
+Where: static/render.js (same table as the entry above)
+Notes: added 2026-10-27 by the i18n build, owner to review. Lowercase, as the data value; the code capitalises where the line needs it.
+
+    uncommon
+
+### app.rarity.rare
+Where: static/render.js (same table as the entry above)
+Notes: added 2026-10-27 by the i18n build, owner to review. Lowercase, as the data value; the code capitalises where the line needs it.
+
+    rare
+
+### app.rarity.token
+Where: static/render.js (same table as the entry above)
+Notes: added 2026-10-27 by the i18n build, owner to review. Lowercase, as the data value; the code capitalises where the line needs it.
+
+    token
+
+### app.decay.lose_one_eot
+Where: static/render.js (status decay: {decay} in app.mech.status_decays. The English is the raw value as the site printed it before (underscores as spaces); worth rewording)
+Notes: added 2026-10-27 by the i18n build, owner to review. Lowercase, as the data value; the code capitalises where the line needs it.
+
+    lose one eot
+
+### app.decay.lose_all_eot
+Where: static/render.js (same table as the entry above)
+Notes: added 2026-10-27 by the i18n build, owner to review. Lowercase, as the data value; the code capitalises where the line needs it.
+
+    lose all eot
 
 ### app.feedback.cat.great
 Where: static/render.js:429 (feedback category button)
@@ -2639,6 +2729,12 @@ Where: web/app.py:380 (p of the server-rendered 404 page)
 
     This class link is no longer valid — it may have been deleted, or the link was mistyped.
 
+### deck.rules_in_english
+Where: static/render.js renderRulesNote (under the cards of the result view and the /deck page; shown only when the site language is not English)
+Notes: added 2026-10-27 by the i18n build, owner to review
+
+    Card rules text is shown in English here; the game shows it in Chinese.
+
 ## Archive (archive.html, archive.js, featured.js)
 
 ### archive.meta.title
@@ -2807,14 +2903,16 @@ Where: static/webview.js:42
     an in-app browser
 
 ### signin.webview.menu_ios
-Where: static/webview.js:46 (hint under the Open in Safari button; signin.js:35 appends a full stop)
+Where: static/webview.js (hint under the Open in Safari button, shown by signin.js)
+Notes: a whole sentence with its own full stop (signin.js appended an English "." until 2026-10-27).
 
-    or tap the ··· menu at the top right and choose Open in Safari
+    or tap the ··· menu at the top right and choose Open in Safari.
 
 ### signin.webview.menu_android
-Where: static/webview.js:47 (hint; signin.js:35 appends a full stop)
+Where: static/webview.js (hint, shown by signin.js)
+Notes: a whole sentence with its own full stop, as signin.webview.menu_ios.
 
-    or tap the ⋮ menu at the top right and choose Open in Chrome (or Open in browser)
+    or tap the ⋮ menu at the top right and choose Open in Chrome (or Open in browser).
 
 ### signin.webview.email_label
 Where: static/signin.js:45-46 (replaces signin.email.label inside an in-app browser)
@@ -3733,6 +3831,24 @@ Where: generation/btsgen/class_forge.py:3735 (abort)
 
     too few cards survived; aborting class
 
+### console.loc.concept
+Where: generation/btsgen/loc.py translate_concept (before the forge; a Chinese concept, or any concept on a non-English forge with no Latin words)
+Notes: added 2026-10-27 by the i18n build, owner to review. {text} = the English concept the design runs on.
+
+    concept translated to English: {text}
+
+### console.loc.translating
+Where: web/forge.py _translate_result (after the bundle is assembled, non-English forges only)
+Notes: added 2026-10-27 by the i18n build, owner to review
+
+    translating the class's names and descriptions…
+
+### console.loc.done
+Where: generation/btsgen/loc.py translate_bundle (the translation's result line)
+Notes: added 2026-10-27 by the i18n build, owner to review. {locale} = the game locale (zhs). The code may append ", N fell back to English (reasons)".
+
+    translation ({locale}): {len(kept)}/{len(strings)} strings
+
 ## Out of scope
 
 - static/privacy.html and static/terms.html: English-only legal pages, not extracted.
@@ -3749,11 +3865,11 @@ Where: generation/btsgen/class_forge.py:3735 (abort)
 |---|---|
 | Shared (header, footer, toasts) | 19 |
 | Landing page (landing.html, landing.js, signup-event.js) | 34 |
-| App shell (index.html) | 90 |
-| App JS strings (app.js, render.js) | 253 |
+| App shell (index.html) | 94 |
+| App JS strings (app.js, render.js) | 263 |
 | Help page (help.html) | 32 |
 | Download page (download.html) | 48 |
-| Deck page (deck.html, deck.js) | 19 |
+| Deck page (deck.html, deck.js) | 20 |
 | Archive (archive.html, archive.js, featured.js) | 7 |
 | Sign-in pages (signin.html, signin-continue.html, signin-expired.html, signin.js, webview.js) | 36 |
 | Email | 9 |
@@ -3761,5 +3877,5 @@ Where: generation/btsgen/class_forge.py:3735 (abort)
 | Stripe checkout | 2 |
 | Steam Workshop | 3 |
 | In-game mod UI | 45 |
-| Forge console stage headers | 27 |
-| **Total** | **692** |
+| Forge console stage headers | 30 |
+| **Total** | **710** |

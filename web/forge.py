@@ -25,6 +25,10 @@ _log = logging.getLogger(__name__)
 # via BTS_REPO_ROOT before importing it. setdefault: an explicit env (or editable install) still wins.
 _REPO_ROOT = Path(__file__).resolve().parents[1]
 os.environ.setdefault("BTS_REPO_ROOT", str(_REPO_ROOT))
+# The per-forge translation (btsgen.loc, I18N plan C2) reads the term glossary from the repo checkout for the
+# same reason: a non-editable btsgen install would look for docs/copy/GLOSSARY.md inside the venv. The droplet
+# is a full git clone (deploy.sh pulls the whole repo), so docs/ is there next to web/.
+os.environ.setdefault("BTS_GLOSSARY_FILE", str(_REPO_ROOT / "docs" / "copy" / "GLOSSARY.md"))
 
 # Wire the player-feedback loop CLOSED on the server (paths.py reads these at import, so set them
 # before any btsgen import):
@@ -45,6 +49,104 @@ from btsgen.class_forge import (ClassBrief, _BlueprintContract, _CardFake, _Reli
                                 point_btsgen_at_mod_contract)
 
 point_btsgen_at_mod_contract()
+
+# Per-forge language (I18N plan C2). Imported by name so tests can monkeypatch forge.translate_bundle /
+# forge.translate_concept; forge_to_bundle calls them through these module globals.
+from btsgen.loc import GAME_LOCALE, apply_loc, has_cjk, load_glossary, translate_bundle, translate_concept  # noqa: E402
+
+
+def normalize_lang(lang) -> str:
+    """The forge language: a site language with a game locale (btsgen.loc.GAME_LOCALE, today "zh"), else
+    "en". Anything unknown, empty or malformed is "en" — the forge then runs exactly as before."""
+    s = str(lang or "").strip().lower()
+    return s if s in GAME_LOCALE else "en"
+
+
+class _RoleOverride:
+    """Wraps a forge's `on_usage` sink so the translation calls land in the forge_usage ledger as their own
+    role ("translate") instead of the design role ("structure") the generator tags them with. The calls run
+    while nothing else in the forge does (before the pipeline starts and after forge_class returns), so a
+    plain attribute is enough: `with meter.role("translate"): ...`."""
+
+    def __init__(self, inner) -> None:
+        self.inner = inner
+        self.current: str | None = None
+
+    def __call__(self, usage) -> None:
+        if self.current:
+            if isinstance(usage, dict):
+                usage = {**usage, "_role": self.current}
+            else:  # anthropic.types.Usage (only reachable untagged on paths that never translate)
+                usage = {"input_tokens": getattr(usage, "input_tokens", 0) or 0,
+                         "output_tokens": getattr(usage, "output_tokens", 0) or 0,
+                         "cache_read_input_tokens": getattr(usage, "cache_read_input_tokens", 0) or 0,
+                         "_role": self.current}
+        self.inner(usage)
+
+    @contextlib.contextmanager
+    def role(self, name: str):
+        prev, self.current = self.current, name
+        try:
+            yield
+        finally:
+            self.current = prev
+
+
+TRANSLATE_ROLE = "translate"  # forge_usage.role of the concept-in and creative-out translation calls
+
+
+def _say(on_event, msg: str) -> None:
+    if on_event is not None:
+        try:
+            on_event(msg)
+        except Exception:  # noqa: BLE001 — a broken progress sink must never break generation
+            pass
+
+
+def _concept_for_design(concept: str, lang: str, make_gen, usage, on_event) -> str:
+    """The English concept the pipeline (and the explicit-request check) runs on. A Chinese concept (or any
+    concept on a non-English forge with no Latin words) is translated by ONE call on the design model;
+    btsgen.loc logs "concept translated to English: ..." itself. Never raises; any failure keeps the
+    player's own words."""
+    if lang == "en" and not has_cjk(concept):
+        return concept
+    try:
+        with (usage.role(TRANSLATE_ROLE) if usage is not None else contextlib.nullcontext()):
+            out = translate_concept(concept, make_gen, lang, on_event=on_event)
+        out = (out or "").strip() if isinstance(out, str) else ""
+        return out or concept
+    except Exception as e:  # noqa: BLE001
+        _log.warning("concept translation failed: %s", e)
+        return concept
+
+
+def _lazy_gen_factory(build):
+    """A `make_gen(contract_mod, *, max_tokens)` that calls `build()` (which returns the real factory) on first
+    use, so an English forge never builds a translation backend it will not call."""
+    box: dict = {}
+
+    def make_gen(contract_mod, *, max_tokens):
+        if "f" not in box:
+            box["f"] = build()
+        return box["f"](contract_mod, max_tokens=max_tokens)
+    return make_gen
+
+
+def _translate_result(res, lang: str, make_gen, usage, on_event, *, concept: str, archetypes: list) -> None:
+    """Translate the class's creative strings into the forge language and stamp `res.bundle["loc"]`
+    (btsgen.loc). The archetype names ride along (the bundle has none of its own; the web shows them, the mod
+    ignores them). Runs after forge_class, before encode_class. Never raises, never fails the forge."""
+    if lang == "en" or res is None or not getattr(res, "ok", False) or not isinstance(res.bundle, dict):
+        return
+    try:
+        _say(on_event, "translating the class's names and descriptions…")
+        src = {**res.bundle, "archetypes": archetypes or []}
+        with (usage.role(TRANSLATE_ROLE) if usage is not None else contextlib.nullcontext()):
+            loc = translate_bundle(src, lang, make_gen, glossary=load_glossary(), on_event=on_event, concept=concept)
+        if loc:
+            apply_loc(res.bundle, lang, loc)
+    except Exception as e:  # noqa: BLE001 — the translation can never fail the forge
+        _log.warning("class translation failed: %s", e)
 
 
 class ForgeError(RuntimeError):
@@ -686,7 +788,8 @@ def verify_byok_models(base_url: str, api_key: str, model: str, card_model: str 
 def forge_to_bundle(concept: str, *, key: dict | None = None, hosted: bool = False,
                     fake: bool = False, model: str | None = None, pool_per_archetype: int = 4,
                     staged: bool = True, ollama_mix: bool = False, on_event=None,
-                    archetype_checkpoint=None, user_id=None, triad: bool = True, on_usage=None) -> dict:
+                    archetype_checkpoint=None, user_id=None, triad: bool = True, on_usage=None,
+                    lang: str = "en") -> dict:
     """Forge a whole class from `concept`. Returns
     {character, cards, blueprint, code, skipped, log}. Raises ForgeError on failure.
 
@@ -713,10 +816,19 @@ def forge_to_bundle(concept: str, *, key: dict | None = None, hosted: bool = Fal
     front-end to INTERACTIVE forge mode: it's called mid-forge with the theme-matched archetypes and blocks
     until the player picks (the app.py bridge waits on the SSE round-trip with a timeout). Empty return =
     the forge decides autonomously.
+
+    `lang` (I18N plan C2, normalised by normalize_lang): the forge language. The design always runs in
+    English: a Chinese concept is first translated to English on the design model (the pipeline and the
+    explicit-request check run on that), and on a non-English forge the class's creative strings are
+    translated after forge_class into the bundle's `loc` block, on the SAME backend the design stage used
+    (hosted: the Ollama mixture's structure tier; BYOK: the user's design model; fake: the stage fake).
+    Both calls book their usage as role "translate". Neither can fail the forge.
     """
     concept = (concept or "").strip()
     if not concept:
         raise ForgeError("concept is empty.")
+    lang = normalize_lang(lang)
+    usage = _RoleOverride(on_usage) if on_usage is not None else None
 
     # Triad lives in the staged front-end (the one-shot path has no triad prompt): without `staged` the forge
     # runs the legacy 2-archetype flow, so drop the flag rather than stamp a non-triad forge as 1.7-triad.
@@ -737,17 +849,17 @@ def forge_to_bundle(concept: str, *, key: dict | None = None, hosted: bool = Fal
     _lscope = (ledger.ledger_scope(ledger.ledger_path_for_user(user_id))
                if user_id is not None else contextlib.nullcontext())
     with _lscope:
-        brief = ClassBrief(concept=concept, pool_cards_per_archetype=max(2, int(pool_per_archetype)))
-
         # The token path forges on the server's Ollama mixture: one build_ollama_mix() supplies every generator
         # (blueprint/cards/relic) AND the front-end make_gen, so both legs share the same per-role models.
         front_end = None
         if ollama_mix:
             try:
                 from btsgen.ollama_mix import build_ollama_mix
-                blueprint_gen, card_factory, relic_gen, make_gen = build_ollama_mix(on_usage=on_usage)
+                blueprint_gen, card_factory, relic_gen, make_gen = build_ollama_mix(on_usage=usage)
             except RuntimeError as e:
                 raise ForgeError(f"hosted generation unavailable: {e}") from e
+            concept_en = _concept_for_design(concept, lang, make_gen, usage, on_event)
+            brief = ClassBrief(concept=concept_en, pool_cards_per_archetype=max(2, int(pool_per_archetype)))
             if staged:
                 from btsgen.frontend import BlueprintBuilder, load_catalog
                 front_end = BlueprintBuilder(make_gen, catalog=load_catalog(), on_event=on_event,
@@ -757,15 +869,22 @@ def forge_to_bundle(concept: str, *, key: dict | None = None, hosted: bool = Fal
                               relic_gen=relic_gen, fake=False, front_end=front_end, on_event=on_event,
                               triad=triad, gap_log_append=_append_captured_gaps)
             _append_jev_signals(res, user_id=user_id, concept=brief.concept)
+            _translate_result(res, lang, make_gen, usage, on_event, concept=concept,
+                              archetypes=_archetypes_of(res))
             return _bundle_result(res)
 
-        blueprint_gen, card_factory, relic_gen = _build_generators(key, hosted, fake, model, on_usage=on_usage)
+        blueprint_gen, card_factory, relic_gen = _build_generators(key, hosted, fake, model, on_usage=usage)
+        # The staged front-end's factory doubles as the translation backend (its design role); the one-shot
+        # path builds it only if a translation call actually happens.
+        make_gen = (_make_gen_factory(key, hosted, fake, model, on_usage=usage) if staged else
+                    _lazy_gen_factory(lambda: _make_gen_factory(key, hosted, fake, model, on_usage=usage)))
+        concept_en = _concept_for_design(concept, lang, make_gen, usage, on_event)
+        brief = ClassBrief(concept=concept_en, pool_cards_per_archetype=max(2, int(pool_per_archetype)))
 
         # Opt into the staged creative front-end (autonomous: picks the most distinctive BUILDABLE candidate). The
         # bp it produces is identical in shape, so the card set / safety nets / assembly below are untouched.
         if staged:
             from btsgen.frontend import BlueprintBuilder, load_catalog
-            make_gen = _make_gen_factory(key, hosted, fake, model, on_usage=on_usage)
             # The website READS the git-managed VOCABULARY_GAPS.md (for buildability) but never WRITES it (a server
             # append would dirty the tracked file and block deploy.sh's `git pull --ff-only`). Live-surfaced gaps go
             # to the SEPARATE untracked side log (_append_captured_gaps) for later human triage into git.
@@ -778,7 +897,17 @@ def forge_to_bundle(concept: str, *, key: dict | None = None, hosted: bool = Fal
                           triad=triad, gap_log_append=None if fake else _append_captured_gaps)
         if not fake:
             _append_jev_signals(res, user_id=user_id, concept=brief.concept)
+        _translate_result(res, lang, make_gen, usage, on_event, concept=concept, archetypes=_archetypes_of(res))
         return _bundle_result(res, model=(key or {}).get("model") or None)
+
+
+def _archetypes_of(res) -> list:
+    """archetype_display(res.blueprint), or [] (never raises: it only feeds the optional translation)."""
+    try:
+        from btsgen.class_forge import archetype_display
+        return archetype_display(getattr(res, "blueprint", None))
+    except Exception:  # noqa: BLE001
+        return []
 
 
 # (pattern, one-sentence explanation) for the provider refusals a BYOK forge dies on at its FIRST call. Order
@@ -862,6 +991,9 @@ def _bundle_result(res, model: str | None = None) -> dict:
         "relic": res.bundle.get("relic"),  # the forged keystone relic, or None if it wasn't generated
         "blueprint": res.blueprint,
         "archetypes": archetype_display(res.blueprint),  # report-only: what the class was built around
+        # The translated creative strings ({locale: {...}}, btsgen.loc), already inside `code`; absent on an
+        # English forge. _persist_class stores it in bundle_json so the site can show it too.
+        **({"loc": res.bundle["loc"]} if res.bundle.get("loc") else {}),
         "code": code,
         "skipped": res.skipped,
         "log": res.log,

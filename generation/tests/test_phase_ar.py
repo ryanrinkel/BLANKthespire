@@ -281,7 +281,9 @@ def _t_contract() -> None:
     check("`when`-gated" in note and "passive_timing" in note and "never stack it with `max_energy`" in note,
           "DESIGN_HEURISTICS orb_channel note prices the gated orb + the Plasma passive")
     app = WEB_APP.read_text(encoding="utf-8")
-    check('passive_turn_start: "At the start of each turn while channeled"' in app
+    en = json.loads((WEB_APP.parent / "i18n" / "en.json").read_text(encoding="utf-8"))["strings"]  # render.js labels come from COPY.md (i18n build) since 2026-10-27
+    check(en.get("app.mech.orb_passive_turn_start") == "At the start of each turn while channeled"
+          and '"app.mech.orb_passive_turn_start"' in app
           and 'orb.passive_timing === "turn_start"' in app, "render.js labels a turn_start passive")
     for kind in ("draw_pile_empty", "hp_lost_ge", "dark_ge", "light_ge", "centered", "target_hp_below_half",
                  "target_has_block", "energy_ge", "cards_played_this_turn_ge"):

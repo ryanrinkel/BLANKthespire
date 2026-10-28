@@ -159,7 +159,9 @@ def _t_contract() -> None:
               and ex["card"]["effects"][0]["effects"][0]["op"] == "buff_summon", "the exemplar IS the on_damage_dealt -> buff_summon engine")
     check(len(pool["exemplars"]) >= 113, f"pool grew to >= 113 (got {len(pool['exemplars'])})")
     app = WEB_APP.read_text(encoding="utf-8")
-    check('on_damage_dealt: "On damage dealt"' in app, "render.js keeps the on_damage_dealt label (no new token)")
+    en = json.loads((WEB_APP.parent / "i18n" / "en.json").read_text(encoding="utf-8"))["strings"]  # render.js labels come from COPY.md (i18n build) since 2026-10-27
+    check('"on_damage_dealt"' in app and en.get("app.relic.trigger.on_damage_dealt") == "On damage dealt",
+          "render.js keeps the on_damage_dealt label (no new token)")
     bp = cf._BlueprintContract(mode="dossier", triad=True, seed=1).system_prompt()
     print(f"  (rule 0.9) blueprint prompt: {len(bp):,} chars (the ONE ceiling lives in tests/test_harness_v2.py)")
     # AT's rule-0.9 contribution is a WORDING swap in VOCABULARY / card.schema.json / RELIC_VOCABULARY (asserted

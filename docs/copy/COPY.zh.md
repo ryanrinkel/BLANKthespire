@@ -283,6 +283,22 @@ Notes: {word}是翻牌板当前的英文单词（Blank、Forge……），与“
 
     例如：一位剧毒瘟疫医生，牺牲生命来叠加中毒，再把鲜血化为护甲
 
+### app.concept.lang_label
+
+    角色语言
+
+### app.concept.lang_en
+
+    English
+
+### app.concept.lang_zh
+
+    中文（简体）
+
+### app.concept.lang_hint
+
+    名称和描述会在设计完成后翻译；设计本身用英文进行。
+
 ### app.pay.label
 
     由谁提供算力？
@@ -1271,27 +1287,27 @@ Notes: 英文版以空格开头；中文不需要空格。
 
 ### app.relic.mod.max_energy
 
-    最大能量
+    最大能量{amount}
 
 ### app.relic.mod.first_attack
 
-    首次攻击伤害
+    首次攻击伤害{amount}
 
 ### app.relic.mod.cost_reduction
 
-    卡牌耗能减少
+    卡牌耗能减少{amount}
 
 ### app.relic.mod.start_combat_block
 
-    战斗开始时的格挡
+    战斗开始时的格挡{amount}
 
 ### app.relic.mod.attack_base
 
-    每次攻击的伤害
+    每次攻击的伤害{amount}
 
 ### app.relic.mod.max_hp
 
-    最大生命值
+    最大生命值{amount}
 
 ### app.relic.trigger.turn_start
 
@@ -1338,9 +1354,8 @@ Notes: 英文版以空格开头；中文不需要空格。
     打出{type}牌时
 
 ### app.relic.every_nth
-Notes: {nth}目前是代码生成的英文序数词（“3rd”），中文会显示为“每3rd次”。需要代码改为传入纯数字。
 
-    （每{nth}次）
+    （每{n}次）
 
 ### app.relic.once_per_combat
 
@@ -1505,11 +1520,51 @@ Notes: 这里是储君的游戏内关键词Forge，按术语表用“铸造”�
 
 ### app.mech.summon_every_nth
 
-    每第{n}次命中：{actions}
+    每{n}次命中：{actions}
 
 ### app.card.show_upgraded
 
     显示升级后
+
+### app.card_type.attack
+
+    攻击
+
+### app.card_type.skill
+
+    技能
+
+### app.card_type.power
+
+    能力
+
+### app.rarity.basic
+
+    基础
+
+### app.rarity.common
+
+    普通
+
+### app.rarity.uncommon
+
+    罕见
+
+### app.rarity.rare
+
+    稀有
+
+### app.rarity.token
+
+    衍生
+
+### app.decay.lose_one_eot
+
+    每回合结束时减少1层
+
+### app.decay.lose_all_eot
+
+    回合结束时全部清除
 
 ### app.feedback.cat.great
 
@@ -1978,6 +2033,10 @@ Notes: 角色码内的角色名是英文数据，游戏里显示英文名，所�
 
     这个角色链接已失效：它可能已被删除，或者链接输错了。
 
+### deck.rules_in_english
+
+    此处卡牌规则文字以英文显示；游戏内会显示为中文。
+
 ## Archive (archive.html, archive.js, featured.js)
 
 ### archive.meta.title
@@ -2108,13 +2167,12 @@ Notes: {word}是翻牌板上的5字母英文单词，与“the spire”连成英
     应用内浏览器
 
 ### signin.webview.menu_ios
-Notes: signin.js会在末尾加一个英文句点；中文最好由代码改为加“。”。
 
-    或者点按右上角的···菜单，选择“在Safari中打开”
+    或者点按右上角的···菜单，选择“在Safari中打开”。
 
 ### signin.webview.menu_android
 
-    或者点按右上角的⋮菜单，选择“在Chrome中打开”（或“在浏览器中打开”）
+    或者点按右上角的⋮菜单，选择“在Chrome中打开”（或“在浏览器中打开”）。
 
 ### signin.webview.email_label
 
@@ -2831,3 +2889,14 @@ Notes: 稀有度和类型是英文原始值（Common、Attack……），保持�
 
     存活的卡牌太少；终止角色锻造
 
+### console.loc.concept
+
+    构思已译为英文：{text}
+
+### console.loc.translating
+
+    正在翻译角色的名称和描述…
+
+### console.loc.done
+
+    翻译（{locale}）：{len(kept)}/{len(strings)} 条

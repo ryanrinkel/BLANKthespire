@@ -4,10 +4,11 @@
 //     STRIPE_SECRET_KEY=sk_test_smoke PORT=5077 uv run --project ../generation python app.py
 // (the dummy Stripe key only flips /api/billing to {enabled:true} so the donate tiers + custom-amount row
 //  render; nothing in these scenarios ever hits Stripe)
-// then, from web/tools:  node ui_smoke.mjs http://127.0.0.1:5077 <outdir> forge|v3|byok-narrow|byok-models|library|account|pages|art|lost|archive|featured|webview|phone|events|lang
+// then, from web/tools:  node ui_smoke.mjs http://127.0.0.1:5077 <outdir> forge|v3|byok-narrow|byok-models|library|account|pages|art|lost|archive|featured|webview|phone|events|lang|forge-zh
 // (`archive` needs BTSWEB_ADMIN_EMAILS=unlimited@example.com and is best run first on a fresh DB: it puts a class
 //  in The Archive through the UI, which is what `featured` then shows on the landing strip)
 // (`lang` needs a web/static/i18n/zh.json with at least one translated landing string and one console.* rule)
+// (`forge-zh`: the class-language selector + a fake forge in 中文, checked on the result, library and /deck)
 // (needs a package.json with {"type":"module"} next to it, or rename to .mjs — it is already .mjs).
 
 // Minimal Chrome DevTools Protocol driver (Node 24 has a global WebSocket). Usage:
@@ -851,11 +852,11 @@ if (scenario === "forge") {
       hrefs: tiles.map((t) => t.getAttribute('href')),
       empty_hidden: document.getElementById('archive-empty').classList.contains('hidden'),
       nav: [...document.querySelectorAll('header nav a')].map((a) => a.textContent.trim())}; })()`);
-  check(page.title === "The Archive — BLANK the spire" && page.h1 === "The Archive" && page.tiles >= 1
+  check(page.title === "The Archive — Blank the Spire" && page.h1 === "The Archive" && page.tiles >= 1
         && page.words[0] === "GOOSE" && page.hrefs[0] === `/deck/${target.slug}` && page.tiles === api.length && page.empty_hidden,
         "/archive: newest tile is GOOSE, one tile per featured class", JSON.stringify(page));
   console.log("archive tiles:", page.tiles, JSON.stringify(page.words));
-  check(page.nav.join("|") === "Forge your own →|Get the mod ⬇|Help", "/archive header nav", JSON.stringify(page.nav));
+  check(page.nav.join("|") === "Forge your own →|Get the Mod ⬇|Help", "/archive header nav", JSON.stringify(page.nav));
   await shot("archive-desktop");
   await send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
   await nav(`${base}/archive`); await sleep(1500);
@@ -1507,6 +1508,99 @@ if (scenario === "forge") {
     const real = d.differKeys.filter((k) => !RUNTIME.includes(k));
     check(real.length === 0 && d.missing.length === 0, `(e) /${p} in English matches en.json`, JSON.stringify(d));
   }
+} else if (scenario === "forge-zh") {
+  // 2026-10-27 (docs/plans/I18N_PLAN.md C2, phase 3): the per-forge language selector and a Chinese forge end to
+  // end on the dev-only offline demo. The fake generator answers btsgen.loc's translate contract with a
+  // deterministic pseudo-translation (card names "测试卡N", every other string "测试：" + the English), so the
+  // result view, the library and the /deck page can be checked for the translated names. Needs BTSWEB_DEV_AUTH=1.
+  const vis = `((e) => !!e && e.offsetParent !== null)`;
+  const sel = `({value: document.getElementById('forge-lang').value,
+    text: document.getElementById('forge-lang').selectedOptions[0].textContent,
+    label: document.querySelector('label[for=forge-lang]').textContent,
+    hint: ${vis}(document.getElementById('forge-lang-hint')),
+    hint_text: document.getElementById('forge-lang-hint').textContent,
+    stored: localStorage.getItem('bts.forge_lang'), site: BTS_I18N.lang})`;
+  await nav(`${base}/app`);
+  await evaluate(`localStorage.clear()`);
+  await nav(`${base}/app?lang=zh`); await sleep(800);
+  const s0 = await json(sel);
+  check(s0.site === "zh" && s0.value === "zh" && s0.text === "中文（简体）" && s0.hint && s0.stored === null
+        && !/[A-Za-z]{3,}/.test(s0.label + s0.hint_text),
+        "(a) ?lang=zh: the class-language selector defaults to 中文, the hint shows in Chinese, nothing stored", JSON.stringify(s0));
+  await shotEl("forge-zh-a-selector", "#forge-input");
+
+  // (b) the choice is remembered apart from the site language
+  await evaluate(`(() => { const s = document.getElementById('forge-lang'); s.value = 'en'; s.dispatchEvent(new Event('change')); })()`);
+  const s1 = await json(sel);
+  await nav(`${base}/app?lang=zh`); await sleep(600);
+  const s2 = await json(sel);
+  check(!s1.hint && s1.stored === "en" && s2.value === "en" && s2.site === "zh",
+        "(b) picking English hides the hint and is remembered on its own (bts.forge_lang), site stays zh", JSON.stringify({s1, s2}));
+  await evaluate(`(() => { const s = document.getElementById('forge-lang'); s.value = 'zh'; s.dispatchEvent(new Event('change')); })()`);
+
+  // (c) a fake forge in Chinese through the UI
+  await evaluate(`(() => { document.getElementById('forge-advanced').open = true;
+    document.getElementById('mode-fake').checked = true;
+    document.getElementById('concept').value = '一位守护灯塔、囤积光芒的老人';
+    window.__forgeBody = null; const f = window.fetch;
+    window.fetch = (u, o) => { if (String(u).includes('/api/forge-class')) window.__forgeBody = o && o.body; return f(u, o); };
+    document.getElementById('forge-btn').click(); })()`);
+  let done = false;
+  for (let i = 0; i < 120 && !done; i++) {
+    await sleep(1000);
+    done = await evaluate(`!document.getElementById('result').classList.contains('hidden') && !!document.getElementById('r-code').value`);
+  }
+  check(done, "(c) the zh fake forge reached the result page");
+  const body = JSON.parse((await evaluate(`window.__forgeBody`)) || "{}");
+  check(body.lang === "zh" && body.mode === "fake", "(c) the request carried lang=zh", JSON.stringify(body));
+  const zhDoc = JSON.parse(await evaluate(`(async () => JSON.stringify((await (await fetch('/static/i18n/zh.json')).json()).console))()`));
+  const log = await evaluate(`document.getElementById('log').textContent`);
+  const head = (k) => zhDoc[k].text.split("{")[0];
+  check(log.includes(head("console.loc.concept")) && log.includes(head("console.loc.translating"))
+        && log.includes(head("console.loc.done")) && log.includes(head("console.stage.map"))
+        && !log.includes("[2/6] map: matching"),
+        "(c) console: the translation lines and the stage headers are in Chinese",
+        JSON.stringify({concept: head("console.loc.concept"), done: head("console.loc.done"),
+                        lines: log.split("\n").filter((l) => /翻译|构思/.test(l))}));
+  const r = await json(`({name: document.getElementById('r-name').textContent,
+    desc: document.getElementById('r-desc').textContent,
+    cards: [...document.querySelectorAll('#r-cards .cc-name')].map((e) => e.textContent),
+    meta: (document.querySelector('#r-cards .cc-meta') || {}).textContent || '',
+    eff: (document.querySelector('#r-cards .cc-eff') || {}).textContent || '',
+    relic: (document.querySelector('#r-relic .relic-name') || {}).textContent || '',
+    note: (document.getElementById('r-rules-note') || {}).textContent || null,
+    share: document.getElementById('share-link').dataset.url || ''})`);
+  check(r.name.startsWith("测试：") && r.desc.startsWith("测试："), "(c) result view: the class name and description are the translated ones", JSON.stringify({name: r.name, desc: r.desc.slice(0, 40)}));
+  check(r.cards.length > 5 && r.cards.filter((n) => n.startsWith("测试卡")).length >= r.cards.length - 2,
+        "(c) result view: card names are translated", JSON.stringify(r.cards.slice(0, 6)));
+  check(/[一-鿿]/.test(r.meta) && /[A-Za-z]{3,}/.test(r.eff), "(c) card type/rarity in Chinese, rules text stays English", JSON.stringify({meta: r.meta, eff: r.eff.slice(0, 50)}));
+  check(r.relic === "" || r.relic.startsWith("测试："), "(c) the relic name is translated", r.relic);
+  check(!!r.note && /[一-鿿]/.test(r.note), "(c) the rules-in-English note sits under the cards", r.note || "missing");
+  await shot("forge-zh-c-result", true);
+
+  // (d) the library row shows the translated name
+  await evaluate(`document.getElementById('nav-library').click()`); await sleep(1200);
+  const libName = await evaluate(`(document.querySelector('#lib-list .lib-row .lr-name') || {}).textContent || ''`);
+  check(libName.startsWith("测试："), "(d) library: the newest row shows the translated name", libName);
+
+  // (e) the public /deck page: Chinese names in zh, English names (and no note) in en
+  const slug = (r.share.match(/\/deck\/([A-Za-z0-9_-]+)/) || [])[1];
+  check(!!slug, "(e) the result carried a share link", r.share);
+  if (slug) {
+    await nav(`${base}/deck/${slug}?lang=zh`); await sleep(800);
+    const dz = await json(`({name: document.getElementById('r-name').textContent, title: document.title,
+      note: !!document.getElementById('r-rules-note'), card: (document.querySelector('#r-cards .cc-name') || {}).textContent})`);
+    check(dz.name.startsWith("测试：") && dz.title.startsWith("测试：") && dz.note && (dz.card || "").startsWith("测试"),
+          "(e) /deck in zh: translated name, title, card names, rules note", JSON.stringify(dz));
+    await shot("forge-zh-e-deck-zh", false);
+    await nav(`${base}/deck/${slug}?lang=en`); await sleep(800);
+    const de = await json(`({name: document.getElementById('r-name').textContent,
+      note: !!document.getElementById('r-rules-note'), card: (document.querySelector('#r-cards .cc-name') || {}).textContent})`);
+    check(!!de.name && !de.name.includes("测试") && !de.note && !(de.card || "").includes("测试"),
+          "(e) /deck in English: the English names, no note (an English reader of a zh forge sees English)", JSON.stringify(de));
+    await shot("forge-zh-e-deck-en", false);
+  }
+  await evaluate(`localStorage.clear()`);
 }
 console.log(errors.length ? "CONSOLE ERRORS:\n" + errors.join("\n") : "no console errors");
 ws.close(); chrome.kill();

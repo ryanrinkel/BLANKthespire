@@ -121,6 +121,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .advanced > summary:hover { color: var(--ink); }
 .advanced[open] { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 8px; }
 .hint { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
+/* The per-forge language selector under the concept box (I18N plan C2). */
+.forge-lang { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 8px; font-size: 13px; color: var(--muted); }
+.forge-lang select.in { width: auto; min-width: 0; padding: 4px 8px; margin-bottom: 0; }
+.forge-lang .hint { margin: 0; flex-basis: 100%; }
 /* The forge button (app.js renderForgeButton): centred, never disabled except mid-forge (2026-10-26). */
 .forge-actions { display: flex; justify-content: center; margin-top: 16px; }
 .forge-actions .btn { margin-top: 0; }

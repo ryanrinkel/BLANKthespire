@@ -34,7 +34,7 @@ function webviewLayout(emailLogin) {
     open.href = WV.openUrl;
     open.textContent = t("signin.open_browser", { browser: WV.browser });
     open.classList.remove("hidden");
-    el("webview-menu").textContent = WV.menuHint + ".";
+    el("webview-menu").textContent = WV.menuHint;  // the sentence's own full stop is in the string (COPY.md)
     el("webview-menu").classList.remove("hidden");
   }
   el("webview-box").classList.remove("hidden");

@@ -29,7 +29,8 @@ function featuredPlaceholder(word) {
 function featuredTile(item, hooks) {
   hooks = hooks || {};
   const word = String(item.word || "").toUpperCase();
-  const name = item.name || item.blurb || word;
+  // a class forged in the site's language shows its translated name/description (bundle `loc`, I18N plan C2)
+  const name = BTS_I18N.locField(item, "character", null, "name", item.name || item.blurb || word);
   const a = document.createElement("a");
   a.className = "featured-tile";
   a.href = item.share_url;
@@ -63,7 +64,7 @@ function featuredTile(item, hooks) {
   h.className = "featured-name";
   h.textContent = name;
   body.append(cap, h);
-  const desc = clip(item.description, FEATURED_DESC_MAX);
+  const desc = clip(BTS_I18N.locField(item, "character", null, "description", item.description), FEATURED_DESC_MAX);
   if (desc) {
     const p = document.createElement("p");
     p.className = "featured-desc";

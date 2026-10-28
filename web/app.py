@@ -45,7 +45,7 @@ from db import db_ping, init_db, load_featured_file, session_scope, set_class_fi
 from db import seed_featured_from_file as _db_seed_featured  # noqa: E402
 from forge import (ELEMENT_KINDS, VALID_FEEDBACK_CATEGORIES, ForgeError, UsageMeter,  # noqa: E402
                    append_card_feedback, append_element_feedback, forge_to_bundle, list_models,
-                   verify_byok_models)
+                   normalize_lang, verify_byok_models)
 from models import (AdminAction, ForgeJob, ForgeUsage, ForgedCard, ForgedClass, Identity,  # noqa: E402
                     PromoGrant, Promotion, Purchase, User, new_slug, spend_token, unspend_token)
 import promo as _promo  # noqa: E402
@@ -908,7 +908,7 @@ def _generate_card_art(class_id: int, out: dict, bundle: dict, on_event=None, me
 
 
 def _persist_class(user_id: int, concept: str, out: dict, forge_meta: dict | None = None, art_backend=None,
-                   on_event=None, meter=None) -> dict:
+                   on_event=None, meter=None, lang: str = "en") -> dict:
     """Save a forged class (+ denormalized card rows) for the user; return the detail shape. After the
     row gets its id, generate the art (best-effort) and re-encode the import code so it carries the
     splash_url/sprite_url/card_art_url — the harness/forge_to_bundle is never touched. Splash, sprite,
@@ -934,6 +934,8 @@ def _persist_class(user_id: int, concept: str, out: dict, forge_meta: dict | Non
         bundle["forge_meta"] = forge_meta
     if out.get("archetypes"):  # report-only: the archetype cards the class was built around
         bundle["archetypes"] = out["archetypes"]
+    if out.get("loc"):  # the translated creative strings (I18N plan C2); the encoded code carries them too
+        bundle["loc"] = out["loc"]
     # Three short transactions with the art OUTSIDE them: the ~20s art calls used to run inside the
     # insert's open transaction, holding SQLite's ONE write lock the whole time — concurrent forges
     # then died "database is locked" the moment saves overlapped (caught by the 4-forge queue test).
@@ -946,6 +948,7 @@ def _persist_class(user_id: int, concept: str, out: dict, forge_meta: dict | Non
             bundle_json=json.dumps(bundle, separators=(",", ":")),
             code=out["code"],
             slug=new_slug(),
+            lang=normalize_lang(lang),
         )
         for i, card in enumerate(out["cards"]):
             cls.cards.append(ForgedCard(card_json=json.dumps(card, separators=(",", ":")), ordinal=i))
@@ -1243,6 +1246,9 @@ def forge_class_route():
     # interactive checkpoint, so there is nothing for the site to opt out to — the request body is not
     # consulted for `staged` at all.
     staged = True
+    # Per-forge language (I18N plan C2): "en" (default) or a site language with a game locale ("zh"). Anything
+    # else is "en". The design runs in English either way; a non-English forge adds a translated `loc` block.
+    lang = normalize_lang(body.get("lang"))
 
     # BYOK keys (OpenAI-compat or Anthropic) ride in the body, used once, never persisted.
     key = None
@@ -1376,7 +1382,7 @@ def forge_class_route():
             # on_event: the card-art step narrates itself over the same SSE stream the forge used.
             # meter: its image costs join this forge's ledger rows (written by _record_usage below).
             saved = _persist_class(user["id"], concept, out, forge_meta=forge_meta,
-                                   on_event=on_event, meter=meter, art_backend=art_backend)
+                                   on_event=on_event, meter=meter, art_backend=art_backend, lang=lang)
         except Exception as e:
             finish_failed(i18n.get_text("en", "server.forge.saving_failed", e=e))
             return
@@ -1476,7 +1482,7 @@ def forge_class_route():
                 concept, key=key, hosted=hosted, fake=fake, model=model,
                 pool_per_archetype=pool_per, staged=staged, ollama_mix=ollama_mix, on_event=on_event,
                 archetype_checkpoint=archetype_checkpoint if interactive else None,
-                user_id=user["id"], triad=triad, on_usage=meter)
+                user_id=user["id"], triad=triad, on_usage=meter, lang=lang)
         except ForgeError as e:
             watchdog.cancel()
             finish_failed(str(e))
@@ -2047,7 +2053,11 @@ def featured_list():
                 "description": str(character.get("description") or ""),
                 "card_count": len(cards) if cards is not None else 0,
                 "share_url": f"/deck/{cls.slug}",
+                "lang": cls.lang or "en",
             }
+            loc = cls.loc_summary()
+            if loc:
+                item["loc"] = loc
             item.update(_art_fields(cls, f"/api/deck/{cls.slug}"))
             out.append(item)
     resp = jsonify({"featured": out})

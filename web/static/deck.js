@@ -53,7 +53,7 @@
         else { navigator.clipboard.writeText(box.value); }
       });
     }
-    const name = cls.character?.name || cls.name;
+    const name = BTS_I18N.locField(cls, "character", null, "name", cls.character?.name || cls.name);
     if (name) { document.title = BTS_I18N.t("common.title_suffix", { page: name }); }
     if (cls.featured === true) { markFeatured(); }
     const sendPc = document.getElementById("send-pc");

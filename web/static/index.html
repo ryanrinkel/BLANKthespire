@@ -7,7 +7,7 @@
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png" />
   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/static/style.css?v=20261028a" />
+  <link rel="stylesheet" href="/static/style.css?v=20261028b" />
 </head>
 <body>
   <header>
@@ -59,6 +59,17 @@
       <label class="lbl" for="concept" data-i18n="app.concept.label">Describe your class</label>
       <!-- can we add a few more contrasting examples and select one at random so the user doesn't always see the same sample text? another example might be 'the bravest toaster in the world' -->
       <textarea id="concept" rows="3" data-i18n-attr="placeholder:app.concept.placeholder" placeholder="e.g. a venomous plague doctor who sacrifices health to stack poison, then turns blood into armor"></textarea>
+      <!-- Per-forge language (docs/plans/I18N_PLAN.md C2): sent as `lang` in the /api/forge-class body. Defaults
+           to the site language, remembered on its own (app.js initForgeLang, bts.forge_lang). The hint shows
+           only when it is not English; English forges are unchanged. -->
+      <div class="forge-lang">
+        <label for="forge-lang" data-i18n="app.concept.lang_label">Class language</label>
+        <select id="forge-lang" class="in">
+          <option value="en" data-i18n="app.concept.lang_en">English</option>
+          <option value="zh" lang="zh" data-i18n="app.concept.lang_zh">中文（简体）</option>
+        </select>
+        <span id="forge-lang-hint" class="hint hidden" data-i18n="app.concept.lang_hint">Names and descriptions are translated after the design; the design itself runs in English.</span>
+      </div>
 
       <!-- The pay step (2026-10-26): hidden until the first Forge click that can't pay yet (or the "Change my
            tokens provider" link), then open for the rest of the visit (app.js PAY_STEP_OPEN). #pay-reason is the
@@ -495,8 +506,8 @@
 
   <!-- ?v= busts the 1-hour static cache on deploy: bump all three whenever any file changes. i18n.js loads first (BTS_I18N); render.js holds
        the class renderers shared with the public /deck page and must load first. -->
-  <script src="/static/i18n.js?v=20261028a"></script>
-  <script src="/static/render.js?v=20261028a"></script>
-  <script src="/static/app.js?v=20261028a"></script>
+  <script src="/static/i18n.js?v=20261028b"></script>
+  <script src="/static/render.js?v=20261028b"></script>
+  <script src="/static/app.js?v=20261028b"></script>
 </body>
 </html>

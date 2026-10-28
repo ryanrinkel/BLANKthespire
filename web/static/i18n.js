@@ -33,13 +33,21 @@
  *                    Page scripts await it before building any string with t().
  *   console(line)    forge-console line, translated by the first matching console.* rule (stage headers
  *                    only); returned unchanged in English or when nothing matches.
+ *   locField(src, section, key, field, english)
+ *                    a forged class's translated creative string (I18N_PLAN.md C2, the bundle `loc` block)
+ *                    for the site language, else `english`. `src` is anything carrying `loc` (a class
+ *                    detail, a library row, a featured item), keyed by the GAME locale (zh -> zhs).
+ *                    section/key/field follow the bundle schema: ("character", null, "name"),
+ *                    ("cards", cardId, "name"), ("relic", null, "description"), ("orbs", englishName,
+ *                    "name"), ("archetypes", index, "name"). English site: always `english`.
  */
 (function () {
   "use strict";
 
-  var VERSION = "20261028a";  // cache-buster for the json files; bump with the page ?v= stamps
+  var VERSION = "20261028b";  // cache-buster for the json files; bump with the page ?v= stamps
   var STORE_KEY = "bts.lang";
-  var LANGUAGES = [{ code: "en", label: "EN" }, { code: "zh", label: "中文" }];
+  // game: the game's locale code a forged class's `loc` block is keyed by (btsgen.loc.GAME_LOCALE)
+  var LANGUAGES = [{ code: "en", label: "EN" }, { code: "zh", label: "中文", game: "zhs" }];
   // Browser-language auto-select (navigator.language "zh*" -> zh) is implemented but OFF for this release:
   // the Chinese strings are a machine draft no native speaker has reviewed yet, so nobody gets them without
   // choosing them (toggle or ?lang=zh). Flip to true after the review (I18N_PLAN.md phase 4).
@@ -130,6 +138,17 @@
     if (data && data.code && has("server." + data.code)) return t("server." + data.code, data.vars || null);
     if (data && data.error) return String(data.error);
     return fallback === undefined ? "" : fallback;
+  }
+
+  function locField(src, section, key, field, english) {
+    if (lang === "en" || !src || !src.loc || typeof src.loc !== "object") return english;
+    var game = null;
+    for (var i = 0; i < LANGUAGES.length; i++) if (LANGUAGES[i].code === lang) game = LANGUAGES[i].game;
+    var node = game ? src.loc[game] : null;
+    node = node && node[section];
+    if (node && key !== null && key !== undefined) node = node[key];
+    var v = node && node[field];
+    return typeof v === "string" && v.trim() ? v : english;
   }
 
   // ------------------------------------------------------------------------------------------ console
@@ -356,5 +375,6 @@
     set: set,
     apply: apply,
     console: localizeConsole,
+    locField: locField,
   };
 })();

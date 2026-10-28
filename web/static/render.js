@@ -15,6 +15,18 @@ const rT = (key, vars) => BTS_I18N.t(key, vars);
 const rH = (key, vars) => BTS_I18N.html(key, vars);
 // A label table keyed by a data value: the COPY.md key when the value is one we know, else null.
 const rLabel = (prefix, known, value) => (known.includes(value) ? rT(prefix + value) : null);
+// A forged class's translated name / description (the bundle's `loc` block, I18N_PLAN.md C2) for the site
+// language, else `english`, per field. The one lookup every painter below uses (BTS_I18N.locField). Card
+// RULES text is never in `loc`: the site always prints it in English.
+const locField = (src, section, key, field, english) => BTS_I18N.locField(src, section, key, field, english);
+// Data values shown as words: app.card_type.<type>, app.rarity.<rarity>, app.decay.<decay>; an unknown value
+// prints raw (as before).
+const CARD_TYPES = ["attack", "skill", "power"];
+const RARITIES = ["basic", "common", "uncommon", "rare", "token"];
+const DECAYS = ["lose_one_eot", "lose_all_eot"];
+const capFirst = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+const cardTypeLabel = (t) => rLabel("app.card_type.", CARD_TYPES, t) || String(t ?? "");
+const rarityLabel = (r) => rLabel("app.rarity.", RARITIES, r) || String(r ?? "");
 
 // --- phones (docs/plans/PHONE_FUNNEL_PLAN.md section 5) ----------------------------------------------
 // A phone can forge but cannot play: the game runs on a PC. Coarse pointer (touch-first) or a phone/tablet
@@ -93,7 +105,7 @@ function renderClassArt(cls) {
   box.innerHTML = "";
   const splash = cls.splash_thumb_url, sprite = cls.sprite_thumb_url;
   if (!artEnabled() || (!splash && !sprite)) { box.classList.add("hidden"); return; }
-  const name = cls.character?.name || cls.name || "class";
+  const name = locField(cls, "character", null, "name", cls.character?.name || cls.name || "class");
   if (splash) box.appendChild(artImg(splash, "r-splash", rT("app.library.splash_alt", { name })));
   if (sprite) box.appendChild(artImg(sprite, "r-sprite", rT("app.result.sprite_alt", { name })));
   box.classList.remove("hidden");
@@ -107,18 +119,33 @@ function renderClassArt(cls) {
 function renderClassView(cls, opts) {
   const readOnly = !!(opts && opts.readOnly);
   const classId = readOnly ? null : (cls.id ?? null);
-  el("r-name").textContent = cls.character?.name || cls.name || "";
-  el("r-desc").textContent = cls.character?.description || "";
-  renderArchetypes(cls.archetypes);
-  renderRelic(cls.relic, classId);
-  renderMechanics(cls.character, classId);
+  el("r-name").textContent = locField(cls, "character", null, "name", cls.character?.name || cls.name || "");
+  el("r-desc").textContent = locField(cls, "character", null, "description", cls.character?.description || "");
+  renderArchetypes(cls.archetypes, cls);
+  renderRelic(cls.relic, classId, cls);
+  renderMechanics(cls.character, classId, cls);
   renderClassArt(cls);
   el("r-code").value = cls.code || "";
   const wrap = el("r-cards");
   wrap.innerHTML = "";
   const art = artEnabled() ? (cls.card_art || {}) : {};  // {card id: portrait thumb URL}
-  for (const c of cls.cards || []) wrap.appendChild(cardEl(c, classId, art[c.id]));
+  for (const c of cls.cards || []) wrap.appendChild(cardEl(c, classId, art[c.id], cls));
+  renderRulesNote(wrap);
   el("result").classList.remove("hidden");
+}
+
+// Not English: the card names above may be translated, but the rules text is the site's English renderer
+// (I18N_PLAN.md C2, phase 1), so say once, under the cards, that the game prints it in the player's language.
+function renderRulesNote(wrap) {
+  let note = el("r-rules-note");
+  if (BTS_I18N.lang === "en") { if (note) note.remove(); return; }
+  if (!note) {
+    note = document.createElement("p");
+    note.id = "r-rules-note";
+    note.className = "hint muted";
+    wrap.after(note);
+  }
+  note.textContent = rT("deck.rules_in_english");
 }
 
 // --- the archetypes the class was built around ---------------------------------------------------
@@ -126,15 +153,17 @@ function renderClassView(cls, opts) {
 // Classes forged before this was stored (or via paths without a pitch) fall back to the catalog
 // name + description; an empty list (old classes) hides the section entirely.
 
-function renderArchetypes(archetypes) {
+function renderArchetypes(archetypes, src) {
   const box = el("r-archetypes");
   box.innerHTML = "";
-  const list = (archetypes || []).filter((a) => a && (a.title || a.name || a.id));
+  // keep each archetype's bundle index: the translated names (loc.<locale>.archetypes[i]) are positional
+  const list = (archetypes || []).map((a, i) => ({ a, i })).filter(({ a }) => a && (a.title || a.name || a.id));
   if (!list.length) { box.classList.add("hidden"); return; }
-  for (const a of list) {
+  for (const { a, i } of list) {
     const d = document.createElement("div");
     d.className = "arch";
-    const headline = a.title || a.name || a.id;
+    // the translation covers the archetype NAME (the pitch title is not translated), so it wins over the title
+    const headline = locField(src, "archetypes", i, "name", a.title || a.name || a.id);
     const line = a.pitch || a.description || "";
     d.innerHTML = `<div class="mech-top"><span class="mech-badge">${rH("app.result.archetype_badge")}</span>`
       + `<span class="mech-name">${esc(headline)}</span></div>`
@@ -146,22 +175,24 @@ function renderArchetypes(archetypes) {
 
 // --- forged keystone relic ----------------------------------------------------------------------
 
-function renderRelic(relic, classId) {
+function renderRelic(relic, classId, src) {
   const box = el("r-relic");
   if (!relic) { box.classList.add("hidden"); box.innerHTML = ""; return; }
   const lines = relicLines(relic);
+  const name = locField(src, "relic", null, "name", relic.name || "");
+  const desc = locField(src, "relic", null, "description", relic.description || "");
   box.innerHTML = fbButtonHtml()
     + `<div class="relic-top"><span class="relic-badge">${rH("app.result.relic_badge")}</span>`
-    + `<span class="relic-name">${esc(relic.name || "")}</span></div>`
-    + (relic.description ? `<div class="relic-desc">${esc(relic.description)}</div>` : "")
+    + `<span class="relic-name">${esc(name)}</span></div>`
+    + (desc ? `<div class="relic-desc">${esc(desc)}</div>` : "")
     + (lines.length ? `<ul class="relic-eff">${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>` : "");
   // Only persisted (forged / re-opened) classes can take feedback — they have an id to tie it to.
   const fb = box.querySelector(".cc-fb");
   if (classId != null) {
     fb.onclick = (ev) => {
       ev.stopPropagation();
-      openFeedback({ classId, kind: "relic", subjectId: relic.name || "", title: relic.name || rT("app.result.relic_fallback_title"),
-                     detailHtml: elementDetailHtml(relic.description, lines), chip: box });
+      openFeedback({ classId, kind: "relic", subjectId: relic.name || "", title: name || rT("app.result.relic_fallback_title"),
+                     detailHtml: elementDetailHtml(desc, lines), chip: box });
     };
   } else { fb.remove(); }
   box.classList.remove("hidden");
@@ -171,12 +202,17 @@ function relicLines(relic) {
   return [...(relic.modifiers || []).map(fmtMod), ...(relic.hooks || []).map(fmtHook)].filter(Boolean);
 }
 
-// app.relic.mod.<stat>; max_hp is Phase AS (v48) and may be negative (the price)
+// app.relic.mod.<stat> is the whole line ("{amount} max energy"); {amount} carries its sign ("+1", "-8").
+// max_hp is Phase AS (v48) and may be negative (the price).
 const RELIC_MOD_STATS = ["max_energy", "first_attack", "cost_reduction", "start_combat_block", "attack_base", "max_hp"];
 function fmtMod(m) {
-  return `${m.amount > 0 ? "+" : ""}${m.amount} ${rLabel("app.relic.mod.", RELIC_MOD_STATS, m.stat) || m.stat}`;
+  const amount = `${m.amount > 0 ? "+" : ""}${m.amount}`;
+  return RELIC_MOD_STATS.includes(m.stat) ? rT("app.relic.mod." + m.stat, { amount }) : `${amount} ${m.stat}`;
 }
 function ordinal(n) { return n + ({ 1: "st", 2: "nd", 3: "rd" }[n % 100 > 10 && n % 100 < 14 ? 0 : n % 10] || "th"); }
+// "every Nth": an English ordinal (1st, 2nd, 3rd, 4th, 11th, 21st); every other language takes the bare number
+// (its template carries the counter word: zh 每{n}次).
+function nthLabel(n) { return BTS_I18N.lang === "en" ? ordinal(n) : String(n); }
 
 // app.relic.trigger.<trigger>
 const RELIC_TRIGGERS = ["turn_start", "turn_end", "attacked", "on_exhaust", "on_card_played", "combat_end",
@@ -185,9 +221,9 @@ function fmtHook(h) {
   let trig = rLabel("app.relic.trigger.", RELIC_TRIGGERS, h.trigger) || h.trigger;
   // Phase AS (v48): a typed on_card_played reads "On Attack played"; every_n reads "every 3rd".
   if (h.trigger === "on_card_played" && h.card_type) {
-    trig = rT("app.relic.trigger.on_type_played", { type: `${h.card_type[0].toUpperCase()}${h.card_type.slice(1)}` });
+    trig = rT("app.relic.trigger.on_type_played", { type: capFirst(cardTypeLabel(h.card_type)) });
   }
-  const every = h.every_n ? rT("app.relic.every_nth", { nth: ordinal(h.every_n) }) : "";
+  const every = h.every_n ? rT("app.relic.every_nth", { n: nthLabel(h.every_n) }) : "";
   const eff = (h.effects || []).map(fmtEffect).join(", ");
   const tgt = h.target && h.target !== "self" ? ` → ${h.target}` : "";
   const cond = h.when?.kind ? ` (if ${String(h.when.kind).replace(/_/g, " ")})` : "";
@@ -208,7 +244,10 @@ const MECH_KINDS = [
   { kind: "potion", badge: "app.mech.badge_potion", pool: "potion_pool", lines: potionLines },
 ];
 
-function renderMechanics(character, classId) {
+// pool kind -> the bundle `loc` section its entries are translated under (keyed by the English name)
+const MECH_LOC = { orb: "orbs", status: "statuses", summon: "summons", potion: "potions" };
+
+function renderMechanics(character, classId, src) {
   const box = el("r-mechanics");
   box.innerHTML = "";
   const items = [];
@@ -227,7 +266,7 @@ function renderMechanics(character, classId) {
     + (classId != null ? rH("app.mech.head_rate") : ``) + `</div><div class="mech-grid"></div>`;
   const grid = box.querySelector(".mech-grid");
   if (persist) grid.appendChild(forgePersistEl());
-  for (const { spec, entry } of items) grid.appendChild(mechEl(spec, entry, classId));
+  for (const { spec, entry } of items) grid.appendChild(mechEl(spec, entry, classId, src));
   box.classList.remove("hidden");
 }
 
@@ -244,24 +283,26 @@ function forgePersistEl() {
   return d;
 }
 
-function mechEl(spec, entry, classId) {
+function mechEl(spec, entry, classId, src) {
   const d = document.createElement("div");
   d.className = "mech mech-" + spec.kind;
   const emoji = entry.emoji ? esc(entry.emoji) + " " : "";
   const lines = spec.lines(entry);
+  const name = locField(src, MECH_LOC[spec.kind], entry.name, "name", entry.name || "");
+  const desc = locField(src, MECH_LOC[spec.kind], entry.name, "description", entry.description || "");
   // Show the FULL effect in the chip (e.g. an orb's channel AND evoke), not just a teaser — the player
   // shouldn't have to open the popout to read what it does. The popout stays for giving feedback.
-  const descHtml = entry.description ? `<div class="mech-teaser">${esc(entry.description)}</div>` : "";
+  const descHtml = desc ? `<div class="mech-teaser">${esc(desc)}</div>` : "";
   const effHtml = lines.length
     ? `<ul class="mech-eff">${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>` : "";
   d.innerHTML = fbButtonHtml()
     + `<div class="mech-top"><span class="mech-badge">${rH(spec.badge)}</span>`
-    + `<span class="mech-name">${emoji}${esc(entry.name || "")}</span></div>`
+    + `<span class="mech-name">${emoji}${esc(name)}</span></div>`
     + descHtml + effHtml;
   if (classId != null) {
     d.onclick = () => openFeedback({
-      classId, kind: spec.kind, subjectId: entry.name || "", title: (entry.emoji ? entry.emoji + " " : "") + (entry.name || ""),
-      detailHtml: elementDetailHtml(entry.description, lines), chip: d,
+      classId, kind: spec.kind, subjectId: entry.name || "", title: (entry.emoji ? entry.emoji + " " : "") + name,
+      detailHtml: elementDetailHtml(desc, lines), chip: d,
     });
   } else {
     d.querySelector(".cc-fb").remove();
@@ -295,7 +336,7 @@ function potionLines(po) {
   const out = [];
   const rarity = String(po.rarity || "common");
   out.push(rT("app.mech.potion_line", {
-    rarity: `${rarity.charAt(0).toUpperCase()}${rarity.slice(1)}`,
+    rarity: capFirst(rarityLabel(rarity)),
     when: rT(po.usage === "any" ? "app.mech.potion_any_time" : "app.mech.potion_in_combat"),
   }));
   const tgt = po.target || "self";
@@ -322,7 +363,10 @@ function statusLines(st) {
   // Phase AQ: a multiplicative damage status reads as a percent scaler, not a flat stack bonus.
   const mode = st.mode === "multiplicative" ? rT("app.mech.status_multiplicative") : "";
   out.push(hook ? rT("app.mech.status_line", { kind, hook, mode }) : kind);
-  if (st.decay && st.decay !== "none") out.push(rT("app.mech.status_decays", { decay: String(st.decay).replace(/_/g, " ") }));
+  if (st.decay && st.decay !== "none") {
+    const decay = rLabel("app.decay.", DECAYS, st.decay) || String(st.decay).replace(/_/g, " ");
+    out.push(rT("app.mech.status_decays", { decay }));
+  }
   return out;
 }
 
@@ -367,7 +411,7 @@ function summonLines(sm) {
   }
   const nth = sm.on_nth_attack;
   if (nth && Array.isArray(nth.actions) && nth.actions.length) {
-    out.push(rT("app.mech.summon_every_nth", { n: nth.n, actions: summonActionPhrase(nth.actions) }));
+    out.push(rT("app.mech.summon_every_nth", { n: nthLabel(nth.n), actions: summonActionPhrase(nth.actions) }));
   }
   return out;
 }
@@ -387,20 +431,22 @@ function hasUpgrade(c) {
     && ((Array.isArray(c.upgrade.effects) && c.upgrade.effects.length > 0) || c.upgrade.cost != null);
 }
 
-function cardEl(c, classId, artUrl) {
+function cardEl(c, classId, artUrl, src) {
   const d = document.createElement("div");
   d.className = "cardchip r-" + (c.rarity || "common");
   d.dataset.cardId = c.id ?? "";
+  const shownName = locField(src, "cards", c.id, "name", c.name ?? "");
   d.innerHTML = fbButtonHtml()
     + `<div class="cc-top"><span class="cc-name"></span><span class="cc-cost"></span></div>`
-    + `<div class="cc-meta">${esc(c.type)} · ${esc(c.rarity)}</div>`
+    + `<div class="cc-meta">${esc(cardTypeLabel(c.type))} · ${esc(rarityLabel(c.rarity))}</div>`
     + `<div class="cc-eff"></div>`;
   // The portrait (when the class shipped with card art) sits above the name, like the in-game card.
   if (artUrl) d.insertBefore(artImg(artUrl, "cc-art", ""), d.querySelector(".cc-top"));
   // Name/cost/effects are painted (not baked into the innerHTML) so the upgrade toggle can repaint
   // them without rebuilding the chip — the feedback button keeps its listener and rated state.
   const paint = (view) => {
-    d.querySelector(".cc-name").textContent = view.name ?? "";
+    // upgradedView() appends "+" to the English name; the shown (maybe translated) name gets the same "+"
+    d.querySelector(".cc-name").textContent = view === c ? shownName : shownName + "+";
     d.querySelector(".cc-cost").textContent = view.cost ?? "";
     d.querySelector(".cc-eff").textContent =
       (view.effects || []).map((e) => fmtEffect(e, view.target)).join(". ");
@@ -421,7 +467,7 @@ function cardEl(c, classId, artUrl) {
   if (classId != null) {
     fb.onclick = (ev) => {
       ev.stopPropagation();
-      openFeedback({ classId, kind: "card", subjectId: c.id ?? "", title: c.name || "", chip: d });
+      openFeedback({ classId, kind: "card", subjectId: c.id ?? "", title: shownName || "", chip: d });
     };
   } else {
     fb.remove();

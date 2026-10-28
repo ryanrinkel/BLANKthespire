@@ -829,6 +829,8 @@ async function forge() {
     // interactive forge mode: pause at the archetype checkpoint for the player's pick
     interactive: !!el("interactive").checked,
     triad: true,
+    // the class's language (I18N plan C2): names and descriptions are translated after an English design
+    lang: forgeLang(),
   };
   if (choice === "token") {
     if (!ME.unlimited) {
@@ -1149,7 +1151,7 @@ function emailBlocker() {
 }
 
 function wireHandoff(sendBtn, mailBtn, cls, url) {
-  const name = cls.character?.name || cls.name || "";
+  const name = locField(cls, "character", null, "name", cls.character?.name || cls.name || "");
   sendBtn.disabled = !url;
   sendBtn.onclick = () => sendToPc(name, url);
   const why = cls.id == null ? appT("app.handoff.open_from_library") : emailBlocker();
@@ -1326,7 +1328,7 @@ function paintLibrary() {
 function libRow(c) {
   const li = document.createElement("li");
   li.className = "lib-row";
-  li.innerHTML = `<div class="lr-main"><span class="lr-name">${esc(c.name)}</span>`
+  li.innerHTML = `<div class="lr-main"><span class="lr-name">${esc(locField(c, "character", null, "name", c.name))}</span>`
     + `<span class="lr-meta">${appH("app.library.cards_meta", { count: c.card_count, vocab: c.vocab_version })}</span>`
     + `<div class="lr-concept muted">${esc(c.concept || "")}</div></div>`
     + `<div class="lr-actions">`
@@ -2532,8 +2534,35 @@ el("api_key").oninput = () => {
 el("api_key").onchange = scheduleModelLoad;
 el("api_key").addEventListener("paste", () => setTimeout(scheduleModelLoad, 0));
 
+// --- per-forge language (docs/plans/I18N_PLAN.md C2, "Per-forge language") ------------------------------
+// The selector next to the concept box: the language the forged class's names and descriptions come out in.
+// It defaults to the site language and, once changed, is remembered on its own (bts.forge_lang), apart from
+// the site's EN | 中文 toggle (bts.lang). The hint shows only when it is not English.
+const FORGE_LANG_KEY = "bts.forge_lang";
+
+function forgeLang() {
+  const sel = el("forge-lang");
+  return sel && sel.value ? sel.value : "en";
+}
+
+function renderForgeLangHint() {
+  const hint = el("forge-lang-hint");
+  if (hint) hint.classList.toggle("hidden", forgeLang() === "en");
+}
+
+function initForgeLang() {
+  const sel = el("forge-lang");
+  if (!sel) return;
+  const known = [...sel.options].map((o) => o.value);
+  const stored = lsGet(FORGE_LANG_KEY);
+  sel.value = known.includes(stored) ? stored : (known.includes(BTS_I18N.lang) ? BTS_I18N.lang : "en");
+  sel.onchange = () => { lsSet(FORGE_LANG_KEY, sel.value); renderForgeLangHint(); };
+  renderForgeLangHint();
+}
+
 // Every string comes from the i18n json, so nothing renders before it has loaded (English included).
 BTS_I18N.ready.then(() => {
+  initForgeLang();
   applyProvider();
   boot();
 });
