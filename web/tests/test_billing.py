@@ -173,7 +173,7 @@ def test_donate_creates_a_two_line_item_session(client, app_module, stripe_stub)
     assert kw["mode"] == "payment" and kw["submit_type"] == "donate"
     items = kw["line_items"]
     assert [i["price_data"]["product_data"]["name"] for i in items] == [
-        "Donation — BLANK the spire", "Card processing fee"]
+        "Donation — Blank the Spire", "Card processing fee"]
     assert [i["price_data"]["unit_amount"] for i in items] == [500, 46]
     assert sum(i["price_data"]["unit_amount"] for i in items) == 546   # == gross_for(500)
     assert all(i["quantity"] == 1 and i["price_data"]["currency"] == "usd" for i in items)
@@ -195,7 +195,7 @@ def test_donate_creates_a_custom_amount_session(client, app_module, stripe_stub)
     assert kw["mode"] == "payment" and kw["submit_type"] == "donate"
     items = kw["line_items"]
     assert [i["price_data"]["product_data"]["name"] for i in items] == [
-        "Donation — BLANK the spire", "Card processing fee"]
+        "Donation — Blank the Spire", "Card processing fee"]
     assert [i["price_data"]["unit_amount"] for i in items] == [2500, 106]
     assert sum(i["price_data"]["unit_amount"] for i in items) == 2606   # == gross_for(2500)
     assert all(i["quantity"] == 1 and i["price_data"]["currency"] == "usd" for i in items)

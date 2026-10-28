@@ -341,8 +341,9 @@ class _FailoverGenerator:
 _BRAINSTORM_CONTRACTS = frozenset({"_CloudClusterContract", "_RelicIntentContract", "_OrbIntentContract"})
 # map/compose joins the blueprint on the strong schema-faithful model — see module docstring. The
 # interactive forge's split halves (_MapOnlyContract/_ComposeOnlyContract) are the same convergent work.
+# The loc.py translation calls (bundle out, concept in) also run on the design model (I18N plan C2).
 _STRUCTURE_CONTRACTS = frozenset({"_MapComposeContract", "_MapOnlyContract", "_ComposeOnlyContract",
-                                  "_BlueprintContract"})
+                                  "_BlueprintContract", "_TranslateContract", "_ConceptContract"})
 
 
 def _resolve_role(contract_mod) -> str:

@@ -8,6 +8,14 @@
 const $ = (sel) => document.querySelector(sel);
 const el = (id) => document.getElementById(id);
 
+// UI strings come from i18n.js (BTS_I18N, loaded first; docs/copy/COPY.md keys). Nothing here calls them at
+// load time: every caller (app.js, deck.js) awaits BTS_I18N.ready before it renders. rT = plain text (for
+// textContent / attributes / string building), rH = HTML (for innerHTML; vars are escaped).
+const rT = (key, vars) => BTS_I18N.t(key, vars);
+const rH = (key, vars) => BTS_I18N.html(key, vars);
+// A label table keyed by a data value: the COPY.md key when the value is one we know, else null.
+const rLabel = (prefix, known, value) => (known.includes(value) ? rT(prefix + value) : null);
+
 // --- phones (docs/plans/PHONE_FUNNEL_PLAN.md section 5) ----------------------------------------------
 // A phone can forge but cannot play: the game runs on a PC. Coarse pointer (touch-first) or a phone/tablet
 // UA turns on the hand-off furniture (body.is-phone shows .phone-only); desktops never see it.
@@ -24,9 +32,10 @@ async function sendToPc(name, url) {
   if (!url) return;
   if (navigator.share) {
     try {
+      const shown = name || rT("app.share_sheet.name_fallback");
       await navigator.share({
-        title: `${name || "A class"} — BLANK the spire`,
-        text: `${name || "A class"}: a Slay the Spire 2 class. Open this on your PC to grab the import code.`,
+        title: rT("app.share_sheet.title", { name: shown }),
+        text: rT("app.share_sheet.text", { name: shown }),
         url,
       });
       return;
@@ -85,8 +94,8 @@ function renderClassArt(cls) {
   const splash = cls.splash_thumb_url, sprite = cls.sprite_thumb_url;
   if (!artEnabled() || (!splash && !sprite)) { box.classList.add("hidden"); return; }
   const name = cls.character?.name || cls.name || "class";
-  if (splash) box.appendChild(artImg(splash, "r-splash", `${name} splash art`));
-  if (sprite) box.appendChild(artImg(sprite, "r-sprite", `${name} combat sprite`));
+  if (splash) box.appendChild(artImg(splash, "r-splash", rT("app.library.splash_alt", { name })));
+  if (sprite) box.appendChild(artImg(sprite, "r-sprite", rT("app.result.sprite_alt", { name })));
   box.classList.remove("hidden");
 }
 
@@ -127,7 +136,7 @@ function renderArchetypes(archetypes) {
     d.className = "arch";
     const headline = a.title || a.name || a.id;
     const line = a.pitch || a.description || "";
-    d.innerHTML = `<div class="mech-top"><span class="mech-badge">⚙ Archetype</span>`
+    d.innerHTML = `<div class="mech-top"><span class="mech-badge">${rH("app.result.archetype_badge")}</span>`
       + `<span class="mech-name">${esc(headline)}</span></div>`
       + (line ? `<div class="mech-teaser">${esc(line)}</div>` : "");
     box.appendChild(d);
@@ -141,8 +150,8 @@ function renderRelic(relic, classId) {
   const box = el("r-relic");
   if (!relic) { box.classList.add("hidden"); box.innerHTML = ""; return; }
   const lines = relicLines(relic);
-  box.innerHTML = `<button class="cc-fb" title="Give feedback" aria-label="Give feedback">💬</button>`
-    + `<div class="relic-top"><span class="relic-badge">⬦ Keystone relic</span>`
+  box.innerHTML = fbButtonHtml()
+    + `<div class="relic-top"><span class="relic-badge">${rH("app.result.relic_badge")}</span>`
     + `<span class="relic-name">${esc(relic.name || "")}</span></div>`
     + (relic.description ? `<div class="relic-desc">${esc(relic.description)}</div>` : "")
     + (lines.length ? `<ul class="relic-eff">${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>` : "");
@@ -151,7 +160,7 @@ function renderRelic(relic, classId) {
   if (classId != null) {
     fb.onclick = (ev) => {
       ev.stopPropagation();
-      openFeedback({ classId, kind: "relic", subjectId: relic.name || "", title: relic.name || "Keystone relic",
+      openFeedback({ classId, kind: "relic", subjectId: relic.name || "", title: relic.name || rT("app.result.relic_fallback_title"),
                      detailHtml: elementDetailHtml(relic.description, lines), chip: box });
     };
   } else { fb.remove(); }
@@ -162,31 +171,27 @@ function relicLines(relic) {
   return [...(relic.modifiers || []).map(fmtMod), ...(relic.hooks || []).map(fmtHook)].filter(Boolean);
 }
 
-const RELIC_MOD_LABELS = {
-  max_energy: "max energy", first_attack: "first-attack damage",
-  cost_reduction: "card cost reduction", start_combat_block: "block at combat start",
-  attack_base: "damage on every attack", max_hp: "max HP", // Phase AS (v48); max_hp may be negative (the price)
-};
+// app.relic.mod.<stat>; max_hp is Phase AS (v48) and may be negative (the price)
+const RELIC_MOD_STATS = ["max_energy", "first_attack", "cost_reduction", "start_combat_block", "attack_base", "max_hp"];
 function fmtMod(m) {
-  return `${m.amount > 0 ? "+" : ""}${m.amount} ${RELIC_MOD_LABELS[m.stat] || m.stat}`;
+  return `${m.amount > 0 ? "+" : ""}${m.amount} ${rLabel("app.relic.mod.", RELIC_MOD_STATS, m.stat) || m.stat}`;
 }
 function ordinal(n) { return n + ({ 1: "st", 2: "nd", 3: "rd" }[n % 100 > 10 && n % 100 < 14 ? 0 : n % 10] || "th"); }
 
-const RELIC_TRIGGER_LABELS = {
-  turn_start: "Turn start", turn_end: "Turn end", attacked: "When attacked",
-  on_exhaust: "On exhaust", on_card_played: "On card played", combat_end: "Combat end",
-  on_card_drawn: "On card drawn", on_damage_dealt: "On damage dealt", on_block_gained: "On block gained",
-  on_hp_lost: "On HP lost",
-};
+// app.relic.trigger.<trigger>
+const RELIC_TRIGGERS = ["turn_start", "turn_end", "attacked", "on_exhaust", "on_card_played", "combat_end",
+  "on_card_drawn", "on_damage_dealt", "on_block_gained", "on_hp_lost"];
 function fmtHook(h) {
-  let trig = RELIC_TRIGGER_LABELS[h.trigger] || h.trigger;
+  let trig = rLabel("app.relic.trigger.", RELIC_TRIGGERS, h.trigger) || h.trigger;
   // Phase AS (v48): a typed on_card_played reads "On Attack played"; every_n reads "every 3rd".
-  if (h.trigger === "on_card_played" && h.card_type) trig = `On ${h.card_type[0].toUpperCase()}${h.card_type.slice(1)} played`;
-  const every = h.every_n ? ` (every ${ordinal(h.every_n)})` : "";
+  if (h.trigger === "on_card_played" && h.card_type) {
+    trig = rT("app.relic.trigger.on_type_played", { type: `${h.card_type[0].toUpperCase()}${h.card_type.slice(1)}` });
+  }
+  const every = h.every_n ? rT("app.relic.every_nth", { nth: ordinal(h.every_n) }) : "";
   const eff = (h.effects || []).map(fmtEffect).join(", ");
   const tgt = h.target && h.target !== "self" ? ` → ${h.target}` : "";
   const cond = h.when?.kind ? ` (if ${String(h.when.kind).replace(/_/g, " ")})` : "";
-  const once = h.once_per_combat ? " · once/combat" : "";
+  const once = h.once_per_combat ? rT("app.relic.once_per_combat") : "";
   return `${trig}${every}${tgt}: ${eff}${cond}${once}`;
 }
 
@@ -195,12 +200,12 @@ function fmtHook(h) {
 // We surface each as a chip; clicking it opens the feedback popout with a full description + effect lines.
 
 const MECH_KINDS = [
-  { kind: "orb", badge: "◉ Orb", pool: "orb_pool", lines: orbLines },
-  { kind: "status", badge: "✦ Status", pool: "status_pool", lines: statusLines },
-  { kind: "summon", badge: "⚔ Summon", pool: "summon_pool", lines: summonLines },
+  { kind: "orb", badge: "app.mech.badge_orb", pool: "orb_pool", lines: orbLines },
+  { kind: "status", badge: "app.mech.badge_status", pool: "status_pool", lines: statusLines },
+  { kind: "summon", badge: "app.mech.badge_summon", pool: "summon_pool", lines: summonLines },
   // Phase BA (v55): the class's signature potion. It carries no card text and it is not in the deck, so this
   // panel is the only place a player can read what it does before one drops.
-  { kind: "potion", badge: "🧪 Potion", pool: "potion_pool", lines: potionLines },
+  { kind: "potion", badge: "app.mech.badge_potion", pool: "potion_pool", lines: potionLines },
 ];
 
 function renderMechanics(character, classId) {
@@ -218,8 +223,8 @@ function renderMechanics(character, classId) {
   // the only place a player can learn the counter survives the fight. Informational: no feedback subject.
   const persist = !!character?.forge_persist;
   if (!items.length && !persist) { box.classList.add("hidden"); return; }
-  box.innerHTML = `<div class="mech-head">Class mechanics — custom elements this class invents.`
-    + (classId != null ? ` Click one to see what it does and rate it.` : ``) + `</div><div class="mech-grid"></div>`;
+  box.innerHTML = `<div class="mech-head">${rH("app.mech.head")}`
+    + (classId != null ? rH("app.mech.head_rate") : ``) + `</div><div class="mech-grid"></div>`;
   const grid = box.querySelector(".mech-grid");
   if (persist) grid.appendChild(forgePersistEl());
   for (const { spec, entry } of items) grid.appendChild(mechEl(spec, entry, classId));
@@ -231,11 +236,11 @@ function renderMechanics(character, classId) {
 function forgePersistEl() {
   const d = document.createElement("div");
   d.className = "mech mech-forge";
-  d.innerHTML = `<div class="mech-top"><span class="mech-badge">⚒ Forge</span>`
-    + `<span class="mech-name">Keeps its edge</span></div>`
-    + `<div class="mech-teaser">This class's Forge counter does not fully reset between fights.</div>`
-    + `<ul class="mech-eff"><li>At the end of each combat it banks up to 5 Forge</li>`
-    + `<li>Your first turn of the next combat gets that much Forge back (and summons your blade)</li></ul>`;
+  d.innerHTML = `<div class="mech-top"><span class="mech-badge">${rH("app.mech.forge_badge")}</span>`
+    + `<span class="mech-name">${rH("app.mech.forge_name")}</span></div>`
+    + `<div class="mech-teaser">${rH("app.mech.forge_teaser")}</div>`
+    + `<ul class="mech-eff"><li>${rH("app.mech.forge_line_1")}</li>`
+    + `<li>${rH("app.mech.forge_line_2")}</li></ul>`;
   return d;
 }
 
@@ -249,8 +254,8 @@ function mechEl(spec, entry, classId) {
   const descHtml = entry.description ? `<div class="mech-teaser">${esc(entry.description)}</div>` : "";
   const effHtml = lines.length
     ? `<ul class="mech-eff">${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>` : "";
-  d.innerHTML = `<button class="cc-fb" title="Give feedback" aria-label="Give feedback">💬</button>`
-    + `<div class="mech-top"><span class="mech-badge">${spec.badge}</span>`
+  d.innerHTML = fbButtonHtml()
+    + `<div class="mech-top"><span class="mech-badge">${rH(spec.badge)}</span>`
     + `<span class="mech-name">${emoji}${esc(entry.name || "")}</span></div>`
     + descHtml + effHtml;
   if (classId != null) {
@@ -272,33 +277,31 @@ function elementDetailHtml(description, lines) {
 
 // Phase AR (v49): a `passive_timing: turn_start` orb (the Plasma shape) says so; fmtEffect already appends a
 // per-effect `when` gate ("… (if you have 3+ orbs)").
-const ORB_VAL_LABELS = { passive: "Each turn while channeled", passive_turn_start: "At the start of each turn while channeled", evoke: "On evoke" };
 function orbLines(orb) {
   const out = [];
   const passive = (orb.passive || []).map((e) => fmtEffect(e, "enemy")).join(", ");
   const evoke = (orb.evoke || []).map((e) => fmtEffect(e, "enemy")).join(", ");
-  if (passive) out.push(`${orb.passive_timing === "turn_start" ? ORB_VAL_LABELS.passive_turn_start : ORB_VAL_LABELS.passive}: ${passive}`);
-  if (evoke) out.push(`${ORB_VAL_LABELS.evoke}: ${evoke}`);
+  if (passive) out.push(`${rT(orb.passive_timing === "turn_start" ? "app.mech.orb_passive_turn_start" : "app.mech.orb_passive")}: ${passive}`);
+  if (evoke) out.push(`${rT("app.mech.orb_evoke")}: ${evoke}`);
   return out;
 }
 
-const STATUS_HOOK_LABELS = {
-  damage_dealt: "your attacks", damage_taken: "damage you take",
-  block_gained: "block you gain", turn_start: "turn start", turn_end: "turn end",
-  energy_gain: "energy you gain", card_draw: "cards you draw",
-  damage_over_time: "HP lost at its turn start", hit_count: "hits per attack",  // Phase AQ (v47)
-};
+// app.mech.status_hook.<hook>; damage_over_time / hit_count are Phase AQ (v47)
+const STATUS_HOOKS = ["damage_dealt", "damage_taken", "block_gained", "turn_start", "turn_end", "energy_gain",
+  "card_draw", "damage_over_time", "hit_count"];
 // Phase BA (v55): the signature potion's chip lines — what it does, when you can drink it, and the one fact
 // a player cannot infer from anywhere else: it is an ADDITION to the normal potion table, not a replacement.
 function potionLines(po) {
   const out = [];
   const rarity = String(po.rarity || "common");
-  out.push(`${rarity.charAt(0).toUpperCase()}${rarity.slice(1)} potion — usable `
-           + (po.usage === "any" ? "any time" : "in combat"));
+  out.push(rT("app.mech.potion_line", {
+    rarity: `${rarity.charAt(0).toUpperCase()}${rarity.slice(1)}`,
+    when: rT(po.usage === "any" ? "app.mech.potion_any_time" : "app.mech.potion_in_combat"),
+  }));
   const tgt = po.target || "self";
   const eff = (po.effects || []).map((e) => potionEffectText(e, tgt)).filter(Boolean).join(", ");
   if (eff) out.push(eff);
-  out.push("Drops alongside the usual potions on runs of this class");
+  out.push(rT("app.mech.potion_drops"));
   return out;
 }
 
@@ -314,12 +317,12 @@ function potionEffectText(e, target) {
 
 function statusLines(st) {
   const out = [];
-  const kind = st.type === "debuff" ? "Debuff" : "Buff";
-  const hook = STATUS_HOOK_LABELS[st.hook] || (st.hook ? String(st.hook).replace(/_/g, " ") : "");
+  const kind = rT(st.type === "debuff" ? "app.mech.status_debuff" : "app.mech.status_buff");
+  const hook = rLabel("app.mech.status_hook.", STATUS_HOOKS, st.hook) || (st.hook ? String(st.hook).replace(/_/g, " ") : "");
   // Phase AQ: a multiplicative damage status reads as a percent scaler, not a flat stack bonus.
-  const mode = st.mode === "multiplicative" ? " (+10% per stack, up to double)" : "";
-  out.push(hook ? `${kind} — affects ${hook}${mode}` : kind);
-  if (st.decay && st.decay !== "none") out.push(`Decays: ${String(st.decay).replace(/_/g, " ")}`);
+  const mode = st.mode === "multiplicative" ? rT("app.mech.status_multiplicative") : "";
+  out.push(hook ? rT("app.mech.status_line", { kind, hook, mode }) : kind);
+  if (st.decay && st.decay !== "none") out.push(rT("app.mech.status_decays", { decay: String(st.decay).replace(/_/g, " ") }));
   return out;
 }
 
@@ -347,20 +350,24 @@ function summonActionPhrase(actions) {
 function summonLines(sm) {
   const out = [];
   const moves = summonMoves(sm);
-  out.push(sm.attackable === false ? "Ethereal (cannot be attacked)"
-                                   : `Max HP: ${sm.max_hp != null ? sm.max_hp : "?"}`);
+  out.push(sm.attackable === false ? rT("app.mech.summon_ethereal")
+                                   : rT("app.mech.summon_max_hp", { hp: sm.max_hp != null ? sm.max_hp : "?" }));
   if (!moves.length) {
-    out.push("A passive minion — summon it, then spend cards to make it attack.");
+    out.push(rT("app.mech.summon_passive"));
   } else if (moves.length === 1) {
-    out.push(`Each turn: ${summonActionPhrase(moves[0])}`);
+    out.push(rT("app.mech.summon_each_turn", { actions: summonActionPhrase(moves[0]) }));
   } else {
-    moves.forEach((m, i) => out.push(`Turn ${i + 1}: ${summonActionPhrase(m)}`));
+    moves.forEach((m, i) => out.push(rT("app.mech.summon_turn_n", { n: i + 1, actions: summonActionPhrase(m) })));
   }
-  if (Array.isArray(sm.on_summon) && sm.on_summon.length) out.push(`On summon: ${summonActionPhrase(sm.on_summon)}`);
-  if (Array.isArray(sm.on_death) && sm.on_death.length) out.push(`On death: ${summonActionPhrase(sm.on_death)}`);
+  if (Array.isArray(sm.on_summon) && sm.on_summon.length) {
+    out.push(rT("app.mech.summon_on_summon", { actions: summonActionPhrase(sm.on_summon) }));
+  }
+  if (Array.isArray(sm.on_death) && sm.on_death.length) {
+    out.push(rT("app.mech.summon_on_death", { actions: summonActionPhrase(sm.on_death) }));
+  }
   const nth = sm.on_nth_attack;
   if (nth && Array.isArray(nth.actions) && nth.actions.length) {
-    out.push(`Every ${nth.n}th hit: ${summonActionPhrase(nth.actions)}`);
+    out.push(rT("app.mech.summon_every_nth", { n: nth.n, actions: summonActionPhrase(nth.actions) }));
   }
   return out;
 }
@@ -384,7 +391,7 @@ function cardEl(c, classId, artUrl) {
   const d = document.createElement("div");
   d.className = "cardchip r-" + (c.rarity || "common");
   d.dataset.cardId = c.id ?? "";
-  d.innerHTML = `<button class="cc-fb" title="Give feedback" aria-label="Give feedback">💬</button>`
+  d.innerHTML = fbButtonHtml()
     + `<div class="cc-top"><span class="cc-name"></span><span class="cc-cost"></span></div>`
     + `<div class="cc-meta">${esc(c.type)} · ${esc(c.rarity)}</div>`
     + `<div class="cc-eff"></div>`;
@@ -402,7 +409,7 @@ function cardEl(c, classId, artUrl) {
   if (hasUpgrade(c)) {
     const lab = document.createElement("label");
     lab.className = "cc-up";
-    lab.innerHTML = `<input type="checkbox"> Show upgraded`;
+    lab.innerHTML = `<input type="checkbox"> ${rH("app.card.show_upgraded")}`;
     lab.querySelector("input").onchange = (ev) => {
       d.classList.toggle("upgraded", ev.target.checked);
       paint(ev.target.checked ? upgradedView(c) : c);
@@ -424,30 +431,29 @@ function cardEl(c, classId, artUrl) {
 
 // --- per-card feedback overlay ------------------------------------------------------------------
 
-// UI labels → the generator's canonical categories (btsgen.contract). Order = display order.
-const FB_CATEGORIES = [
-  { value: "great", label: "Good" },
-  { value: "overpowered", label: "Seems OP" },
-  { value: "underpowered", label: "Underpowered" },
-  { value: "off_theme", label: "Off-theme" },
-  { value: "confusing", label: "Doesn't make sense" },
-  { value: "doesnt_work", label: "Doesn't work" },
-];
+// The generator's canonical categories (btsgen.contract), labelled by app.feedback.cat.<value>. Order =
+// display order.
+const FB_CATEGORIES = ["great", "overpowered", "underpowered", "off_theme", "confusing", "doesnt_work"]
+  .map((value) => ({ value, get label() { return rT("app.feedback.cat." + value); } }));
 
 // What the popout rates. `kind` is "card" for deck cards, or "orb"/"status"/"summon"/"relic" for the
 // non-card elements; `subjectId` is the card id (cards) or the element name (elements).
 let fbState = { classId: null, kind: "card", subjectId: "", chip: null, category: null };
 
-const FB_TITLES = {
-  card: "How's this card?", relic: "How's this relic?", orb: "How's this orb?",
-  status: "How's this status?", summon: "How's this summon?", potion: "How's this potion?",
-};
+// app.feedback.title_<kind>
+const FB_TITLE_KINDS = ["card", "relic", "orb", "status", "summon", "potion"];
+
+// The 💬 button on every chip (title + aria-label: app.result.feedback_tip).
+function fbButtonHtml() {
+  const tip = esc(rT("app.result.feedback_tip"));
+  return `<button class="cc-fb" title="${tip}" aria-label="${tip}">💬</button>`;
+}
 
 // Open the shared feedback popout. `detailHtml` (elements only) shows a description + effect lines so the
 // player can actually evaluate a mechanic that carries no card text.
 function openFeedback({ classId, kind, subjectId, title, detailHtml, chip }) {
   fbState = { classId, kind, subjectId: subjectId ?? "", chip, category: null };
-  el("fb-title").textContent = FB_TITLES[kind] || "How's this?";
+  el("fb-title").textContent = rLabel("app.feedback.title_", FB_TITLE_KINDS, kind) || rT("app.feedback.title_fallback");
   el("fb-card-name").textContent = title || "";
   const detail = el("fb-detail");
   detail.innerHTML = detailHtml || "";
@@ -490,18 +496,18 @@ async function submitFeedback() {
       body: JSON.stringify(body),
     });
     const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
+    if (!r.ok) throw new Error(BTS_I18N.err(d, rT("common.http_error", { status: r.status })));
     if (fbState.chip) {
       fbState.chip.classList.add("rated");
       const fb = fbState.chip.querySelector(".cc-fb");
       if (fb) {
         fb.textContent = "✓";
         const label = (FB_CATEGORIES.find((c) => c.value === fbState.category) || {}).label;
-        fb.title = label ? `You rated this: ${label} — click to change` : "Feedback sent — click to change";
+        fb.title = label ? rT("app.feedback.rated_tip", { label }) : rT("app.feedback.sent_tip");
       }
     }
     closeFeedback();
-    toast("Thanks for the feedback!");
+    toast(rT("app.feedback.toast_thanks"));
   } catch (e) {
     toast(e.message);
     btn.disabled = false;
@@ -821,8 +827,8 @@ function fmtEffect(e, target) {
 // --- helpers -------------------------------------------------------------------------------------
 
 async function copy(text) {
-  try { await navigator.clipboard.writeText(text); toast("Copied!"); }
-  catch (_) { toast("Copy failed — select the text manually."); }
+  try { await navigator.clipboard.writeText(text); toast(rT("common.toast.copied")); }
+  catch (_) { toast(rT("common.toast.copy_failed")); }
 }
 function esc(s) {
   return String(s ?? "").replace(/[&<>"]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));

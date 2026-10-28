@@ -3,36 +3,36 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Forge a Class — BLANK the spire</title>
+  <title data-i18n-page="app.meta.title">Forge a Class — Blank the Spire</title>
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png" />
   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/static/style.css?v=20261027a" />
+  <link rel="stylesheet" href="/static/style.css?v=20261028a" />
 </head>
 <body>
   <header>
-    <div class="brand">⚒ <strong>Forge a Class</strong> <span class="sub">BLANK the spire</span></div>
+    <div class="brand">⚒ <strong data-i18n="app.meta.title">Forge a Class</strong> <span class="sub" data-i18n="common.brand.name">Blank the Spire</span></div>
     <nav>
-      <button id="nav-forge" class="tab active">Forge</button>
-      <button id="nav-library" class="tab">My Classes</button>
-      <a class="tab" href="/archive">The Archive</a>
-      <button id="nav-account" class="tab">Account</button>
-      <a class="tab" href="/download">Get the mod ⬇</a>
-      <a class="tab" href="/help" title="Where do I paste my class code?">Help ?</a>
+      <button id="nav-forge" class="tab active" data-i18n="app.nav.forge">Forge</button>
+      <button id="nav-library" class="tab" data-i18n="app.nav.library">My Classes</button>
+      <a class="tab" href="/archive" data-i18n="common.nav.archive">The Archive</a>
+      <button id="nav-account" class="tab" data-i18n="app.nav.account">Account</button>
+      <a class="tab" href="/download" data-i18n="common.nav.get_mod">Get the Mod ⬇</a>
+      <a class="tab" href="/help" title="Where do I paste my class code?" data-i18n="app.nav.help" data-i18n-attr="title:app.nav.help_tip">Help ?</a>
       <span class="spacer"></span>
-      <span id="tokens" class="tokens hidden" title="Tokens are spent by the 'Use a token' forge option. Press Forge to get one."></span>
+      <span id="tokens" class="tokens hidden" title="Tokens are spent by the 'Use a token' forge option. Press Forge to get one." data-i18n-attr="title:app.header.tokens_tip"></span>
       <span id="who" class="who"></span>
-      <button id="signout" class="ghost hidden">Sign out</button>
+      <button id="signout" class="ghost hidden" data-i18n="app.header.signout">Sign out</button>
     </nav>
   </header>
 
   <!-- Signed-out gate -->
   <section id="gate" class="card hidden">
-    <h1>Fill in the Blank.</h1>
-    <p>Be as detailed or as vague as you like. At the end you will get a code. Copy the code it generates to paste into the mod menu in-game.</p>
-    <a id="signin" class="btn primary" href="/login">Sign in</a>
-    <a class="btn ghost" href="/download">Get the mod &amp; install guide</a>
-    <a class="btn ghost" href="/help">Help — where does my code go?</a>
+    <h1 data-i18n="app.gate.title">Fill in the Blank.</h1>
+    <p data-i18n="app.gate.body">Be as detailed or as vague as you like. At the end you will get a code. Copy the code it generates to paste into the mod menu in-game.</p>
+    <a id="signin" class="btn primary" href="/login" data-i18n="app.gate.signin">Sign in</a>
+    <a class="btn ghost" href="/download" data-i18n="app.gate.get_mod">Get the mod &amp; install guide</a>
+    <a class="btn ghost" href="/help" data-i18n="app.gate.help">Help — where does my code go?</a>
     <!-- what is this dev sign in? should we remove before production? -->
     <a id="dev-signin" class="btn ghost hidden" href="/dev-login?email=dev@example.com">Dev sign-in (local)</a>
   </section>
@@ -45,7 +45,7 @@
     <div id="welcome-banner" class="banner welcome hidden" role="status">
       <span class="banner-icon" aria-hidden="true">🎁</span>
       <p id="welcome-text"></p>
-      <button id="welcome-x" class="banner-x" aria-label="Dismiss">×</button>
+      <button id="welcome-x" class="banner-x" aria-label="Dismiss" data-i18n-attr="aria-label:common.dismiss">×</button>
     </div>
     <!-- Forge-first screen (2026-10-26, docs/plans/FORGE_FIRST_PLAN.md sections 3-4): the concept box is the
          first thing under the header and the Forge button is never disabled (except mid-forge). Nothing about
@@ -56,9 +56,9 @@
          chooser cards/strip and the five-step tutorial are gone; installing the mod is explained on the
          result ("Play it", below the code) instead of before the first forge. -->
     <section id="forge-input" class="card">
-      <label class="lbl" for="concept">Describe your class</label>
+      <label class="lbl" for="concept" data-i18n="app.concept.label">Describe your class</label>
       <!-- can we add a few more contrasting examples and select one at random so the user doesn't always see the same sample text? another example might be 'the bravest toaster in the world' -->
-      <textarea id="concept" rows="3" placeholder="e.g. a venomous plague doctor who sacrifices health to stack poison, then turns blood into armor"></textarea>
+      <textarea id="concept" rows="3" data-i18n-attr="placeholder:app.concept.placeholder" placeholder="e.g. a venomous plague doctor who sacrifices health to stack poison, then turns blood into armor"></textarea>
 
       <!-- The pay step (2026-10-26): hidden until the first Forge click that can't pay yet (or the "Change my
            tokens provider" link), then open for the rest of the visit (app.js PAY_STEP_OPEN). #pay-reason is the
@@ -70,60 +70,60 @@
              pick. They behave like a radio pair: the open one is highlighted with a filled dot, and clicking its
              own header does not close it (app.js onPaySummaryClick) — switch by opening the other. The token box
              sits first, the key box under it (same 2026-10-12 change). -->
-        <p class="lbl pay-lbl">Who provides your compute? <span class="muted">Pick one.</span></p>
+        <p class="lbl pay-lbl"><span data-i18n="app.pay.label">Who provides your compute?</span> <span class="muted" data-i18n="app.pay.label_hint">Pick one.</span></p>
         <!-- Tokens without leaving the forge: the balance, then the same tier + custom-amount buttons the
              Account tab builds (app.js renderDonatePanel). -->
         <details id="forge-token" class="settings pay">
-          <summary>Use a token</summary>
+          <summary data-i18n="app.pay.token.summary">Use a token</summary>
           <p class="hint" id="token-balance-line"></p>
           <!-- The tiers fold behind "Get a forge token" (2026-09-26) so someone spending a token they already
                hold isn't looking at a price list. Open by default only when the balance is 0 (app.js
                renderGetTokens); unlimited accounts never see either. -->
           <div class="get-tokens-row">
             <button id="forge-get-tokens" class="btn" type="button" aria-expanded="false"
-                    aria-controls="forge-donate-wrap">Get a forge token</button>
+                    aria-controls="forge-donate-wrap" data-i18n="app.pay.token.get">Get a forge token</button>
           </div>
           <div id="forge-donate-wrap" class="hidden">
             <div id="forge-donate-box" class="donate hidden">
               <div id="forge-donate-tiers" class="donate-tiers"></div>
               <div id="forge-donate-custom" class="donate-custom hidden"></div>
             </div>
-            <p id="forge-donate-note" class="hint hidden">Donations aren't available right now — bring your own API key to keep forging.</p>
+            <p id="forge-donate-note" class="hint hidden" data-i18n="app.pay.token.unavailable">Donations aren't available right now — bring your own API key to keep forging.</p>
           </div>
-          <p class="hint">Have an API key? Forging with it is free — open “Bring your own key” below.</p>
+          <p class="hint" data-i18n="app.pay.token.byok_hint">Have an API key? Forging with it is free — open “Bring your own key” below.</p>
         </details>
 
         <details id="forge-byok" class="settings pay">
-          <summary>Bring your own key</summary>
+          <summary data-i18n="app.byok.summary">Bring your own key</summary>
           <div class="byok-grid">
             <div>
-              <label class="lbl small" for="provider">Provider</label>
+              <label class="lbl small" for="provider" data-i18n="app.byok.provider_label">Provider</label>
               <select id="provider" class="in">
-                <option value="anthropic" selected>Anthropic (Claude)</option>
-                <option value="openai">OpenAI</option>
-                <option value="ollama">Ollama Cloud</option>
-                <option value="openrouter">OpenRouter</option>
-                <option value="groq">Groq</option>
-                <option value="google">Google Gemini</option>
-                <option value="xai">xAI (Grok)</option>
-                <option value="deepseek">DeepSeek</option>
-                <option value="together">Together</option>
-                <option value="custom">Other (OpenAI-compatible URL)</option>
+                <option value="anthropic" selected data-i18n="app.byok.provider.anthropic">Anthropic (Claude)</option>
+                <option value="openai" data-i18n="app.byok.provider.openai">OpenAI</option>
+                <option value="ollama" data-i18n="app.byok.provider.ollama">Ollama Cloud</option>
+                <option value="openrouter" data-i18n="app.byok.provider.openrouter">OpenRouter</option>
+                <option value="groq" data-i18n="app.byok.provider.groq">Groq</option>
+                <option value="google" data-i18n="app.byok.provider.google">Google Gemini</option>
+                <option value="xai" data-i18n="app.byok.provider.xai">xAI (Grok)</option>
+                <option value="deepseek" data-i18n="app.byok.provider.deepseek">DeepSeek</option>
+                <option value="together" data-i18n="app.byok.provider.together">Together</option>
+                <option value="custom" data-i18n="app.byok.provider.custom">Other (OpenAI-compatible URL)</option>
               </select>
             </div>
             <div>
-              <label class="lbl small" for="api_key">API key</label>
-              <input id="api_key" class="in" type="password" placeholder="Paste your key" autocomplete="off" />
+              <label class="lbl small" for="api_key" data-i18n="app.byok.key_label">API key</label>
+              <input id="api_key" class="in" type="password" placeholder="Paste your key" data-i18n-attr="placeholder:app.byok.key_placeholder" autocomplete="off" />
             </div>
           </div>
-          <input id="base_url" class="in" placeholder="Base URL — e.g. https://api.openai.com/v1" style="display:none" />
+          <input id="base_url" class="in" placeholder="Base URL — e.g. https://api.openai.com/v1" data-i18n-attr="placeholder:app.byok.base_url_placeholder" style="display:none" />
           <!-- One line: where to get a key, then the key-handling answer behind a link. Keep the answer TRUE:
                the key is saved in this browser's localStorage (bts_byok) so it survives a reload, travels to
                our server only inside the forge / model-list request, and is never written to the database or
                the logs. -->
           <p class="hint byok-line"><span id="byok-hint"></span> ·
-            <button id="key-safety-btn" class="linkish" type="button">Your key stays in this browser</button></p>
-          <p class="hint hidden" id="key-safety">We never store it. It's kept in this browser so you don't have to
+            <button id="key-safety-btn" class="linkish" type="button" data-i18n="app.byok.key_safety_link">Your key stays in this browser</button></p>
+          <p class="hint hidden" id="key-safety" data-i18n="app.byok.key_safety_body">We never store it. It's kept in this browser so you don't have to
             retype it (clear the box to forget it), and when you forge it goes straight to your provider — it's
             never written to our database or our logs.</p>
 
@@ -133,19 +133,19 @@
                (app.js loadModels, auto-run once a key is entered); the forge route re-checks the ids against
                that listing. Only "Other" falls back to typed ids when its endpoint can't list models. -->
           <div class="byok-models-head">
-            <span class="lbl small">Models</span>
-            <button id="load-models" class="linkish" type="button">Load my model list</button>
+            <span class="lbl small" data-i18n="app.byok.models_label">Models</span>
+            <button id="load-models" class="linkish" type="button" data-i18n="app.byok.load_models">Load my model list</button>
           </div>
           <div class="byok-grid">
             <div>
-              <label class="lbl small" for="model">Design</label>
-              <select id="model" class="in" disabled><option value="">Enter your key, then load models</option></select>
-              <p class="hint">A few calls that shape the class. Use your smartest model.</p>
+              <label class="lbl small" for="model" data-i18n="app.byok.design_label">Design</label>
+              <select id="model" class="in" disabled><option value="" data-i18n="app.byok.design_placeholder">Enter your key, then load models</option></select>
+              <p class="hint" data-i18n="app.byok.design_hint">A few calls that shape the class. Use your smartest model.</p>
             </div>
             <div>
-              <label class="lbl small" for="card_model">Card coding</label>
-              <select id="card_model" class="in" disabled><option value="">Same as design</option></select>
-              <p class="hint">Writes every card in strict JSON — most of the cost. A reliable coder is enough.</p>
+              <label class="lbl small" for="card_model" data-i18n="app.byok.card_label">Card coding</label>
+              <select id="card_model" class="in" disabled><option value="" data-i18n="app.byok.card_same">Same as design</option></select>
+              <p class="hint" data-i18n="app.byok.card_hint">Writes every card in strict JSON — most of the cost. A reliable coder is enough.</p>
             </div>
           </div>
 
@@ -153,47 +153,47 @@
             <span id="byok-art" class="chip"></span>
             <!-- The quote is on demand: a link, then the table in its place. Changing the provider or either
                  model folds it back so a stale number is never on screen. -->
-            <button id="estimate-btn" class="linkish" type="button">Estimate cost</button>
+            <button id="estimate-btn" class="linkish" type="button" data-i18n="app.byok.estimate_link">Estimate cost</button>
           </div>
           <div class="estimate hidden" id="byok-estimate"></div>
         </details>
       </div>
 
       <div class="forge-actions">
-        <button id="forge-btn" class="btn primary">Forge the class</button>
+        <button id="forge-btn" class="btn primary" data-i18n="app.forge.button">Forge the class</button>
       </div>
-      <p class="pay-open-row"><button id="pay-open" class="linkish" type="button">Change my tokens provider</button></p>
+      <p class="pay-open-row"><button id="pay-open" class="linkish" type="button" data-i18n="app.pay.open_link">Change my tokens provider</button></p>
 
       <!-- One-line "how it works" (2026-10-26, FORGE_FIRST_PLAN.md 3.4), shown until dismissed
            (bts_tutorial_banner_dismissed). It replaced the five-step 2026-09-30 tutorial whose first step sent
            people to Steam before they had a class; the illustrated version lives on /help. -->
       <div id="v3-banner" class="banner tutorial hidden" role="status">
         <span class="banner-icon" aria-hidden="true">⚒</span>
-        <p id="v3-banner-text" class="tutorial-body">Describe a class, press Forge, copy the code, paste it in-game
-          (Mods → BLANK the spire → Import a class code → Import → restart).
+        <p id="v3-banner-text" class="tutorial-body" data-i18n-html="app.tutorial.body">Describe a class, press Forge, copy the code, paste it in-game
+          (Mods → Blank the Spire → Import a class code → Import → restart).
           <a class="tutorial-more" href="/help">Full guide with screenshots</a></p>
-        <button id="v3-banner-x" class="banner-x" aria-label="Dismiss">×</button>
+        <button id="v3-banner-x" class="banner-x" aria-label="Dismiss" data-i18n-attr="aria-label:common.dismiss">×</button>
       </div>
       <!-- Phone banner (PHONE_FUNNEL_PLAN.md 5.1; under the Forge button since 2026-10-26, FORGE_FIRST_PLAN.md
            D10): phones only (render.js IS_PHONE), until dismissed (bts_phone_banner_dismissed). Forging on a
            phone is fine; playing needs the PC. -->
       <div id="phone-banner" class="banner phone hidden" role="status">
         <span class="banner-icon" aria-hidden="true">📱</span>
-        <p class="phone-banner-text">On a phone? Forge away — the class is saved to My Classes. Open
+        <p class="phone-banner-text" data-i18n="app.phone_banner.body">On a phone? Forge away — the class is saved to My Classes. Open
           blankthespire.com on the PC that runs Slay the Spire 2 to grab the code, or send it to yourself below.</p>
-        <button id="phone-banner-x" class="banner-x" aria-label="Dismiss">×</button>
+        <button id="phone-banner-x" class="banner-x" aria-label="Dismiss" data-i18n-attr="aria-label:common.dismiss">×</button>
       </div>
 
       <!-- Options most people never touch, folded under the button. The interactive toggle is a property of
            the forge itself, not of how it is paid for, so it lives here rather than in either pay box. -->
       <details id="forge-advanced" class="advanced">
-        <summary>Advanced options</summary>
+        <summary data-i18n="app.advanced.summary">Advanced options</summary>
         <label class="small" style="display:block;margin-top:.6rem;">
           <input id="interactive" type="checkbox" />
-          Interactive forge
+          <span data-i18n="app.advanced.interactive_label">Interactive forge</span>
         </label>
-        <p class="hint" style="margin-top:.25rem;">Normally the forge maps your theme onto the game's build
-          engines (the archetypes) and picks the strongest combination itself. With <b>Interactive forge</b> on,
+        <p class="hint" style="margin-top:.25rem;" data-i18n-html="app.advanced.interactive_hint">Normally the forge maps your theme onto the game's build
+          engines (the archetypes) and picks the strongest combination itself. With <strong>Interactive forge</strong> on,
           it pauses once your theme is mapped, shows you the candidate engines, and lets you pick up to two of
           them. You get a short timer; if you don't answer, the forge decides for you.</p>
         <!-- dev deploys only (BTSWEB_DEV_AUTH): forges canned output with no key and no token. -->
@@ -204,13 +204,13 @@
     </section>
 
     <section id="progress" class="card hidden">
-      <h3>Forging… <span id="spinner" class="spin">◓</span></h3>
+      <h3><span data-i18n="app.progress.title">Forging…</span> <span id="spinner" class="spin">◓</span></h3>
       <div id="choice" class="choice hidden">
-        <p class="lbl">Your call — pick up to 2 engines to build the class around <span id="choice-timer" class="muted"></span></p>
+        <p class="lbl"><span data-i18n="app.choice.prompt">Your call — pick up to 2 engines to build the class around</span> <span id="choice-timer" class="muted"></span></p>
         <div id="choice-options" class="choice-options"></div>
         <div class="choice-actions">
-          <button id="choice-go" class="btn primary" disabled>Forge with my picks</button>
-          <button id="choice-skip" class="btn">Let the forge decide</button>
+          <button id="choice-go" class="btn primary" disabled data-i18n="app.choice.go">Forge with my picks</button>
+          <button id="choice-skip" class="btn" data-i18n="app.choice.skip">Let the forge decide</button>
         </div>
       </div>
       <pre id="log" class="log"></pre>
@@ -220,7 +220,7 @@
         <span class="banner-icon" aria-hidden="true">⚠</span>
         <div>
           <p id="forge-lost-text"></p>
-          <button id="forge-lost-library" class="btn">Open My Classes</button>
+          <button id="forge-lost-library" class="btn" data-i18n="app.lost.open_library">Open My Classes</button>
         </div>
       </div>
     </section>
@@ -229,22 +229,24 @@
       <div id="view-bar" class="view-bar hidden">
         <span id="view-title" class="muted"></span>
         <span class="spacer"></span>
-        <button id="share-link" class="btn hidden" title="Copy a public link to this class">🔗 Copy share link</button>
+        <button id="share-link" class="btn hidden" title="Copy a public link to this class" data-i18n="app.result.share" data-i18n-attr="title:app.result.share_tip">🔗 Copy share link</button>
         <!-- The Archive (FORGE_FIRST_PLAN.md 5.2): three states painted by app.js paintNominate(). -->
-        <button id="nominate" class="btn hidden" type="button">☆ Nominate for The Archive</button>
-        <button id="view-back" class="btn ghost hidden">← Back to the forge</button>
+        <button id="nominate" class="btn hidden" type="button" data-i18n="app.result.nominate">☆ Nominate for The Archive</button>
+        <button id="view-back" class="btn ghost hidden" data-i18n="app.result.back">← Back to the forge</button>
       </div>
       <h2 id="r-name"></h2>
       <p id="r-desc" class="muted"></p>
       <!-- Phone hand-off (PHONE_FUNNEL_PLAN.md 5.2/5.3): above the art and the card gallery so it is on the
            first screen. .phone-only: desktops never see it. -->
       <div id="r-handoff" class="handoff phone-only">
-        <p class="handoff-lede">Play it on your PC — send the class there:</p>
+        <p class="handoff-lede" data-i18n="app.handoff.lede">Play it on your PC — send the class there:</p>
         <div class="handoff-actions">
           <button id="send-pc" class="btn primary" type="button"
-                  title="Share the class link to your PC (AirDrop, Messages, Notes, Mail…)">📲 Send to my PC</button>
+                  title="Share the class link to your PC (AirDrop, Messages, Notes, Mail…)"
+                  data-i18n="app.handoff.send_pc" data-i18n-attr="title:app.handoff.send_pc_tip">📲 Send to my PC</button>
           <button id="email-me" class="btn" type="button"
-                  title="Email the link and the import code to your account's address">✉️ Email it to me</button>
+                  title="Email the link and the import code to your account's address"
+                  data-i18n="app.handoff.email_me" data-i18n-attr="title:app.handoff.email_me_tip">✉️ Email it to me</button>
         </div>
         <p id="r-handoff-note" class="hint hidden"></p>
       </div>
@@ -254,19 +256,19 @@
       <div id="r-mechanics" class="mechanics hidden"></div>
       <div id="r-cards" class="cards"></div>
       <div class="codebox">
-        <label class="lbl small">Class import code</label>
+        <label class="lbl small" data-i18n="app.result.code_label">Class import code</label>
         <textarea id="r-code" rows="3" readonly></textarea>
-        <button id="copy-code" class="btn">Copy code</button>
+        <button id="copy-code" class="btn" data-i18n="app.result.copy_code">Copy code</button>
         <!-- "Play it" (2026-10-26, FORGE_FIRST_PLAN.md 3.5): the install steps live here, after the class exists,
              instead of in a pre-forge tutorial. Same three steps and markup classes as deck.html's block. -->
         <div class="play-how">
-          <h3 class="play-title">Play it</h3>
+          <h3 class="play-title" data-i18n="app.play.title">Play it</h3>
           <ol class="play-steps">
-            <li><a href="/workshop" target="_blank" rel="noopener">Subscribe to the mod on Steam Workshop</a> (once).</li>
-            <li>In Slay the Spire 2: Mods → BLANK the spire → <em>Import a class code</em> → paste → Import.</li>
-            <li>Restart the game and pick your class.</li>
+            <li data-i18n-html="app.play.step_1"><a href="/workshop" target="_blank" rel="noopener">Subscribe to the mod on Steam Workshop</a> (once).</li>
+            <li data-i18n-html="app.play.step_2">In Slay the Spire 2: Mods → Blank the Spire → <em>Import a class code</em> → paste → Import.</li>
+            <li data-i18n="app.play.step_3">Restart the game and pick your class.</li>
           </ol>
-          <p class="hint"><a href="/help">Where do I paste this?</a></p>
+          <p class="hint"><a href="/help" data-i18n="app.play.where">Where do I paste this?</a></p>
         </div>
         <p id="r-usage" class="hint hidden"></p>
       </div>
@@ -277,12 +279,12 @@
   <main id="view-library" class="hidden">
     <section class="card">
       <div class="lib-head">
-        <h2>My Classes</h2>
+        <h2 data-i18n="app.nav.library">My Classes</h2>
         <span class="spacer"></span>
-        <label class="lib-toggle" title="Hide the splash, sprite and card art to scan the list faster">
-          <input type="checkbox" id="lib-show-art" checked> Show art</label>
+        <label class="lib-toggle" title="Hide the splash, sprite and card art to scan the list faster" data-i18n-attr="title:app.library.show_art_tip">
+          <input type="checkbox" id="lib-show-art" checked> <span data-i18n="app.library.show_art">Show art</span></label>
       </div>
-      <p id="lib-empty" class="muted hidden">No classes yet — forge one!</p>
+      <p id="lib-empty" class="muted hidden" data-i18n="app.library.empty">No classes yet — forge one!</p>
       <ul id="lib-list" class="lib"></ul>
     </section>
   </main>
@@ -290,21 +292,21 @@
   <!-- Account view: balance, donations (fixed tiers), donation history -->
   <main id="view-account" class="hidden">
     <section class="card">
-      <h2>Account</h2>
+      <h2 data-i18n="app.nav.account">Account</h2>
       <p id="acct-email" class="muted"></p>
-      <p class="acct-balance-row"><span id="acct-balance" class="acct-balance"></span> <span class="muted">tokens</span></p>
-      <p class="hint">One token forges one class on our models. Bring your own API key and forging is free and unlimited — no token needed.</p>
+      <p class="acct-balance-row"><span id="acct-balance" class="acct-balance"></span> <span class="muted" data-i18n="app.account.balance_unit">tokens</span></p>
+      <p class="hint" data-i18n="app.account.balance_hint">One token forges one class on our models. Bring your own API key and forging is free and unlimited — no token needed.</p>
     </section>
 
     <section class="card">
-      <h2>Get a forge token</h2>
-      <p class="hint">BLANK the spire is free and open source, but every hosted forge costs me real money. Your donations cover the cost of our compute.</p>
+      <h2 data-i18n="app.pay.token.get">Get a forge token</h2>
+      <p class="hint" data-i18n="app.account.donate_hint">Blank the Spire is free and open source, but every hosted forge costs me real money. Your donations cover the cost of our compute.</p>
       <div id="donate" class="donate hidden">
         <div id="donate-tiers" class="donate-tiers"></div>
         <div id="donate-custom" class="donate-custom hidden"></div>
       </div>
-      <p id="donate-note" class="hint hidden">Donations aren't available right now — bring your own API key to keep forging.</p>
-      <p class="hint">Payments are handled by Stripe — we never see your card details.</p>
+      <p id="donate-note" class="hint hidden" data-i18n="app.pay.token.unavailable">Donations aren't available right now — bring your own API key to keep forging.</p>
+      <p class="hint" data-i18n="app.account.stripe_note">Payments are handled by Stripe — we never see your card details.</p>
     </section>
 
     <!-- Admin-only (users.admin from /api/me): forge telemetry from forge_jobs / forge_usage / purchases.
@@ -450,8 +452,8 @@
     </section>
 
     <section class="card">
-      <h2>Donation history</h2>
-      <p id="purchases-empty" class="muted hidden">No donations yet.</p>
+      <h2 data-i18n="app.account.history_title">Donation history</h2>
+      <p id="purchases-empty" class="muted hidden" data-i18n="app.account.history_empty">No donations yet.</p>
       <ul id="purchase-list" class="lib"></ul>
     </section>
 
@@ -459,11 +461,11 @@
          Both lists are built by app.js from /api/me (identities, providers, email_login). No unlinking in
          v1 — an account down to its last identity could lock itself out. -->
     <section class="card">
-      <h2>Sign-in methods</h2>
-      <p class="hint">Any of these signs you in to this same account.</p>
+      <h2 data-i18n="app.account.signin_title">Sign-in methods</h2>
+      <p class="hint" data-i18n="app.account.signin_hint">Any of these signs you in to this same account.</p>
       <ul id="acct-identities" class="signin-methods"></ul>
       <p id="acct-link-row" class="acct-link-row hidden">
-        <span class="hint">Link another:</span> <span id="acct-link-options"></span>
+        <span class="hint" data-i18n="app.account.link_another">Link another:</span> <span id="acct-link-options"></span>
       </p>
     </section>
   </main>
@@ -471,15 +473,15 @@
   <!-- Per-card feedback overlay (single reusable modal) -->
   <div id="fb-overlay" class="fb-overlay hidden">
     <div class="fb-panel" role="dialog" aria-modal="true" aria-labelledby="fb-title">
-      <button id="fb-close" class="fb-close" aria-label="Close">×</button>
-      <h3 id="fb-title">How's this card?</h3>
+      <button id="fb-close" class="fb-close" aria-label="Close" data-i18n-attr="aria-label:common.close">×</button>
+      <h3 id="fb-title" data-i18n="app.feedback.title_card">How's this card?</h3>
       <p id="fb-card-name" class="muted"></p>
       <div id="fb-detail" class="fb-detail hidden"></div>
       <div id="fb-cats" class="fb-cats"></div>
-      <textarea id="fb-note" rows="3" maxlength="500"
+      <textarea id="fb-note" rows="3" maxlength="500" data-i18n-attr="placeholder:app.feedback.note_placeholder"
                 placeholder="Optional — tell us why (your words help tune future generations)"></textarea>
       <div class="fb-actions">
-        <button id="fb-submit" class="btn primary" disabled>Submit feedback</button>
+        <button id="fb-submit" class="btn primary" disabled data-i18n="app.feedback.submit">Submit feedback</button>
       </div>
     </div>
   </div>
@@ -487,13 +489,14 @@
   <div id="toast" class="toast hidden"></div>
 
   <footer class="foot">
-    <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a>
-    <a href="mailto:ryan.r.rinkel@gmail.com">Support</a>
+    <a href="/terms" data-i18n="common.footer.terms">Terms</a> · <a href="/privacy" data-i18n="common.footer.privacy">Privacy</a>
+    <a href="mailto:ryan.r.rinkel@gmail.com" data-i18n="common.footer.support">Support</a>
   </footer>
 
-  <!-- ?v= busts the 1-hour static cache on deploy: bump both whenever either file changes. render.js holds
+  <!-- ?v= busts the 1-hour static cache on deploy: bump all three whenever any file changes. i18n.js loads first (BTS_I18N); render.js holds
        the class renderers shared with the public /deck page and must load first. -->
-  <script src="/static/render.js?v=20261027a"></script>
-  <script src="/static/app.js?v=20261027a"></script>
+  <script src="/static/i18n.js?v=20261028a"></script>
+  <script src="/static/render.js?v=20261028a"></script>
+  <script src="/static/app.js?v=20261028a"></script>
 </body>
 </html>

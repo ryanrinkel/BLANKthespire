@@ -3,72 +3,73 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Sign in — BLANK the spire</title>
+  <title data-i18n-page="signin.meta.title">Sign in — Blank the Spire</title>
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png" />
   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/static/style.css?v=20261027a" />
+  <link rel="stylesheet" href="/static/style.css?v=20261028a" />
 </head>
 <body>
   <header>
-    <div class="brand">⚒ <strong>BLANK the spire</strong> <span class="sub">sign in</span></div>
-    <nav><a class="tab" href="/">← Back home</a></nav>
+    <div class="brand">⚒ <strong>Blank the Spire</strong> <span class="sub" data-i18n="signin.header.sub">sign in</span></div>
+    <nav><a class="tab" href="/" data-i18n="common.nav.back_home">← Back home</a></nav>
   </header>
 
   <main>
     <section class="card">
       <!-- Both the heading and the lede are rewritten by signin.js in link mode (/login?link=1, reached
            from the Account tab), where this page adds a provider to the account already signed in. -->
-      <h1 id="title">Sign in</h1>
-      <p id="lede" class="muted">Pick a provider — we only ever see the email address and display name it
+      <h1 id="title" data-i18n="signin.meta.title">Sign in</h1>
+      <p id="lede" class="muted" data-i18n="signin.lede">Pick a provider — we only ever see the email address and display name it
         shares. No passwords, ever.</p>
 
       <!-- In an in-app browser (webview.js): why Google is missing, plus a hand-off to the real browser.
            signin.js fills the copy, unhides this box and moves the email form up under it. -->
       <div id="webview-box" class="webview-box hidden">
         <p id="webview-head" class="webview-head"></p>
-        <a id="open-browser" class="btn ghost webview-open hidden" href="#">Open in Safari</a>
+        <a id="open-browser" class="btn ghost webview-open hidden" href="#" data-i18n="signin.open_browser" data-i18n-var-browser="Safari">Open in Safari</a>
         <p id="webview-menu" class="hint webview-menu hidden"></p>
       </div>
 
       <!-- One .btn.primary per provider /api/me reports, built by signin.js (CSP forbids inline script). -->
       <div id="providers" class="signin-options"></div>
 
-      <p id="none" class="hint hidden">Sign-in is not configured on this server.</p>
+      <p id="none" class="hint hidden" data-i18n="signin.none">Sign-in is not configured on this server.</p>
 
       <!-- The magic link. Both this and the divider stay hidden until /api/me says email_login (mail
            configured, or the dev bypass standing in for it); signin.js does the swap. -->
-      <p id="or" class="signin-or hidden">or</p>
+      <p id="or" class="signin-or hidden" data-i18n="signin.or">or</p>
       <form id="email-form" class="signin-email hidden">
-        <label class="lbl small" for="email">Get a sign-in link by email</label>
+        <label class="lbl small" for="email" data-i18n="signin.email.label">Get a sign-in link by email</label>
         <input id="email" class="in" type="email" autocomplete="email" placeholder="you@example.com"
-               required />
-        <button class="btn" type="submit">Email me a link</button>
-        <p id="email-error" class="hint hidden">That didn’t go through — try again in a moment.</p>
+               data-i18n-attr="placeholder:signin.email.placeholder" required />
+        <button class="btn" type="submit" data-i18n="signin.email.button">Email me a link</button>
+        <p id="email-error" class="hint hidden" data-i18n="signin.email.error">That didn’t go through — try again in a moment.</p>
       </form>
 
       <!-- The no-account path: featured classes on the splash. Hidden in link mode by signin.js. -->
-      <p id="try-instead" class="muted signin-try">Just want to play one? <a href="/#featured">Try a featured class</a> — no account needed.</p>
+      <p id="try-instead" class="muted signin-try" data-i18n-html="signin.try_instead">Just want to play one? <a href="/#featured">Try a featured class</a> — no account needed.</p>
 
       <p>
         <a id="dev-signin" class="btn ghost hidden" href="/dev-login?email=dev@example.com">Dev sign-in (local)</a>
       </p>
       <p>
-        <a id="back-app" class="btn ghost hidden" href="/app#account">Back to the app</a>
-        <a class="btn ghost" href="/">Back to the splash</a>
-        <a class="btn ghost" href="/download">Get the mod &amp; install guide</a>
+        <a id="back-app" class="btn ghost hidden" href="/app#account" data-i18n="signin.back_app">Back to the app</a>
+        <a class="btn ghost" href="/" data-i18n="signin.back_splash">Back to the splash</a>
+        <a class="btn ghost" href="/download" data-i18n="app.gate.get_mod">Get the mod &amp; install guide</a>
       </p>
     </section>
   </main>
 
   <footer class="foot">
-    <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> ·
-    <a href="mailto:ryan.r.rinkel@gmail.com">Support</a>
-    <p class="foot-note">Unofficial fan project — not affiliated with or endorsed by Mega Crit.</p>
+    <a href="/terms" data-i18n="common.footer.terms">Terms</a> · <a href="/privacy" data-i18n="common.footer.privacy">Privacy</a> ·
+    <a href="mailto:ryan.r.rinkel@gmail.com" data-i18n="common.footer.support">Support</a>
+    <p class="foot-note" data-i18n="common.footer.disclaimer">Unofficial fan project — not affiliated with or endorsed by Mega Crit.</p>
   </footer>
 
-  <script src="/static/webview.js?v=20261013"></script>
-  <script src="/static/signup-event.js?v=20261026d"></script>
-  <script src="/static/signin.js?v=20261026d"></script>
+  <script src="/static/i18n.js?v=20261028a"></script>
+  <script src="/static/webview.js?v=20261028a"></script>
+  <script src="/static/signup-event.js?v=20261028a"></script>
+  <script src="/static/signin.js?v=20261028a"></script>
 </body>
 </html>

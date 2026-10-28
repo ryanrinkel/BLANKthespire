@@ -105,7 +105,7 @@ def test_app_is_forge_first_with_a_hidden_pay_step_and_a_play_it_block(client):
     assert body.index('id="forge-byok"') < body.index('id="forge-btn"') < body.index('id="pay-open"')
     assert body.count('id="forge-btn"') == 1
     # "Play it" under the code, with the Workshop link.
-    assert '<h3 class="play-title">Play it</h3>' in body
+    assert '<h3 class="play-title" data-i18n="app.play.title">Play it</h3>' in body
     assert body.index('id="copy-code"') < body.index('class="play-how"')
     play = body[body.index('class="play-how"'):]
     play = play[:play.index("</div>")]
@@ -125,8 +125,8 @@ def test_archive_page_is_public_and_csp_clean(client):
     assert r.status_code == 200 and "text/html" in r.headers["Content-Type"]
     body = r.get_data(as_text=True)
     assert 'id="archive-grid"' in body and 'id="archive-empty"' in body
-    assert "<h1>The Archive</h1>" in body and "<title>The Archive — BLANK the spire</title>" in body
-    assert '<meta property="og:title" content="The Archive — BLANK the spire" />' in body
+    assert '<h1 data-i18n="archive.meta.title">The Archive</h1>' in body and '<title data-i18n-page="archive.meta.title">The Archive — Blank the Spire</title>' in body
+    assert '<meta property="og:title" content="The Archive — Blank the Spire" />' in body
     assert "/static/archive.js" in body and "/static/featured.js" in body
     assert body.index("/static/featured.js") < body.index("/static/archive.js")
     assert 'href="/app"' in body and 'href="/download"' in body and 'href="/help"' in body
@@ -139,17 +139,17 @@ def test_every_header_links_the_archive(client, app_module):
     login(client)
     assert 'href="/archive"' in client.get("/app").get_data(as_text=True)
     for path in ("/help", "/download"):
-        assert '<a class="tab" href="/archive">The Archive</a>' in client.get(path).get_data(as_text=True), path
+        assert '<a class="tab" href="/archive" data-i18n="common.nav.archive">The Archive</a>' in client.get(path).get_data(as_text=True), path
     slug = _make_class(app_module, client)
     deck = client.get(f"/deck/{slug}").get_data(as_text=True)
-    assert '<a class="tab" href="/archive">The Archive</a>' in deck
+    assert '<a class="tab" href="/archive" data-i18n="common.nav.archive">The Archive</a>' in deck
     assert "nav-more" not in deck and "More featured classes" not in deck
 
 
 def test_landing_promotes_the_archive(client):
     body = client.get("/").get_data(as_text=True)
-    assert '<h2 class="how-title">The Archive</h2>' in body
-    assert 'href="/archive">Browse The Archive' in body
+    assert '<h2 class="how-title" data-i18n="landing.archive.title">The Archive</h2>' in body
+    assert 'href="/archive" data-i18n="landing.archive.more">Browse The Archive' in body
     assert "Or play a class from The Archive — no account needed." in body
     assert "Try a featured class" not in body and "featured class right now" not in body
     assert "Create Your Own Class" in body
@@ -186,7 +186,7 @@ def test_deck_page_renders_unfurl_tags_and_the_fetch_url(client, app_module):
     # The class name lands in og:title, HTML-escaped (quote=True, so the " is escaped too).
     assert '<meta property="og:title" content="Storm &amp; Ash &quot;Tempest&quot;" />' in body
     assert 'content="A storm-caller who channels lightning."' in body
-    assert '<meta property="og:site_name" content="BLANK the spire" />' in body
+    assert '<meta property="og:site_name" content="Blank the Spire" />' in body
     assert 'name="twitter:card" content="summary_large_image"' in body
     assert f'<meta property="og:url" content="http://testserver/deck/{slug}" />' in body
     # The client-side renderer needs the slug to fetch the class.

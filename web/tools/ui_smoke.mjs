@@ -4,9 +4,10 @@
 //     STRIPE_SECRET_KEY=sk_test_smoke PORT=5077 uv run --project ../generation python app.py
 // (the dummy Stripe key only flips /api/billing to {enabled:true} so the donate tiers + custom-amount row
 //  render; nothing in these scenarios ever hits Stripe)
-// then, from web/tools:  node ui_smoke.mjs http://127.0.0.1:5077 <outdir> forge|v3|byok-narrow|byok-models|library|account|pages|art|lost|archive|featured|webview|phone|events
+// then, from web/tools:  node ui_smoke.mjs http://127.0.0.1:5077 <outdir> forge|v3|byok-narrow|byok-models|library|account|pages|art|lost|archive|featured|webview|phone|events|lang
 // (`archive` needs BTSWEB_ADMIN_EMAILS=unlimited@example.com and is best run first on a fresh DB: it puts a class
 //  in The Archive through the UI, which is what `featured` then shows on the landing strip)
+// (`lang` needs a web/static/i18n/zh.json with at least one translated landing string and one console.* rule)
 // (needs a package.json with {"type":"module"} next to it, or rename to .mjs — it is already .mjs).
 
 // Minimal Chrome DevTools Protocol driver (Node 24 has a global WebSocket). Usage:
@@ -1401,6 +1402,111 @@ if (scenario === "forge") {
   check(after.ribbon === null, "(e) after End now: no ribbon", JSON.stringify(after));
   await shot("events-e-landing-ended-390", false);
   await desktop();
+} else if (scenario === "lang") {
+  // 2026-10-28 (docs/plans/I18N_PLAN.md phase 1): the EN | 中文 toggle and i18n.js. Needs a web/static/i18n/zh.json
+  // with at least one translated landing string and one console.* rule (the real one comes from the translation
+  // build; a hand-made stub is enough). ?lang=zh picks Chinese and persists it, a reload without ?lang keeps it,
+  // clicking EN brings the English page back. English text in the HTML is never touched in English.
+  await send("Network.enable");
+  await send("Network.setCacheDisabled", { cacheDisabled: true });
+  const phone = () => send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+  const desktop = () => send("Emulation.clearDeviceMetricsOverride");
+  const noScroll = `document.documentElement.scrollWidth <= window.innerWidth`;
+  // Elements whose visible text differs from the English string of their key (en.json, tags stripped).
+  const diffCount = `(async () => {
+    await BTS_I18N.ready;
+    const en = (await (await fetch('/static/i18n/en.json')).json()).strings;
+    const plain = (h) => { const d = document.createElement('div'); d.innerHTML = h; return d.textContent.replace(/\\s+/g, ' ').trim(); };
+    const els = [...document.querySelectorAll('[data-i18n], [data-i18n-html]')];
+    const keys = els.map((e) => e.getAttribute('data-i18n') || e.getAttribute('data-i18n-html'));
+    const missing = [...new Set(keys.filter((k) => !(k in en)))];
+    const differ = keys.filter((k, i) => (k in en) && !/\\{\\w+\\}/.test(en[k])
+      && els[i].textContent.replace(/\\s+/g, ' ').trim() !== plain(en[k]));
+    return JSON.stringify({tagged: els.length, differ: differ.length, differKeys: differ.slice(0, 8), missing});
+  })()`;
+  const diffs = async () => JSON.parse(await evaluate(diffCount));
+  const state = `({lang: document.documentElement.lang, i18n: window.BTS_I18N && BTS_I18N.lang,
+    toggle: !!document.querySelector('[data-lang-toggle]'),
+    inHeader: !!document.querySelector('header nav [data-lang-toggle]'),
+    active: (document.querySelector('[data-lang-toggle] .lang-opt.active') || {}).dataset?.lang || null,
+    opts: [...document.querySelectorAll('[data-lang-toggle] [data-lang]')].map((b) => b.dataset.lang + '=' + b.textContent),
+    stored: localStorage.getItem('bts.lang'), url: location.search,
+    tag: (document.querySelector('.splash-tag') || {}).textContent || null,
+    word: !!document.querySelector('[data-i18n-html="landing.how.step_3_body"] [data-i18n-slot="word"]')})`;
+
+  await nav(`${base}/`);
+  await evaluate(`fetch('/logout', {method: 'POST', headers: {'X-Requested-With': 'fetch'}}).then(() => 1)`);
+  await nav(`${base}/`);
+  await evaluate(`localStorage.clear()`);
+  await nav(`${base}/`); await sleep(500);
+  const en0 = await json(state);
+  check(en0.lang === "en" && en0.i18n === "en" && en0.toggle && en0.active === "en" && en0.stored === null
+        && en0.opts.join(",") === "en=EN,zh=中文", "(a) fresh visitor: English, toggle shows EN active, nothing stored", JSON.stringify(en0));
+  const enTag = en0.tag;
+
+  await nav(`${base}/?lang=zh`); await sleep(800);
+  const zh = await json(state);
+  check(zh.lang === "zh" && zh.i18n === "zh" && zh.toggle && zh.active === "zh" && zh.stored === "zh",
+        "(b) ?lang=zh: <html lang=zh>, toggle active zh, choice stored", JSON.stringify(zh));
+  const zd = await diffs();
+  check(zd.differ >= 1 && zh.tag !== enTag, "(b) at least one data-i18n element is translated", JSON.stringify({zd, tag: zh.tag}));
+  check(zd.missing.length === 0, "(b) every data-i18n key on the landing page exists in en.json", JSON.stringify(zd.missing));
+  check(zh.word, "(b) the step-3 {word} slot survives the translation (landing.js keeps its node)", JSON.stringify(zh));
+  const cons = await json(`({hit: BTS_I18N.console("[1/6] cloud: brainstorming free associations on 'a smoke toaster'..."),
+    miss: BTS_I18N.console("some detail line nobody translates")})`);
+  check(cons.hit.includes("a smoke toaster") && !cons.hit.startsWith("[1/6] cloud: brainstorming") && cons.miss === "some detail line nobody translates",
+        "(b) console stage header localised with the concept carried over; detail line unchanged", JSON.stringify(cons));
+  await shot("lang-b-landing-zh", false);
+  await phone(); await sleep(300);
+  const ph = await json(`({noScroll: ${noScroll}, box: (() => { const r = document.querySelector('[data-lang-toggle]').getBoundingClientRect(); return [Math.round(r.left), Math.round(r.right), Math.round(r.top)]; })(), vw: innerWidth})`);
+  check(ph.noScroll && ph.box[1] <= ph.vw && ph.box[0] >= 0, "(b) phone 390: toggle on screen, no horizontal scroll", JSON.stringify(ph));
+  await shot("lang-b-landing-zh-390", false);
+  await desktop();
+
+  await nav(`${base}/`); await sleep(800);
+  const kept = await json(state);
+  check(kept.lang === "zh" && kept.active === "zh" && kept.url === "", "(c) reload without ?lang keeps zh", JSON.stringify(kept));
+
+  // the other pages in zh: html lang, toggle in the header, no console errors (collected at the end)
+  for (const p of ["help", "download", "archive", "login"]) {
+    await nav(`${base}/${p}`); await sleep(500);
+    const s = await json(state);
+    const d = await diffs();
+    check(s.lang === "zh" && s.inHeader && s.active === "zh" && d.missing.length === 0,
+          `(c) /${p} in zh: lang, toggle in header nav, all keys known`, JSON.stringify({s: {lang: s.lang, inHeader: s.inHeader}, d}));
+  }
+  await nav(`${base}/dev-login?email=unlimited@example.com`);
+  await nav(`${base}/app`); await sleep(800);
+  const app = await json(state);
+  check(app.lang === "zh" && app.inHeader, "(c) /app in zh boots with the toggle in the header", JSON.stringify(app));
+  await shot("lang-c-app-zh", false);
+  await phone(); await sleep(300);
+  const aph = await json(`({noScroll: ${noScroll}, vis: (() => { const r = document.querySelector('[data-lang-toggle]').getBoundingClientRect(); return r.width > 0 && r.right <= innerWidth; })()})`);
+  check(aph.noScroll && aph.vis, "(c) /app at 390: toggle visible, no horizontal scroll", JSON.stringify(aph));
+  await shot("lang-c-app-zh-390", false);
+  await desktop();
+
+  // (d) click EN: English back, stored, ?lang gone
+  await nav(`${base}/?lang=zh`); await sleep(600);
+  await evaluate(`document.querySelector('[data-lang-toggle] [data-lang="en"]').click()`);
+  await sleep(1500);
+  const back = await json(state);
+  const bd = await diffs();
+  check(back.lang === "en" && back.active === "en" && back.stored === "en" && back.url === "" && back.tag === enTag && bd.differ === 0,
+        "(d) clicking EN: English page back, choice stored, no ?lang in the URL", JSON.stringify({back, bd}));
+  await shot("lang-d-landing-en", false);
+  // (e) English drift: on every page the static English of each tagged element equals its en.json string
+  // (COPY.md is the source; a mismatch means the HTML and COPY.md disagree). Keys with {placeholders} skipped.
+  // app.js relabels the Forge button at boot (token count), so that one key is expected to differ on /app.
+  const RUNTIME = ["app.forge.button"];
+  await evaluate(`fetch('/logout', {method: 'POST', headers: {'X-Requested-With': 'fetch'}}).then(() => 1)`);
+  for (const p of ["login", "help", "download", "archive", "app"]) {
+    if (p === "app") await nav(`${base}/dev-login?email=unlimited@example.com`);
+    await nav(`${base}/${p}`); await sleep(500);
+    const d = await diffs();
+    const real = d.differKeys.filter((k) => !RUNTIME.includes(k));
+    check(real.length === 0 && d.missing.length === 0, `(e) /${p} in English matches en.json`, JSON.stringify(d));
+  }
 }
 console.log(errors.length ? "CONSOLE ERRORS:\n" + errors.join("\n") : "no console errors");
 ws.close(); chrome.kill();

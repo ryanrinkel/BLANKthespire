@@ -3,52 +3,53 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>The Archive — BLANK the spire</title>
-  <meta name="description" content="Classes forged with BLANK the spire, free to play." />
+  <title data-i18n-page="archive.meta.title">The Archive — Blank the Spire</title>
+  <meta name="description" content="Classes forged with Blank the Spire, free to play." data-i18n-attr="content:archive.meta.description" />
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png" />
   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png" />
   <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="BLANK the spire" />
-  <meta property="og:title" content="The Archive — BLANK the spire" />
-  <meta property="og:description" content="Classes forged with BLANK the spire, free to play." />
+  <meta property="og:site_name" content="Blank the Spire" />
+  <meta property="og:title" content="The Archive — Blank the Spire" />
+  <meta property="og:description" content="Classes forged with Blank the Spire, free to play." />
   <meta property="og:url" content="https://blankthespire.com/archive" />
   <meta property="og:image" content="https://blankthespire.com/static/img/og-landing.png" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="The Archive — BLANK the spire" />
-  <meta name="twitter:description" content="Classes forged with BLANK the spire, free to play." />
+  <meta name="twitter:title" content="The Archive — Blank the Spire" />
+  <meta name="twitter:description" content="Classes forged with Blank the Spire, free to play." />
   <meta name="twitter:image" content="https://blankthespire.com/static/img/og-landing.png" />
-  <link rel="stylesheet" href="/static/style.css?v=20261027a" />
+  <link rel="stylesheet" href="/static/style.css?v=20261028a" />
 </head>
 <body class="archive-page">
   <header>
-    <div class="brand">⚒ <strong>BLANK the spire</strong> <span class="sub">The Archive</span></div>
+    <div class="brand">⚒ <strong>Blank the Spire</strong> <span class="sub" data-i18n="archive.meta.title">The Archive</span></div>
     <nav>
-      <a class="tab" href="/app">Forge your own →</a>
-      <a class="tab" href="/download">Get the mod ⬇</a>
-      <a class="tab" href="/help">Help</a>
+      <a class="tab" href="/app" data-i18n="common.nav.forge_your_own">Forge your own →</a>
+      <a class="tab" href="/download" data-i18n="common.nav.get_mod">Get the Mod ⬇</a>
+      <a class="tab" href="/help" data-i18n="common.nav.help">Help</a>
     </nav>
   </header>
 
   <!-- Tiles are built by archive.js (featured.js) from /api/featured, newest featured first. The CSP forbids
        inline JS, so everything dynamic lives in those two files. -->
   <main class="archive">
-    <h1>The Archive</h1>
-    <p class="muted archive-lede">Classes forged with BLANK the spire, free to play. Copy a code, paste it in-game, or
+    <h1 data-i18n="archive.meta.title">The Archive</h1>
+    <p class="muted archive-lede" data-i18n-html="archive.lede">Classes forged with Blank the Spire, free to play. Copy a code, paste it in-game, or
       <a href="/app">forge your own</a>.</p>
     <div id="archive-grid" class="featured-grid"></div>
-    <p id="archive-empty" class="muted hidden">Nothing in The Archive yet.</p>
+    <p id="archive-empty" class="muted hidden" data-i18n="archive.empty">Nothing in The Archive yet.</p>
   </main>
 
   <footer class="foot">
-    <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> ·
-    <a href="/help">Help</a> ·
-    <a href="https://github.com/ryanrinkel/BLANKthespire" target="_blank" rel="noopener">GitHub</a> ·
-    <a href="mailto:ryan.r.rinkel@gmail.com">Support</a>
-    <p class="foot-note">Unofficial fan project — not affiliated with or endorsed by Mega Crit.</p>
+    <a href="/terms" data-i18n="common.footer.terms">Terms</a> · <a href="/privacy" data-i18n="common.footer.privacy">Privacy</a> ·
+    <a href="/help" data-i18n="common.nav.help">Help</a> ·
+    <a href="https://github.com/ryanrinkel/BLANKthespire" target="_blank" rel="noopener" data-i18n="common.footer.github">GitHub</a> ·
+    <a href="mailto:ryan.r.rinkel@gmail.com" data-i18n="common.footer.support">Support</a>
+    <p class="foot-note" data-i18n="common.footer.disclaimer">Unofficial fan project — not affiliated with or endorsed by Mega Crit.</p>
   </footer>
 
-  <script src="/static/featured.js?v=20261026b"></script>
-  <script src="/static/archive.js?v=20261026b"></script>
+  <script src="/static/i18n.js?v=20261028a"></script>
+  <script src="/static/featured.js?v=20261028a"></script>
+  <script src="/static/archive.js?v=20261028a"></script>
 </body>
 </html>

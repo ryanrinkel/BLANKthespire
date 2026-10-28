@@ -1,5 +1,14 @@
 "use strict";
 
+// i18n (web/static/i18n.js, loaded first): every user-facing string below comes from
+// /static/i18n/<lang>.json by its docs/copy/COPY.md key. appT = plain text (textContent, title, toast,
+// confirm), appH = HTML for innerHTML (values escaped). Nothing may call them before BTS_I18N.ready
+// (the boot at the bottom of this file waits for it).
+const appT = (key, vars) => BTS_I18N.t(key, vars);
+const appH = (key, vars) => BTS_I18N.html(key, vars);
+// A server JSON error: its translated `code` when there is one, else its English `error`, else "HTTP n".
+const appErr = (d, status) => BTS_I18N.err(d, appT("common.http_error", { status }));
+
 
 let ME = null;
 // The non-user half of /api/me ({dev_auth, providers, email_login}) — ME is data.user, so the Account tab's
@@ -119,7 +128,7 @@ function applyRemixPrefill() {
   box.value = p.concept;
   const hint = document.createElement("p");
   hint.className = "hint";
-  hint.textContent = `Remixing “${p.name || "a shared class"}” — edit the description, then forge.`;
+  hint.textContent = appT("app.remix.hint", { name: p.name || appT("app.remix.name_fallback") });
   box.insertAdjacentElement("afterend", hint);
 }
 
@@ -130,15 +139,15 @@ function renderTokens() {
   const unlimited = !!ME.unlimited;
   const paid = Number(ME.token_balance || 0);
   const chip = el("tokens");
-  chip.textContent = unlimited ? "∞ tokens" : `${paid} token${paid === 1 ? "" : "s"}`;
+  chip.textContent = unlimited ? appT("app.tokens.chip_unlimited") : appT("app.tokens.chip", { count: paid });
   chip.classList.remove("hidden");
   chip.classList.toggle("empty", !unlimited && paid <= 0);
 
   const line = el("token-balance-line");
   if (line) {
-    if (unlimited) line.textContent = "\u221E tokens \u2014 your account forges free.";
-    else if (paid > 0) line.textContent = `You have ${paid} token${paid === 1 ? "" : "s"}.`;
-    else line.textContent = "You have no tokens. Get a forge token below \u2014 one token forges one class.";
+    if (unlimited) line.textContent = appT("app.tokens.line_unlimited");
+    else if (paid > 0) line.textContent = appT("app.tokens.line_have", { count: paid });
+    else line.textContent = appT("app.tokens.line_none");
   }
 
   // Keep the Account view's balance in lockstep wherever the numbers change (forge spend, donation).
@@ -162,7 +171,7 @@ function renderGetTokens() {
   const open = !unlimited && (GET_TOKENS_OPEN ?? Number(ME.token_balance || 0) <= 0);
   btn.parentElement.classList.toggle("hidden", unlimited);
   wrap.classList.toggle("hidden", !open);
-  btn.textContent = open ? "Hide token options" : "Get a forge token";
+  btn.textContent = open ? appT("app.tokens.hide_options") : appT("app.pay.token.get");
   btn.setAttribute("aria-expanded", String(open));
 }
 
@@ -210,24 +219,24 @@ function renderForgeButton() {
   const btn = el("forge-btn");
   if (!btn) return;
   const m = currentMode();
-  let label = "Forge the class", why = "";
+  let label = appT("app.forge.button"), why = "";
   if (m === "fake") {
     label = "Forge the class (offline demo)";
   } else if (m === "byok") {
-    if (payable()) label = "Forge the class (uses your API key)";
+    if (payable()) label = appT("app.forge.button_byok");
     else why = el("model").tagName === "SELECT" && currentProvider().mode === "byok"
-      ? "Enter your API key, then pick a model from your provider's list."
-      : "Enter your API key and a model.";
+      ? appT("app.forge.why_byok_list")
+      : appT("app.forge.why_byok");
   } else if (m === "token") {
     if (!ME || ME.unlimited) {
-      label = "Forge the class (free \u2014 unlimited account)";
+      label = appT("app.forge.button_unlimited");
     } else {
       const paid = Number(ME.token_balance || 0);
-      if (paid > 0) label = `Forge the class (uses 1 of your ${paid} token${paid === 1 ? "" : "s"})`;
-      else why = "You have no tokens \u2014 get a forge token below, or bring your own key.";
+      if (paid > 0) label = appT("app.forge.button_token", { count: paid });
+      else why = appT("app.forge.why_no_tokens");
     }
   } else {
-    why = "Pick how to pay: 'Use a token' or 'Bring your own key'.";
+    why = appT("app.forge.why_no_mode");
   }
   btn.textContent = label;
   btn.disabled = FORGING;
@@ -309,7 +318,7 @@ function revealPayStep(reason) {
 
 // What the pay step says when a Forge click can't pay yet.
 function payReason() {
-  return currentMode() === "byok" ? "Enter your API key and pick a model" : "Pick how to pay for this forge";
+  return currentMode() === "byok" ? appT("app.pay.reason_byok") : appT("app.pay.reason_token");
 }
 
 // --- "how it works" tutorial banner ---------------------------------------------------------------
@@ -334,8 +343,8 @@ function renderWelcome(grant) {
   }
   const n = grant ? Number(grant.tokens) || 0 : 0;
   if (n <= 0) return;
-  el("welcome-text").textContent = `Welcome! ${grant.label || "A sign-up event"} gave you ${n} free forge token`
-    + `${n === 1 ? "" : "s"}. One token forges one class \u2014 describe yours below and press Forge.`;
+  el("welcome-text").textContent = appT("app.welcome.text",
+    { label: grant.label || appT("app.welcome.label_fallback"), count: n });
   el("welcome-banner").classList.remove("hidden");
 }
 
@@ -411,8 +420,8 @@ function slotUsd(t, model) {
 }
 
 function tokensLine(t) {
-  return `~${t.calls} calls · ~${fmtTokens(t.input_tokens)} in (~${fmtTokens(t.cached_tokens)} cached) · `
-    + `~${fmtTokens(t.output_tokens)} out`;
+  return appT("app.estimate.tokens_line", { calls: t.calls, input: fmtTokens(t.input_tokens),
+                                            cached: fmtTokens(t.cached_tokens), output: fmtTokens(t.output_tokens) });
 }
 
 // The whole quote as data: rows of {label, what, cost (USD or null), tip}, the total, and at most one short
@@ -420,21 +429,22 @@ function tokensLine(t) {
 function estimateRows() {
   const e = ESTIMATE, p = currentProvider(), { design, cards } = byokModels();
   if (!e) return { rows: [], total: null, text: null, art: null,
-                   note: "A forge is ~50 model calls and ~1.4M input tokens — check your provider's pricing." };
+                   note: appT("app.estimate.note_fallback") };
   const whole = { calls: e.calls, input_tokens: e.input_tokens, cached_tokens: e.cached_tokens,
                   output_tokens: e.output_tokens };
   // One row when one model does everything; otherwise each half priced on its own model.
   const slots = design === cards || !e.slots
-    ? [{ label: "Design + cards", model: design, t: whole }]
-    : [{ label: "Design", model: design, t: e.slots.design }, { label: "Card coding", model: cards, t: e.slots.cards }];
+    ? [{ label: appT("app.estimate.row_design_cards"), model: design, t: whole }]
+    : [{ label: appT("app.byok.design_label"), model: design, t: e.slots.design },
+       { label: appT("app.byok.card_label"), model: cards, t: e.slots.cards }];
   const rows = [], unpriced = [];
   let text = 0, ceiling = 0;
   for (const sl of slots) {
     const usdPair = slotUsd(sl.t, sl.model);
-    if (!usdPair) { unpriced.push(sl.model || "(no model)"); text = null; }
+    if (!usdPair) { unpriced.push(sl.model || appT("app.estimate.no_model")); text = null; }
     else if (text != null) { text += usdPair[0]; ceiling += usdPair[1]; }
     // The vendor prefix ("anthropic/", "openai/") is dropped on screen; the tooltip keeps the full id.
-    rows.push({ label: sl.label, what: sl.model.split("/").pop() || "pick a model",
+    rows.push({ label: sl.label, what: sl.model.split("/").pop() || appT("app.estimate.pick_model"),
                 cost: usdPair ? usdPair[0] : null, tip: `${sl.model}: ${tokensLine(sl.t)}` });
   }
 
@@ -444,11 +454,13 @@ function estimateRows() {
     const n = Number(e.images_per_forge || 36);
     art = artBlock.pack_usd != null ? Number(artBlock.pack_usd)
         : (artBlock.per_image_usd != null ? Number(artBlock.per_image_usd) * n : null);
-    rows.push({ label: "Art", what: `${n} images`, cost: art,
-                tip: `${artBlock.model || p.label + " image API"}: splash, sprite and ${n - 2} card portraits` });
+    rows.push({ label: appT("app.estimate.row_art"), what: appT("app.estimate.art_images", { count: n }), cost: art,
+                tip: appT("app.estimate.art_tip", {
+                  model: artBlock.model || appT("app.estimate.art_tip_model_fallback", { provider: p.label }),
+                  count: n - 2 }) });
   } else {
-    rows.push({ label: "Art", what: "not on this provider", cost: "—",
-                tip: "Classes forged on this key use the game's built-in card doodles." });
+    rows.push({ label: appT("app.estimate.row_art"), what: appT("app.estimate.art_none"), cost: "—",
+                tip: appT("app.estimate.art_none_tip") });
   }
   const total = text != null && (art != null || !artBlock) ? text + (art || 0) : null;
 
@@ -457,20 +469,22 @@ function estimateRows() {
   // caveat when it moves the number.
   const or = e.art?.openrouter;
   let note = "";
-  if (unpriced.length) note = `No price on file for ${unpriced.join(" / ")} — check your provider's rates.`;
+  if (unpriced.length) note = appT("app.estimate.note_unpriced", { models: unpriced.join(" / ") });
   else if (artBlock && (p.artKey === "gemini" || p.artKey === "xai") && or?.pack_usd != null && art > or.pack_usd) {
-    note = `An OpenRouter key makes the same art for ~${usd(or.pack_usd)}.`;
-  } else if (ceiling > text * 1.25) note = `Assumes prompt caching — up to ${usd(ceiling + (art || 0))} without it.`;
+    note = appT("app.estimate.note_openrouter", { price: usd(or.pack_usd) });
+  } else if (ceiling > text * 1.25) note = appT("app.estimate.note_caching", { price: usd(ceiling + (art || 0)) });
   return { rows, total, text, art, note };
 }
 
 // The confirm dialog: three short lines, same numbers as the panel.
 function estimateText() {
   const { total, text, art, note } = estimateRows(), { design, cards } = byokModels();
-  const models = design === cards ? `Model: ${design}` : `Design: ${design} · Cards: ${cards}`;
+  const models = design === cards ? appT("app.estimate.confirm_model", { model: design })
+    : appT("app.estimate.confirm_models", { design, cards });
   const cost = total != null
-    ? `Estimated ≈ ${usd(total)} per forge` + (art ? ` (text ${usd(text)} + art ${usd(art)})` : "")
-    : "Estimated cost: unknown for this model.";
+    ? appT("app.estimate.confirm_cost", { total: usd(total),
+        split: art ? appT("app.estimate.confirm_split", { text: usd(text), art: usd(art) }) : "" })
+    : appT("app.estimate.confirm_unknown");
   return [models, cost, note].filter(Boolean).join("\n");
 }
 
@@ -492,11 +506,11 @@ function renderEstimate() {
   if (!ESTIMATE_SHOWN) { box.innerHTML = ""; return; }
   const { rows, total, note } = estimateRows();
   const cost = (c) => c == null ? "?" : typeof c === "string" ? c : usd(c);
-  box.innerHTML = `<div class="est-head">Estimated cost per forge</div>`
+  box.innerHTML = `<div class="est-head">${appH("app.estimate.title")}</div>`
     + (rows.length ? `<table class="est-table">${rows.map((r) =>
         `<tr title="${esc(r.tip)}"><th>${esc(r.label)}</th><td class="est-what">${esc(r.what)}</td>`
         + `<td class="est-cost">${cost(r.cost)}</td></tr>`).join("")}`
-      + `<tr class="est-total"><th>Total</th><td></td><td class="est-cost">${total == null ? "?" : "≈ " + usd(total)}</td></tr>`
+      + `<tr class="est-total"><th>${appH("app.estimate.total")}</th><td></td><td class="est-cost">${total == null ? "?" : "≈ " + usd(total)}</td></tr>`
       + `</table>` : "")
     + (note ? `<p class="est-note">${esc(note)}</p>` : "");
 }
@@ -542,7 +556,7 @@ const PROVIDERS = {
                 prefix: "sk-ant-", keyFrom: "console.anthropic.com",
                 models: ["claude-sonnet-5", "claude-opus-5-5"] },
   openai:     { label: "OpenAI", mode: "byok", base_url: "https://api.openai.com/v1", art: true, artKey: "openai",
-                prefix: "sk-", keyFrom: "platform.openai.com (an API key, not a ChatGPT login)",
+                prefix: "sk-", get keyFrom() { return appT("app.byok.key_from_openai"); },
                 models: ["gpt-5.6-sol", "gpt-6.1-sol", "gpt-6-astra"] },
   ollama:     { label: "Ollama Cloud", mode: "byok", base_url: "https://ollama.com/v1",
                 prefix: "", keyFrom: "ollama.com/settings/keys",
@@ -569,7 +583,8 @@ const PROVIDERS = {
   together:   { label: "Together", mode: "byok", base_url: "https://api.together.xyz/v1",
                 prefix: "", keyFrom: "api.together.xyz/settings/api-keys",
                 models: ["zai-org/GLM-5.3", "openai/gpt-oss-120b", "deepseek-ai/DeepSeek-V4.1-Flash"] },
-  custom:     { label: "Other", mode: "byok", base_url: "", prefix: "", keyFrom: "your provider",
+  custom:     { get label() { return appT("app.byok.provider_label_custom"); }, mode: "byok", base_url: "",
+                prefix: "", get keyFrom() { return appT("app.byok.key_from_custom"); },
                 models: [] },
 };
 
@@ -594,15 +609,15 @@ function applyProvider() {
   resetModelPickers(p);
   renderLoadModelsBtn();
 
-  el("byok-hint").textContent = `Get a key at ${p.keyFrom}`;
+  el("byok-hint").textContent = appT("app.byok.get_key_at", { where: p.keyFrom });
   // Art is a property of the provider, so it lives in a chip beside the estimate rather than a paragraph;
   // the tooltip carries the detail.
   const chip = el("byok-art");
-  chip.textContent = p.art ? "Art included" : "No generated art";
+  chip.textContent = p.art ? appT("app.byok.art_chip_yes") : appT("app.byok.art_chip_no");
   chip.classList.toggle("ok", !!p.art);
   chip.title = p.art
-    ? "The splash, sprite and card portraits are generated on this key too."
-    : `${p.label} can't make images, so classes forged on this key use the game's built-in card doodles.`;
+    ? appT("app.byok.art_tip_yes")
+    : appT("app.byok.art_tip_no", { provider: p.label });
   renderEstimate();
   scheduleModelLoad();
 }
@@ -647,7 +662,7 @@ function setModelControl(kind) {
     next.id = id; next.className = cur.className;
     if (tag === "INPUT") {
       next.autocomplete = "off";
-      next.placeholder = id === "model" ? "Model id" : "Same as design";
+      next.placeholder = id === "model" ? appT("app.byok.model_placeholder_typed") : appT("app.byok.card_same");
       next.value = (id === "model" ? SAVED_MODELS.model : SAVED_MODELS.card_model) || "";
     } else next.disabled = true;  // empty until filled; modelsReady() then falls back to SAVED_MODELS
     cur.replaceWith(next);
@@ -672,14 +687,14 @@ function resetModelPickers(p) {
   MODELS_LOADED_FOR = "";
   const m = el("model"), c = el("card_model");
   m.innerHTML = ""; c.innerHTML = "";
-  c.appendChild(newOption("", "Same as design"));
+  c.appendChild(newOption("", appT("app.byok.card_same")));
   if (p.mode === "anthropic") {
     for (const id of p.models) { m.appendChild(newOption(id, id)); c.appendChild(newOption(id, id)); }
     if (p.models.includes(SAVED_MODELS.model)) m.value = SAVED_MODELS.model;
     c.value = p.models.includes(SAVED_MODELS.card_model) ? SAVED_MODELS.card_model : "";
     m.disabled = c.disabled = false;
   } else {
-    m.appendChild(newOption("", "Enter your key, then load models"));
+    m.appendChild(newOption("", appT("app.byok.design_placeholder")));
     m.disabled = c.disabled = true;
   }
   renderForgeButton();
@@ -694,15 +709,15 @@ function populateModels(d) {
   const tested = (d.recommended || []).filter((id) => ids.includes(id));
   const rest = ids.filter((id) => !tested.includes(id));
   m.innerHTML = ""; c.innerHTML = "";
-  c.appendChild(newOption("", "Same as design"));
+  c.appendChild(newOption("", appT("app.byok.card_same")));
   if (!ids.length) {
-    m.appendChild(newOption("", "No usable models on this key"));
+    m.appendChild(newOption("", appT("app.byok.no_models")));
     m.disabled = c.disabled = true;
     renderForgeButton();
     return [];
   }
   for (const sel of [m, c]) {
-    for (const [label, group] of [["Tested", tested], ["All models", rest]]) {
+    for (const [label, group] of [[appT("app.byok.group_tested"), tested], [appT("app.byok.group_all"), rest]]) {
       if (!group.length) continue;
       const g = document.createElement("optgroup");
       g.label = label;
@@ -728,7 +743,7 @@ function renderLoadModelsBtn() {
   // Load-models hits {base_url}/models with a Bearer token — works for OpenAI-compatible providers, not
   // Anthropic's native API. Hidden when there's no usable URL.
   btn.style.display = (p.mode === "byok" && resolvedBaseUrl()) ? "" : "none";
-  if (!MODELS_LOADING_FOR) btn.textContent = MODELS_LOADED_FOR ? "Reload model list" : "Load my model list";
+  if (!MODELS_LOADING_FOR) btn.textContent = MODELS_LOADED_FOR ? appT("app.byok.reload_models") : appT("app.byok.load_models");
 }
 
 // Auto-load (debounced) once a byok provider has a URL + key and the BYOK box is open; never twice for
@@ -793,7 +808,7 @@ function currentMode() {
 
 async function forge() {
   const concept = el("concept").value.trim();
-  if (!concept) { toast("Describe a class first."); el("concept").focus(); return; }
+  if (!concept) { toast(appT("app.forge.toast_no_concept")); el("concept").focus(); return; }
   // Nothing armed can pay yet: unfold the pay step instead of forging (FORGE_FIRST_PLAN.md 3.2). A repeat click
   // re-scrolls, re-focuses and repeats the reason as a toast.
   if (!payable()) {
@@ -818,22 +833,22 @@ async function forge() {
   if (choice === "token") {
     if (!ME.unlimited) {
       if (spendable() <= 0) {
-        toast("No tokens to spend — get a forge token below, or bring your own key.");
+        toast(appT("app.forge.toast_no_tokens"));
         return;
       }
       const paid = Number(ME.token_balance || 0);
-      if (!confirm(`This will use 1 token. You have ${paid}. Forge this class?`)) return;
+      if (!confirm(appT("app.forge.confirm_token", { count: paid }))) return;
     }
   } else if (choice === "byok") {
     const p = currentProvider();
     const api_key = el("api_key").value.trim();
     const model = el("model").value.trim();
     if (p.mode === "byok" && el("model").tagName === "SELECT" && (el("model").disabled || !model)) {
-      toast("Load your model list and pick a model first.");
+      toast(appT("app.forge.toast_load_models"));
       return;
     }
-    if (!api_key || !model) { toast("Enter your API key and a model — or switch to 'Use a token'."); return; }
-    if (!confirm(`This forge bills your ${p.label} key.\n\n${estimateText()}\n\nForge this class?`)) return;
+    if (!api_key || !model) { toast(appT("app.forge.toast_need_key")); return; }
+    if (!confirm(appT("app.forge.confirm_byok", { provider: p.label, estimate: estimateText() }))) return;
     // Blank = the design model codes the cards too; sent only when it differs, so a one-model forge's
     // request is unchanged.
     const card_model = byokModels().cards !== model ? byokModels().cards : undefined;
@@ -842,7 +857,7 @@ async function forge() {
       body.key = { api_key, model, card_model };
     } else {
       const base_url = resolvedBaseUrl();
-      if (!base_url) { toast("Enter the base URL for your provider."); return; }
+      if (!base_url) { toast(appT("app.forge.toast_need_base_url")); return; }
       body.mode = "byok";
       body.key = { base_url, api_key, model, card_model };
     }
@@ -854,10 +869,16 @@ async function forge() {
   el("result").classList.add("hidden");
   el("progress").classList.remove("hidden");
   el("log").textContent = "";
+  // Not English: one line up top saying the detail lines stay English (only stage headers are translated).
+  if (BTS_I18N.lang !== "en") {
+    appendLog(BTS_I18N.has("app.console.log_in_english") ? appT("app.console.log_in_english")
+      : "The forge log below is in English; only the stage headers are translated.");
+  }
   el("forge-lost").classList.add("hidden");
   resetChoice();  // clear any choice panel left over from a previous forge
   // Echo what we asked for, so a mode mishap (e.g. a stale page) is visible in the log immediately.
-  appendLog(`• requested: ${body.mode}` + (body.interactive ? " · interactive" : ""));
+  appendLog(appT("app.console.requested", { mode: body.mode,
+    interactive: body.interactive ? appT("app.console.requested_interactive") : "" }));
 
   // started = the server answered, so the forge exists (and a token is reserved); settled = the stream
   // reached its result/error. Started but not settled means the CONNECTION died, not the forge.
@@ -874,19 +895,19 @@ async function forge() {
       // the tiers are (the 402 text says "under the Forge button").
       if (resp.status === 402) {
         if (applyTokenState(e)) renderTokens();
-        revealPayStep("Pick how to pay for this forge");
+        revealPayStep(appT("app.pay.reason_token"));
       }
-      throw new Error(e.error || ("HTTP " + resp.status));
+      throw new Error(appErr(e, resp.status));
     }
     // A non-JSON error page (an nginx 502 while the app restarts) means no forge started.
-    if (!resp.ok) throw new Error("the server answered HTTP " + resp.status + " — nothing was forged; try again");
+    if (!resp.ok) throw new Error(appT("app.forge.err_http_nonjson", { status: resp.status }));
     run.started = true;
     await consumeSSE(resp, (event, data) => {
       if (event === "result" || event === "error") run.settled = true;
       if (data && data.forge_id) run.forgeId = data.forge_id;
       onForgeEvent(event, data);
     });
-    if (!run.settled) throw new TypeError("the progress stream ended early");
+    if (!run.settled) throw new TypeError(appT("app.forge.err_stream_ended"));
   } catch (e) {
     if (e instanceof TypeError && !run.settled) await recoverForge(body, run, e.message);
     else {
@@ -913,18 +934,16 @@ const RECOVER_NOT_FOUND = 3;                // 404s in a row before "no forge st
 async function recoverForge(body, run, reason) {
   const token = body.mode === "token";
   const note = (text) => { el("forge-lost-text").textContent = text; el("forge-lost").classList.remove("hidden"); };
-  const stillRunning = () => note("Lost the connection to your forge — this happens when a phone locks or "
-    + "switches networks. It's still running on our server, and this page will pick it back up and show the "
-    + "class when it's done. If you leave, it'll be waiting in My Classes."
-    + (token ? " If the forge fails, your token is refunded automatically." : ""));
+  const stillRunning = () => note(appT("app.lost.still_running")
+    + (token ? appT("app.lost.refund_note") : ""));
   if (run.started) {
     stillRunning();
-    appendLog("✗ lost the connection (" + reason + ") — the forge continues on the server; reconnecting…");
-    toast("Connection lost — reconnecting to your forge…");
+    appendLog(appT("app.console.lost", { reason }));
+    toast(appT("app.lost.toast_reconnecting"));
   } else {
-    note("Couldn't reach the server (" + reason + "). Checking whether your forge started…");
-    appendLog("✗ couldn't reach the server (" + reason + ")");
-    toast("Couldn't reach the server — checking your connection…");
+    note(appT("app.lost.unreachable", { reason }));
+    appendLog(appT("app.console.unreachable", { reason }));
+    toast(appT("app.lost.toast_unreachable"));
   }
 
   let id = run.forgeId || "latest";
@@ -937,8 +956,8 @@ async function recoverForge(body, run, reason) {
       const r = await fetch(`/api/forge-jobs/${encodeURIComponent(id)}`);
       if (r.status === 404) {
         if (!found && ++notFound >= RECOVER_NOT_FOUND) {
-          note("No forge was started, so nothing was spent. Check your connection and forge again.");
-          appendLog("✗ the forge never started");
+          note(appT("app.lost.never_started"));
+          appendLog(appT("app.console.never_started"));
           return;
         }
         continue;
@@ -950,7 +969,7 @@ async function recoverForge(body, run, reason) {
     id = job.forge_id;  // a "latest" lookup pins to the job it found
     if (applyTokenState(job)) renderTokens();
     if (job.status === "running") {
-      if (job.message && job.message !== lastMsg) { lastMsg = job.message; appendLog("• " + job.message); }
+      if (job.message && job.message !== lastMsg) { lastMsg = job.message; appendLog("• " + BTS_I18N.console(job.message)); }
       // An engine pick the stream never delivered (or delivered before it died): show it again. The answer
       // goes back on /api/forge/answer as usual, independent of the stream.
       if (job.choice && (!choiceState || choiceState.forgeId !== job.choice.forge_id)) renderChoice(job.choice);
@@ -960,19 +979,19 @@ async function recoverForge(body, run, reason) {
     if (job.status === "done" && job.class_id) {
       try {
         const r = await fetch(`/api/classes/${job.class_id}`);
-        if (r.ok) { appendLog("✓ done (reconnected)"); renderResult(await r.json()); return; }
+        if (r.ok) { appendLog(appT("app.console.done_reconnected")); renderResult(await r.json()); return; }
       } catch (_) { /* fall through to the pointer */ }
-      appendLog("✓ done — open it from My Classes");
-      toast("Your class is ready in My Classes.");
+      appendLog(appT("app.console.done_open_library"));
+      toast(appT("app.lost.toast_ready"));
       return;
     }
-    const msg = (job.error || "the forge failed") + (job.refunded ? " — your token was refunded." : "");
+    const msg = (BTS_I18N.err(job, "") || appT("app.lost.failed_fallback"))
+      + (job.refunded ? appT("app.lost.refunded_suffix") : "");
     appendLog("✗ " + msg);
     toast(msg);
     return;
   }
-  note("Still no word from your forge. If it finishes, it'll appear in My Classes"
-    + (token ? "; if it fails, your token is refunded automatically." : "."));
+  note(token ? appT("app.lost.gave_up_token") : appT("app.lost.gave_up"));
 }
 
 // Wait `ms`, but wake as soon as the tab is visible again or the network comes back: a phone that slept
@@ -1022,10 +1041,10 @@ function onForgeEvent(event, data) {
   // Any event may carry an updated token_balance (charged on success, refunded on failure) — keep the
   // header chip in lockstep with the server.
   if (applyTokenState(data)) renderTokens();
-  if (event === "progress") appendLog("• " + data.message);
+  if (event === "progress") appendLog("• " + BTS_I18N.console(data.message));
   else if (event === "choice") renderChoice(data);
-  else if (event === "error") { appendLog("✗ " + data.error); toast(data.error); }
-  else if (event === "result") { appendLog("✓ done"); renderResult(data); }
+  else if (event === "error") { const m = BTS_I18N.err(data, ""); appendLog("✗ " + m); toast(m); }
+  else if (event === "result") { appendLog(appT("app.console.done")); renderResult(data); }
 }
 
 // A freshly forged class: spinner off, then the shared renderer + the share bar + what it consumed.
@@ -1050,8 +1069,9 @@ function shareText(name, description, url) {
   } else {
     d = d.replace(/[.!?]+$/, "");
   }
-  const head = `"${String(name || "A forged class").trim()}"`;
-  return d ? `${head} \u2014 ${d}. Play it: ${url}` : `${head}. Play it: ${url}`;
+  const head = String(name || appT("app.share.name_fallback")).trim();
+  return d ? appT("app.share.text", { name: head, description: d, url })
+    : appT("app.share.text_no_description", { name: head, url });
 }
 
 // The bar above a rendered class: a share link (the public /deck/<slug> page) and, when the class was opened
@@ -1070,7 +1090,7 @@ function renderShareBar(cls, viewing) {
   el("r-handoff-note").textContent = why;
   el("r-handoff-note").classList.toggle("hidden", !why);
   el("view-back").classList.toggle("hidden", !viewing);
-  el("view-title").textContent = viewing ? "Viewing a saved class" : "Your new class";
+  el("view-title").textContent = viewing ? appT("app.result.view_saved") : appT("app.result.view_new");
   el("view-bar").classList.remove("hidden");
 }
 
@@ -1082,10 +1102,11 @@ function renderShareBar(cls, viewing) {
 function paintNominate(btn, c) {
   const featured = !!c.featured, nominated = !featured && !!c.nominated;
   btn.disabled = featured;
-  btn.textContent = featured ? "★ In The Archive" : nominated ? "★ Nominated · withdraw" : "☆ Nominate for The Archive";
-  btn.title = featured ? "Picked for The Archive"
-    : nominated ? "Waiting for review — click to withdraw the nomination"
-      : "Ask for this class to be featured in The Archive, the public showcase";
+  btn.textContent = featured ? appT("app.nominate.featured") : nominated ? appT("app.nominate.nominated")
+    : appT("app.result.nominate");
+  btn.title = featured ? appT("app.nominate.tip_featured")
+    : nominated ? appT("app.nominate.tip_nominated")
+      : appT("app.nominate.tip_nominate");
   btn.classList.toggle("on", featured || nominated);
   btn.onclick = featured ? null : () => toggleNomination(btn, c);
 }
@@ -1094,8 +1115,7 @@ async function toggleNomination(btn, c) {
   const withdraw = !!c.nominated;
   let body;
   if (!withdraw) {
-    const note = prompt("Nominate this class for The Archive?\n\nOptional: why should it be picked? "
-      + "(up to 200 characters; only the reviewer sees it)", "");
+    const note = prompt(appT("app.nominate.prompt"), "");
     if (note === null) return;  // cancelled
     body = JSON.stringify({ note: String(note).trim().slice(0, 200) });
   }
@@ -1106,13 +1126,13 @@ async function toggleNomination(btn, c) {
     });
     const d = await r.json().catch(() => ({}));
     if (r.status === 409) c.featured = true;  // picked meanwhile
-    if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
+    if (!r.ok) throw new Error(appErr(d, r.status));
     for (const t of [c, libClasses.find((x) => x.id === c.id)]) {
       if (t) { t.nominated = !!d.nominated; t.featured = !!d.featured; t.featured_word = d.featured_word; }
     }
-    toast(withdraw ? "Nomination withdrawn." : "Nominated — you'll see it in The Archive if it's picked.");
+    toast(withdraw ? appT("app.nominate.toast_withdrawn") : appT("app.nominate.toast_nominated"));
   } catch (e) {
-    toast(e.message || "That didn't go through — try again.");
+    toast(e.message || appT("app.common.toast_retry"));
   } finally {
     paintNominate(btn, c);
   }
@@ -1123,8 +1143,8 @@ async function toggleNomination(btn, c) {
 // /api/classes/<id>/email: the link + the import code to the account's own address). Shown on phones only
 // (.phone-only); the email button is disabled, with the reason in its title, when it cannot work.
 function emailBlocker() {
-  if (!ME_META || !ME_META.mail) return "Email isn't set up on this server yet — use Send to my PC, or copy the code.";
-  if (!ME || !ME.email) return "This account has no email address — use Send to my PC, or copy the code.";
+  if (!ME_META || !ME_META.mail) return appT("app.handoff.no_mail_server");
+  if (!ME || !ME.email) return appT("app.handoff.no_email");
   return "";
 }
 
@@ -1132,21 +1152,24 @@ function wireHandoff(sendBtn, mailBtn, cls, url) {
   const name = cls.character?.name || cls.name || "";
   sendBtn.disabled = !url;
   sendBtn.onclick = () => sendToPc(name, url);
-  const why = cls.id == null ? "Open this class from My Classes to email it." : emailBlocker();
+  const why = cls.id == null ? appT("app.handoff.open_from_library") : emailBlocker();
   mailBtn.disabled = !!why;
-  mailBtn.title = why || "Email the link and the import code to " + (ME?.email || "your address");
+  mailBtn.title = why || appT("app.handoff.email_tip", { email: ME?.email || appT("app.handoff.email_tip_fallback") });
   mailBtn.onclick = why ? null : () => emailClass(cls.id, mailBtn);
 }
 
 async function emailClass(id, btn) {
   btn.disabled = true;
   try {
-    const r = await fetch(`/api/classes/${id}/email`, { method: "POST" });
+    const r = await fetch(`/api/classes/${id}/email`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lang: BTS_I18N.lang }),
+    });
     const d = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
-    toast(`Sent to ${d.to || "your inbox"} — open it on your PC.`);
+    if (!r.ok) throw new Error(appErr(d, r.status));
+    toast(appT("app.handoff.toast_sent", { email: d.to || appT("app.handoff.toast_sent_fallback") }));
   } catch (e) {
-    toast(e.message || "The email didn't go out — copy the code instead.");
+    toast(e.message || appT("app.handoff.toast_failed"));
   } finally {
     btn.disabled = false;
   }
@@ -1162,13 +1185,15 @@ function renderUsage(cls) {
   // actually reported a cost (OpenRouter); Gemini/xAI/OpenAI report none, so that figure is the list-price
   // "est." and must never read as a bill.
   const art = u.images
-    ? ` · ${u.images} image${u.images === 1 ? "" : "s"}`
+    ? appT("app.result.usage_images", { count: u.images })
       + (u.art_cost_usd != null
-          ? ` ($${Number(u.art_cost_usd).toFixed(2)} ${u.art_cost_metered ? "metered" : "est."})` : "")
+          ? appT("app.result.usage_art_cost", { cost: Number(u.art_cost_usd).toFixed(2),
+              kind: u.art_cost_metered ? appT("app.result.usage_metered") : appT("app.result.usage_est") }) : "")
     : "";
-  line.textContent = `This forge used ${u.calls} calls · ${fmtTokens(u.input_tokens)} tokens in`
-    + (u.cached_tokens ? ` (${fmtTokens(u.cached_tokens)} cached)` : "")
-    + ` · ${fmtTokens(u.output_tokens)} out${art} on your key.`;
+  line.textContent = appT("app.result.usage", {
+    calls: u.calls, input: fmtTokens(u.input_tokens),
+    cached: u.cached_tokens ? appT("app.result.usage_cached", { cached: fmtTokens(u.cached_tokens) }) : "",
+    output: fmtTokens(u.output_tokens), art });
   line.classList.remove("hidden");
 }
 
@@ -1210,8 +1235,8 @@ function renderChoice(data) {
     // an engine the player asked for by name in their concept ("an orb class") — the front-end pinned it
     // onto the menu (frontend.request); say so, since it may have no themed title/pitch of its own.
     b.innerHTML = `<strong>${esc(title)}</strong>`
-      + (o.requested ? `<span class="co-req">you asked for this</span>` : "")
-      + (o.buildable ? "" : `<span class="co-warn">needs new vocab — some cards may substitute</span>`)
+      + (o.requested ? `<span class="co-req">${appH("app.choice.requested_badge")}</span>` : "")
+      + (o.buildable ? "" : `<span class="co-warn">${appH("app.choice.needs_vocab")}</span>`)
       + (why ? `<em>${esc(why)}</em>` : "");
     b.onclick = () => toggleChoiceOpt(b, String(o.id));
     wrap.appendChild(b);
@@ -1229,7 +1254,7 @@ function toggleChoiceOpt(btn, id) {
     choiceState.picked.delete(id);
     btn.classList.remove("sel");
   } else {
-    if (choiceState.picked.size >= 2) { toast("Pick at most 2 — deselect one first."); return; }
+    if (choiceState.picked.size >= 2) { toast(appT("app.choice.toast_max")); return; }
     choiceState.picked.add(id);
     btn.classList.add("sel");
   }
@@ -1239,9 +1264,9 @@ function toggleChoiceOpt(btn, id) {
 function tickChoice() {
   if (!choiceState) return;
   const left = Math.max(0, Math.round((choiceState.deadline - Date.now()) / 1000));
-  el("choice-timer").textContent = `(${left}s — then the forge decides)`;
+  el("choice-timer").textContent = appT("app.choice.timer", { seconds: left });
   if (left <= 0) {
-    appendLog("• choice timed out — the forge decides");
+    appendLog(appT("app.console.choice_timeout"));
     resetChoice();
   }
 }
@@ -1251,7 +1276,7 @@ async function sendChoice(picks) {
   choiceState.sent = true;
   const forgeId = choiceState.forgeId;
   resetChoice();
-  appendLog(picks.length ? "• you picked: " + picks.join(", ") : "• skipped — the forge decides");
+  appendLog(picks.length ? appT("app.console.picked", { picks: picks.join(", ") }) : appT("app.console.skipped"));
   try {
     const r = await fetch("/api/forge/answer", {
       method: "POST",
@@ -1260,7 +1285,7 @@ async function sendChoice(picks) {
     });
     if (!r.ok) {
       const e = await r.json().catch(() => ({}));
-      appendLog("• " + (e.error || "the pick didn't land — the forge decides"));
+      appendLog(e.error || e.code ? "• " + BTS_I18N.err(e, "") : appT("app.console.pick_failed"));
     }
   } catch {
     // the server's own timeout auto-continues the forge; nothing to recover here
@@ -1283,7 +1308,7 @@ async function loadLibrary() {
     const r = await fetch("/api/classes");
     ({ classes } = await r.json());
   } catch (_) {
-    toast("Couldn't load your classes — check your connection.");
+    toast(appT("app.library.toast_load_failed"));
     return;
   }
   libClasses = classes;
@@ -1302,24 +1327,24 @@ function libRow(c) {
   const li = document.createElement("li");
   li.className = "lib-row";
   li.innerHTML = `<div class="lr-main"><span class="lr-name">${esc(c.name)}</span>`
-    + `<span class="lr-meta">${c.card_count} cards · v${c.vocab_version}</span>`
+    + `<span class="lr-meta">${appH("app.library.cards_meta", { count: c.card_count, vocab: c.vocab_version })}</span>`
     + `<div class="lr-concept muted">${esc(c.concept || "")}</div></div>`
     + `<div class="lr-actions">`
-    + `<button data-act="share" title="Copy a public link to this class">🔗 Share link</button>`
-    + `<button data-act="sendpc" class="phone-only">📲 Send to my PC</button>`
-    + `<button data-act="email" class="phone-only">✉️ Email it to me</button>`
-    + `<button data-act="code" title="Copy the in-game import code">Copy code</button>`
+    + `<button data-act="share" title="${esc(appT("app.result.share_tip"))}">${appH("app.library.share")}</button>`
+    + `<button data-act="sendpc" class="phone-only">${appH("app.handoff.send_pc")}</button>`
+    + `<button data-act="email" class="phone-only">${appH("app.handoff.email_me")}</button>`
+    + `<button data-act="code" title="${esc(appT("app.library.code_tip"))}">${appH("app.result.copy_code")}</button>`
     + `<button data-act="nominate"></button>`
-    + `<button data-act="rename">Rename</button>`
-    + `<button data-act="open">Open</button>`
-    + `<button data-act="delete" class="danger">Delete</button></div>`;
+    + `<button data-act="rename">${appH("app.library.rename")}</button>`
+    + `<button data-act="open">${appH("app.library.open")}</button>`
+    + `<button data-act="delete" class="danger">${appH("app.library.delete")}</button></div>`;
   // Splash + sprite thumbnails lead the row (art on, and only when the class shipped with art — a BYOK
   // forge on a text-only provider has neither, and pruned art drops the field server-side).
   if (artEnabled() && (c.splash_thumb_url || c.sprite_thumb_url)) {
     const art = document.createElement("div");
     art.className = "lr-art";
-    if (c.splash_thumb_url) art.appendChild(artImg(c.splash_thumb_url, "lr-splash", `${c.name} splash art`));
-    if (c.sprite_thumb_url) art.appendChild(artImg(c.sprite_thumb_url, "lr-sprite", `${c.name} sprite`));
+    if (c.splash_thumb_url) art.appendChild(artImg(c.splash_thumb_url, "lr-splash", appT("app.library.splash_alt", { name: c.name })));
+    if (c.sprite_thumb_url) art.appendChild(artImg(c.sprite_thumb_url, "lr-sprite", appT("app.library.sprite_alt", { name: c.name })));
     li.insertBefore(art, li.firstChild);
   }
   const share = li.querySelector('[data-act="share"]');
@@ -1361,7 +1386,7 @@ async function openClass(id) {
   window.scrollTo({ top: 0 });
 }
 async function renameClass(id, oldName) {
-  const name = prompt("New name:", oldName);
+  const name = prompt(appT("app.library.rename_prompt"), oldName);
   if (!name) return;
   await fetch(`/api/classes/${id}`, {
     method: "PATCH", headers: { "Content-Type": "application/json" },
@@ -1370,7 +1395,7 @@ async function renameClass(id, oldName) {
   loadLibrary();
 }
 async function deleteClass(id, name) {
-  if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+  if (!confirm(appT("app.library.delete_confirm", { name }))) return;
   await fetch(`/api/classes/${id}`, { method: "DELETE" });
   loadLibrary();
 }
@@ -1394,7 +1419,7 @@ async function loadAccount() {
     await loadDonation();
     renderPurchases((await purR.json()).purchases || []);
   } catch (_) {
-    toast("Couldn't load your account — check your connection.");
+    toast(appT("app.account.toast_load_failed"));
   }
   loadStats();
   loadTraffic();
@@ -1404,7 +1429,14 @@ async function loadAccount() {
 }
 
 // Which sign-ins reach this account, and what is left to add. No unlinking in v1 (see index.html).
-const IDENTITY_LABELS = { google: "Google", discord: "Discord", github: "GitHub", email: "Email", dev: "Dev" };
+// Read lazily (the strings load after this file is parsed). "Dev" is a dev-only label, not in COPY.md.
+const IDENTITY_LABELS = {
+  get google() { return appT("app.account.identity.google"); },
+  get discord() { return appT("app.account.identity.discord"); },
+  get github() { return appT("app.account.identity.github"); },
+  get email() { return appT("app.account.identity.email"); },
+  dev: "Dev",
+};
 
 // Light masking for the identity label: an address shows as "r…@gmail.com" — enough to tell two accounts
 // apart without printing the whole thing. A display name or a provider id is left as it is.
@@ -1420,8 +1452,8 @@ function renderSignInMethods() {
   list.innerHTML = "";
   for (const i of identities) {
     const li = document.createElement("li");
-    li.textContent = (IDENTITY_LABELS[i.provider] || i.provider)
-      + (i.label ? ` (${maskIdentity(i.label)})` : "");
+    const provider = IDENTITY_LABELS[i.provider] || i.provider;
+    li.textContent = i.label ? appT("app.account.identity_row", { provider, label: maskIdentity(i.label) }) : provider;
     list.appendChild(li);
   }
 
@@ -1510,25 +1542,26 @@ function renderCustomAmount(container, cfg) {
   const base = container.id;
   if (!CUSTOM_SHOWN.has(base)) {
     container.innerHTML = `<div class="custom-reveal"><button id="${base}-open" class="btn" type="button">`
-      + `Enter another custom amount</button></div>`;
+      + `${appH("app.donate.custom_reveal")}</button></div>`;
     el(`${base}-open`).onclick = () => { CUSTOM_SHOWN.add(base); renderCustomAmount(container, cfg); };
     return;
   }
   container.innerHTML =
     `<div class="custom-row"><span class="custom-cur">$</span>`
     + `<input id="${base}-input" class="in custom-amt" type="number" min="${min}" max="${max}" step="1" `
-    + `inputmode="numeric" placeholder="${min}+" aria-label="Custom amount in dollars" />`
-    + `<button id="${base}-btn" class="btn" type="button">Get tokens</button></div>`
+    + `inputmode="numeric" placeholder="${esc(appT("app.donate.custom_placeholder", { min }))}" `
+    + `aria-label="${esc(appT("app.donate.custom_aria"))}" />`
+    + `<button id="${base}-btn" class="btn" type="button">${appH("app.donate.custom_button")}</button></div>`
     + `<p id="${base}-line" class="hint custom-line"></p>`;
   const input = el(`${base}-input`), btn = el(`${base}-btn`), line = el(`${base}-line`);
-  const sentence = `$${min} and up: one token per dollar, whole dollars only.`;
+  const sentence = appT("app.donate.custom_rule", { min });
   const sync = () => {
     const n = customDollars(input.value, c);
-    btn.textContent = n ? `Get ${n * per} token${n * per === 1 ? "" : "s"}` : "Get tokens";
+    btn.textContent = n ? appT("app.donate.custom_button_n", { count: n * per }) : appT("app.donate.custom_button");
     if (!n) { line.textContent = sentence; return; }
     const { gross, fee } = grossFee(n * 100, c);
-    line.textContent = `${sentence} ${fmtMoney(gross, cfg.currency)} charged, incl. `
-      + `${fmtMoney(fee, cfg.currency)} card fee`;
+    line.textContent = `${sentence} `
+      + appT("app.donate.fee_line", { gross: fmtMoney(gross, cfg.currency), fee: fmtMoney(fee, cfg.currency) });
   };
   input.oninput = sync;
   btn.onclick = () => donateCustom(input.value, btn, cfg);
@@ -1555,10 +1588,11 @@ function renderTiers(container, cfg) {
     b.type = "button";
     b.className = "btn donate-tier";
     const n = Number(t.tokens || 0);
-    b.innerHTML = `<span class="tier-label">${esc(fmtMoneyShort(t.net_cents, cfg.currency))} → `
-      + `${n} token${n === 1 ? "" : "s"}</span>`
-      + `<span class="tier-fee">${esc(fmtMoney(t.gross_cents, cfg.currency))} charged, incl. `
-      + `${esc(fmtMoney(t.fee_cents, cfg.currency))} card fee</span>`;
+    b.innerHTML = `<span class="tier-label">`
+      + appH("app.donate.tier_label", { amount: fmtMoneyShort(t.net_cents, cfg.currency), count: n }) + `</span>`
+      + `<span class="tier-fee">`
+      + appH("app.donate.fee_line", { gross: fmtMoney(t.gross_cents, cfg.currency),
+                                     fee: fmtMoney(t.fee_cents, cfg.currency) }) + `</span>`;
     b.onclick = () => donate(t.id, b);
     container.appendChild(b);
   }
@@ -1575,7 +1609,7 @@ async function donateCustom(raw, btn, cfg) {
   if (!c) return;
   const n = customDollars(raw, c);
   if (!n) {
-    toast(`Enter a whole dollar amount between $${c.min_dollars} and $${c.max_dollars}.`);
+    toast(appT("app.donate.toast_bad_amount", { min: c.min_dollars, max: c.max_dollars }));
     return;
   }
   await startCheckout({ custom_dollars: n }, btn);
@@ -1585,14 +1619,14 @@ async function donateCustom(raw, btn, cfg) {
 async function startCheckout(payload, btn) {
   btn.disabled = true;
   const label = btn.innerHTML;
-  btn.textContent = "Redirecting…";
+  btn.textContent = appT("app.donate.redirecting");
   try {
     const r = await fetch("/api/donate", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, lang: BTS_I18N.lang }),  // Stripe Checkout locale + line-item names
     });
     const d = await r.json();
-    if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
+    if (!r.ok) throw new Error(appErr(d, r.status));
     stashDraft();           // the concept survives the round trip (restoreDraft on the way back)
     location.href = d.url;  // off to Stripe's hosted checkout page
   } catch (e) {
@@ -1620,12 +1654,14 @@ function renderPurchases(purchases) {
       ? p.fee_cents : Number(p.amount_cents || 0) - Number(p.net_cents || 0);
     const what = p.kind === "donation"
       ? (typeof p.net_cents === "number"
-        ? `Donated ${gross} (${fmtMoney(p.net_cents, p.currency)} + ${fmtMoney(fee, p.currency)} card fee)`
-        : `Donated ${gross}`)
-      : `Token pack, ${gross}`;   // a pre-v3 pack row: never "buy"/"purchase" in donor copy (pricing v3)
+        ? appT("app.history.donated_split", { gross, net: fmtMoney(p.net_cents, p.currency),
+                                               fee: fmtMoney(fee, p.currency) })
+        : appT("app.history.donated", { gross }))
+      : appT("app.history.pack", { gross });   // a pre-v3 pack row: never "buy"/"purchase" in donor copy (pricing v3)
     li.innerHTML = `<div class="lr-main"><span class="lr-name">${esc(what)}</span>`
-      + `<span class="lr-meta">+${p.tokens} token${p.tokens === 1 ? "" : "s"} · ${esc(when)}`
-      + (p.status === "refunded" ? ' · <span class="refunded">refunded</span>' : "") + `</span></div>`;
+      + `<span class="lr-meta">${appH("app.history.tokens", { count: p.tokens, date: when })}`
+      + (p.status === "refunded" ? ` · <span class="refunded">${appH("app.history.refunded")}</span>` : "")
+      + `</span></div>`;
     list.appendChild(li);
   }
 }
@@ -1639,22 +1675,22 @@ async function handlePurchaseReturn() {
   if (!outcome) return;
   const sessionId = params.get("session_id") || "";
   history.replaceState(null, "", "/app");
-  if (outcome === "cancel") { toast("Donation canceled — you weren't charged."); return; }
+  if (outcome === "cancel") { toast(appT("app.checkout.toast_canceled")); return; }
   if (outcome !== "success" || !sessionId) return;
 
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const r = await fetch(`/api/checkout-status?session_id=${encodeURIComponent(sessionId)}`);
       const d = await r.json();
-      if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
+      if (!r.ok) throw new Error(appErr(d, r.status));
       if (d.status === "paid") {
         applyTokenState(d);
         renderTokens();
-        const added = `${d.tokens} token${d.tokens === 1 ? "" : "s"} added`;
+        const added = appT("app.checkout.added", { count: d.tokens });
         toast(d.tokens > 0
-          ? (DRAFT_RESTORED ? `Thank you! ${added} — your class is ready to forge.`
-                            : `Thank you! ${added} — you're ready to forge.`)
-          : "Thank you for your donation!");
+          ? (DRAFT_RESTORED ? appT("app.checkout.toast_thanks_draft", { added })
+                            : appT("app.checkout.toast_thanks", { added }))
+          : appT("app.checkout.toast_thanks_plain"));
         // They came here to forge, not to read the Account tab: land on the forge, token path armed, the pay
         // step open on "You have N tokens" and the Forge button in view.
         setForgePref("token");
@@ -1671,7 +1707,7 @@ async function handlePurchaseReturn() {
     }
     await new Promise((res) => setTimeout(res, 2000));  // still processing — give Stripe a moment
   }
-  toast("Payment is processing — your balance will update shortly.");
+  toast(appT("app.checkout.toast_processing"));
 }
 
 // --- admin: forge stats dashboard -----------------------------------------------------------------
@@ -1926,35 +1962,35 @@ document.addEventListener("keydown", (ev) => {
 async function loadModels({ auto = false } = {}) {
   const base_url = resolvedBaseUrl();
   const api_key = el("api_key").value.trim();
-  if (!base_url || !api_key) { if (!auto) toast("Pick a provider and enter your API key first."); return; }
+  if (!base_url || !api_key) { if (!auto) toast(appT("app.byok.toast_need_key")); return; }
   const pair = modelPair();
   if (pair === MODELS_LOADING_FOR) return;
   MODELS_LOADING_FOR = pair;
   const btn = el("load-models");
-  btn.disabled = true; btn.textContent = "Loading…";
+  btn.disabled = true; btn.textContent = appT("app.byok.loading");
   try {
     const r = await fetch("/api/models", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ base_url, api_key }),
     });
     const d = await r.json();
-    if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
+    if (!r.ok) throw new Error(appErr(d, r.status));
     if (pair !== modelPair()) return;  // the provider or key changed mid-request: that list is stale
     // The server drops models that can't run a forge (embeddings, speech, images, OpenRouter :free routes,
     // small or short-context models) and lists the ones a forge has finished on first ("recommended").
     setModelControl("select");
     const gone = populateModels(d);
     MODELS_LOADED_FOR = pair;
-    const hid = d.hidden ? ` (hid ${d.hidden} that can't run a forge)` : "";
-    if (gone.length) toast(`Your saved model “${gone[0]}” isn't offered on this key any more — pick another.`);
-    else toast(`Loaded ${d.models.length} models${hid}.`);
+    const hid = d.hidden ? appT("app.byok.toast_loaded_hidden", { count: d.hidden }) : "";
+    if (gone.length) toast(appT("app.byok.toast_saved_gone", { model: gone[0] }));
+    else toast(appT("app.byok.toast_loaded", { count: d.models.length, hidden: hid }));
   } catch (e) {
     if (pair !== modelPair()) return;
     if (el("provider").value === "custom") {
       // Not every OpenAI-compatible server has /models: let the user type the ids instead.
       setModelControl("text");
       renderForgeButton();
-      toast(`Couldn't list models on this endpoint (${e.message}) — type the model ids instead.`);
+      toast(appT("app.byok.toast_typed_fallback", { error: e.message }));
     } else toast(e.message);
   } finally {
     if (MODELS_LOADING_FOR === pair) MODELS_LOADING_FOR = "";
@@ -2496,5 +2532,8 @@ el("api_key").oninput = () => {
 el("api_key").onchange = scheduleModelLoad;
 el("api_key").addEventListener("paste", () => setTimeout(scheduleModelLoad, 0));
 
-applyProvider();
-boot();
+// Every string comes from the i18n json, so nothing renders before it has loaded (English included).
+BTS_I18N.ready.then(() => {
+  applyProvider();
+  boot();
+});

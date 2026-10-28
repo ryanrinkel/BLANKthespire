@@ -26,6 +26,7 @@ from datetime import datetime, timedelta, timezone
 import requests
 from flask import jsonify, redirect, request, send_from_directory, session, url_for
 
+import i18n
 import promo
 from db import session_scope
 from models import Identity, LoginLink, PromoGrant, Promotion, User
@@ -344,13 +345,12 @@ def _send_mail(to: str, subject: str, html: str | None, text: str) -> None:
     resp.raise_for_status()
 
 
-def _send_magic_link(email: str, url: str) -> None:
+def _send_magic_link(email: str, url: str, lang: str = "en") -> None:
     """Send one sign-in link. Deliberately plain text, one URL, no tracking pixels or click-wrapping.
-    Module-level so tests can swap it for a capture stub."""
-    body = ("Here is your sign-in link for BLANK the spire:\n\n"
-            f"{url}\n\n"
-            "This link expires in 15 minutes. If you didn't ask for it, ignore this email.\n")
-    _send_mail(email, "Your BLANK the spire sign-in link", None, body)
+    Subject and body are COPY.md's email.magic.* in the language the sign-in page was showing (per-key
+    English fallback, web/i18n.py). Module-level so tests can swap it for a capture stub."""
+    body = i18n.get_text(lang, "email.magic.body", url=url) + "\n"
+    _send_mail(email, i18n.get_text(lang, "email.magic.subject"), None, body)
 
 
 class MagicLinkLimiter:
@@ -421,7 +421,7 @@ def require_login(fn):
     @functools.wraps(fn)
     def wrapper(*args, **kwargs):
         if current_user() is None:
-            return jsonify({"error": "sign in required"}), 401
+            return jsonify(i18n.error_body("server.auth.sign_in_required")), 401
         return fn(*args, **kwargs)
     return wrapper
 
@@ -482,10 +482,10 @@ def init_auth(app) -> None:
     @app.route("/login/<provider>")
     def login_provider(provider):
         if provider not in PROVIDERS:
-            return ("Unknown sign-in provider.", 404)
+            return (i18n.get_text("en", "server.auth.unknown_provider"), 404)
         client = _client(provider)
         if client is None:
-            return (f"{provider.title()} sign-in is not configured on this server.", 503)
+            return (i18n.get_text("en", "server.auth.provider_not_configured", provider=provider.title()), 503)
         # Google still returns to the legacy /auth/callback: that is the only URI the Google console lists,
         # and a redirect_uri it does not know is a hard "redirect_uri_mismatch" for every Google sign-in. Point
         # this at auth_provider_callback once the console also lists /auth/google/callback (DEPLOY §7).
@@ -497,10 +497,10 @@ def init_auth(app) -> None:
     @app.route("/auth/<provider>/callback")
     def auth_provider_callback(provider):
         if provider not in PROVIDERS:
-            return ("Unknown sign-in provider.", 404)
+            return (i18n.get_text("en", "server.auth.unknown_provider"), 404)
         client = _client(provider)
         if client is None:
-            return (f"{provider.title()} sign-in is not configured on this server.", 503)
+            return (i18n.get_text("en", "server.auth.provider_not_configured", provider=provider.title()), 503)
         token = client.authorize_access_token()
         profile = _PROFILE[provider](client, token)
         # current_user_id is "link another provider while signed in" (rule 2): a signed-in user who runs the
@@ -524,9 +524,15 @@ def init_auth(app) -> None:
         gibberish in the box — so the endpoint cannot be used to probe who has an account or to confirm a
         send. It lives under /api/ so app.py's X-Requested-With guard already covers it."""
         if not email_login_enabled():
-            return jsonify({"error": "email sign-in is not configured on this server"}), 503
-        answer = {"ok": True, "message": "Check your inbox."}
-        email = _normalize_email((request.get_json(silent=True) or {}).get("email", ""))
+            return jsonify(i18n.error_body("server.auth.email_not_configured")), 503
+        answer = {"ok": True, "message": i18n.get_text("en", "server.auth.check_inbox")}
+        start_body = request.get_json(silent=True)
+        if not isinstance(start_body, dict):
+            start_body = {}
+        email = _normalize_email(start_body.get("email", ""))
+        # The language the sign-in page was showing ("en" | "zh"; anything else is English) picks the email's
+        # subject and body. Not stored: the link itself is language-free.
+        lang = i18n.normalize_lang(start_body.get("lang"))
         ip = _client_ip()
         if not email or not magic_limiter.check(email, ip):
             return jsonify(answer)
@@ -546,7 +552,7 @@ def init_auth(app) -> None:
 
         if mail_configured():
             try:
-                _send_magic_link(email, url)
+                _send_magic_link(email, url, lang=lang)
             except Exception as exc:  # a dead mail provider must not change the answer (or leak a stacktrace)
                 app.logger.warning("magic-link send failed for %s: %s", email, exc)
             return jsonify(answer)

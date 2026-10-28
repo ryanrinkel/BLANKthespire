@@ -40,10 +40,8 @@ window.BTS_EVENT = (() => {
     icon.setAttribute("aria-hidden", "true");
     icon.textContent = "🎁";
     const text = document.createElement("span");
-    const label = document.createElement("b");
-    label.textContent = ev.label;
-    text.append(label, ": sign up before " + when + " and "
-      + (n === 1 ? "your first forge is on us." : "your first " + n + " forges are on us."));
+    // landing.event.ribbon.one / .other; html() escapes the admin-typed label and the date
+    text.innerHTML = BTS_I18N.html("landing.event.ribbon", { label: ev.label, when, count: n });
     box.append(icon, text);
     place(box);
   }

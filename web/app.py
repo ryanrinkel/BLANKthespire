@@ -37,6 +37,7 @@ if os.environ.get("BTSWEB_NO_DOTENV", "").strip() not in ("1", "true", "yes"):
 from auth import (current_user, init_auth, is_admin, is_production, is_unlimited,  # noqa: E402
                   require_login, session_age, user_is_unlimited)
 import alerts as _alerts  # noqa: E402
+import i18n  # noqa: E402
 import auth as _auth  # noqa: E402  (module attrs: tests swap the mailer / mail_configured)
 from billing import init_billing  # noqa: E402
 from db import FEATURED_WORD_RE as _FEATURED_WORD_RE  # noqa: E402
@@ -130,7 +131,7 @@ CSRF_VALUE = "fetch"
 def _csrf_guard():
     if request.method in ("POST", "PUT", "PATCH", "DELETE") and request.path.startswith("/api/"):
         if request.headers.get(CSRF_HEADER, "") != CSRF_VALUE:
-            return jsonify({"error": "missing X-Requested-With header (cross-site request blocked)"}), 403
+            return jsonify(i18n.error_body("server.csrf")), 403
     return None
 
 
@@ -374,7 +375,7 @@ def privacy():
 _DECK_404_HTML = """<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Class not found — BLANK the spire</title>
+<title>Class not found — Blank the Spire</title>
 <link rel="stylesheet" href="/static/style.css" /></head>
 <body><main><section class="card"><h1>Class not found</h1>
 <p class="muted">This class link is no longer valid — it may have been deleted, or the link was mistyped.</p>
@@ -513,7 +514,7 @@ def _serve_thumb(src_bytes: bytes | None, kind: str, dest: Path):
     """Cached thumb if it exists, else build it; falls back to the original bytes when Pillow can't."""
     if not dest.exists() and (src_bytes is None or not _make_thumb(src_bytes, kind, dest)):
         if src_bytes is None:
-            return jsonify({"error": "not found"}), 404
+            return jsonify(i18n.error_body("server.not_found")), 404
         return _thumb_headers(Response(src_bytes, mimetype="image/png"))
     return _thumb_headers(send_file(dest, mimetype="image/webp", max_age=31536000, conditional=True))
 
@@ -521,13 +522,13 @@ def _serve_thumb(src_bytes: bytes | None, kind: str, dest: Path):
 def _art_thumb_response(class_id: int, kind: str, digest: str | None):
     """Thumbnail of the class's splash or sprite PNG (404 when it was never made or has been pruned)."""
     if kind not in _ART_KINDS or not digest:
-        return jsonify({"error": "not found"}), 404
+        return jsonify(i18n.error_body("server.not_found")), 404
     src = STATIC_FORGED_DIR / str(class_id) / f"{kind}.png"
     dest = STATIC_FORGED_DIR / str(class_id) / "thumbs" / f"{kind}-{digest[:8]}.webp"
     if dest.exists():
         return _serve_thumb(None, kind, dest)
     if not src.is_file():
-        return jsonify({"error": "not found"}), 404
+        return jsonify(i18n.error_body("server.not_found")), 404
     return _serve_thumb(src.read_bytes(), kind, dest)
 
 
@@ -535,21 +536,21 @@ def _card_thumb_response(class_id: int, stem: str, digest: str | None):
     """Thumbnail of one portrait out of cards.zip, addressed by its entry stem (the card id as
     _card_art_id spelled it). The stem is validated against the alphabet before it names a cache file."""
     if not digest or not _STEM_RE.match(stem or ""):
-        return jsonify({"error": "not found"}), 404
+        return jsonify(i18n.error_body("server.not_found")), 404
     dest = STATIC_FORGED_DIR / str(class_id) / "thumbs" / f"card-{stem}-{digest[:8]}.webp"
     if dest.exists():
         return _serve_thumb(None, "card", dest)
     pack = STATIC_FORGED_DIR / str(class_id) / "cards.zip"
     if not pack.is_file():
-        return jsonify({"error": "not found"}), 404
+        return jsonify(i18n.error_body("server.not_found")), 404
     import zipfile
     try:
         with zipfile.ZipFile(pack) as z:
             if f"{stem}.png" not in z.namelist():
-                return jsonify({"error": "not found"}), 404
+                return jsonify(i18n.error_body("server.not_found")), 404
             src = z.read(f"{stem}.png")
     except zipfile.BadZipFile:
-        return jsonify({"error": "not found"}), 404
+        return jsonify(i18n.error_body("server.not_found")), 404
     return _serve_thumb(src, "card", dest)
 
 
@@ -996,7 +997,7 @@ def api_models():
     try:
         listing = list_models((body.get("base_url") or "").strip(), (body.get("api_key") or "").strip())
     except ForgeError as e:
-        return jsonify({"error": str(e)}), 400
+        return jsonify(i18n.with_code({"error": str(e)})), 400
     return jsonify(listing)
 
 
@@ -1064,7 +1065,7 @@ def _reconcile_forge_jobs() -> int:
         ids = [j.id for j in s.query(ForgeJob).filter_by(status="running").all()]
     n = 0
     for fid in ids:
-        done, _ = _settle_forge_job(fid, ok=False, error="the server restarted mid-forge — token refunded")
+        done, _ = _settle_forge_job(fid, ok=False, error=i18n.get_text("en", "server.forge.restarted"))
         n += int(done)
     if n:
         app.logger.warning("reconciled %d forge job(s) left running by a restart (tokens refunded)", n)
@@ -1255,13 +1256,12 @@ def forge_class_route():
                "card_model": (k.get("card_model") or "").strip()}  # blank = the design model codes too
 
     if not concept:
-        return jsonify({"error": "describe a class first."}), 400
+        return jsonify(i18n.error_body("server.forge.no_concept")), 400
 
     if mode == "hosted":  # retired: never spend our Anthropic key on a hand-crafted POST
-        return jsonify({"error": "the hosted Anthropic path is retired — use a token or bring your own "
-                                 "API key."}), 410
+        return jsonify(i18n.error_body("server.forge.hosted_retired")), 410
     if mode not in ("token", "byok", "anthropic", "fake"):
-        return jsonify({"error": "unknown forge mode."}), 400
+        return jsonify(i18n.error_body("server.forge.unknown_mode")), 400
     if mode == "fake" and not os.environ.get("BTSWEB_DEV_AUTH", "").strip() in ("1", "true", "yes"):
         return jsonify({"error": "the offline demo forge is dev-only."}), 403
 
@@ -1272,7 +1272,7 @@ def forge_class_route():
         bad = verify_byok_models(str(key.get("base_url") or "").strip(), str(key.get("api_key") or "").strip(),
                                  str(key.get("model") or "").strip(), str(key.get("card_model") or "").strip())
         if bad:
-            return jsonify({"error": bad}), 400
+            return jsonify(i18n.with_code({"error": bad})), 400
 
     fake = mode == "fake"
     hosted = False
@@ -1286,12 +1286,11 @@ def forge_class_route():
     with _forge_admit_lock:
         line_len = _waiting_total()
     if line_len >= FORGE_MAX_QUEUE:
-        return jsonify({"error": "the forge is at full capacity right now — please try again in a few "
-                                 "minutes."}), 503
+        return jsonify(i18n.error_body("server.forge.at_capacity")), 503
 
     # One forge per account at a time, across every mode.
     if not _user_begin(user["id"]):
-        return jsonify({"error": "you already have a forge in progress — wait for it to finish."}), 429
+        return jsonify(i18n.error_body("server.forge.already_running")), 429
 
     # The "Use a token" path forges on our server-side Ollama mixture and spends one of the user's tokens,
     # unless the account is unlimited. Reserve it up front so we can 402 BEFORE streaming; a
@@ -1315,15 +1314,11 @@ def forge_class_route():
     if ollama_mix and not unlimited:
         if not has_any:
             _user_end(user["id"])
-            return jsonify({"error": "you're out of tokens — get a forge token under the Forge button, or bring your own "
-                                     "API key to keep forging.",
-                            "token_balance": 0}), 402
+            return jsonify({**i18n.error_body("server.forge.out_of_tokens"), "token_balance": 0}), 402
         res = _reserve_token(user["id"])
         if res is None:  # lost a race for the last token
             _user_end(user["id"])
-            return jsonify({"error": "you're out of tokens — get a forge token under the Forge button, or bring your own "
-                                     "API key to keep forging.",
-                            "token_balance": 0}), 402
+            return jsonify({**i18n.error_body("server.forge.out_of_tokens"), "token_balance": 0}), 402
         token_kind, token_state = res
         reserved = True
 
@@ -1360,7 +1355,7 @@ def forge_class_route():
     def finish_failed(message: str) -> None:
         """Settle the job as failed (refunding the token if this is the first settlement) and tell the stream."""
         transitioned, state = _settle_forge_job(forge_id, ok=False, error=message)
-        data = {"error": message}
+        data = i18n.with_code({"error": message})  # code (+ vars) when the message is a COPY.md server text
         if transitioned and reserved:
             data.update(refund_state(state))
         _record_usage(meter, user_id=user["id"], forge_id=forge_id, mode=usage_mode,
@@ -1383,7 +1378,7 @@ def forge_class_route():
             saved = _persist_class(user["id"], concept, out, forge_meta=forge_meta,
                                    on_event=on_event, meter=meter, art_backend=art_backend)
         except Exception as e:
-            finish_failed(f"forged, but saving failed: {e}")
+            finish_failed(i18n.get_text("en", "server.forge.saving_failed", e=e))
             return
         transitioned, _ = _settle_forge_job(forge_id, ok=True, class_id=saved.get("id"))
         _record_usage(meter, user_id=user["id"], forge_id=forge_id, mode=usage_mode,
@@ -1422,10 +1417,10 @@ def forge_class_route():
         """Watchdog: the forge has run past FORGE_MAX_SECONDS. Refund now and free the user's slot; the worker
         keeps going and a late success still lands in the library."""
         transitioned, state = _settle_forge_job(
-            forge_id, ok=False, error=f"the forge ran past {int(FORGE_MAX_SECONDS)}s and was abandoned")
+            forge_id, ok=False, error=i18n.get_text("en", "server.forge.too_long_job",
+                                                    intFORGE_MAX_SECONDS=int(FORGE_MAX_SECONDS)))
         if transitioned:
-            data = {"error": "this forge is taking far too long — it's been abandoned and your token "
-                             "refunded. If it does finish, the class will appear in My Classes."}
+            data = i18n.error_body("server.forge.too_long")
             if reserved:
                 data.update(refund_state(state))
             _user_end(user["id"])
@@ -1459,22 +1454,20 @@ def forge_class_route():
         ticket = _forge_enqueue(priority=ollama_mix)
         if not ticket.is_set():
             last_pos = _forge_position(ticket)
-            q.put(("progress", f"the forge is busy — you're in line at position {last_pos} "
-                               f"(your spot is held, hang tight)…"))
+            q.put(("progress", i18n.get_text("en", "console.queue.busy", last_pos=last_pos)))
             deadline = time.time() + FORGE_QUEUE_TIMEOUT_S
             while not ticket.wait(timeout=5):
                 if time.time() >= deadline:
                     if _forge_abandon(ticket):
-                        finish_failed("the forge stayed at capacity too long — nothing was forged (and "
-                                      "no token was spent); please try again later.")
+                        finish_failed(i18n.get_text("en", "server.forge.queue_timeout"))
                         _user_end(user["id"])
                         return
                     break  # a slot arrived in the same instant — we own it now, proceed
                 pos = _forge_position(ticket)
                 if pos and pos != last_pos:
                     last_pos = pos
-                    q.put(("progress", f"in line: position {pos}…"))
-            q.put(("progress", "it's your turn — forging now…"))
+                    q.put(("progress", i18n.get_text("en", "console.queue.position", pos=pos)))
+            q.put(("progress", i18n.get_text("en", "console.queue.turn")))
         watchdog = threading.Timer(FORGE_MAX_SECONDS, on_wall_clock)
         watchdog.daemon = True
         watchdog.start()
@@ -1489,7 +1482,7 @@ def forge_class_route():
             finish_failed(str(e))
         except Exception as e:  # never leak a stack trace to the browser
             watchdog.cancel()
-            finish_failed(f"unexpected error: {e}")
+            finish_failed(i18n.get_text("en", "server.forge.unexpected", e=e))
         else:
             watchdog.cancel()
             finish_done(out)
@@ -1506,8 +1499,7 @@ def forge_class_route():
 
         # Carry the post-reserve balance on the FIRST event so the header chip ticks down the moment the
         # forge starts (the token is already spent server-side); an error event refunds it back visibly.
-        first = {"message": "starting… (interactive forge: you'll pick the engines after the map stage)"
-                            if interactive else "starting…"}
+        first = {"message": i18n.get_text("en", "console.start_interactive" if interactive else "console.start")}
         if reserved and token_state:
             first.update(token_state)
         first["forge_id"] = forge_id  # what the browser polls (/api/forge-jobs/<id>) if this stream drops
@@ -1555,9 +1547,10 @@ def forge_job_status(forge_id: str):
         age = (now - job.started_at).total_seconds() if job is not None and job.started_at else None
         if job is None or (forge_id == "latest" and job.status != "running"
                            and (age is None or age > FORGE_LATEST_WINDOW_S)):
-            return jsonify({"error": "no such forge."}), 404
-        out = {"forge_id": job.id, "status": job.status, "class_id": job.class_id, "error": job.error or "",
-               "refunded": bool(job.refunded), "age_s": int(age) if age is not None else None}
+            return jsonify(i18n.error_body("server.forge.no_such_forge")), 404
+        out = i18n.with_code({"forge_id": job.id, "status": job.status, "class_id": job.class_id,
+                              "error": job.error or "", "refunded": bool(job.refunded),
+                              "age_s": int(age) if age is not None else None})
         u = s.query(User).filter_by(id=user["id"]).one_or_none()
         if u is not None and not user_is_unlimited(u):
             out.update(_token_state(u))  # a failed forge's refund shows up in the header chip
@@ -1585,9 +1578,9 @@ def forge_answer():
     with _choices_lock:
         entry = _pending_choices.get(forge_id)
     if entry is None:
-        return jsonify({"error": "no pending choice for this forge — it may have already timed out."}), 404
+        return jsonify(i18n.error_body("server.forge.choice_gone")), 404
     if entry["user_id"] != user["id"]:
-        return jsonify({"error": "this isn't your forge."}), 403
+        return jsonify(i18n.error_body("server.forge.not_yours")), 403
     entry["answer"] = picks
     entry["event"].set()
     return jsonify({"ok": True, "picked": picks})
@@ -1815,7 +1808,7 @@ def get_class(class_id: int):
     with session_scope() as s:
         cls = _owned(s, user["id"], class_id)
         if cls is None:
-            return jsonify({"error": "not found"}), 404
+            return jsonify(i18n.error_body("server.not_found")), 404
         detail = cls.detail()
         detail.update(_art_fields(cls, f"/api/classes/{cls.id}", detail.get("cards")))
         return jsonify(detail)
@@ -1829,7 +1822,7 @@ def class_art_thumb(class_id: int, kind: str):
     with session_scope() as s:
         cls = _owned(s, user["id"], class_id)
         if cls is None:
-            return jsonify({"error": "not found"}), 404
+            return jsonify(i18n.error_body("server.not_found")), 404
         digest = cls.splash_hash if kind == "splash" else cls.sprite_hash if kind == "sprite" else None
     return _art_thumb_response(class_id, kind, digest)
 
@@ -1842,7 +1835,7 @@ def class_card_thumb(class_id: int, stem: str):
     with session_scope() as s:
         cls = _owned(s, user["id"], class_id)
         if cls is None:
-            return jsonify({"error": "not found"}), 404
+            return jsonify(i18n.error_body("server.not_found")), 404
         digest = cls.card_art_hash
     return _card_thumb_response(class_id, stem, digest)
 
@@ -1853,11 +1846,11 @@ def rename_class(class_id: int):
     user = current_user()
     name = ((request.get_json(silent=True) or {}).get("name") or "").strip()
     if not name:
-        return jsonify({"error": "name is required"}), 400
+        return jsonify(i18n.error_body("server.class.name_required")), 400
     with session_scope() as s:
         cls = _owned(s, user["id"], class_id)
         if cls is None:
-            return jsonify({"error": "not found"}), 404
+            return jsonify(i18n.error_body("server.not_found")), 404
         cls.name = name[:255]
         return jsonify(cls.summary())
 
@@ -1869,7 +1862,7 @@ def delete_class(class_id: int):
     with session_scope() as s:
         cls = _owned(s, user["id"], class_id)
         if cls is None:
-            return jsonify({"error": "not found"}), 404
+            return jsonify(i18n.error_body("server.not_found")), 404
         s.delete(cls)
     # Row is committed gone — remove the class's generated art (splash/sprite/relic) too, or deleted
     # classes leak ~3MB each forever. After the DB delete so a failed delete never strands a live
@@ -1883,24 +1876,32 @@ def delete_class(class_id: int):
 # address the share link + the import code. Only ever the signed-in account's address (users.email, written
 # from a provider-VERIFIED address only), so it cannot be aimed at a stranger; 5 per hour per account.
 
-def _class_mail(name: str, url: str, code: str) -> tuple[str, str, str]:
-    """(subject, text, html) for the class hand-off mail. Text first: it is what most clients show."""
-    subject = f"Your Slay the Spire 2 class: {name}"
-    text = (f"Here is \"{name}\", the class you forged on BLANK the spire.\n\n"
-            f"Open it on the PC that runs Slay the Spire 2:\n{url}\n\n"
-            "Or paste this import code in-game (Mods -> BLANK the spire -> Import a class code -> Import, "
-            "then restart the game):\n\n"
+def _class_mail(name: str, url: str, code: str, lang: str = "en") -> tuple[str, str, str]:
+    """(subject, text, html) for the class hand-off mail, from COPY.md's email.class.* in `lang` (per-key
+    English fallback). Text first: it is what most clients show. The text version spells the arrows "->"."""
+    def t(key: str, **v) -> str:
+        return i18n.get_text(lang, key, **v)
+
+    def h(key: str, **v) -> str:
+        return i18n.get_html(lang, key, **v)
+
+    workshop = f"{PUBLIC_BASE_URL}/workshop"
+    subject = t("email.class.subject", name=name)
+    text = (f"{t('email.class.intro', name=name)}\n\n"
+            f"{t('email.class.open_on_pc')}\n{url}\n\n"
+            f"{t('email.class.paste_code').replace(' → ', ' -> ')}\n\n"
             f"{code}\n\n"
-            f"Don't have the mod yet? {PUBLIC_BASE_URL}/workshop\n"
-            "You asked for this email from your My Classes page; nothing else is sent.\n")
+            f"{t('email.class.no_mod_text', url=workshop)}\n"
+            f"{t('email.class.footer')}\n")
     n, u, c = html_escape(name), html_escape(url), html_escape(code)
-    html = (f"<p>Here is <b>{n}</b>, the class you forged on BLANK the spire.</p>"
-            f"<p>Open it on the PC that runs Slay the Spire 2:<br><a href=\"{u}\">{u}</a></p>"
-            "<p>Or paste this import code in-game (Mods &rarr; BLANK the spire &rarr; <i>Import a class code</i>"
-            " &rarr; Import, then restart the game):</p>"
+    # {name} is bold in the HTML version: fill it with the escaped, bolded name (get_html would escape the <b>)
+    intro_html = i18n.get_html(lang, "email.class.intro").replace("{name}", f"<b>{n}</b>")
+    html = (f"<p>{intro_html}</p>"
+            f"<p>{h('email.class.open_on_pc')}<br><a href=\"{u}\">{u}</a></p>"
+            f"<p>{h('email.class.paste_code')}</p>"
             f"<pre style=\"white-space:pre-wrap;word-break:break-all;font-family:monospace\">{c}</pre>"
-            f"<p>Don't have the mod yet? <a href=\"{PUBLIC_BASE_URL}/workshop\">Get it on Steam Workshop</a>.</p>"
-            "<p style=\"color:#888\">You asked for this email from your My Classes page; nothing else is sent.</p>")
+            f"<p>{h('email.class.no_mod_html', url=workshop)}</p>"
+            f"<p style=\"color:#888\">{h('email.class.footer')}</p>")
     return subject, text, html
 
 
@@ -1911,28 +1912,29 @@ def email_class(class_id: int):
     200 {sent: true} | 404 not yours | 400 no email on the account | 429 rate limited | 503 mail not
     configured | 502 the mail provider refused."""
     if not _auth.mail_configured():
-        return jsonify({"error": "email isn't set up on this server — copy the code or use the share link"}), 503
+        return jsonify(i18n.error_body("server.email.not_configured")), 503
     user = current_user()
     with session_scope() as s:
         cls = _owned(s, user["id"], class_id)
         if cls is None:
-            return jsonify({"error": "not found"}), 404
+            return jsonify(i18n.error_body("server.not_found")), 404
         row = s.query(User).filter_by(id=user["id"]).one_or_none()
         to = ((row.email if row is not None else "") or "").strip()
         if not to:
-            return jsonify({"error": "this account has no email address — sign in with Google, GitHub or "
-                                     "email to use this, or copy the code instead"}), 400
+            return jsonify(i18n.error_body("server.email.no_address")), 400
         if not cls.slug:
             cls.slug = new_slug()  # every class has one since the backfill; belt and braces
         name, code, url = cls.name, cls.code, f"{PUBLIC_BASE_URL}/deck/{cls.slug}"
     if not _auth.class_mail_limiter.check(f"user:{user['id']}", _client_ip()):
-        return jsonify({"error": "that's a lot of emails — try again in an hour, or copy the code"}), 429
-    subject, text, html = _class_mail(name, url, code)
+        return jsonify(i18n.error_body("server.email.rate_limited")), 429
+    mail_body = request.get_json(silent=True)
+    lang = i18n.normalize_lang(mail_body.get("lang") if isinstance(mail_body, dict) else None)  # app.js sends it
+    subject, text, html = _class_mail(name, url, code, lang)
     try:
         _auth._send_mail(to, subject, html, text)
     except Exception:
         app.logger.exception("class email to user %s failed", user["id"])
-        return jsonify({"error": "the email didn't go out — try again later, or copy the code"}), 502
+        return jsonify(i18n.error_body("server.email.send_failed")), 502
     return jsonify({"sent": True, "to": to})
 
 
@@ -1945,11 +1947,11 @@ def email_class(class_id: int):
 def deck_resolve(slug: str):
     slug = (slug or "").strip()
     if not slug or len(slug) > 32:
-        return jsonify({"error": "not found"}), 404
+        return jsonify(i18n.error_body("server.not_found")), 404
     with session_scope() as s:
         cls = s.query(ForgedClass).filter_by(slug=slug).one_or_none()
         if cls is None:
-            return jsonify({"error": "not found"}), 404
+            return jsonify(i18n.error_body("server.not_found")), 404
         detail = cls.detail()
         detail.pop("id", None)  # public shape: never leak the internal enumerable id
         detail.update(_art_fields(cls, f"/api/deck/{slug}", detail.get("cards")))
@@ -2078,9 +2080,9 @@ def nominate_class(class_id: int):
     with session_scope() as s:
         cls = _owned(s, user["id"], class_id)
         if cls is None:
-            return jsonify({"error": "not found"}), 404
+            return jsonify(i18n.error_body("server.not_found")), 404
         if cls.featured_at is not None:
-            return jsonify({"error": "already in The Archive"}), 409
+            return jsonify(i18n.error_body("server.archive.already_featured")), 409
         if request.method == "POST":
             raw = body.get("note") if isinstance(body, dict) else None
             note = (raw.strip() if isinstance(raw, str) else "")[:NOMINATION_NOTE_MAX]
@@ -2107,7 +2109,7 @@ def deck_art_thumb(slug: str, kind: str):
     """Public splash/sprite thumbnail for the /deck/<slug> page — the same slug-only reach as /api/deck."""
     row = _deck_class(slug)
     if row is None:
-        return jsonify({"error": "not found"}), 404
+        return jsonify(i18n.error_body("server.not_found")), 404
     class_id, splash_hash, sprite_hash, _ = row
     digest = splash_hash if kind == "splash" else sprite_hash if kind == "sprite" else None
     return _art_thumb_response(class_id, kind, digest)
@@ -2118,7 +2120,7 @@ def deck_card_thumb(slug: str, stem: str):
     """Public portrait thumbnail for one card of a shared class."""
     row = _deck_class(slug)
     if row is None:
-        return jsonify({"error": "not found"}), 404
+        return jsonify(i18n.error_body("server.not_found")), 404
     class_id, _, _, card_art_hash = row
     return _card_thumb_response(class_id, stem, card_art_hash)
 
@@ -2160,28 +2162,28 @@ def card_feedback_route():
     try:
         class_id = int(body.get("class_id"))
     except (TypeError, ValueError):
-        return jsonify({"error": "class_id is required"}), 400
+        return jsonify(i18n.error_body("server.feedback.class_required")), 400
 
     if category not in VALID_FEEDBACK_CATEGORIES:
-        return jsonify({"error": "unknown feedback category"}), 400
+        return jsonify(i18n.error_body("server.feedback.unknown_category")), 400
     if not card_id:
-        return jsonify({"error": "card_id is required"}), 400
+        return jsonify(i18n.error_body("server.feedback.card_required")), 400
     if not _feedback_allowed(user["id"]):
-        return jsonify({"error": "too much feedback too fast — try again in a while."}), 429
+        return jsonify(i18n.error_body("server.feedback.too_fast")), 429
 
     with session_scope() as s:
         cls = _owned(s, user["id"], class_id)
         if cls is None:
-            return jsonify({"error": "not found"}), 404
+            return jsonify(i18n.error_body("server.not_found")), 404
         bundle = json.loads(cls.bundle_json)
         card = next((c for c in bundle.get("cards", []) if c.get("id") == card_id), None)
     if card is None:
-        return jsonify({"error": "card not found in class"}), 404
+        return jsonify(i18n.error_body("server.feedback.card_missing")), 404
 
     character = card.get("character") or (bundle.get("character") or {}).get("id", "")
     ok = append_card_feedback(category=category, card=card, character=character, note=note)
     if not ok:
-        return jsonify({"error": "could not record feedback"}), 503
+        return jsonify(i18n.error_body("server.feedback.not_recorded")), 503
     return jsonify({"ok": True})
 
 
@@ -2217,29 +2219,29 @@ def element_feedback_route():
     try:
         class_id = int(body.get("class_id"))
     except (TypeError, ValueError):
-        return jsonify({"error": "class_id is required"}), 400
+        return jsonify(i18n.error_body("server.feedback.class_required")), 400
 
     if category not in VALID_FEEDBACK_CATEGORIES:
-        return jsonify({"error": "unknown feedback category"}), 400
+        return jsonify(i18n.error_body("server.feedback.unknown_category")), 400
     if kind not in ELEMENT_KINDS:
-        return jsonify({"error": "unknown element kind"}), 400
+        return jsonify(i18n.error_body("server.feedback.unknown_kind")), 400
     if not _feedback_allowed(user["id"]):
-        return jsonify({"error": "too much feedback too fast — try again in a while."}), 429
+        return jsonify(i18n.error_body("server.feedback.too_fast")), 429
 
     with session_scope() as s:
         cls = _owned(s, user["id"], class_id)
         if cls is None:
-            return jsonify({"error": "not found"}), 404
+            return jsonify(i18n.error_body("server.not_found")), 404
         bundle = json.loads(cls.bundle_json)
         element = _find_element(bundle, kind, element_id)
     if element is None:
-        return jsonify({"error": "element not found in class"}), 404
+        return jsonify(i18n.error_body("server.feedback.element_missing")), 404
 
     character = (bundle.get("character") or {}).get("id", "")
     ok = append_element_feedback(category=category, element_kind=kind, element=element,
                                  character=character, note=note)
     if not ok:
-        return jsonify({"error": "could not record feedback"}), 503
+        return jsonify(i18n.error_body("server.feedback.not_recorded")), 503
     return jsonify({"ok": True})
 
 

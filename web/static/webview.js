@@ -39,11 +39,16 @@ window.BTS_WEBVIEW = (() => {
     android: ANDROID_WEBVIEW,
     any,
     app,                                                          // "YouTube", "Instagram", ... or ""
-    where: app ? "the " + app + " app's browser" : "an in-app browser",  // "You're in <where>"
+    // "You're in <where>". Getters, not values: the strings come from i18n.js, which its callers
+    // (signin.js, landing.js) await before they read them.
+    get where() {
+      return app ? BTS_I18N.t("signin.webview.where_app", { app }) : BTS_I18N.t("signin.webview.where_generic");
+    },
     browser: IOS_WEBVIEW ? "Safari" : "Chrome",
     openUrl,
     // The manual route, for when the scheme does nothing: both apps keep "open in browser" in a menu.
-    menuHint: IOS_WEBVIEW ? "or tap the ··· menu at the top right and choose Open in Safari"
-      : "or tap the ⋮ menu at the top right and choose Open in Chrome (or Open in browser)",
+    get menuHint() {
+      return BTS_I18N.t(IOS_WEBVIEW ? "signin.webview.menu_ios" : "signin.webview.menu_android");
+    },
   };
 })();

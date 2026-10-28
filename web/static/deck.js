@@ -16,7 +16,7 @@
     const card = document.createElement("section");
     card.className = "card";
     const h = document.createElement("h1");
-    h.textContent = "This class link is no longer valid";
+    h.textContent = BTS_I18N.t("deck.dead.title");
     const p = document.createElement("p");
     p.className = "muted";
     p.textContent = msg;
@@ -24,11 +24,11 @@
     const forge = document.createElement("a");
     forge.className = "btn primary";
     forge.href = "/app";
-    forge.textContent = "Forge your own";
+    forge.textContent = BTS_I18N.t("deck.dead.forge");
     const mod = document.createElement("a");
     mod.className = "btn";
     mod.href = "/download";
-    mod.textContent = "Get the mod";
+    mod.textContent = BTS_I18N.t("deck.dead.get_mod");
     nav.append(forge, document.createTextNode(" "), mod);
     card.append(h, p, nav);
     root.appendChild(card);
@@ -54,7 +54,7 @@
       });
     }
     const name = cls.character?.name || cls.name;
-    if (name) { document.title = name + " — BLANK the spire"; }
+    if (name) { document.title = BTS_I18N.t("common.title_suffix", { page: name }); }
     if (cls.featured === true) { markFeatured(); }
     const sendPc = document.getElementById("send-pc");
     if (sendPc && window.sendToPc) {
@@ -69,10 +69,10 @@
   function markFeatured() {
     const lede = document.getElementById("lede");
     if (lede) {
-      lede.textContent = "A class from The Archive, free to play. Copy the code, paste it in-game — or make your own.";
+      lede.innerHTML = BTS_I18N.html("deck.lede_featured");
     }
     const sub = document.querySelector("header .sub");
-    if (sub) { sub.textContent = "from The Archive"; }
+    if (sub) { sub.textContent = BTS_I18N.t("deck.header.sub_featured"); }
   }
 
   // "Forge your own twist": hand the concept to the app via localStorage (app.js boot() reads bts_prefill
@@ -87,12 +87,14 @@
     location.href = "/login";
   }
 
-  fetch(api, { headers: { "Accept": "application/json" } })
-    .then((r) => {
+  // Every string (render.js included) comes from i18n.js, so the page renders once its json is in.
+  Promise.all([
+    fetch(api, { headers: { "Accept": "application/json" } }).then((r) => {
       if (!r.ok) { throw new Error("gone"); }
       return r.json();
-    })
-    .then(show)
-    .catch(() => dead("It may have been deleted, or the link was mistyped. "
-      + "Ask whoever shared it for a fresh link — or forge your own class."));
+    }),
+    BTS_I18N.ready,
+  ])
+    .then(([cls]) => show(cls))
+    .catch(() => BTS_I18N.ready.then(() => dead(BTS_I18N.t("deck.dead.body"))));
 })();

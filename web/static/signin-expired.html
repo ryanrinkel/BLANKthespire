@@ -3,37 +3,38 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Link expired — BLANK the spire</title>
+  <title data-i18n-page="signin.expired.title">Link expired — Blank the Spire</title>
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png" />
   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="/static/style.css?v=20261028a" />
 </head>
 <body>
   <header>
-    <div class="brand">⚒ <strong>BLANK the spire</strong> <span class="sub">sign in</span></div>
-    <nav><a class="tab" href="/">← Back home</a></nav>
+    <div class="brand">⚒ <strong>Blank the Spire</strong> <span class="sub" data-i18n="signin.header.sub">sign in</span></div>
+    <nav><a class="tab" href="/" data-i18n="common.nav.back_home">← Back home</a></nav>
   </header>
 
   <main>
     <section class="card">
-      <h1>This link is no longer valid</h1>
-      <p class="muted">This sign-in link has expired or was already used. Request a new one — they last
+      <h1 data-i18n="signin.expired.heading">This link is no longer valid</h1>
+      <p class="muted" data-i18n="signin.expired.body">This sign-in link has expired or was already used. Request a new one — they last
         15 minutes and work once.</p>
 
       <p>
-        <a class="btn primary" href="/login">Get a new sign-in link</a>
+        <a class="btn primary" href="/login" data-i18n="signin.expired.button">Get a new sign-in link</a>
       </p>
       <p>
-        <a class="btn ghost" href="/">Back to the splash</a>
+        <a class="btn ghost" href="/" data-i18n="signin.back_splash">Back to the splash</a>
       </p>
     </section>
   </main>
 
   <footer class="foot">
-    <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> ·
-    <a href="mailto:ryan.r.rinkel@gmail.com">Support</a>
-    <p class="foot-note">Unofficial fan project — not affiliated with or endorsed by Mega Crit.</p>
+    <a href="/terms" data-i18n="common.footer.terms">Terms</a> · <a href="/privacy" data-i18n="common.footer.privacy">Privacy</a> ·
+    <a href="mailto:ryan.r.rinkel@gmail.com" data-i18n="common.footer.support">Support</a>
+    <p class="foot-note" data-i18n="common.footer.disclaimer">Unofficial fan project — not affiliated with or endorsed by Mega Crit.</p>
   </footer>
+  <script src="/static/i18n.js?v=20261028a"></script>
 </body>
 </html>

@@ -13,6 +13,8 @@ const LABELS = { google: "Google", discord: "Discord", github: "GitHub" };
 const LINKING = new URLSearchParams(location.search).get("link") === "1";
 
 const el = (id) => document.getElementById(id);
+// UI strings come from i18n.js (loaded first); the page init below awaits BTS_I18N.ready before using them.
+const t = (key, vars) => BTS_I18N.t(key, vars);
 
 // The "try a featured class" escape hatch is for visitors without an account; linking is for members.
 if (LINKING) el("try-instead").classList.add("hidden");
@@ -26,11 +28,11 @@ const WV = window.BTS_WEBVIEW || { any: false };
 const WEBVIEW_BLOCKED = new Set(["google"]);
 
 function webviewLayout(emailLogin) {
-  el("webview-head").textContent = "You're in " + WV.where + " — Google can't sign you in here.";
+  el("webview-head").textContent = t("signin.webview.head", { where: WV.where });
   if (WV.openUrl) {
     const open = el("open-browser");
     open.href = WV.openUrl;
-    open.textContent = "Open in " + WV.browser;
+    open.textContent = t("signin.open_browser", { browser: WV.browser });
     open.classList.remove("hidden");
     el("webview-menu").textContent = WV.menuHint + ".";
     el("webview-menu").classList.remove("hidden");
@@ -42,8 +44,7 @@ function webviewLayout(emailLogin) {
     const box = el("providers");
     box.before(el("email-form"));
     box.before(el("or"));
-    el("email-form").querySelector("label").textContent =
-      "Enter your email and we'll send a link; it opens in " + WV.browser + " and you're in.";
+    el("email-form").querySelector("label").textContent = t("signin.webview.email_label", { browser: WV.browser });
     el("email-form").classList.add("signin-email-first");
     el("email-form").querySelector("button").classList.add("primary");  // the way in here: make it the loud one
   }
@@ -61,21 +62,21 @@ function wireEmailForm() {
     if (!email) return;
     el("email-error").classList.add("hidden");
     button.disabled = true;
-    button.textContent = "Sending…";
+    button.textContent = t("signin.email.sending");
 
     let data = null;
     try {
       const r = await fetch("/api/auth/email/start", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Requested-With": "fetch" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, lang: BTS_I18N.lang }),  // the magic-link email's language
       });
       data = await r.json();
     } catch (_) { /* offline: fall through to the error hint */ }
 
     if (!data || !data.ok) {
       button.disabled = false;
-      button.textContent = "Email me a link";
+      button.textContent = t("signin.email.button");
       el("email-error").classList.remove("hidden");
       return;
     }
@@ -83,7 +84,7 @@ function wireEmailForm() {
     const sent = document.createElement("div");
     sent.className = "signin-sent";
     const p = document.createElement("p");
-    p.textContent = "Check your inbox — the link expires in 15 minutes.";
+    p.textContent = t("signin.email.sent");
     sent.appendChild(p);
     if (data.link) {  // dev auth with no mail provider: the link comes back instead of being sent
       const a = document.createElement("a");
@@ -99,8 +100,9 @@ function wireEmailForm() {
 (async () => {
   let me = null;
   try {
-    me = await (await fetch("/api/me")).json();
+    [me] = await Promise.all([fetch("/api/me").then((r) => r.json()), BTS_I18N.ready]);
   } catch (_) { /* offline or the API is down — fall through to the "not configured" copy */ }
+  await BTS_I18N.ready;
 
   // A sign-up event (signup-event.js): park a welcome notice this read may have consumed before bouncing to
   // the app, and show the event ribbon under the lede to a signed-out visitor only.
@@ -114,9 +116,8 @@ function wireEmailForm() {
 
   const owned = new Set(((me && me.user && me.user.identities) || []).map((i) => i.provider));
   if (me && me.user) {
-    el("title").textContent = "Link another sign-in";
-    el("lede").textContent = "You're signed in as " + (me.user.name || me.user.email || "this account")
-      + ". Linking lets you sign in with any of these later.";
+    el("title").textContent = t("signin.link.title");
+    el("lede").textContent = t("signin.link.lede", { who: me.user.name || me.user.email || t("signin.link.who_fallback") });
     el("back-app").classList.remove("hidden");
   }
 
@@ -131,7 +132,7 @@ function wireEmailForm() {
     // In a webview the email button is the primary one; the provider buttons step back to plain.
     a.className = WV.any && me && me.email_login ? "btn" : "btn primary";
     a.href = "/login/" + p;
-    a.textContent = (LINKING ? "Link " : "Continue with ") + (LABELS[p] || p);
+    a.textContent = t(LINKING ? "signin.provider.link" : "signin.provider.continue", { provider: LABELS[p] || p });
     box.appendChild(a);
   }
 
@@ -146,7 +147,7 @@ function wireEmailForm() {
     el("none").classList.remove("hidden");
   }
   if (LINKING && !providers.length && !(me && me.email_login)) {
-    el("none").textContent = "Every sign-in method this server offers is already linked to your account.";
+    el("none").textContent = t("signin.link.all_linked");
     el("none").classList.remove("hidden");
   }
 })();
