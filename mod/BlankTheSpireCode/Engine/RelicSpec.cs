@@ -26,7 +26,12 @@ public sealed record RelicSpec(
     string Description,
     string Tier,                 // "starter" (v1: forged relics are always the class's starter relic)
     RelicHook[] Hooks,
-    RelicModifier[] Modifiers);
+    RelicModifier[] Modifiers)
+{
+    /// <summary>i18n (I18N_PLAN C2): the bundle's optional <c>loc</c> strings for this entry, keyed by the GAME's locale
+    /// code ("zhs", ...). Null/absent = English only. A missing field falls back to the English one.</summary>
+    public IReadOnlyDictionary<string, LocText>? Loc { get; init; }
+}
 
 /// <summary>One triggered relic behaviour: when <see cref="Trigger"/> fires (and <see cref="When"/> holds), run
 /// <see cref="Effects"/> on the resolved <see cref="Target"/>. <see cref="OncePerCombat"/> gates one-shot hooks

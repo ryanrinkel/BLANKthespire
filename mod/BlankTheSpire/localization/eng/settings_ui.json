@@ -1,4 +1,11 @@
 {
+  "BLANKTHESPIRE-IMPORT_SECTION.title": "Import a class code",
+  "BLANKTHESPIRE-APPLY_SECTION.title": "Apply changes",
+  "BLANKTHESPIRE-IMPORT_BUTTON.title": "Import",
+  "BLANKTHESPIRE-CLEAR_SLOT_BUTTON.title": "Clear slot",
+  "BLANKTHESPIRE-CLEAR_ALL_BUTTON.title": "Clear ALL",
+  "BLANKTHESPIRE-RESTART_BUTTON.title": "Restart game",
+
   "BLANKTHESPIRE-IMPORT_CLASS_CODE.title": "Class code",
   "BLANKTHESPIRE-IMPORT_CLASS_SLOT.title": "Class slot (0 = auto)",
 

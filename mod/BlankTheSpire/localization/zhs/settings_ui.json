@@ -1,0 +1,18 @@
+{
+  "BLANKTHESPIRE-IMPORT_SECTION.title": "导入角色码",
+  "BLANKTHESPIRE-APPLY_SECTION.title": "应用更改",
+  "BLANKTHESPIRE-IMPORT_BUTTON.title": "导入",
+  "BLANKTHESPIRE-CLEAR_SLOT_BUTTON.title": "清除栏位",
+  "BLANKTHESPIRE-CLEAR_ALL_BUTTON.title": "全部清除",
+  "BLANKTHESPIRE-RESTART_BUTTON.title": "重启游戏",
+  "BLANKTHESPIRE-IMPORT_CLASS_CODE.title": "角色码",
+  "BLANKTHESPIRE-IMPORT_CLASS_SLOT.title": "角色栏位（0 = 自动）",
+  "BLANKTHESPIRE-IMPORT_CLASS.title": "将角色导入栏位",
+  "BLANKTHESPIRE-IMPORT_CLASS.hover.desc": "将来自blankthespire.com的角色码（BTSC）粘贴到“角色码”栏中，然后按“导入”。栏位0会自动选择：更新同名角色，或占用编号最小的空栏位。",
+  "BLANKTHESPIRE-CLEAR_CLASS.title": "清除一个角色栏位",
+  "BLANKTHESPIRE-CLEAR_CLASS.hover.desc": "移除所选栏位中的锻造角色。请先将上方的“角色栏位”设为1或更大。",
+  "BLANKTHESPIRE-CLEAR_ALL_CLASSES.title": "删除所有锻造角色",
+  "BLANKTHESPIRE-CLEAR_ALL_CLASSES.hover.desc": "一次性移除所有已导入的角色。此操作无法撤销。",
+  "BLANKTHESPIRE-RESTART_GAME.title": "重启游戏（应用更改）",
+  "BLANKTHESPIRE-RESTART_GAME.hover.desc": "关闭游戏并通过Steam自动重新打开。导入或清除的角色只有在重启后才会生效。"
+}

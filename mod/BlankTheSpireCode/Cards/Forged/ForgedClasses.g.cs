@@ -572,16 +572,9 @@ public sealed class ForgedCharacterSlot01 : PlaceholderCharacterModel, IForgedCh
     public override bool HideFromVanillaCharacterSelect => Spec.IsEmpty;
 
     // In-code localization (no .pck rebuild). Pronouns/banter are sensible defaults; the forge only supplies
-    // name + description. Order matches CharacterLoc(Title, TitleObject, Description, PronounObject,
-    // PronounSubject, PronounPossessive, PossessiveAdjective, AromaPrinciple, EndTurnPingAlive,
-    // EndTurnPingDead, EventDeathPrevention, GoldMonologue, CardsModifierTitle, CardsModifierDescription).
-    public override List<(string, string)>? Localization => Spec.IsEmpty ? null
-        : (List<(string, string)>)new CharacterLoc(
-            Spec.Name, Spec.Name, Spec.Description,
-            "them", "they", "theirs", "their",
-            "Forged from the effect vocabulary.",
-            "Your move.", "...", "Not yet. There is more to compose.", "It all adds up.",
-            "Forged", "Composed from the effect vocabulary.");
+    // name + description (+ an optional per-locale `loc` block). The game-language switch and the CharacterLoc
+    // field order live in ForgedText.CharacterLoc (i18n, I18N_PLAN C2).
+    public override List<(string, string)>? Localization => Spec.IsEmpty ? null : ForgedText.CharacterLoc(Spec);
 }
 
 public sealed class ForgedClassPool02 : CustomCardPoolModel
@@ -1129,16 +1122,9 @@ public sealed class ForgedCharacterSlot02 : PlaceholderCharacterModel, IForgedCh
     public override bool HideFromVanillaCharacterSelect => Spec.IsEmpty;
 
     // In-code localization (no .pck rebuild). Pronouns/banter are sensible defaults; the forge only supplies
-    // name + description. Order matches CharacterLoc(Title, TitleObject, Description, PronounObject,
-    // PronounSubject, PronounPossessive, PossessiveAdjective, AromaPrinciple, EndTurnPingAlive,
-    // EndTurnPingDead, EventDeathPrevention, GoldMonologue, CardsModifierTitle, CardsModifierDescription).
-    public override List<(string, string)>? Localization => Spec.IsEmpty ? null
-        : (List<(string, string)>)new CharacterLoc(
-            Spec.Name, Spec.Name, Spec.Description,
-            "them", "they", "theirs", "their",
-            "Forged from the effect vocabulary.",
-            "Your move.", "...", "Not yet. There is more to compose.", "It all adds up.",
-            "Forged", "Composed from the effect vocabulary.");
+    // name + description (+ an optional per-locale `loc` block). The game-language switch and the CharacterLoc
+    // field order live in ForgedText.CharacterLoc (i18n, I18N_PLAN C2).
+    public override List<(string, string)>? Localization => Spec.IsEmpty ? null : ForgedText.CharacterLoc(Spec);
 }
 
 public sealed class ForgedClassPool03 : CustomCardPoolModel
@@ -1686,16 +1672,9 @@ public sealed class ForgedCharacterSlot03 : PlaceholderCharacterModel, IForgedCh
     public override bool HideFromVanillaCharacterSelect => Spec.IsEmpty;
 
     // In-code localization (no .pck rebuild). Pronouns/banter are sensible defaults; the forge only supplies
-    // name + description. Order matches CharacterLoc(Title, TitleObject, Description, PronounObject,
-    // PronounSubject, PronounPossessive, PossessiveAdjective, AromaPrinciple, EndTurnPingAlive,
-    // EndTurnPingDead, EventDeathPrevention, GoldMonologue, CardsModifierTitle, CardsModifierDescription).
-    public override List<(string, string)>? Localization => Spec.IsEmpty ? null
-        : (List<(string, string)>)new CharacterLoc(
-            Spec.Name, Spec.Name, Spec.Description,
-            "them", "they", "theirs", "their",
-            "Forged from the effect vocabulary.",
-            "Your move.", "...", "Not yet. There is more to compose.", "It all adds up.",
-            "Forged", "Composed from the effect vocabulary.");
+    // name + description (+ an optional per-locale `loc` block). The game-language switch and the CharacterLoc
+    // field order live in ForgedText.CharacterLoc (i18n, I18N_PLAN C2).
+    public override List<(string, string)>? Localization => Spec.IsEmpty ? null : ForgedText.CharacterLoc(Spec);
 }
 
 public sealed class ForgedClassPool04 : CustomCardPoolModel
@@ -2243,15 +2222,8 @@ public sealed class ForgedCharacterSlot04 : PlaceholderCharacterModel, IForgedCh
     public override bool HideFromVanillaCharacterSelect => Spec.IsEmpty;
 
     // In-code localization (no .pck rebuild). Pronouns/banter are sensible defaults; the forge only supplies
-    // name + description. Order matches CharacterLoc(Title, TitleObject, Description, PronounObject,
-    // PronounSubject, PronounPossessive, PossessiveAdjective, AromaPrinciple, EndTurnPingAlive,
-    // EndTurnPingDead, EventDeathPrevention, GoldMonologue, CardsModifierTitle, CardsModifierDescription).
-    public override List<(string, string)>? Localization => Spec.IsEmpty ? null
-        : (List<(string, string)>)new CharacterLoc(
-            Spec.Name, Spec.Name, Spec.Description,
-            "them", "they", "theirs", "their",
-            "Forged from the effect vocabulary.",
-            "Your move.", "...", "Not yet. There is more to compose.", "It all adds up.",
-            "Forged", "Composed from the effect vocabulary.");
+    // name + description (+ an optional per-locale `loc` block). The game-language switch and the CharacterLoc
+    // field order live in ForgedText.CharacterLoc (i18n, I18N_PLAN C2).
+    public override List<(string, string)>? Localization => Spec.IsEmpty ? null : ForgedText.CharacterLoc(Spec);
 }
 

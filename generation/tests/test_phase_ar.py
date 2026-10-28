@@ -241,7 +241,11 @@ def _t_csharp_mirror() -> None:
           "OrbRunner.RunEffect gates on Conditions.Evaluate (player-state overload, no target)")
     check('"[AR] orb' in run, "OrbRunner logs the [AR] tag (gate + turn-start tick)")
     check("spec.PassiveAtTurnStart" in run and "Passive (turn start):" in run, "Describe names a turn_start passive")
-    check("Conditions.Phrase(oe.When)" in run and '"unless " : "if "' in run, "the tooltip fragment carries the if/unless clause")
+    # i18n (I18N_PLAN C1): the clause words moved into the shared ForgedText weave (English inline, byte-identical).
+    fcw = (MOD_CODE / "Engine" / "ForgedCards.cs").read_text(encoding="utf-8")
+    check("ForgedCards.Weave(core, oe.When.Negate, Conditions.Phrase(oe.When))" in run
+          and '"weave.unless", "{s} unless {cond}"' in fcw and '"weave.if", "{s} if {cond}"' in fcw,
+          "the tooltip fragment carries the if/unless clause")
     orb = (MOD_CODE / "Powers" / "ForgedOrb.cs").read_text(encoding="utf-8")
     check("public override Task AfterTurnStartOrbTrigger(PlayerChoiceContext ctx)" in orb,
           "ForgedOrb overrides AfterTurnStartOrbTrigger (the game's Plasma hook)")

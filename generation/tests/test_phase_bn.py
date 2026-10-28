@@ -214,7 +214,7 @@ def _t_engine() -> None:
           "ForgedTriggerPower: an autoplay turn_start payload fires from AfterAutoPrePlayPhaseEntered (not AfterPlayerTurnStart)")
     co = _cs("Engine", "Conditions.cs")
     check("target_killed" in _set(co, "public static readonly HashSet<string> Kinds")
-          and _set(co, "PlayLocalKinds") == {"target_killed"} and '"target_killed"             => "this kills the enemy",' in co,
+          and _set(co, "PlayLocalKinds") == {"target_killed"} and '"target_killed"             => ForgedText.T("cond.target_killed", "this kills the enemy"),' in co,  # i18n
           "Conditions: Kinds + PlayLocalKinds + the phrase")
     ch = _cs("Engine", "ForgedCharacters.cs")
     check(".. Conditions.PlayLocalKinds]" in ch, "orb gates reject target_killed (OrbForbiddenConditionKinds)")
@@ -260,19 +260,21 @@ CASES = [([{"op": "damage", "amount": 10}, {"op": "gain_max_hp", "amount": 3, "w
           "At the start of your turn, add a random Power to your hand."),
          (_trig("turn_start", [{"op": "autoplay", "from": "draw_top"}]), "self",
           "At the start of your turn, play the top card of your draw pile and Exhaust it.")]
-C_FRAGMENTS = ('string phrase = e.When.Kind == "target_killed" && target != TargetType.AnyEnemy\n                    ? "this kills an enemy" : Conditions.Phrase(e.When);',
+# i18n (I18N_PLAN C1): the sentences are ForgedText templates (English inline); the verb case rides a {verb}
+# placeholder and the AoE kill phrase moved into CardConditionPhrase (the same ternary, keyed).
+C_FRAGMENTS = ('when.Kind == "target_killed" && target != TargetType.AnyEnemy\n            ? Tx("cond.target_killed_any", "this kills an enemy") : Conditions.Phrase(when);',
                'case "add_random_card":  parts.Add(AddRandomCardSentence(e, capitalize: true)); break;',
                'case "autoplay":         parts.Add(AutoplaySentence(e, capitalize: true)); break;',
                '"add_random_card" => AddRandomCardSentence(e, capitalize: false),',
                '"autoplay"      => AutoplaySentence(e, capitalize: false),',
-               'string body = choose ? $"{(capitalize ? "Choose" : "choose")} 1 of {e.ChooseOf} random {RandomCardNoun(e.CardKind, true)} to add to your {pile}"',
-               ': n > 1 ? $"{(capitalize ? "Add" : "add")} {n} random {RandomCardNoun(e.CardKind, true)} to your {pile}"',
-               ': $"{(capitalize ? "Add" : "add")} a random {RandomCardNoun(e.CardKind, false)} to your {pile}";',
-               'if (e.FreeThisTurn) body += !choose && n > 1 ? ". They cost 0 this turn" : ". It costs 0 this turn";',
-               '? (n > 1 ? $"{verb} {n} random {RandomCardNoun(e.CardKind, true)} from your draw pile"',
-               ': $"{verb} a random {RandomCardNoun(e.CardKind, false)} from your draw pile")',
-               ': (n > 1 ? $"{verb} the top {n} cards of your draw pile and Exhaust them"',
-               ': $"{verb} the top card of your draw pile and Exhaust it");',
+               'string body = choose ? Fx(pre + ".add_random.choose", "{verb} 1 of {k} random {nouns} to add to your {pile}", ("verb", capitalize ? "Choose" : "choose"), ("k", e.ChooseOf), ("nouns", RandomCardNoun(e.CardKind, true)), ("pile", pile))',
+               ': n > 1 ? Fx(pre + ".add_random.n", "{verb} {n} random {nouns} to your {pile}", ("verb", capitalize ? "Add" : "add"), ("n", n), ("nouns", RandomCardNoun(e.CardKind, true)), ("pile", pile))',
+               ': Fx(pre + ".add_random.1", "{verb} a random {noun} to your {pile}", ("verb", capitalize ? "Add" : "add"), ("noun", RandomCardNoun(e.CardKind, false)), ("pile", pile));',
+               'if (e.FreeThisTurn) body += !choose && n > 1 ? Tx("frag.free.they", ". They cost 0 this turn") : Tx("frag.free.it", ". It costs 0 this turn");',
+               '? (n > 1 ? Fx(pre + ".autoplay.random_n", "{verb} {n} random {nouns} from your draw pile", ("verb", verb), ("n", n), ("nouns", RandomCardNoun(e.CardKind, true)))',
+               ': Fx(pre + ".autoplay.random_1", "{verb} a random {noun} from your draw pile", ("verb", verb), ("noun", RandomCardNoun(e.CardKind, false))))',
+               ': (n > 1 ? Fx(pre + ".autoplay.top_n", "{verb} the top {n} cards of your draw pile and Exhaust them", ("verb", verb), ("n", n))',
+               ': Fx(pre + ".autoplay.top_1", "{verb} the top card of your draw pile and Exhaust it", ("verb", verb)));',
                '"non_attack" => plural ? "non-Attack cards" : "non-Attack card",')
 
 

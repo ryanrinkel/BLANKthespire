@@ -148,9 +148,9 @@ public sealed class ForgedForgePower : BlankTheSpirePower
     // it has to be true for both regimes. Phase AY (v54): most classes still reset each combat; one that keeps its
     // edge carries up to PersistCap.
     public override List<(string, string)>? Localization =>
-        (List<(string, string)>)new PowerLoc("Forge",
-            "Your first Forge each combat summons your signature blade to your hand. Effects that add your Forge deal or block that much more. Forge resets each combat — unless your class keeps its edge, carrying up to 5 into the next fight.",
-            "Your first Forge each combat summons your signature blade to your hand. Effects that add your Forge deal or block that much more. Forge resets each combat — unless your class keeps its edge, carrying up to 5 into the next fight.");
+        (List<(string, string)>)new PowerLoc(ForgedText.T("power.forge.title", "Forge"),
+            ForgedText.T("power.forge.desc", "Your first Forge each combat summons your signature blade to your hand. Effects that add your Forge deal or block that much more. Forge resets each combat — unless your class keeps its edge, carrying up to 5 into the next fight."),
+            ForgedText.T("power.forge.desc", "Your first Forge each combat summons your signature blade to your hand. Effects that add your Forge deal or block that much more. Forge resets each combat — unless your class keeps its edge, carrying up to 5 into the next fight."));
 
     // Emoji icon via the runtime renderer (kicked in MainFile); falls back to the shipped placeholder.
     public override string? CustomPackedIconPath => EmojiIconRenderer.IconPath("forge") ?? base.CustomPackedIconPath;

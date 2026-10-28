@@ -3442,240 +3442,244 @@ Where: mod/BlankTheSpire.json:5 (description in the game's mod list)
     A data-driven, LLM-extensible custom character for Slay the Spire 2.
 
 ### mod.section.import
-Where: mod/BlankTheSpireCode/ForgeConfig.cs:20 (ConfigSection header)
-Notes: hard-coded C# attribute text; the help page and site copy name it, keep them in sync.
+Where: mod/BlankTheSpire/localization/eng/settings_ui.json:2 (ConfigSection header)
+Notes: lives in the game's localization folder since v0.5.0 (localization/eng/settings_ui.json, Chinese in localization/zhs/settings_ui.json; ForgeConfig.cs:24 names the key); the help page and site copy name it, keep them in sync.
 
     Import a class code
 
 ### mod.section.apply
-Where: mod/BlankTheSpireCode/ForgeConfig.cs:90 (ConfigSection header)
+Where: mod/BlankTheSpire/localization/eng/settings_ui.json:3 (ConfigSection header)
 
     Apply changes
 
 ### mod.button.import
-Where: mod/BlankTheSpireCode/ForgeConfig.cs:30 (button)
+Where: mod/BlankTheSpire/localization/eng/settings_ui.json:4 (button)
 Notes: BaseLib buttons are a fixed 324px texture: keep button text very short.
 
     Import
 
 ### mod.button.clear_slot
-Where: mod/BlankTheSpireCode/ForgeConfig.cs:63 (button)
+Where: mod/BlankTheSpire/localization/eng/settings_ui.json:5 (button)
 
     Clear slot
 
 ### mod.button.clear_all
-Where: mod/BlankTheSpireCode/ForgeConfig.cs:78 (red button)
+Where: mod/BlankTheSpire/localization/eng/settings_ui.json:6 (red button)
 
     Clear ALL
 
 ### mod.button.restart
-Where: mod/BlankTheSpireCode/ForgeConfig.cs:91 (button)
+Where: mod/BlankTheSpire/localization/eng/settings_ui.json:7 (button)
 
     Restart game
 
 ### mod.settings.class_code
-Where: mod/BlankTheSpire/localization/eng/settings_ui.json:2 (row label of the code field)
-Notes: every mod.settings.* string lives in the game's own localization folder (localization/eng/settings_ui.json); a Chinese version would be a sibling localization/zhs/settings_ui.json, not zh.json.
+Where: mod/BlankTheSpire/localization/eng/settings_ui.json:9 (row label of the code field)
+Notes: every mod.settings.* / mod.section.* / mod.button.* string lives in the game's own localization folder (localization/eng/settings_ui.json); the Chinese is the sibling localization/zhs/settings_ui.json. The mod.dialog.* / mod.codec.* / mod.import.* strings are ForgedText defaults, Chinese in Engine/ForgedText.zhs.cs.
 
     Class code
 
 ### mod.settings.class_slot
-Where: mod/BlankTheSpire/localization/eng/settings_ui.json:3 (row label of the slot slider)
+Where: mod/BlankTheSpire/localization/eng/settings_ui.json:10 (row label of the slot slider)
 
     Class slot (0 = auto)
 
 ### mod.settings.import_title
-Where: mod/BlankTheSpire/localization/eng/settings_ui.json:5 (row label of the Import button)
+Where: mod/BlankTheSpire/localization/eng/settings_ui.json:12 (row label of the Import button)
 
     Import class into a slot
 
 ### mod.settings.import_tip
-Where: mod/BlankTheSpire/localization/eng/settings_ui.json:6 (hover tip)
+Where: mod/BlankTheSpire/localization/eng/settings_ui.json:13 (hover tip)
 
     Paste a class (BTSC) code from blankthespire.com into the "Class code" field, then press Import. Slot 0 picks automatically: it updates a same-named class, or takes the lowest empty slot.
 
 ### mod.settings.clear_title
-Where: mod/BlankTheSpire/localization/eng/settings_ui.json:8 (row label)
+Where: mod/BlankTheSpire/localization/eng/settings_ui.json:15 (row label)
 
     Clear one class slot
 
 ### mod.settings.clear_tip
-Where: mod/BlankTheSpire/localization/eng/settings_ui.json:9 (hover tip)
+Where: mod/BlankTheSpire/localization/eng/settings_ui.json:16 (hover tip)
 
     Removes the forged class in the selected slot. Set "Class slot" above to 1 or higher first.
 
 ### mod.settings.clear_all_title
-Where: mod/BlankTheSpire/localization/eng/settings_ui.json:11 (row label)
+Where: mod/BlankTheSpire/localization/eng/settings_ui.json:18 (row label)
 
     Delete ALL forged classes
 
 ### mod.settings.clear_all_tip
-Where: mod/BlankTheSpire/localization/eng/settings_ui.json:12 (hover tip)
+Where: mod/BlankTheSpire/localization/eng/settings_ui.json:19 (hover tip)
 
     Removes every imported class at once. This cannot be undone.
 
 ### mod.settings.restart_title
-Where: mod/BlankTheSpire/localization/eng/settings_ui.json:14 (row label); named on the help page (help.steps.step_5)
+Where: mod/BlankTheSpire/localization/eng/settings_ui.json:21 (row label); named on the help page (help.steps.step_5)
 
     Restart game (applies changes)
 
 ### mod.settings.restart_tip
-Where: mod/BlankTheSpire/localization/eng/settings_ui.json:15 (hover tip)
+Where: mod/BlankTheSpire/localization/eng/settings_ui.json:22 (hover tip)
 
     Closes the game and reopens it automatically via Steam. Imported or cleared classes only take effect after a restart.
 
 ### mod.dialog.import_title
-Where: mod/BlankTheSpireCode/ForgeConfig.cs:34 (dialog title)
+Where: mod/BlankTheSpireCode/ForgeConfig.cs:40 (dialog title)
 
     Import class
 
 ### mod.dialog.import_empty
-Where: mod/BlankTheSpireCode/ForgeConfig.cs:34 (dialog body)
+Where: mod/BlankTheSpireCode/ForgeConfig.cs:41 (dialog body)
 
     Paste a class code into the "Class code" field above first.
 
 ### mod.dialog.import_failed_title
-Where: mod/BlankTheSpireCode/ForgeConfig.cs:38 (dialog title)
+Where: mod/BlankTheSpireCode/ForgeConfig.cs:47 (dialog title)
 Notes: the body is one of the mod.codec.* messages.
 
     Import failed
 
 ### mod.dialog.wrong_type_title
-Where: mod/BlankTheSpireCode/ForgeConfig.cs:43 (dialog title)
+Where: mod/BlankTheSpireCode/ForgeConfig.cs:52 (dialog title)
 
     Wrong code type
 
 ### mod.dialog.wrong_type_body
-Where: mod/BlankTheSpireCode/ForgeConfig.cs:43 (dialog body)
+Where: mod/BlankTheSpireCode/ForgeConfig.cs:53 (dialog body)
 
     That code isn't a class code. Paste a class (BTSC) code from blankthespire.com.
 
 ### mod.dialog.rejected_title
-Where: mod/BlankTheSpireCode/ForgeConfig.cs:49 (dialog title)
+Where: mod/BlankTheSpireCode/ForgeConfig.cs:59 (dialog title)
 
     Import rejected
 
 ### mod.dialog.rejected_body
-Where: mod/BlankTheSpireCode/ForgeConfig.cs:49 (dialog body)
+Where: mod/BlankTheSpireCode/ForgeConfig.cs:60 (dialog body)
 Notes: {err} = one of the mod.import.* messages (or a card-validation message, see Notes on mod.import.slots_full).
 
     The code decoded, but the class isn't playable here:
     {err}
 
 ### mod.dialog.imported_title
-Where: mod/BlankTheSpireCode/ForgeConfig.cs:59 (dialog title)
+Where: mod/BlankTheSpireCode/ForgeConfig.cs:70 (dialog title)
 
     Class imported
 
 ### mod.dialog.imported_body
-Where: mod/BlankTheSpireCode/ForgeConfig.cs:60 (dialog body; the "restart" prompt)
-Notes: {classSlot:00} = the slot number, two digits. "Restart game" names mod.button.restart.
+Where: mod/BlankTheSpireCode/ForgeConfig.cs:71 (dialog body; the "restart" prompt)
+Notes: {slot} = the slot number, two digits. "Restart game" names mod.button.restart.
 
-    Imported into class slot {classSlot:00}.
+    Imported into class slot {slot}.
     
     Press "Restart game" below, then pick the class on the character-select screen.
 
 ### mod.dialog.clear_title
-Where: mod/BlankTheSpireCode/ForgeConfig.cs:69, 73 (dialog title)
+Where: mod/BlankTheSpireCode/ForgeConfig.cs:82, 88 (dialog title)
 
     Clear class
 
 ### mod.dialog.clear_need_slot
-Where: mod/BlankTheSpireCode/ForgeConfig.cs:69 (dialog body)
-Notes: {ForgedCharacters.ClassCount} = number of class slots.
+Where: mod/BlankTheSpireCode/ForgeConfig.cs:83 (dialog body)
+Notes: {max} = number of class slots.
 
-    Set "Class slot" above to the class slot to clear (1..{ForgedCharacters.ClassCount}), then click again.
+    Set "Class slot" above to the class slot to clear (1..{max}), then click again.
 
 ### mod.dialog.cleared
-Where: mod/BlankTheSpireCode/ForgeConfig.cs:74 (dialog body)
+Where: mod/BlankTheSpireCode/ForgeConfig.cs:89 (dialog body)
+Notes: {slot} = the slot number, two digits.
 
-    Cleared class slot {ImportClassSlot:00}.
+    Cleared class slot {slot}.
     Press "Restart game" to update the game.
 
 ### mod.dialog.already_empty
-Where: mod/BlankTheSpireCode/ForgeConfig.cs:75 (dialog body)
+Where: mod/BlankTheSpireCode/ForgeConfig.cs:90 (dialog body)
+Notes: {slot} = the slot number, two digits.
 
-    Class slot {ImportClassSlot:00} was already empty.
+    Class slot {slot} was already empty.
 
 ### mod.dialog.clear_all_title
-Where: mod/BlankTheSpireCode/ForgeConfig.cs:83 (dialog title)
+Where: mod/BlankTheSpireCode/ForgeConfig.cs:98 (dialog title)
 
     Clear all forged classes
 
 ### mod.dialog.clear_all_body
-Where: mod/BlankTheSpireCode/ForgeConfig.cs:84 (dialog body)
+Where: mod/BlankTheSpireCode/ForgeConfig.cs:99 (dialog body)
 Notes: {n} = classes removed; "class(es)" is the code's plural.
 
     Removed {n} forged class(es). Empty class slots stay hidden.
     Press "Restart game" to update the game.
 
 ### mod.dialog.restart_title
-Where: mod/BlankTheSpireCode/ForgeConfig.cs:96, 111 (dialog title)
+Where: mod/BlankTheSpireCode/ForgeConfig.cs:111, 127 (dialog title)
 
     Restart
 
 ### mod.dialog.restart_nothing
-Where: mod/BlankTheSpireCode/ForgeConfig.cs:96 (dialog body)
+Where: mod/BlankTheSpireCode/ForgeConfig.cs:112 (dialog body)
 
     Nothing imported yet this session.
     (Restarting will still apply any classes imported earlier.)
 
 ### mod.dialog.restart_failed
-Where: mod/BlankTheSpireCode/ForgeConfig.cs:111 (dialog body)
-Notes: {e.Message} = the system error.
+Where: mod/BlankTheSpireCode/ForgeConfig.cs:128 (dialog body)
+Notes: {err} = the system error.
 
     Couldn't auto-relaunch:
-    {e.Message}
+    {err}
     
     Please quit and start the game yourself to apply changes.
 
 ### mod.codec.empty
-Where: mod/BlankTheSpireCode/Engine/BTS1Codec.cs:51 (body of mod.dialog.import_failed_title)
+Where: mod/BlankTheSpireCode/Engine/BTS1Codec.cs:52 (body of mod.dialog.import_failed_title)
 Notes: the codec messages start lower case because they were written as log fragments; they are the only text a player sees for a bad code.
 
     empty code.
 
 ### mod.codec.not_bts
-Where: mod/BlankTheSpireCode/Engine/BTS1Codec.cs:58
+Where: mod/BlankTheSpireCode/Engine/BTS1Codec.cs:59
 
     not a Blank the Spire code.
 
 ### mod.codec.bad_magic
-Where: mod/BlankTheSpireCode/Engine/BTS1Codec.cs:61
+Where: mod/BlankTheSpireCode/Engine/BTS1Codec.cs:62
 
     not a Blank the Spire (BTS1/BTSC) code.
 
 ### mod.codec.bad_version
-Where: mod/BlankTheSpireCode/Engine/BTS1Codec.cs:64
+Where: mod/BlankTheSpireCode/Engine/BTS1Codec.cs:65
 
     malformed code (bad version field).
 
 ### mod.codec.needs_update
-Where: mod/BlankTheSpireCode/Engine/BTS1Codec.cs:67
-Notes: {ver} = the code's vocabulary version; {ForgedCards.VocabVersion} = the mod's.
+Where: mod/BlankTheSpireCode/Engine/BTS1Codec.cs:68
+Notes: {ver} = the code's vocabulary version; {max} = the mod's.
 
-    this code needs a newer Blank the Spire (code is v{ver}, this mod supports v{ForgedCards.VocabVersion}). Update the mod.
+    this code needs a newer Blank the Spire (code is v{ver}, this mod supports v{max}). Update the mod.
 
 ### mod.codec.corrupted
-Where: mod/BlankTheSpireCode/Engine/BTS1Codec.cs:73
+Where: mod/BlankTheSpireCode/Engine/BTS1Codec.cs:75
+Notes: {err} = the decoder's error message.
 
-    corrupted code ({e.Message}).
+    corrupted code ({err}).
 
 ### mod.codec.checksum
-Where: mod/BlankTheSpireCode/Engine/BTS1Codec.cs:76
+Where: mod/BlankTheSpireCode/Engine/BTS1Codec.cs:78
 
     corrupted code (checksum mismatch — try copying it again).
 
 ### mod.import.slots_full
-Where: mod/BlankTheSpireCode/Engine/ForgedCharacters.cs:1423 ({err} in mod.dialog.rejected_body)
-Notes: the other importer messages at ForgedCharacters.cs:1366-1418 (bad bundle JSON, card N invalid, too many cards, ...) are validator output for a malformed code, not copy; they are left out.
+Where: mod/BlankTheSpireCode/Engine/ForgedCharacters.cs:1547 ({err} in mod.dialog.rejected_body)
+Notes: {n} = number of class slots. The other importer messages in ForgedCharacters.cs (bad bundle JSON, card N invalid, too many cards, ...) are validator output for a malformed code, not copy; they are left out.
 
-    all {ClassCount} class slots are full — clear one first.
+    all {n} class slots are full — clear one first.
 
 ### mod.import.write_failed
-Where: mod/BlankTheSpireCode/Engine/ForgedCharacters.cs:1426 ({err} in mod.dialog.rejected_body)
+Where: mod/BlankTheSpireCode/Engine/ForgedCharacters.cs:1550 ({err} in mod.dialog.rejected_body)
+Notes: {err} = the system error.
 
-    failed to write class files: {e.Message}
+    failed to write class files: {err}
 
 ## Forge console stage headers
 

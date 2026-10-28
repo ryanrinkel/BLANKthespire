@@ -1298,9 +1298,11 @@ public static class ForgedCards
 
         string title = Str(card, "name", id);
         // Allow explicit text (e.g. website-authored), else synthesize like cardgen.py.
-        string description = card.ContainsKey("description") ? Str(card, "description")
-                           : card.ContainsKey("text") ? Str(card, "text")
-                           : Describe(effects, target);
+        bool textFromEffects = !card.ContainsKey("description") && !card.ContainsKey("text");
+        string description;
+        if (card.ContainsKey("description")) description = Str(card, "description");
+        else if (card.ContainsKey("text")) description = Str(card, "text");
+        else using (ForgedText.Force("eng")) description = Describe(effects, target); // the spec keeps the ENGLISH text (i18n)
 
         // Phase AE (gap #25): optional declarative `tags` (lowercase synergy slugs) read by the tag_cards_owned
         // deck scan. Purely metadata (no runtime behavior on its own); shape (1..2, pattern) is contract-enforced.
@@ -1321,7 +1323,8 @@ public static class ForgedCards
         // DataCard reads IsToken to hide it from the compendium + block combat-generation. `isToken` is parsed
         // and rarity-gated above (near the Basic gate).
         spec = new CardSpec(id, cost, type, rarity, target, effects, upgrade, title, description,
-                            CostsX: costsX, IsToken: isToken, Tags: tags, UpgradedCost: upgradedCost);
+                            CostsX: costsX, IsToken: isToken, Tags: tags, UpgradedCost: upgradedCost)
+            { Loc = ParseCardLoc(card), TextFromEffects = textFromEffects };
         error = "";
         return true;
     }
@@ -2672,23 +2675,59 @@ public static class ForgedCards
     /// <summary>The DynamicVar key an effect declares in <see cref="DataCard"/> (null = declares none). Two
     /// effects with the same key would make the game's DynamicVarSet ctor throw — see the dup check above.
     /// damage/block collapse to one key each (normal or scale:x) since the attack/block path reads one var.</summary>
+    // ===== i18n (I18N_PLAN C1): every sentence below goes through ForgedText with its ENGLISH inline, so English output is
+    // the inline text by construction and a language table (ForgedText.<lang>.cs) only overrides by key. The KNOWN English
+    // quirks are kept on purpose (not fixed in the i18n pass): "Apply Vulnerable." / "Gain Thorns." print no amount, the
+    // "Exhaust." line duplicates the game's own keyword line, "Channel a orb orb" for an orb-less channel, and the raw status
+    // id in "the enemy has vulnerable". -------------------------------------------------------------------------------------
+    private static string Tx(string key, string en) => ForgedText.T(key, en);
+    private static string Fx(string key, string en, params (string, object?)[] args) => ForgedText.F(key, en, args);
+    private static string Life(EffectSpec e) => e.Scope == "combat" ? Tx("life.combat", "this combat") : Tx("life.turn", "this turn");
+
+    /// <summary>Weave a condition into a sentence: English appends "… if X." before the closing period; a table may
+    /// front the clause instead (Chinese: 如果X，…). <paramref name="sentence"/> may or may not end with the period.</summary>
+    internal static string Weave(string sentence, bool negate, string phrase)
+    {
+        string dot = Tx("punct.period", ".");
+        bool hadDot = sentence.EndsWith(dot, StringComparison.Ordinal);
+        string body = hadDot ? sentence[..^dot.Length] : sentence;
+        string woven = negate ? Fx("weave.unless", "{s} unless {cond}", ("s", body), ("cond", phrase))
+                              : Fx("weave.if", "{s} if {cond}", ("s", body), ("cond", phrase));
+        return hadDot ? woven + dot : woven;
+    }
+
+    /// <summary>The localized display word of a status (the English is <see cref="StatusDisplay"/>).</summary>
+    internal static string StatusWord(string? status) => Tx("status." + (status ?? ""), StatusDisplay(status));
+
+    /// <summary>The measure word a localized amount of <paramref name="status"/> takes (English: none).</summary>
+    internal static string StatusUnit(string? status) => Tx("unit." + (status ?? ""), "");
+
+    /// <summary>The localized display name of an orb in text. English is <see cref="OrbDisplay"/>; a custom (forged) orb
+    /// uses the class's <c>loc</c> name when the text is rendered for a class in a translated language.</summary>
+    internal static string OrbWord(string? orb) => orb switch
+    {
+        "lightning" or "frost" or "dark" or "random" => Tx("orb." + orb, OrbDisplay(orb)),
+        null or "" => Tx("orb.none", OrbDisplay(orb)),
+        _ => ForgedCharacters.CreativeName(ForgedText.ClassScope, "orbs", orb) ?? OrbDisplay(orb),
+    };
+
     /// <summary>Phase BP (v67, gap #76): the cost_delta sentence — "Costs 1 less this turn for each Skill you play." / "After you
     /// play this, it costs 0 for the rest of combat." / "Whenever you draw this, it costs 1 less this combat." / "Costs 1 more
     /// each time you play it." Literal numbers (no var). Byte-lockstep with cardgen._cost_delta_sentence.</summary>
     private static string CostDeltaSentence(EffectSpec e)
     {
-        if (e.SetZero) return "After you play this, it costs 0 for the rest of combat.";
-        if (e.Amount > 0) return $"Costs {e.Amount} more each time you play it.";
+        if (e.SetZero) return Tx("card.cost_delta.set_zero", "After you play this, it costs 0 for the rest of combat.");
+        if (e.Amount > 0) return Fx("card.cost_delta.more", "Costs {n} more each time you play it.", ("n", e.Amount));
         int n = Math.Max(1, -e.Amount);
-        string life = e.Scope == "combat" ? "this combat" : "this turn";
+        string life = Life(e);
         return e.On switch
         {
-            "played"         => $"Costs {n} less {life} each time you play it.",
-            "drawn"          => $"Whenever you draw this, it costs {n} less {life}.",
-            "attack_played"  => $"Costs {n} less {life} for each Attack you play.",
-            "skill_played"   => $"Costs {n} less {life} for each Skill you play.",
-            "card_exhausted" => $"Costs {n} less {life} for each card you Exhaust.",
-            _                => $"Costs {n} less {life} for each card you play.",
+            "played"         => Fx("card.cost_delta.played", "Costs {n} less {life} each time you play it.", ("n", n), ("life", life)),
+            "drawn"          => Fx("card.cost_delta.drawn", "Whenever you draw this, it costs {n} less {life}.", ("n", n), ("life", life)),
+            "attack_played"  => Fx("card.cost_delta.attack_played", "Costs {n} less {life} for each Attack you play.", ("n", n), ("life", life)),
+            "skill_played"   => Fx("card.cost_delta.skill_played", "Costs {n} less {life} for each Skill you play.", ("n", n), ("life", life)),
+            "card_exhausted" => Fx("card.cost_delta.card_exhausted", "Costs {n} less {life} for each card you Exhaust.", ("n", n), ("life", life)),
+            _                => Fx("card.cost_delta.card_played", "Costs {n} less {life} for each card you play.", ("n", n), ("life", life)),
         };
     }
 
@@ -2697,29 +2736,30 @@ public static class ForgedCards
     /// balance_step). Byte-lockstep with cardgen._cost_shift_sentence.</summary>
     private static string CostShiftSentence(EffectSpec e)
     {
-        string plural = e.CardKind switch { "attack" => "Attacks", "skill" => "Skills", "power" => "Powers", _ => "cards" };
-        string single = e.CardKind switch { "attack" => "Attack", "skill" => "Skill", "power" => "Power", _ => "card" };
-        string life = e.Scope == "combat" ? "this combat" : "this turn";
+        string kk = e.CardKind switch { "attack" => "attack", "skill" => "skill", "power" => "power", _ => "card" };
+        string plural = Tx("noun.many." + kk, e.CardKind switch { "attack" => "Attacks", "skill" => "Skills", "power" => "Powers", _ => "cards" });
+        string single = Tx("noun.bare." + kk, e.CardKind switch { "attack" => "Attack", "skill" => "Skill", "power" => "Power", _ => "card" });
+        string life = Life(e);
         int amt = Math.Max(1, e.Amount);
-        if (e.Count == 1) return $"Your next {single} costs {amt} less {life}.";
-        if (e.Count > 1) return $"Your next {e.Count} {plural} cost {amt} less {life}.";
-        return $"Your {plural} cost {amt} less {life}.";
+        if (e.Count == 1) return Fx("card.cost_shift.next1", "Your next {single} costs {amt} less {life}.", ("single", single), ("amt", amt), ("life", life));
+        if (e.Count > 1) return Fx("card.cost_shift.next_n", "Your next {count} {plural} cost {amt} less {life}.", ("count", e.Count), ("plural", plural), ("amt", amt), ("life", life));
+        return Fx("card.cost_shift.all", "Your {plural} cost {amt} less {life}.", ("plural", plural), ("amt", amt), ("life", life));
     }
 
     /// <summary>Phase BM (v65, gaps #68/#69): the card sentence of a self status (null = not one). The {vars} are the
     /// names DataCard declares. Byte-lockstep with cardgen._BM_SENTENCES.</summary>
     internal static string? BmStatusSentence(string? status) => status switch
     {
-        "no_draw"        => "You cannot draw additional cards this turn.",
-        "no_energy_gain" => "You cannot gain energy this turn.",
-        "no_block_gain"       => "You cannot gain Block from cards for {NoBlockTurns} turns.",
-        "dex_decay"      => "At the start of your turn, lose {DexDecay} Dexterity.",
-        "focus_decay"    => "At the start of your turn, lose {FocusDecay} Focus.",
-        "lose_strength"  => "Lose {SelfStrengthLoss} Strength.",
-        "lose_dexterity" => "Lose {SelfDexterityLoss} Dexterity.",
-        "lose_focus"     => "Lose {SelfFocusLoss} Focus.",
-        "echo_form"      => "The first card you play each turn is played twice.",
-        "loop"           => "At the start of your turn, trigger your next orb's passive.", // Phase BQ (v68, gap #78)
+        "no_draw"        => Tx("card.bm.no_draw", "You cannot draw additional cards this turn."),
+        "no_energy_gain" => Tx("card.bm.no_energy_gain", "You cannot gain energy this turn."),
+        "no_block_gain"       => Tx("card.bm.no_block_gain", "You cannot gain Block from cards for {NoBlockTurns} turns."),
+        "dex_decay"      => Tx("card.bm.dex_decay", "At the start of your turn, lose {DexDecay} Dexterity."),
+        "focus_decay"    => Tx("card.bm.focus_decay", "At the start of your turn, lose {FocusDecay} Focus."),
+        "lose_strength"  => Tx("card.bm.lose_strength", "Lose {SelfStrengthLoss} Strength."),
+        "lose_dexterity" => Tx("card.bm.lose_dexterity", "Lose {SelfDexterityLoss} Dexterity."),
+        "lose_focus"     => Tx("card.bm.lose_focus", "Lose {SelfFocusLoss} Focus."),
+        "echo_form"      => Tx("card.bm.echo_form", "The first card you play each turn is played twice."),
+        "loop"           => Tx("card.bm.loop", "At the start of your turn, trigger your next orb's passive."), // Phase BQ (v68, gap #78)
         _ => null,
     };
 
@@ -2729,8 +2769,9 @@ public static class ForgedCards
     private static string TriggerPassiveSentence(EffectSpec e)
     {
         int n = Math.Max(1, e.Amount);
-        string whose = e.Orbs == "all" ? "all your orbs" : "your next orb";
-        return n > 1 ? $"Trigger the passive of {whose} {n} times." : $"Trigger the passive of {whose}.";
+        string whose = e.Orbs == "all" ? Tx("orbs.all_yours", "all your orbs") : Tx("orbs.next_yours", "your next orb");
+        return n > 1 ? Fx("card.trigger_passive.n", "Trigger the passive of {whose} {n} times.", ("whose", whose), ("n", n))
+                     : Fx("card.trigger_passive.1", "Trigger the passive of {whose}.", ("whose", whose));
     }
 
     /// <summary>Phase BM (v65, gap #69): "This turn, your next Skill is played twice." / "This turn, your next 2 Attacks
@@ -2738,12 +2779,15 @@ public static class ForgedCards
     /// card is played twice." Literal count (no var). Byte-lockstep with cardgen._replay_next_sentence.</summary>
     private static string ReplayNextSentence(EffectSpec e)
     {
-        string single = e.CardKind switch { "attack" => "Attack", "power" => "Power", "all" => "card", _ => "Skill" };
+        string kk = e.CardKind switch { "attack" => "attack", "power" => "power", "all" => "card", _ => "skill" };
+        string single = Tx("noun.bare." + kk, e.CardKind switch { "attack" => "Attack", "power" => "Power", "all" => "card", _ => "Skill" });
+        string many = Tx("noun.many." + kk, e.CardKind switch { "attack" => "Attack", "power" => "Power", "all" => "card", _ => "Skill" } + "s");
         int n = Math.Max(1, e.Count);
-        string what = n > 1 ? $"your next {n} {single}s are" : $"your next {single} is";
-        return e.CardKind == "power"
-            ? $"{char.ToUpperInvariant(what[0])}{what[1..]} played twice."
-            : $"This turn, {what} played twice.";
+        if (e.CardKind == "power")
+            return n > 1 ? Fx("card.replay_next.power_n", "Your next {n} {many} are played twice.", ("n", n), ("many", many))
+                         : Fx("card.replay_next.power_1", "Your next {single} is played twice.", ("single", single));
+        return n > 1 ? Fx("card.replay_next.n", "This turn, your next {n} {many} are played twice.", ("n", n), ("many", many))
+                     : Fx("card.replay_next.1", "This turn, your next {single} is played twice.", ("single", single));
     }
 
     /// <summary>Phase AX (v53): the var key of the i-th effect. apply_status is occurrence-numbered, so a card's
@@ -2773,7 +2817,8 @@ public static class ForgedCards
 
     /// <summary>Phase AX (v53): the DISPLAY name of a base status — the word the card text prints and the stem the
     /// second (gated) copy's suffixed var is built from ("Weak" -> "Weak2"). Shared by <see cref="Describe"/> and
-    /// <see cref="DataCard"/>; lockstep with cardgen.STATUS_NAME.</summary>
+    /// <see cref="DataCard"/>; lockstep with cardgen.STATUS_NAME. NOT localized (it names DynamicVars); the
+    /// localized word is <see cref="StatusWord"/>.</summary>
     internal static string StatusDisplay(string? status) => status switch
     {
         "vulnerable" => "Vulnerable", "weak" => "Weak", "frail" => "Frail", "poison" => "Poison",
@@ -2802,7 +2847,7 @@ public static class ForgedCards
     }
 
     /// <summary>The human phrase for a non-X scalar (F5), e.g. "the cards you retained". Lockstep with cardgen.py.</summary>
-    private static string ScalePhrase(string? scale) => scale switch
+    private static string ScalePhrase(string? scale) => Tx("scale." + (scale ?? ""), scale switch
     {
         "cards_in_hand"            => "the cards in your hand",
         "cards_retained"           => "the cards you retained",
@@ -2828,11 +2873,11 @@ public static class ForgedCards
         "orb_count"                   => "the orbs you have channeled",
         "orb_types"                   => "the different orbs you have channeled",
         _ => "X",
-    };
+    });
 
     /// <summary>Phase BK (v63, gap #65): the singular noun a <c>hits_scale</c> damage counts ("Deal {Damage} damage for each
     /// Attack you played this turn."). Lockstep with cardgen._HITS_PHRASE + render.js HITS_NOUN.</summary>
-    private static string HitsPhrase(string? src) => src switch
+    private static string HitsPhrase(string? src) => Tx("hits." + (src ?? ""), src switch
     {
         "attacks_played_this_turn"   => "Attack you played this turn",
         "cards_in_hand"              => "other card in your hand",
@@ -2843,175 +2888,219 @@ public static class ForgedCards
         "energy_spent_this_turn"     => "energy you have spent this turn",
         "orb_count"                  => "orb you have channeled",
         _ => "X",
-    };
+    });
 
     /// <summary>Phase BJ (v62): the effect-aware phrase — target_status_stacks names its status ("the enemy's
     /// Vulnerable"); everything else is <see cref="ScalePhrase(string?)"/>. Lockstep with cardgen._effect_scale_phrase.</summary>
     private static string ScalePhrase(EffectSpec e) =>
-        e.Scale == "target_status_stacks" ? $"the enemy's {StatusDisplay(e.Status)}" : ScalePhrase(e.Scale);
+        e.Scale == "target_status_stacks" ? Fx("scale.target_status_stacks", "the enemy's {status}", ("status", StatusWord(e.Status)))
+                                          : ScalePhrase(e.Scale);
+
+    /// <summary>i18n regression dump only (<see cref="Testing.DescribeDump"/>): the synthesized text of an effect list.</summary>
+    internal static string DumpDescribe(EffectSpec[] effects, TargetType target) => Describe(effects, target);
+
+    /// <summary>i18n: the card's rules text rendered in the ACTIVE language (DataCard re-renders a translated card with it).</summary>
+    internal static string DescribeSpec(CardSpec spec) => Describe(spec.Effects, spec.Target);
+
+    /// <summary>i18n (I18N_PLAN C2): a card JSON's optional <c>loc</c> object — <c>{"zhs": {"name": "...", "flavor": "..."}}</c>,
+    /// written by the class importer from the bundle's <c>loc.&lt;locale&gt;.cards[id]</c>. Absent / malformed = null (English only).</summary>
+    private static IReadOnlyDictionary<string, LocText>? ParseCardLoc(Godot.Collections.Dictionary card)
+    {
+        if (!card.ContainsKey("loc") || card["loc"].VariantType != Godot.Variant.Type.Dictionary) return null;
+        var result = new Dictionary<string, LocText>(StringComparer.Ordinal);
+        foreach (var (locale, v) in card["loc"].AsGodotDictionary())
+        {
+            if (v.VariantType != Godot.Variant.Type.Dictionary) continue;
+            var d = v.AsGodotDictionary();
+            string? name = d.ContainsKey("name") && d["name"].VariantType == Godot.Variant.Type.String ? d["name"].AsString() : null;
+            string? flavor = d.ContainsKey("flavor") && d["flavor"].VariantType == Godot.Variant.Type.String ? d["flavor"].AsString() : null;
+            if (name != null || flavor != null) result[locale.AsString()] = new LocText(name, flavor);
+        }
+        return result.Count > 0 ? result : null;
+    }
 
     // Synthesize card text from effects + target (must match cardgen.py describe()). STS2 AoE cards spell out
     // "to ALL enemies" in their text — the game does NOT auto-append it — so the target must inform the wording.
+    // i18n: {to} is the damage-target fragment (" to ALL enemies"), {who} the apply-target one (a table puts them where its
+    // grammar wants: 对所有敌人造成… / 给予所有敌人…); English uses {to} for both.
     private static string Describe(EffectSpec[] effects, TargetType target)
     {
-        bool aoe = target == TargetType.AllEnemies;
         string dmgSuffix = target switch
         {
-            TargetType.AllEnemies => " to ALL enemies",
-            TargetType.RandomEnemy => " to a random enemy",
+            TargetType.AllEnemies => Tx("to.all", " to ALL enemies"),
+            TargetType.RandomEnemy => Tx("to.random", " to a random enemy"),
+            _ => "",
+        };
+        string who = target switch
+        {
+            TargetType.AllEnemies => Tx("who.all", " to ALL enemies"),
+            TargetType.RandomEnemy => Tx("who.random", " to a random enemy"),
             _ => "",
         };
         var parts = new List<string>(effects.Length);
         // Phase BR (v70, gap #79): a `cards_removed` read names the op that removed the cards (the LAST discard / exhaust_card
         // before it in the list — the validator requires one): "Deal damage equal to the cards Exhausted." /
         // "Deal {Damage} damage for each card Exhausted." Lockstep with cardgen.describe.
-        string removed = "Discarded";
-        string Sp(EffectSpec x) => x.Scale == "cards_removed" ? $"the cards {removed}" : ScalePhrase(x);
+        string removed = Tx("removed.discard", "Discarded");
+        string Sp(EffectSpec x) => x.Scale == "cards_removed" ? Fx("scale.cards_removed", "the cards {removed}", ("removed", removed)) : ScalePhrase(x);
         foreach (var e in effects)
         {
             int before = parts.Count;
+            bool woven = false; // add_trigger weaves its own condition (between the head and the payload in some languages)
             switch (e.Op)
             {
                 case "damage":
                     // Phase AN (v44): an unblockable hit reads "…, ignoring Block." (the clause closes the damage sentence
                     // in every shape; lockstep with cardgen.describe).
-                    string ub = e.Unblockable ? ", ignoring Block" : "";
+                    string ub = e.Unblockable ? Tx("frag.unblockable", ", ignoring Block") : "";
                     if (e.IsScaled)
                         parts.Add(e.Scale == "x"
-                            ? $"Deal X damage{dmgSuffix}{ub}."
+                            ? Fx("card.damage.x", "Deal X damage{to}{ub}.", ("to", dmgSuffix), ("ub", ub))
                             : e.Scale == "forged"
-                                ? $"Deal {e.Amount} damage{dmgSuffix}, plus your Forge{ub}."
+                                ? Fx("card.damage.forged", "Deal {amount} damage{to}, plus your Forge{ub}.", ("amount", e.Amount), ("to", dmgSuffix), ("ub", ub))
                                 : e.Scale == "tag_cards_owned"
-                                    ? $"Deal {e.Amount} damage{dmgSuffix}, plus 1 per '{e.Tag}' card you own{ub}."
-                                    : $"Deal damage equal to {Sp(e)}{dmgSuffix}{ub}.");
+                                    ? Fx("card.damage.tag", "Deal {amount} damage{to}, plus 1 per '{tag}' card you own{ub}.", ("amount", e.Amount), ("to", dmgSuffix), ("tag", e.Tag), ("ub", ub))
+                                    : Fx("card.damage.equal", "Deal damage equal to {what}{to}{ub}.", ("what", Sp(e)), ("to", dmgSuffix), ("ub", ub)));
                     else if (e.HasGrow) // Phase U (gap #23): {CalculatedDamage} (the base-game calc-var name; a bare {Damage} is unresolvable here) shows the CURRENT grown value (calc-var)
-                        parts.Add($"Deal {{CalculatedDamage}} damage{dmgSuffix}{ub}. Grows by {e.Grow} each time it is played this combat.");
+                        parts.Add(Fx("card.damage.grow", "Deal {CalculatedDamage} damage{to}{ub}. Grows by {grow} each time it is played this combat.", ("to", dmgSuffix), ("ub", ub), ("grow", e.Grow)));
                     else if (e.HasGrowHeld) // Phase BD (v58, gap #57): Windmill Strike — the calc-var climbs per held turn
-                        parts.Add($"Deal {{CalculatedDamage}} damage{dmgSuffix}{ub}. Grows by {e.GrowHeld} each turn it is retained.");
+                        parts.Add(Fx("card.damage.grow_held", "Deal {CalculatedDamage} damage{to}{ub}. Grows by {grow} each turn it is retained.", ("to", dmgSuffix), ("ub", ub), ("grow", e.GrowHeld)));
                     else if (e.HitsScale != null) // Phase BK (v63, gap #65): Whirlwind / Finisher — lockstep with cardgen.describe
                         parts.Add(e.HitsScale == "x"
-                            ? $"Deal {{Damage}} damage X times{dmgSuffix}{ub}."
-                            : e.HitsScale == "cards_removed" ? $"Deal {{Damage}} damage for each card {removed}{dmgSuffix}{ub}."
-                            : $"Deal {{Damage}} damage for each {HitsPhrase(e.HitsScale)}{dmgSuffix}{ub}.");
+                            ? Fx("card.damage.hits_x", "Deal {Damage} damage X times{to}{ub}.", ("to", dmgSuffix), ("ub", ub))
+                            : e.HitsScale == "cards_removed" ? Fx("card.damage.hits_removed", "Deal {Damage} damage for each card {removed}{to}{ub}.", ("removed", removed), ("to", dmgSuffix), ("ub", ub))
+                            : Fx("card.damage.hits_each", "Deal {Damage} damage for each {what}{to}{ub}.", ("what", HitsPhrase(e.HitsScale)), ("to", dmgSuffix), ("ub", ub)));
                     else
                         parts.Add(e.Hits > 1
-                            ? $"Deal {{Damage}} damage {{Hits}} times{dmgSuffix}{ub}."
-                            : $"Deal {{Damage}} damage{dmgSuffix}{ub}.");
+                            ? Fx("card.damage.multi", "Deal {Damage} damage {Hits} times{to}{ub}.", ("to", dmgSuffix), ("ub", ub))
+                            : Fx("card.damage", "Deal {Damage} damage{to}{ub}.", ("to", dmgSuffix), ("ub", ub)));
                     break;
-                case "block":       parts.Add(e.HasGrowHeld ? $"Gain {{CalculatedBlock}} Block. Grows by {e.GrowHeld} each turn it is retained." // Phase BD (v58)
-                                        : !e.IsScaled ? "Gain {Block} Block."
-                                        : e.Scale == "x" ? "Gain X Block."
-                                        : e.Scale == "forged" ? $"Gain {e.Amount} Block, plus your Forge."
-                                        : e.Scale == "tag_cards_owned" ? $"Gain {e.Amount} Block, plus 1 per '{e.Tag}' card you own."
-                                        : $"Gain Block equal to {Sp(e)}."); break;
-                case "draw":        parts.Add(!e.IsScaled ? "Draw {Cards} card(s)."
-                                        : e.Scale == "x" ? "Draw X cards."
-                                        : e.Scale == "to_hand_size" ? "Draw cards until you have {Cards} in hand." // Phase BJ (v62): Expertise
-                                        : $"Draw cards equal to {Sp(e)}."); break;
-                case "gain_energy": parts.Add(e.Scale == "energy" ? "Double your energy." : "Gain {Energy} energy."); break; // Phase BJ (v62)
-                case "heal":        parts.Add(e.IsScaled ? $"Heal HP equal to {ScalePhrase(e.Scale)}." : "Heal {Heal} HP."); break;
-                case "lose_hp":     parts.Add("Lose {Loss} HP."); break;
-                case "gain_max_hp": parts.Add("Gain {MaxHp} Max HP."); break; // Phase AN (v44): the Feed payoff (MaxHpVar)
-                case "discard":     parts.Add(e.Cards == "all" ? "Discard your hand." // Phase BR (v70, gap #79): the whole hand
-                                        : e.Cards == "choose" ? "Discard {Discard} card(s) of your choice." // Phase AP (v46): the chosen form
-                                                                  : "Discard {Discard} random card(s)."); removed = "Discarded"; break; // Phase R (gap #17)
+                case "block":       parts.Add(e.HasGrowHeld ? Fx("card.block.grow_held", "Gain {CalculatedBlock} Block. Grows by {grow} each turn it is retained.", ("grow", e.GrowHeld)) // Phase BD (v58)
+                                        : !e.IsScaled ? Tx("card.block", "Gain {Block} Block.")
+                                        : e.Scale == "x" ? Tx("card.block.x", "Gain X Block.")
+                                        : e.Scale == "forged" ? Fx("card.block.forged", "Gain {amount} Block, plus your Forge.", ("amount", e.Amount))
+                                        : e.Scale == "tag_cards_owned" ? Fx("card.block.tag", "Gain {amount} Block, plus 1 per '{tag}' card you own.", ("amount", e.Amount), ("tag", e.Tag))
+                                        : Fx("card.block.equal", "Gain Block equal to {what}.", ("what", Sp(e)))); break;
+                case "draw":        parts.Add(!e.IsScaled ? Tx("card.draw", "Draw {Cards} card(s).")
+                                        : e.Scale == "x" ? Tx("card.draw.x", "Draw X cards.")
+                                        : e.Scale == "to_hand_size" ? Tx("card.draw.to_hand_size", "Draw cards until you have {Cards} in hand.") // Phase BJ (v62): Expertise
+                                        : Fx("card.draw.equal", "Draw cards equal to {what}.", ("what", Sp(e)))); break;
+                case "gain_energy": parts.Add(e.Scale == "energy" ? Tx("card.gain_energy.double", "Double your energy.") : Tx("card.gain_energy", "Gain {Energy} energy.")); break; // Phase BJ (v62)
+                case "heal":        parts.Add(e.IsScaled ? Fx("card.heal.equal", "Heal HP equal to {what}.", ("what", ScalePhrase(e.Scale))) : Tx("card.heal", "Heal {Heal} HP.")); break;
+                case "lose_hp":     parts.Add(Tx("card.lose_hp", "Lose {Loss} HP.")); break;
+                case "gain_max_hp": parts.Add(Tx("card.gain_max_hp", "Gain {MaxHp} Max HP.")); break; // Phase AN (v44): the Feed payoff (MaxHpVar)
+                case "discard":     parts.Add(e.Cards == "all" ? Tx("card.discard.all", "Discard your hand.") // Phase BR (v70, gap #79): the whole hand
+                                        : e.Cards == "choose" ? Tx("card.discard.choose", "Discard {Discard} card(s) of your choice.") // Phase AP (v46): the chosen form
+                                                                  : Tx("card.discard.random", "Discard {Discard} random card(s).")); removed = Tx("removed.discard", "Discarded"); break; // Phase R (gap #17)
                 case "retrieve_card":   parts.Add(RetrieveSentence(e)); break;   // Phase AP (v46): literal (no var), lockstep with cardgen
-                case "exhaust_card":    parts.Add(ExhaustCardSentence(e)); removed = "Exhausted"; break; // Phase BC (v57, gap #52): literal (no var), lockstep with cardgen
+                case "exhaust_card":    parts.Add(ExhaustCardSentence(e)); removed = Tx("removed.exhaust", "Exhausted"); break; // Phase BC (v57, gap #52): literal (no var), lockstep with cardgen
                 case "draw_until":      parts.Add(DrawUntilSentence(e)); break;   // Phase BC (v57, gap #53): literal (no var), lockstep with cardgen
                 case "add_status_card": parts.Add(StatusCardSentence(e)); break; // Phase AP (v46): literal (no var), lockstep with cardgen
-                case "scry":        parts.Add("Scry {Scry}. (Look at that many cards from the top of your draw pile and discard any.)"); break; // Phase AA (gap #17 R-2)
-                case "exhaust":     parts.Add("Exhaust."); break;
-                case "innate":      parts.Add("Innate."); break;
-                case "retain":      parts.Add("Retain."); break;
-                case "ethereal":    parts.Add("Ethereal."); break;
-                case "sly":         parts.Add("Sly."); break; // Phase BB (v56, gap #55): the keyword idiom (byte-lockstep with cardgen.py)
-                case "held_discount": parts.Add($"Costs {Math.Max(1, e.Amount)} less for each turn it is retained."); break; // Phase BD (v58, gap #58)
+                case "scry":        parts.Add(Tx("card.scry", "Scry {Scry}. (Look at that many cards from the top of your draw pile and discard any.)")); break; // Phase AA (gap #17 R-2)
+                case "exhaust":     parts.Add(Tx("card.kw.exhaust", "Exhaust.")); break;
+                case "innate":      parts.Add(Tx("card.kw.innate", "Innate.")); break;
+                case "retain":      parts.Add(Tx("card.kw.retain", "Retain.")); break;
+                case "ethereal":    parts.Add(Tx("card.kw.ethereal", "Ethereal.")); break;
+                case "sly":         parts.Add(Tx("card.kw.sly", "Sly.")); break; // Phase BB (v56, gap #55): the keyword idiom (byte-lockstep with cardgen.py)
+                case "held_discount": parts.Add(Fx("card.held_discount", "Costs {n} less for each turn it is retained.", ("n", Math.Max(1, e.Amount)))); break; // Phase BD (v58, gap #58)
                 case "cost_delta":    parts.Add(CostDeltaSentence(e)); break; // Phase BP (v67, gap #76): byte-lockstep with cardgen._cost_delta_sentence
-                case "purge":       parts.Add("Purge. (Removed from your deck for the rest of the run.)"); break; // Phase W (gap #19)
-                case "purge_card":  parts.Add("Choose a card in your hand and Purge it. (Removed from your deck for the rest of the run.)"); break; // Phase Z (gap #19 choose)
-                case "sacrifice_summon": parts.Add("Sacrifice your summon."); break; // Phase AV (v52): flag-op sentence (byte-lockstep with cardgen.py)
-                case "spend_forge": parts.Add($"Spend {Math.Max(1, e.Amount)} Forge."); break; // Phase AX (v53, gap #44): literal (no var), byte-lockstep with cardgen.py
-                case "spread_debuffs": parts.Add("Copy the target's debuffs to all other enemies."); break; // Phase AX (v53, gaps #45-#47)
-                case "strip_block":    parts.Add("Remove all of the enemy's Block."); break; // Phase BL (v64, gap #66): byte-lockstep with cardgen.py
-                case "strip_artifact": parts.Add("Remove the enemy's Artifact."); break;     // Phase BL (v64, gap #66)
+                case "purge":       parts.Add(Tx("card.purge", "Purge. (Removed from your deck for the rest of the run.)")); break; // Phase W (gap #19)
+                case "purge_card":  parts.Add(Tx("card.purge_card", "Choose a card in your hand and Purge it. (Removed from your deck for the rest of the run.)")); break; // Phase Z (gap #19 choose)
+                case "sacrifice_summon": parts.Add(Tx("card.sacrifice_summon", "Sacrifice your summon.")); break; // Phase AV (v52): flag-op sentence (byte-lockstep with cardgen.py)
+                case "spend_forge": parts.Add(Fx("card.spend_forge", "Spend {n} Forge.", ("n", Math.Max(1, e.Amount)))); break; // Phase AX (v53, gap #44): literal (no var), byte-lockstep with cardgen.py
+                case "spread_debuffs": parts.Add(Tx("card.spread_debuffs", "Copy the target's debuffs to all other enemies.")); break; // Phase AX (v53, gaps #45-#47)
+                case "strip_block":    parts.Add(Tx("card.strip_block", "Remove all of the enemy's Block.")); break; // Phase BL (v64, gap #66): byte-lockstep with cardgen.py
+                case "strip_artifact": parts.Add(Tx("card.strip_artifact", "Remove the enemy's Artifact.")); break;     // Phase BL (v64, gap #66)
                 case "replay_next":    parts.Add(ReplayNextSentence(e)); break; // Phase BM (v65, gap #69): byte-lockstep with cardgen._replay_next_sentence
                 case "block_next_turn": // Phase BM (v65, gap #70): Prolong. Byte-lockstep with cardgen.describe.
-                    parts.Add(e.Scale == "block" ? "Next turn, gain Block equal to your current Block." : "Next turn, gain {NextTurnBlock} Block.");
+                    parts.Add(e.Scale == "block" ? Tx("card.block_next_turn.equal", "Next turn, gain Block equal to your current Block.")
+                                                 : Tx("card.block_next_turn", "Next turn, gain {NextTurnBlock} Block."));
                     break;
-                case "retain_hand":    parts.Add("Retain your hand this turn."); break; // Phase BM (v65, gap #70): Equilibrium
+                case "retain_hand":    parts.Add(Tx("card.retain_hand", "Retain your hand this turn.")); break; // Phase BM (v65, gap #70): Equilibrium
                 // Phase BO (v66, gaps #74/#75): byte-lockstep with cardgen.describe.
-                case "return_to_hand":   parts.Add("Returns to your hand after you play it."); break;
-                case "to_draw_top":      parts.Add("Goes on top of your draw pile after you play it."); break;
-                case "return_next_turn": parts.Add("At the start of your next turn, return this to your hand."); break;
-                case "put_back":         parts.Add(e.From == "discard" ? "Put a card from your discard pile on top of your draw pile."
-                                                                       : "Put a card from your hand on top of your draw pile."); break;
-                case "shuffle_hand":     parts.Add("Shuffle your hand and discard pile into your draw pile."); break;
+                case "return_to_hand":   parts.Add(Tx("card.return_to_hand", "Returns to your hand after you play it.")); break;
+                case "to_draw_top":      parts.Add(Tx("card.to_draw_top", "Goes on top of your draw pile after you play it.")); break;
+                case "return_next_turn": parts.Add(Tx("card.return_next_turn", "At the start of your next turn, return this to your hand.")); break;
+                case "put_back":         parts.Add(e.From == "discard" ? Tx("card.put_back.discard", "Put a card from your discard pile on top of your draw pile.")
+                                                                       : Tx("card.put_back.hand", "Put a card from your hand on top of your draw pile.")); break;
+                case "shuffle_hand":     parts.Add(Tx("card.shuffle_hand", "Shuffle your hand and discard pile into your draw pile.")); break;
                 case "grant_keyword":    parts.Add(GrantKeywordSentence(e)); break;
                 // Phase BN (v69, gaps #72/#73): Discovery / Infernal Blade, Havoc / Uproar. Byte-lockstep with cardgen.describe.
                 case "add_random_card":  parts.Add(AddRandomCardSentence(e, capitalize: true)); break;
                 case "autoplay":         parts.Add(AutoplaySentence(e, capitalize: true)); break;
-                case "stun":             parts.Add("Stun the enemy."); break; // Phase BR (v70, gap #11): Whistle. Byte-lockstep with cardgen.describe
-                case "corruption":  parts.Add("Your Skills cost 0."); parts.Add("Your Skills Exhaust when played."); break; // Phase AB (gap #20)
+                case "stun":             parts.Add(Tx("card.stun", "Stun the enemy.")); break; // Phase BR (v70, gap #11): Whistle. Byte-lockstep with cardgen.describe
+                case "corruption":  parts.Add(Tx("card.corruption.cost", "Your Skills cost 0.")); parts.Add(Tx("card.corruption.exhaust", "Your Skills Exhaust when played.")); break; // Phase AB (gap #20)
                 case "cost_shift":  parts.Add(CostShiftSentence(e)); break; // Phase AO (v45): the discount sentence (literal, no var)
-                case "blade_empower": parts.Add($"Your blade deals {Math.Max(2, e.Amount)}x damage this turn."); break; // Phase AF (gap #41)
-                case "transform_card": parts.Add($"Transforms into {AddCardName(e.CardId)} for the rest of the run."); break; // Phase AH (gaps #35/#38): target title title-cased from the id (no sibling context here, like add_card)
-                case "graft_card":  parts.Add($"Choose a card in your hand. It transforms into {AddCardName(e.CardId)} for the rest of the run."); break; // Phase AI (gap #7): the choose-form transform (target title from the id, like transform_card)
-                case "gain_orb_slot": parts.Add($"Gain {e.Amount} orb slot(s)."); break;
-                case "forge": parts.Add($"Forge {e.Amount}."); break; // Phase M (gap #36): the keyword sentence
+                case "blade_empower": parts.Add(Fx("card.blade_empower", "Your blade deals {n}x damage this turn.", ("n", Math.Max(2, e.Amount)))); break; // Phase AF (gap #41)
+                case "transform_card": parts.Add(Fx("card.transform_card", "Transforms into {name} for the rest of the run.", ("name", AddCardName(e.CardId)))); break; // Phase AH (gaps #35/#38): target title title-cased from the id (no sibling context here, like add_card)
+                case "graft_card":  parts.Add(Fx("card.graft_card", "Choose a card in your hand. It transforms into {name} for the rest of the run.", ("name", AddCardName(e.CardId)))); break; // Phase AI (gap #7): the choose-form transform (target title from the id, like transform_card)
+                case "gain_orb_slot": parts.Add(Fx("card.gain_orb_slot", "Gain {n} orb slot(s).", ("n", e.Amount))); break;
+                case "forge": parts.Add(Fx("card.forge", "Forge {n}.", ("n", e.Amount))); break; // Phase M (gap #36): the keyword sentence
                 case "balance_step": parts.Add(BalanceSentence(e, capitalize: true)); break; // Phase S (gap #1)
                 case "channel_orb":
-                    string orbName = OrbDisplay(e.Orb);
+                    string orbName = OrbDisplay(e.Orb), orbWord = OrbWord(e.Orb);
                     int oc = Math.Max(1, e.Amount);
-                    parts.Add(e.PerEnemy ? $"Channel a {orbName} orb for each enemy." // Phase BQ (v68, gap #78): Chill
-                              : oc > 1 ? $"Channel {oc} {orbName} orbs." : $"Channel a {orbName} orb.");
+                    parts.Add(e.PerEnemy ? Fx("card.channel.per_enemy", "Channel a {orb} orb for each enemy.", ("orb", orbName), ("orbname", orbWord)) // Phase BQ (v68, gap #78): Chill
+                              : oc > 1 ? Fx("card.channel.n", "Channel {n} {orb} orbs.", ("n", oc), ("orb", orbName), ("orbname", orbWord))
+                                       : Fx("card.channel.1", "Channel a {orb} orb.", ("orb", orbName), ("orbname", orbWord)));
                     break;
                 case "evoke":
                     int ec = Math.Max(1, e.Amount);
                     // Phase BQ (v68, gap #78): Dualcast (keep) / the newest orb. Byte-lockstep with cardgen.describe.
-                    parts.Add(e.Keep ? "Evoke your next orb twice."
-                              : e.Which == "newest" ? (ec > 1 ? $"Evoke your {ec} newest orbs." : "Evoke your newest orb.")
-                              : ec > 1 ? $"Evoke {ec} times." : "Evoke your next orb.");
+                    parts.Add(e.Keep ? Tx("card.evoke.keep", "Evoke your next orb twice.")
+                              : e.Which == "newest" ? (ec > 1 ? Fx("card.evoke.newest_n", "Evoke your {n} newest orbs.", ("n", ec)) : Tx("card.evoke.newest_1", "Evoke your newest orb."))
+                              : ec > 1 ? Fx("card.evoke.n", "Evoke {n} times.", ("n", ec)) : Tx("card.evoke.1", "Evoke your next orb."));
                     break;
                 case "trigger_passive": parts.Add(TriggerPassiveSentence(e)); break; // Phase BQ (v68, gap #78): Darkness / Tesla Coil
-                case "lose_orb_slot":   parts.Add("Lose 1 Orb Slot."); break;          // Phase BQ (v68, gap #78): Bulk Up
+                case "lose_orb_slot":   parts.Add(Tx("card.lose_orb_slot", "Lose 1 Orb Slot.")); break;          // Phase BQ (v68, gap #78): Bulk Up
                 case "apply_custom": // EXPLORE SPIKE
-                    parts.Add($"Gain {Math.Max(1, e.Amount)} 🗡️ Sharpen.");
+                    parts.Add(Fx("card.apply_custom", "Gain {n} 🗡️ Sharpen.", ("n", Math.Max(1, e.Amount))));
                     break;
                 case "summon": // Phase K (true-Osty): summon the class's minion, or grow its Max HP if already out.
-                    string mn = OrbDisplay(e.SummonName); // reuse the title-caser used for custom orb names
-                    parts.Add(e.Amount >= 1 ? $"Summon a {mn} with {e.Amount} HP." : $"Summon a {mn}.");
+                    string mn = ForgedCharacters.CreativeName(ForgedText.ClassScope, "summons", e.SummonName) ?? OrbDisplay(e.SummonName); // reuse the title-caser used for custom orb names
+                    parts.Add(e.Amount >= 1 ? Fx("card.summon.hp", "Summon a {name} with {hp} HP.", ("name", mn), ("hp", e.Amount))
+                                            : Fx("card.summon", "Summon a {name}.", ("name", mn)));
                     break;
                 case "summon_attack": // Phase K (true-Osty): the class's summon deals the damage (literal, no var).
                     parts.Add(e.Hits > 1
-                        ? $"Deal {e.Amount} damage {e.Hits} times with your summon{dmgSuffix}."
-                        : $"Deal {e.Amount} damage with your summon{dmgSuffix}.");
+                        ? Fx("card.summon_attack.multi", "Deal {amount} damage {hits} times with your summon{to}.", ("amount", e.Amount), ("hits", e.Hits), ("to", dmgSuffix))
+                        : Fx("card.summon_attack", "Deal {amount} damage with your summon{to}.", ("amount", e.Amount), ("to", dmgSuffix)));
                     break;
                 case "buff_summon": // Phase K (true-Osty): a self-buff on the class's summon (default Strength).
-                    parts.Add($"Your summon gains {Math.Max(1, e.Amount)} {SummonRunner.StatusDisplay(e.Status ?? "strength")}.");
+                    string bs = e.Status ?? "strength";
+                    parts.Add(Fx("card.buff_summon", "Your summon gains {n} {status}.", ("n", Math.Max(1, e.Amount)),
+                                 ("status", Tx("status." + bs, SummonRunner.StatusDisplay(bs))), ("unit", StatusUnit(bs))));
                     break;
                 case "heal_summon": // Phase AC (gap #2): heal the class's living summon (literal, no var).
-                    parts.Add($"Heal your summon {Math.Max(1, e.Amount)} HP.");
+                    parts.Add(Fx("card.heal_summon", "Heal your summon {n} HP.", ("n", Math.Max(1, e.Amount))));
                     break;
                 case "shield_summon": // Phase AC (gap #2): grant Block to the class's living summon (literal, no var).
-                    parts.Add($"Your summon gains {Math.Max(1, e.Amount)} Block.");
+                    parts.Add(Fx("card.shield_summon", "Your summon gains {n} Block.", ("n", Math.Max(1, e.Amount))));
                     break;
                 case "summon_spike": // PHASE K SPIKE
                     int sc = Math.Max(1, e.Amount);
-                    parts.Add(sc > 1 ? $"Summon {sc} Spike Imps." : "Summon a Spike Imp.");
+                    parts.Add(sc > 1 ? Fx("card.summon_spike.n", "Summon {n} Spike Imps.", ("n", sc)) : Tx("card.summon_spike.1", "Summon a Spike Imp."));
                     break;
                 case "apply_status_custom":
                     // Phase J: no class status-pool context here (no emoji), so wording keys off the card's
                     // TARGET — a self-target card GAINs the (buff) status, an enemy-target card APPLIES the
                     // (debuff). Lockstep with cardgen.describe's apply_status_custom case. (Hand-authored J-1
                     // cards carry explicit text; real per-status emoji in card text is a cosmetic follow-up.)
+                    string cname = ForgedCharacters.CreativeName(ForgedText.ClassScope, "statuses", e.StatusName) ?? e.StatusName ?? "";
                     parts.Add(target == TargetType.Self
-                        ? $"Gain {Math.Max(1, e.Amount)} {e.StatusName}."
-                        : $"Apply {Math.Max(1, e.Amount)} {e.StatusName}{dmgSuffix}."); // AJ: " to a random enemy" too
+                        ? Fx("card.custom_status.gain", "Gain {n} {name}.", ("n", Math.Max(1, e.Amount)), ("name", cname))
+                        : Fx("card.custom_status.apply", "Apply {n} {name}{to}.", ("n", Math.Max(1, e.Amount)), ("name", cname), ("to", dmgSuffix), ("who", who))); // AJ: " to a random enemy" too
                     break;
                 case "add_trigger":
-                    // The trigger sentence WITHOUT its condition; the generic When-weave below appends it (so
-                    // card text and the power tooltip stay in lockstep). cardgen.py mirrors this.
-                    parts.Add(TriggerSentence(e));
+                    // The trigger sentence. With a condition it is woven HERE (not by the generic weave below) so a table can
+                    // put the clause between the head and the payload; the English is byte-identical to the old append.
+                    // cardgen.py mirrors this.
+                    if (e.When != null)
+                    {
+                        parts.Add(TriggerSentence(e, CardConditionPhrase(e.When, target)));
+                        woven = true;
+                    }
+                    else parts.Add(TriggerSentence(e, null));
                     break;
                 case "add_card":
                     // Phase Q (gap #16): the referenced title is derived from the card_id (title-cased) — no class
@@ -3019,13 +3108,13 @@ public static class ForgedCards
                     parts.Add(AddCardSentence(e, capitalize: true));
                     break;
                 case "summon_blade": // Phase T: no class context here, so a fixed phrase (lockstep with cardgen.py).
-                    parts.Add("Put your blade into your hand from anywhere.");
+                    parts.Add(Tx("card.summon_blade", "Put your blade into your hand from anywhere."));
                     break;
                 case "upgrade_card": // Phase V (gap #18): combat-scoped hand upgrade (lockstep with cardgen.py).
                     parts.Add(UpgradeSentence(e, capitalize: true));
                     break;
                 case "apply_status":
-                    string name = StatusDisplay(e.Status); // Phase AX (v53): shared with the suffixed-var stem
+                    string name = StatusWord(e.Status); // Phase AX (v53): StatusDisplay is shared with the suffixed-var stem
                     // Self-buffs are worded "Gain"; debuffs are "Apply"-ed to the target. SelfBuffStatuses is the
                     // single source of truth (shared with EffectRunner) so wording matches actual targeting.
                     bool buff = EffectRunner.SelfBuffStatuses.Contains(e.Status ?? "");
@@ -3034,99 +3123,103 @@ public static class ForgedCards
                     if (e.Status == "strength_down")
                         parts.Add(target switch
                         {
-                            TargetType.AllEnemies => "ALL enemies lose {StrengthLoss} Strength.",
-                            TargetType.RandomEnemy => "A random enemy loses {StrengthLoss} Strength.",
-                            _ => "The enemy loses {StrengthLoss} Strength.",
+                            TargetType.AllEnemies => Tx("card.strength_down.all", "ALL enemies lose {StrengthLoss} Strength."),
+                            TargetType.RandomEnemy => Tx("card.strength_down.random", "A random enemy loses {StrengthLoss} Strength."),
+                            _ => Tx("card.strength_down", "The enemy loses {StrengthLoss} Strength."),
                         });
                     else if (e.Status == "doom" && e.Scale == "damage_dealt_unblocked")
-                        parts.Add("Apply Doom equal to the unblocked damage dealt.");
+                        parts.Add(Tx("card.doom.unblocked", "Apply Doom equal to the unblocked damage dealt."));
                     // Phase BM (v65, gaps #68/#69): the self statuses read as their own sentences (the "Gain X." idiom would
                     // misread a drawback). Lockstep with cardgen._BM_SENTENCES.
                     else if (BmStatusSentence(e.Status) is { } bmLine)
                         parts.Add(bmLine);
                     else
-                        parts.Add($"{(buff ? "Gain" : "Apply")} {name}{(buff ? "" : dmgSuffix)}."); // AJ: random_enemy suffix too
+                        parts.Add(buff ? Fx("card.status.gain", "Gain {status}.", ("status", name))
+                                       : Fx("card.status.apply", "Apply {status}{to}.", ("status", name), ("to", dmgSuffix), ("who", who))); // AJ: random_enemy suffix too
                     break;
             }
             // Phase H: weave the condition into the gated effect's sentence ("… if your orbs match.").
-            if (e.When != null && parts.Count > before)
-            {
-                string p = parts[^1];
-                // Phase BN (v69, gap #71): on an AoE / random-enemy card a kill is ANY kill ("if this kills an enemy").
-                string phrase = e.When.Kind == "target_killed" && target != TargetType.AnyEnemy
-                    ? "this kills an enemy" : Conditions.Phrase(e.When);
-                string clause = (e.When.Negate ? "unless " : "if ") + phrase;
-                parts[^1] = p.EndsWith(".") ? $"{p[..^1]} {clause}." : $"{p} {clause}";
-            }
+            if (e.When != null && !woven && parts.Count > before)
+                parts[^1] = Weave(parts[^1], e.When.Negate, CardConditionPhrase(e.When, target));
         }
         return string.Join("\n", parts);
     }
+
+    /// <summary>Phase BN (v69, gap #71): on an AoE / random-enemy card a kill is ANY kill ("if this kills an enemy").</summary>
+    private static string CardConditionPhrase(Condition when, TargetType target) =>
+        when.Kind == "target_killed" && target != TargetType.AnyEnemy
+            ? Tx("cond.target_killed_any", "this kills an enemy") : Conditions.Phrase(when);
 
     // --- Phase H3 trigger text (must match cardgen.py) ----------------------------------------------
 
     /// <summary>The full trigger sentence WITH its fire-time condition — used for the granted power's tooltip
     /// (which doesn't pass through the card-level When-weave). Kept in lockstep with cardgen.py.</summary>
-    public static string DescribeTrigger(EffectSpec t)
-    {
-        string s = TriggerSentence(t);
-        if (t.When != null)
-        {
-            string clause = (t.When.Negate ? "unless " : "if ") + Conditions.Phrase(t.When);
-            s = s.EndsWith(".") ? $"{s[..^1]} {clause}." : $"{s} {clause}";
-        }
-        return s;
-    }
+    public static string DescribeTrigger(EffectSpec t) =>
+        TriggerSentence(t, t.When != null ? Conditions.Phrase(t.When) : null);
 
-    /// <summary>The trigger sentence WITHOUT its condition, e.g. "At the end of your turn, gain 5 Block."</summary>
-    private static string TriggerSentence(EffectSpec t)
+    /// <summary>The trigger sentence, e.g. "At the start of your turn, gain 5 Block." With <paramref name="cond"/> the
+    /// condition is woven in ("… gain 5 Block if you have no Block."; a table may place it after the head instead).</summary>
+    private static string TriggerSentence(EffectSpec t, string? cond)
     {
         // gap #6 "ripen": a one-shot after N turns. turn_start/turn_end are the recurring per-turn forms; the H4
-        // reactive kinds are "Whenever …" clauses mirroring the relic hooks.
-        string when = t.Trigger switch
+        // reactive kinds are "Whenever …" clauses mirroring the relic hooks. i18n: a reactive head is "Whenever {evt}"
+        // with the event clause separate, so the every_n / this_turn rewordings work in any language.
+        string? evt = t.Trigger switch
         {
-            "turn_start"      => "At the start of your turn",
-            "ripen"           => t.Amount == 1 ? "After 1 turn" : $"After {t.Amount} turns",
-            "on_hp_lost"      => "Whenever you lose HP",
-            "on_exhaust"      => "Whenever a card is Exhausted",
-            "on_card_played"  => "Whenever you play a card",
-            "on_card_drawn"   => "Whenever you draw a card",
-            "on_damage_dealt" => "Whenever you deal damage",
-            "on_block_gained" => "Whenever you gain Block",
-            "attacked"        => "Whenever you are attacked",
-            "on_discard"      => "Whenever this card is discarded", // Phase R (gap #17): Reflex — card-latent
-            "on_blade_played" => "Whenever you play your blade", // Phase T: Parry analogue (fires on the token blade)
-            "on_poison_damage" => "Whenever an enemy takes Poison damage", // Phase BE (v59, gap #56)
-            "on_shuffle"      => "Whenever you shuffle your draw pile", // Phase BO (v66, gap #74)
+            "on_hp_lost"      => Tx("evt.on_hp_lost", "you lose HP"),
+            "on_exhaust"      => Tx("evt.on_exhaust", "a card is Exhausted"),
+            "on_card_played"  => Tx("evt.on_card_played", "you play a card"),
+            "on_card_drawn"   => Tx("evt.on_card_drawn", "you draw a card"),
+            "on_damage_dealt" => Tx("evt.on_damage_dealt", "you deal damage"),
+            "on_block_gained" => Tx("evt.on_block_gained", "you gain Block"),
+            "attacked"        => Tx("evt.attacked", "you are attacked"),
+            "on_discard"      => Tx("evt.on_discard", "this card is discarded"), // Phase R (gap #17): Reflex — card-latent
+            "on_blade_played" => Tx("evt.on_blade_played", "you play your blade"), // Phase T: Parry analogue (fires on the token blade)
+            "on_poison_damage" => Tx("evt.on_poison_damage", "an enemy takes Poison damage"), // Phase BE (v59, gap #56)
+            "on_shuffle"      => Tx("evt.on_shuffle", "you shuffle your draw pile"), // Phase BO (v66, gap #74)
             // Phase BP (v67, gap #77): Arsenal / Sleight of Flesh (+ the Vicious status filter) / the orb evoke.
-            "on_card_generated" => "Whenever you create a card",
-            "on_debuff_applied" => t.Status != null ? $"Whenever you apply {StatusName(t.Status)}" : "Whenever you apply a debuff",
-            "on_evoke"        => "Whenever you Evoke an orb",
-            _                 => "At the end of your turn",
+            "on_card_generated" => Tx("evt.on_card_generated", "you create a card"),
+            "on_debuff_applied" => t.Status != null ? Fx("evt.on_debuff_applied.status", "you apply {status}", ("status", StatusWord(t.Status)))
+                                                    : Tx("evt.on_debuff_applied", "you apply a debuff"),
+            "on_evoke"        => Tx("evt.on_evoke", "you Evoke an orb"),
+            _                 => null,
         };
         // Phase BI (v61, gap #62): the filters reword the head. Lockstep with cardgen._trigger_head.
         if (t.CardKind != null && t.Trigger is ("on_card_played" or "on_card_drawn"))
-            when = $"Whenever you {(t.Trigger == "on_card_drawn" ? "draw" : "play")} {TriggerKindWord(t.CardKind)}";
+            evt = t.Trigger == "on_card_drawn" ? Fx("evt.draw_kind", "you draw {kind}", ("kind", TriggerKindWord(t.CardKind)))
+                                               : Fx("evt.play_kind", "you play {kind}", ("kind", TriggerKindWord(t.CardKind)));
+        string when = evt != null ? Fx("trig.whenever", "Whenever {evt}", ("evt", evt)) : t.Trigger switch
+        {
+            "turn_start" => Tx("trig.turn_start", "At the start of your turn"),
+            "ripen"      => t.Amount == 1 ? Tx("trig.ripen.1", "After 1 turn") : Fx("trig.ripen.n", "After {n} turns", ("n", t.Amount)),
+            _            => Tx("trig.turn_end", "At the end of your turn"),
+        };
         if (t.EveryN > 1)
         {
             string nth = Ordinal(t.EveryN);
-            if (t.CardKind == null && t.Trigger == "on_card_played") when = $"Every {nth} card you play";
-            else if (t.CardKind == null && t.Trigger == "on_card_drawn") when = $"Every {nth} card you draw";
-            else if (when.StartsWith("Whenever ")) when = $"Every {nth} time {when["Whenever ".Length..]}";
+            if (t.CardKind == null && t.Trigger == "on_card_played") when = Fx("trig.every_n.play", "Every {nth} card you play", ("nth", nth), ("n", t.EveryN));
+            else if (t.CardKind == null && t.Trigger == "on_card_drawn") when = Fx("trig.every_n.draw", "Every {nth} card you draw", ("nth", nth), ("n", t.EveryN));
+            else if (evt != null) when = Fx("trig.every_n.time", "Every {nth} time {evt}", ("nth", nth), ("n", t.EveryN), ("evt", evt));
         }
         if (t.Scope == "this_turn")
-            when = $"This turn, {char.ToLowerInvariant(when[0])}{when[1..]}";
+            when = Fx("trig.this_turn", "This turn, {when}", ("when", $"{char.ToLowerInvariant(when[0])}{when[1..]}"));
         var frags = (t.Triggered ?? []).Select(TriggerFragment).Where(s => s.Length > 0).ToList();
+        string body = frags.Count > 0 ? string.Join(Tx("punct.join", ", "), frags) : Tx("frag.nothing", "do nothing");
         // Phase AK (v41): once_per_combat reads "(once per combat)"; it is never combined with once_per_turn.
-        string once = t.OncePerCombat ? " (once per combat)" : t.OncePerTurn ? " (once per turn)" : "";
-        return $"{when}, {(frags.Count > 0 ? string.Join(", ", frags) : "do nothing")}{once}.";
+        string once = t.OncePerCombat ? Tx("trig.once_per_combat", " (once per combat)") : t.OncePerTurn ? Tx("trig.once_per_turn", " (once per turn)") : "";
+        if (cond == null)
+            return Fx("trig.sentence", "{when}, {body}{once}.", ("when", when), ("body", body), ("once", once));
+        return t.When!.Negate
+            ? Fx("trig.sentence.unless", "{when}, {body}{once} unless {cond}.", ("when", when), ("body", body), ("once", once), ("cond", cond))
+            : Fx("trig.sentence.if", "{when}, {body}{once} if {cond}.", ("when", when), ("body", body), ("once", once), ("cond", cond));
     }
 
     /// <summary>Phase BI (v61): the add_trigger card filter as a noun phrase ("an Attack" / "a non-Attack card" /
     /// "a Status"). Lockstep with cardgen._TRIGGER_KIND_WORDS.</summary>
     private static string TriggerKindWord(string? kind) => kind switch
     {
-        "attack" => "an Attack", "skill" => "a Skill", "power" => "a Power",
-        "non_attack" => "a non-Attack card", "status" => "a Status", _ => "a card",
+        "attack" => Tx("noun.one.attack", "an Attack"), "skill" => Tx("noun.one.skill", "a Skill"), "power" => Tx("noun.one.power", "a Power"),
+        "non_attack" => Tx("noun.one.non_attack", "a non-Attack card"), "status" => Tx("noun.one.status", "a Status"), _ => Tx("noun.one.card", "a card"),
     };
 
     /// <summary>Phase BI (v61): 2nd / 3rd / 4th … (every_n is 2..9). Lockstep with cardgen._ordinal.</summary>
@@ -3135,7 +3228,7 @@ public static class ForgedCards
     /// <summary>Phase AL (v42): the "equal to …" phrase for a REPLACE-semantics payload scalar. cards_retained keeps
     /// its F5 wording ("equal to cards retained"); the two new player reads reuse the card-level ScalePhrase text.
     /// Lockstep with cardgen._trigger_scale_phrase.</summary>
-    private static string TriggerScalePhrase(string? scale) => scale switch
+    private static string TriggerScalePhrase(string? scale) => Tx("tscale." + (scale ?? ""), scale switch
     {
         "cards_retained"           => "cards retained",
         "cards_in_hand"            => "the cards in your hand",
@@ -3143,7 +3236,7 @@ public static class ForgedCards
         "exhaust_pile_size"        => "the cards in your exhaust pile",   // Phase BJ (v62)
         "total_enemy_poison"       => "the total Poison on ALL enemies",  // Phase BJ (v62)
         _                          => "X",
-    };
+    });
 
     private static string TriggerFragment(EffectSpec e)
     {
@@ -3155,49 +3248,57 @@ public static class ForgedCards
         // H4 (gap #14): a targeted payload effect is worded "… to ALL enemies" for AoE (single-enemy → no suffix,
         // matching the base-card Describe convention). Phase AK (v41): "… to the attacker" for the riposte target.
         // Phase BI (v61): "… to a random enemy" for the Juggernaut target.
-        string to = e.Target == "all_enemies" ? " to ALL enemies" : e.Target == "attacker" ? " to the attacker"
-                  : e.Target == "random_enemy" ? " to a random enemy"
-                  : e.Target == "that_enemy" ? " to that enemy" : ""; // Phase BP (v67, gap #77): Sleight of Flesh
+        string to = e.Target == "all_enemies" ? Tx("to.all", " to ALL enemies") : e.Target == "attacker" ? Tx("to.attacker", " to the attacker")
+                  : e.Target == "random_enemy" ? Tx("to.random", " to a random enemy")
+                  : e.Target == "that_enemy" ? Tx("to.that_enemy", " to that enemy") : ""; // Phase BP (v67, gap #77): Sleight of Flesh
+        string who = e.Target == "all_enemies" ? Tx("who.all", " to ALL enemies") : e.Target == "attacker" ? Tx("who.attacker", " to the attacker")
+                   : e.Target == "random_enemy" ? Tx("who.random", " to a random enemy")
+                   : e.Target == "that_enemy" ? Tx("who.that_enemy", " to that enemy") : "";
         return e.Op switch
         {
             "damage"        => e.Target == null ? ""
-                                  : sc ? $"deal damage equal to {eq}{to}"
-                                  : fg ? $"deal {e.Amount} damage{to}, plus your Forge"
-                                  : e.Hits > 1 ? $"deal {e.Amount} damage {e.Hits} times{to}" // Phase AL: multi-hit payload
-                                  : e.HasGrow ? $"deal {e.Amount} damage{to}. Increases by {e.Grow} each turn" // Phase BR (v70): Rolling Boulder
-                                  : $"deal {e.Amount} damage{to}",
-            "block"         => sc ? $"gain Block equal to {eq}" : fg ? $"gain {e.Amount} Block, plus your Forge" : $"gain {e.Amount} Block",
-            "draw"          => sc ? $"draw cards equal to {eq}" : $"draw {e.Amount} card(s)",
-            "gain_energy"   => sc ? $"gain energy equal to {eq}" : $"gain {e.Amount} energy",
-            "heal"          => sc ? $"heal HP equal to {eq}" : $"heal {e.Amount} HP",
-            "lose_hp"       => sc ? $"lose HP equal to {eq}" : $"lose {e.Amount} HP",
-            "gain_orb_slot" => sc ? $"gain orb slots equal to {eq}" : $"gain {e.Amount} orb slot(s)",
-            "forge"         => $"Forge {e.Amount}", // Phase M: fixed-amount income ("At the start of your turn, Forge 2.")
+                                  : sc ? Fx("frag.damage.equal", "deal damage equal to {what}{to}", ("what", eq), ("to", to))
+                                  : fg ? Fx("frag.damage.forged", "deal {amount} damage{to}, plus your Forge", ("amount", e.Amount), ("to", to))
+                                  : e.Hits > 1 ? Fx("frag.damage.multi", "deal {amount} damage {hits} times{to}", ("amount", e.Amount), ("hits", e.Hits), ("to", to)) // Phase AL: multi-hit payload
+                                  : e.HasGrow ? Fx("frag.damage.grow", "deal {amount} damage{to}. Increases by {grow} each turn", ("amount", e.Amount), ("to", to), ("grow", e.Grow)) // Phase BR (v70): Rolling Boulder
+                                  : Fx("frag.damage", "deal {amount} damage{to}", ("amount", e.Amount), ("to", to)),
+            "block"         => sc ? Fx("frag.block.equal", "gain Block equal to {what}", ("what", eq)) : fg ? Fx("frag.block.forged", "gain {amount} Block, plus your Forge", ("amount", e.Amount)) : Fx("frag.block", "gain {amount} Block", ("amount", e.Amount)),
+            "draw"          => sc ? Fx("frag.draw.equal", "draw cards equal to {what}", ("what", eq)) : Fx("frag.draw", "draw {amount} card(s)", ("amount", e.Amount)),
+            "gain_energy"   => sc ? Fx("frag.gain_energy.equal", "gain energy equal to {what}", ("what", eq)) : Fx("frag.gain_energy", "gain {amount} energy", ("amount", e.Amount)),
+            "heal"          => sc ? Fx("frag.heal.equal", "heal HP equal to {what}", ("what", eq)) : Fx("frag.heal", "heal {amount} HP", ("amount", e.Amount)),
+            "lose_hp"       => sc ? Fx("frag.lose_hp.equal", "lose HP equal to {what}", ("what", eq)) : Fx("frag.lose_hp", "lose {amount} HP", ("amount", e.Amount)),
+            "gain_orb_slot" => sc ? Fx("frag.gain_orb_slot.equal", "gain orb slots equal to {what}", ("what", eq)) : Fx("frag.gain_orb_slot", "gain {amount} orb slot(s)", ("amount", e.Amount)),
+            "forge"         => Fx("frag.forge", "Forge {amount}", ("amount", e.Amount)), // Phase M: fixed-amount income ("At the start of your turn, Forge 2.")
             "balance_step"  => BalanceSentence(e, capitalize: false), // Phase S (gap #1): the trigger-income fragment
             "apply_status"  => e.Target != null
-                                  ? $"apply {e.Amount} {StatusName(e.Status)}{to}"
-                                  : (sc ? $"gain {StatusName(e.Status)} equal to {eq}" : $"gain {e.Amount} {StatusName(e.Status)}"),
+                                  ? Fx("frag.apply_status", "apply {amount} {status}{to}", ("amount", e.Amount), ("status", StatusWord(e.Status)), ("unit", StatusUnit(e.Status)), ("to", to), ("who", who))
+                                  : (sc ? Fx("frag.gain_status.equal", "gain {status} equal to {what}", ("status", StatusWord(e.Status)), ("what", eq))
+                                        : Fx("frag.gain_status", "gain {amount} {status}", ("amount", e.Amount), ("status", StatusWord(e.Status)), ("unit", StatusUnit(e.Status)))),
             // Phase AL (v42): the class engines as payload fragments (lockstep with cardgen._trigger_fragment). No
             // class context here (same choice as the card-level Describe): a custom status is worded by its name,
             // GAIN when untargeted (the self-buff form) / APPLY when targeted (the debuff form).
-            "summon_attack" => e.Hits > 1 ? $"deal {e.Amount} damage {e.Hits} times with your summon{to}"
-                                          : $"deal {e.Amount} damage with your summon{to}",
-            "buff_summon"   => $"your summon gains {Math.Max(1, e.Amount)} {SummonRunner.StatusDisplay(e.Status ?? "strength")}",
-            "apply_status_custom" => e.Target != null ? $"apply {Math.Max(1, e.Amount)} {e.StatusName}{to}"
-                                                      : $"gain {Math.Max(1, e.Amount)} {e.StatusName}",
+            "summon_attack" => e.Hits > 1 ? Fx("frag.summon_attack.multi", "deal {amount} damage {hits} times with your summon{to}", ("amount", e.Amount), ("hits", e.Hits), ("to", to))
+                                          : Fx("frag.summon_attack", "deal {amount} damage with your summon{to}", ("amount", e.Amount), ("to", to)),
+            "buff_summon"   => Fx("frag.buff_summon", "your summon gains {n} {status}", ("n", Math.Max(1, e.Amount)),
+                                  ("status", Tx("status." + (e.Status ?? "strength"), SummonRunner.StatusDisplay(e.Status ?? "strength"))), ("unit", StatusUnit(e.Status ?? "strength"))),
+            "apply_status_custom" => e.Target != null ? Fx("frag.custom_status.apply", "apply {n} {name}{to}", ("n", Math.Max(1, e.Amount)), ("name", CustomStatusName(e)), ("to", to), ("who", who))
+                                                      : Fx("frag.custom_status.gain", "gain {n} {name}", ("n", Math.Max(1, e.Amount)), ("name", CustomStatusName(e))),
             "channel_orb"   => ChannelFragment(e),
-            "evoke"         => Math.Max(1, e.Amount) > 1 ? $"evoke {e.Amount} times" : "evoke your next orb",
-            "discard"       => $"discard {e.Amount} random card(s)", // Phase R (gap #17): forced-churn payload
+            "evoke"         => Math.Max(1, e.Amount) > 1 ? Fx("frag.evoke.n", "evoke {amount} times", ("amount", e.Amount)) : Tx("frag.evoke.1", "evoke your next orb"),
+            "discard"       => Fx("frag.discard", "discard {amount} random card(s)", ("amount", e.Amount)), // Phase R (gap #17): forced-churn payload
             "add_card"      => AddCardSentence(e, capitalize: false), // Phase Q (gap #16): the compost-loop fragment
-            "summon_blade"  => "put your blade into your hand from anywhere", // Phase T: blade-retrieval fragment
+            "summon_blade"  => Tx("frag.summon_blade", "put your blade into your hand from anywhere"), // Phase T: blade-retrieval fragment
             "upgrade_card"  => UpgradeSentence(e, capitalize: false), // Phase V (gap #18): trigger-side upgrade (random only)
             "add_random_card" => AddRandomCardSentence(e, capitalize: false), // Phase BN (v69, gap #72): Creative AI
             "autoplay"      => AutoplaySentence(e, capitalize: false), // Phase BN (v69, gap #73): Mayhem
-            "heal_summon"   => $"heal your summon {e.Amount} HP", // Phase AC (gap #2): the medic-engine fragment
-            "shield_summon" => $"your summon gains {e.Amount} Block", // Phase AC (gap #2)
+            "heal_summon"   => Fx("frag.heal_summon", "heal your summon {amount} HP", ("amount", e.Amount)), // Phase AC (gap #2): the medic-engine fragment
+            "shield_summon" => Fx("frag.shield_summon", "your summon gains {amount} Block", ("amount", e.Amount)), // Phase AC (gap #2)
             _ => "",
         };
     }
+
+    private static string CustomStatusName(EffectSpec e) =>
+        ForgedCharacters.CreativeName(ForgedText.ClassScope, "statuses", e.StatusName) ?? e.StatusName ?? "";
 
     /// <summary>Phase V (gap #18): the upgrade_card sentence/fragment. <paramref name="capitalize"/> = a card-level
     /// sentence ("Upgrade … ." with a period); false = a trigger-payload fragment ("upgrade …", no period). The
@@ -3206,10 +3307,11 @@ public static class ForgedCards
     /// (describe's upgrade_card case + _trigger_fragment / _upgrade_sentence).</summary>
     private static string UpgradeSentence(EffectSpec e, bool capitalize)
     {
+        string mode = e.Cards switch { "all" => "all", "choose" => "choose", _ => "random" };
         string verb = capitalize ? "Upgrade" : "upgrade";
         string what = e.Cards switch { "all" => "ALL cards", "choose" => "a card of your choice", _ => "a random card" };
-        string body = $"{verb} {what} in your hand for the rest of this combat";
-        return capitalize ? body + "." : body;
+        string body = Fx((capitalize ? "card" : "frag") + ".upgrade." + mode, "{verb} {what} in your hand for the rest of this combat", ("verb", verb), ("what", what));
+        return capitalize ? body + Tx("punct.period", ".") : body;
     }
 
     /// <summary>Phase Q (gap #16): the add_card sentence/fragment. <paramref name="capitalize"/> = a card-level
@@ -3222,21 +3324,27 @@ public static class ForgedCards
         string name = AddCardName(e.CardId);
         string pile = PilePhrase(e.Pile);
         int n = Math.Max(1, e.Amount);
-        string body = n > 1 ? $"{verb} {n} copies of {name} to your {pile}"
-                            : $"{verb} a copy of {name} to your {pile}";
-        return capitalize ? body + "." : body;
+        string pre = capitalize ? "card" : "frag";
+        string body = n > 1 ? Fx(pre + ".add_card.n", "{verb} {n} copies of {name} to your {pile}", ("verb", verb), ("n", n), ("name", name), ("pile", pile))
+                            : Fx(pre + ".add_card.1", "{verb} a copy of {name} to your {pile}", ("verb", verb), ("name", name), ("pile", pile));
+        return capitalize ? body + Tx("punct.period", ".") : body;
     }
 
     /// <summary>Phase BN (v69, gaps #72/#73): the noun a random-generation / auto-play filter names — "Attack" / "Skill" /
     /// "Power" / "non-Attack card" / "card" (plural with an "s"). Lockstep with cardgen._RANDOM_NOUNS.</summary>
-    private static string RandomCardNoun(string? kind, bool plural) => kind switch
+    private static string RandomCardNoun(string? kind, bool plural)
     {
-        "attack"     => plural ? "Attacks" : "Attack",
-        "skill"      => plural ? "Skills" : "Skill",
-        "power"      => plural ? "Powers" : "Power",
-        "non_attack" => plural ? "non-Attack cards" : "non-Attack card",
-        _            => plural ? "cards" : "card",
-    };
+        string kk = kind switch { "attack" => "attack", "skill" => "skill", "power" => "power", "non_attack" => "non_attack", _ => "card" };
+        string en = kind switch
+        {
+            "attack"     => plural ? "Attacks" : "Attack",
+            "skill"      => plural ? "Skills" : "Skill",
+            "power"      => plural ? "Powers" : "Power",
+            "non_attack" => plural ? "non-Attack cards" : "non-Attack card",
+            _            => plural ? "cards" : "card",
+        };
+        return Tx((plural ? "noun.many." : "noun.bare.") + kk, en);
+    }
 
     /// <summary>Phase BN (v69, gap #72): "Add a random Attack to your hand. It costs 0 this turn." / "Add 2 random cards to your
     /// discard pile." / "Choose 1 of 3 random Skills to add to your hand. It costs 0 this turn." <paramref name="capitalize"/> =
@@ -3247,11 +3355,12 @@ public static class ForgedCards
         string pile = PilePhrase(e.Pile);
         int n = Math.Max(1, e.Amount);
         bool choose = e.ChooseOf > 1;
-        string body = choose ? $"{(capitalize ? "Choose" : "choose")} 1 of {e.ChooseOf} random {RandomCardNoun(e.CardKind, true)} to add to your {pile}"
-                    : n > 1 ? $"{(capitalize ? "Add" : "add")} {n} random {RandomCardNoun(e.CardKind, true)} to your {pile}"
-                    : $"{(capitalize ? "Add" : "add")} a random {RandomCardNoun(e.CardKind, false)} to your {pile}";
-        if (e.FreeThisTurn) body += !choose && n > 1 ? ". They cost 0 this turn" : ". It costs 0 this turn";
-        return capitalize ? body + "." : body;
+        string pre = capitalize ? "card" : "frag";
+        string body = choose ? Fx(pre + ".add_random.choose", "{verb} 1 of {k} random {nouns} to add to your {pile}", ("verb", capitalize ? "Choose" : "choose"), ("k", e.ChooseOf), ("nouns", RandomCardNoun(e.CardKind, true)), ("pile", pile))
+                    : n > 1 ? Fx(pre + ".add_random.n", "{verb} {n} random {nouns} to your {pile}", ("verb", capitalize ? "Add" : "add"), ("n", n), ("nouns", RandomCardNoun(e.CardKind, true)), ("pile", pile))
+                    : Fx(pre + ".add_random.1", "{verb} a random {noun} to your {pile}", ("verb", capitalize ? "Add" : "add"), ("noun", RandomCardNoun(e.CardKind, false)), ("pile", pile));
+        if (e.FreeThisTurn) body += !choose && n > 1 ? Tx("frag.free.they", ". They cost 0 this turn") : Tx("frag.free.it", ". It costs 0 this turn");
+        return capitalize ? body + Tx("punct.period", ".") : body;
     }
 
     /// <summary>Phase BN (v69, gap #73): "Play the top card of your draw pile and Exhaust it." (Havoc; forced exhaust) / "Play the
@@ -3260,13 +3369,14 @@ public static class ForgedCards
     internal static string AutoplaySentence(EffectSpec e, bool capitalize)
     {
         string verb = capitalize ? "Play" : "play";
+        string pre = capitalize ? "card" : "frag";
         int n = Math.Max(1, e.Amount);
         string body = e.From == "draw_random"
-            ? (n > 1 ? $"{verb} {n} random {RandomCardNoun(e.CardKind, true)} from your draw pile"
-                     : $"{verb} a random {RandomCardNoun(e.CardKind, false)} from your draw pile")
-            : (n > 1 ? $"{verb} the top {n} cards of your draw pile and Exhaust them"
-                     : $"{verb} the top card of your draw pile and Exhaust it");
-        return capitalize ? body + "." : body;
+            ? (n > 1 ? Fx(pre + ".autoplay.random_n", "{verb} {n} random {nouns} from your draw pile", ("verb", verb), ("n", n), ("nouns", RandomCardNoun(e.CardKind, true)))
+                     : Fx(pre + ".autoplay.random_1", "{verb} a random {noun} from your draw pile", ("verb", verb), ("noun", RandomCardNoun(e.CardKind, false))))
+            : (n > 1 ? Fx(pre + ".autoplay.top_n", "{verb} the top {n} cards of your draw pile and Exhaust them", ("verb", verb), ("n", n))
+                     : Fx(pre + ".autoplay.top_1", "{verb} the top card of your draw pile and Exhaust it", ("verb", verb)));
+        return capitalize ? body + Tx("punct.period", ".") : body;
     }
 
     /// <summary>Phase S (gap #1): the balance_step sentence/fragment. <paramref name="capitalize"/> = a card-level
@@ -3276,17 +3386,20 @@ public static class ForgedCards
     private static string BalanceSentence(EffectSpec e, bool capitalize)
     {
         string verb = capitalize ? "Shift" : "shift";
-        string pole = e.Pole == "light" ? "Light" : "Dark";
+        bool light = e.Pole == "light";
         int n = Math.Max(1, e.Amount);
-        string body = $"{verb} {n} toward the {pole}";
-        return capitalize ? body + "." : body;
+        string body = Fx((capitalize ? "card" : "frag") + (light ? ".balance.light" : ".balance.dark"), "{verb} {n} toward the {pole}",
+                         ("verb", verb), ("n", n), ("pole", light ? "Light" : "Dark"));
+        return capitalize ? body + Tx("punct.period", ".") : body;
     }
 
     /// <summary>Display title for an add_card's referenced card: the snake_case id, title-cased (mirrors
-    /// OrbDisplay's custom-name path and cardgen's title-casing).</summary>
+    /// OrbDisplay's custom-name path and cardgen's title-casing). In a translated language the class's own card (by
+    /// id) supplies its <c>loc</c> title when one exists.</summary>
     private static string AddCardName(string? cardId) =>
-        string.IsNullOrWhiteSpace(cardId) ? "a card"
-            : System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(cardId.Replace('_', ' '));
+        string.IsNullOrWhiteSpace(cardId) ? Tx("noun.a_card", "a card")
+            : ForgedCharacters.CreativeCardTitle(ForgedText.ClassScope, cardId)
+              ?? System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(cardId.Replace('_', ' '));
 
     /// <summary>Phase AP (v46): the retrieve_card sentence — "Return a random card from your discard pile to your hand." /
     /// "Return 2 cards of your choice from your exhaust pile to your hand." Literal numbers (no DynamicVar, like add_card);
@@ -3295,28 +3408,35 @@ public static class ForgedCards
     private static string RetrieveSentence(EffectSpec e)
     {
         int n = Math.Max(1, e.Amount);
-        var (one, many) = HandKindWords(e.CardKind);   // Phase BO (v66): the optional card_type filter
-        string noun = one[(one.IndexOf(' ') + 1)..];
+        var (one, many, noun) = HandKindWords(e.CardKind);   // Phase BO (v66): the optional card_type filter
+        bool choose = e.Cards == "choose";
         // Phase BO (v66, gap #74): the draw-pile tutor — "Put an Attack from your draw pile into your hand." (choose) /
         // "Put a random Skill from your draw pile into your hand." Lockstep with cardgen._retrieve_sentence.
         if (e.Pile == "draw")
-        {
-            string pick = e.Cards == "choose" ? (n > 1 ? $"{n} {many}" : one) : (n > 1 ? $"{n} random {many}" : $"a random {noun}");
-            return $"Put {pick} from your draw pile into your hand.";
-        }
-        string pile = e.Pile == "exhaust" ? "exhaust pile" : "discard pile";
-        string what = e.Cards == "choose"
-            ? (n > 1 ? $"{n} {many} of your choice" : $"{one} of your choice")
-            : (n > 1 ? $"{n} random {many}" : $"a random {noun}");
-        return $"Return {what} from your {pile} to your hand.";
+            return choose
+                ? (n > 1 ? Fx("card.retrieve.draw.choose_n", "Put {n} {many} from your draw pile into your hand.", ("n", n), ("many", many))
+                         : Fx("card.retrieve.draw.choose_1", "Put {one} from your draw pile into your hand.", ("one", one)))
+                : (n > 1 ? Fx("card.retrieve.draw.random_n", "Put {n} random {many} from your draw pile into your hand.", ("n", n), ("many", many))
+                         : Fx("card.retrieve.draw.random_1", "Put a random {noun} from your draw pile into your hand.", ("noun", noun)));
+        string pile = e.Pile == "exhaust" ? Tx("pile.exhaust", "exhaust pile") : Tx("pile.discard", "discard pile");
+        return choose
+            ? (n > 1 ? Fx("card.retrieve.choose_n", "Return {n} {many} of your choice from your {pile} to your hand.", ("n", n), ("many", many), ("pile", pile))
+                     : Fx("card.retrieve.choose_1", "Return {one} of your choice from your {pile} to your hand.", ("one", one), ("pile", pile)))
+            : (n > 1 ? Fx("card.retrieve.random_n", "Return {n} random {many} from your {pile} to your hand.", ("n", n), ("many", many), ("pile", pile))
+                     : Fx("card.retrieve.random_1", "Return a random {noun} from your {pile} to your hand.", ("noun", noun), ("pile", pile)));
     }
 
     /// <summary>Phase BO (v66, gap #75): "Choose a card in your hand. It gains Retain." / "Choose a Skill in your hand. It is Sly
     /// this turn." / "… It gains Ethereal." Lockstep with cardgen._grant_keyword_sentence.</summary>
     private static string GrantKeywordSentence(EffectSpec e)
     {
-        string gains = e.Keyword switch { "sly" => "is Sly this turn", "ethereal" => "gains Ethereal", _ => "gains Retain" };
-        return $"Choose {HandKindWords(e.CardKind).One} in your hand. It {gains}.";
+        string one = HandKindWords(e.CardKind).One;
+        return e.Keyword switch
+        {
+            "sly"      => Fx("card.grant.sly", "Choose {one} in your hand. It is Sly this turn.", ("one", one)),
+            "ethereal" => Fx("card.grant.ethereal", "Choose {one} in your hand. It gains Ethereal.", ("one", one)),
+            _          => Fx("card.grant.retain", "Choose {one} in your hand. It gains Retain.", ("one", one)),
+        };
     }
 
     /// <summary>Phase AP (v46): the add_status_card sentence — "Add a Wound to your discard pile." / "Add 2 Wounds to your
@@ -3325,21 +3445,29 @@ public static class ForgedCards
     private static string StatusCardSentence(EffectSpec e)
     {
         int n = Math.Max(1, e.Amount);
-        string name = StatusCardName(e.StatusCard);
-        string what = n > 1 ? $"{n} {(name == "Dazed" ? name : name + "s")}" : $"a {name}";
-        return $"Add {what} to your {PilePhrase(e.Pile)}.";
+        string en = StatusCardName(e.StatusCard);
+        string key = en.ToLowerInvariant();
+        string pile = PilePhrase(e.Pile);
+        return n > 1 ? Fx("card.status_card.n", "Add {n} {names} to your {pile}.", ("n", n), ("names", Tx("statuscard.many." + key, en == "Dazed" ? en : en + "s")), ("pile", pile))
+                     : Fx("card.status_card.1", "Add a {name} to your {pile}.", ("name", Tx("statuscard." + key, en)), ("pile", pile));
     }
 
     /// <summary>Phase BC (v57): the singular / plural display words for a hand filter — "an Attack"/"Attacks",
-    /// "a non-Attack card"/"non-Attack cards", and the unfiltered "a card"/"cards". Lockstep with cardgen._hand_kind_words.</summary>
-    private static (string One, string Many) HandKindWords(string? kind) => kind switch
+    /// "a non-Attack card"/"non-Attack cards", and the unfiltered "a card"/"cards" (+ the bare noun, "Attack"/"card").
+    /// Lockstep with cardgen._hand_kind_words.</summary>
+    private static (string One, string Many, string Noun) HandKindWords(string? kind)
     {
-        "attack"     => ("an Attack", "Attacks"),
-        "skill"      => ("a Skill", "Skills"),
-        "power"      => ("a Power", "Powers"),
-        "non_attack" => ("a non-Attack card", "non-Attack cards"),
-        _            => ("a card", "cards"),
-    };
+        string kk = kind switch { "attack" => "attack", "skill" => "skill", "power" => "power", "non_attack" => "non_attack", _ => "card" };
+        var (one, many) = kind switch
+        {
+            "attack"     => ("an Attack", "Attacks"),
+            "skill"      => ("a Skill", "Skills"),
+            "power"      => ("a Power", "Powers"),
+            "non_attack" => ("a non-Attack card", "non-Attack cards"),
+            _            => ("a card", "cards"),
+        };
+        return (Tx("noun.one." + kk, one), Tx("noun.many." + kk, many), Tx("noun.bare." + kk, one[(one.IndexOf(' ') + 1)..]));
+    }
 
     /// <summary>Phase BC (v57, gap #52): the exhaust_card sentence — "Exhaust a card in your hand." / "Exhaust 2 random
     /// cards in your hand." / "Exhaust up to 3 cards in your hand." / "Exhaust all non-Attack cards in your hand." /
@@ -3348,22 +3476,25 @@ public static class ForgedCards
     private static string ExhaustCardSentence(EffectSpec e)
     {
         // Phase BR (v70, gap #79): the untyped whole hand reads "Exhaust your hand." (Fiend Fire / Second Wind's shape).
-        if (e.Cards == "all" && e.CardKind == null && e.Pile != "draw") return "Exhaust your hand.";
-        var (one, many) = HandKindWords(e.CardKind);
+        if (e.Cards == "all" && e.CardKind == null && e.Pile != "draw") return Tx("card.exhaust_card.hand", "Exhaust your hand.");
+        var (one, many, noun) = HandKindWords(e.CardKind);
         int n = Math.Max(1, e.Amount);
-        string what = e.Cards switch
+        string where = e.Pile == "draw" ? Tx("pile.draw", "draw pile") : Tx("pile.hand", "hand"); // Phase BO (v66): + the draw pile
+        return e.Cards switch
         {
-            "all"    => $"all {many}",
-            "random" => n > 1 ? $"{n} random {many}" : $"a random {one[(one.IndexOf(' ') + 1)..]}",
-            "up_to"  => $"up to {n} {many}",
-            _        => n > 1 ? $"{n} {many}" : one,
+            "all"    => Fx("card.exhaust_card.all", "Exhaust all {many} in your {where}.", ("many", many), ("where", where)),
+            "random" => n > 1 ? Fx("card.exhaust_card.random_n", "Exhaust {n} random {many} in your {where}.", ("n", n), ("many", many), ("where", where))
+                              : Fx("card.exhaust_card.random_1", "Exhaust a random {noun} in your {where}.", ("noun", noun), ("where", where)),
+            "up_to"  => Fx("card.exhaust_card.up_to", "Exhaust up to {n} {many} in your {where}.", ("n", n), ("many", many), ("where", where)),
+            _        => n > 1 ? Fx("card.exhaust_card.choose_n", "Exhaust {n} {many} in your {where}.", ("n", n), ("many", many), ("where", where))
+                              : Fx("card.exhaust_card.choose_1", "Exhaust {one} in your {where}.", ("one", one), ("where", where)),
         };
-        return $"Exhaust {what} in your {(e.Pile == "draw" ? "draw pile" : "hand")}."; // Phase BO (v66): + the draw pile
     }
 
     /// <summary>Phase BC (v57, gap #53): the draw_until sentence — "Draw cards until you draw a non-Attack card." /
     /// "… a Skill." Lockstep with cardgen._draw_until_sentence.</summary>
-    private static string DrawUntilSentence(EffectSpec e) => $"Draw cards until you draw {HandKindWords(e.CardKind).One}.";
+    private static string DrawUntilSentence(EffectSpec e) =>
+        Fx("card.draw_until", "Draw cards until you draw {one}.", ("one", HandKindWords(e.CardKind).One));
 
     /// <summary>Phase AP (v46): the display name of a base-game Status card kind. Lockstep with cardgen.STATUS_CARD_NAME.</summary>
     internal static string StatusCardName(string? kind) => kind switch
@@ -3377,47 +3508,28 @@ public static class ForgedCards
     /// (Phase AP adds the exhaust pile). Lockstep with cardgen._pile_phrase.</summary>
     private static string PilePhrase(string? pile) => pile switch
     {
-        "discard" => "discard pile",
-        "draw"    => "draw pile",
-        "exhaust" => "exhaust pile", // Phase AP (v46): retrieve_card's second source
-        _         => "hand",
+        "discard" => Tx("pile.discard", "discard pile"),
+        "draw"    => Tx("pile.draw", "draw pile"),
+        "exhaust" => Tx("pile.exhaust", "exhaust pile"), // Phase AP (v46): retrieve_card's second source
+        _         => Tx("pile.hand", "hand"),
     };
 
     private static string ChannelFragment(EffectSpec e)
     {
-        string name = OrbDisplay(e.Orb);
+        string name = OrbDisplay(e.Orb), word = OrbWord(e.Orb);
         int oc = Math.Max(1, e.Amount);
-        return oc > 1 ? $"channel {oc} {name} orbs" : $"channel a {name} orb";
+        return oc > 1 ? Fx("frag.channel.n", "channel {n} {orb} orbs", ("n", oc), ("orb", name), ("orbname", word))
+                      : Fx("frag.channel.1", "channel a {orb} orb", ("orb", name), ("orbname", word));
     }
 
     /// <summary>Display name for an orb in card text. Base orbs title-cased; <c>random</c> stays lowercase; a
     /// custom orb name (Phase I, declared in a class orb_pool) is title-cased from its lowercase id. Mirrors
-    /// cardgen.py <c>_orb_display</c>.</summary>
+    /// cardgen.py <c>_orb_display</c>. English only (also used for matching); the localized word is <see cref="OrbWord"/>.</summary>
     internal static string OrbDisplay(string? orb) => orb switch
     {
         "lightning" => "Lightning", "frost" => "Frost", "dark" => "Dark", "random" => "random",
         null or "" => "orb",
         _ => System.Globalization.CultureInfo.InvariantCulture.TextInfo.ToTitleCase(orb.Replace('_', ' ')),
-    };
-
-    /// <summary>Display name for a status (mirrors the apply_status case in Describe and cardgen.STATUS_NAME).</summary>
-    private static string StatusName(string? status) => status switch
-    {
-        "vulnerable" => "Vulnerable", "weak" => "Weak", "frail" => "Frail", "poison" => "Poison",
-        "strength" => "Strength", "dexterity" => "Dexterity", "thorns" => "Thorns", "regen" => "Regen",
-        "metallicize" => "Metallicize", "artifact" => "Artifact", "buffer" => "Buffer",
-        "intangible" => "Intangible", "ritual" => "Ritual", "blur" => "Blur",
-        "temp_strength" => "Strength", "temp_dexterity" => "Dexterity", "barricade" => "Barricade",
-        "focus" => "Focus",
-        "temp_thorns" => "Thorns", "temp_focus" => "Focus", // Phase AN (v44)
-        "vigor" => "Vigor", "double_damage" => "Double Damage", // Phase BF (v60)
-        "temp_strength_down" => "Strength Down", "strength_down" => "Strength Down", "doom" => "Doom", // Phase BL (v64)
-        // Phase BM (v65, gaps #68/#69): the self statuses (their card text is BmStatusSentence; these name them elsewhere).
-        "no_draw" => "No Draw", "no_energy_gain" => "No Energy Gain", "no_block_gain" => "No Block",
-        "dex_decay" => "Wraith Form", "focus_decay" => "Biased Cognition", "lose_strength" => "Strength",
-        "lose_dexterity" => "Dexterity", "lose_focus" => "Focus", "echo_form" => "Echo Form",
-        "loop" => "Loop", // Phase BQ (v68, gap #78)
-        _ => status ?? "",
     };
 
     private static string Str(Godot.Collections.Dictionary d, string key, string fallback = "") =>

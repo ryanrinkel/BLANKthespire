@@ -147,9 +147,10 @@ def _t_describe() -> None:
     got = cardgen.describe(SANDS, "enemy")
     check(got == "Retain.\nDeal {Damage} damage.\nCosts 1 less for each turn it is retained.", f"sands: {got!r}")
     fc = _cs("Engine", "ForgedCards.cs")
-    for frag in ('damage{dmgSuffix}{ub}. Grows by {e.GrowHeld} each turn it is retained."',
-                 '$"Gain {{CalculatedBlock}} Block. Grows by {e.GrowHeld} each turn it is retained."',
-                 '$"Costs {Math.Max(1, e.Amount)} less for each turn it is retained."'):
+    # i18n (I18N_PLAN C1): ForgedText templates, English inline; {to}/{ub}/{grow}/{n} are the named placeholders.
+    for frag in ('"Deal {CalculatedDamage} damage{to}{ub}. Grows by {grow} each turn it is retained.", ("to", dmgSuffix), ("ub", ub), ("grow", e.GrowHeld))',
+                 'Fx("card.block.grow_held", "Gain {CalculatedBlock} Block. Grows by {grow} each turn it is retained.", ("grow", e.GrowHeld))',
+                 'Fx("card.held_discount", "Costs {n} less for each turn it is retained.", ("n", Math.Max(1, e.Amount)))'):
         check(frag in fc, f"C# Describe carries {frag!r}")
     check(cardgen.effect_literal({"op": "damage", "amount": 7, "grow_held": 4}) == 'new EffectSpec("damage", 7, GrowHeld: 4)', "damage literal")
     check(cardgen.effect_literal({"op": "block", "amount": 5, "grow_held": 2}) == 'new EffectSpec("block", 5, GrowHeld: 2)', "block literal")

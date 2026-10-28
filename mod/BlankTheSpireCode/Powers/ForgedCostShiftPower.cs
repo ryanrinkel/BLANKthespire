@@ -205,9 +205,9 @@ public sealed class ForgedCostShiftPower : BlankTheSpirePower
     }
 
     public override List<(string, string)>? Localization =>
-        (List<(string, string)>)new PowerLoc("Cost Shift",
-            "Some of your cards cost less energy (for this turn, this combat, or your next few plays). Each stack is one live discount.",
-            "Some of your cards cost less energy (for this turn, this combat, or your next few plays). Each stack is one live discount.");
+        (List<(string, string)>)new PowerLoc(ForgedText.T("power.cost_shift.title", "Cost Shift"),
+            ForgedText.T("power.cost_shift.desc", "Some of your cards cost less energy (for this turn, this combat, or your next few plays). Each stack is one live discount."),
+            ForgedText.T("power.cost_shift.desc", "Some of your cards cost less energy (for this turn, this combat, or your next few plays). Each stack is one live discount."));
 
     // Emoji icon via the runtime renderer (kicked in MainFile); falls back to the shipped placeholder.
     public override string? CustomPackedIconPath => EmojiIconRenderer.IconPath("cost_shift") ?? base.CustomPackedIconPath;

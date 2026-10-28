@@ -132,7 +132,9 @@ def _t_generation() -> None:
     d = cardgen.describe(_reflex([{"op": "block", "amount": 6}]), "self")
     check(d == "Whenever this card is discarded, gain 6 Block.", f"byte-match sentence unchanged (got {d!r})")
     fc = (MOD_CODE / "Engine" / "ForgedCards.cs").read_text(encoding="utf-8")
-    check('"on_discard"      => "Whenever this card is discarded"' in fc, "C# TriggerFragment unchanged (byte-match contract)")
+    # i18n (I18N_PLAN C1): the head is "Whenever {evt}" + the event clause, English inline in ForgedText calls.
+    check('"on_discard"      => Tx("evt.on_discard", "this card is discarded")' in fc
+          and 'Fx("trig.whenever", "Whenever {evt}", ("evt", evt))' in fc, "C# TriggerFragment unchanged (byte-match contract)")
     v = CardValidator()
     check(v.validate(_card(_reflex([{"op": "block", "amount": 6}]))).ok,
           f"on_discard Reflex card still validates: {v.validate(_card(_reflex([{'op': 'block', 'amount': 6}]))).errors}")

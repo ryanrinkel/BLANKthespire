@@ -102,7 +102,7 @@ public sealed class ForgedSummonPower : BlankTheSpirePower
     // own describe); this buff just labels the driver generically.
     public override List<(string, string)>? Localization =>
         (List<(string, string)>)new PowerLoc(
-            "Summoned Ally",
-            "A bodyguard that soaks the hits aimed at you; your summon cards strike through it.",
-            "A bodyguard that soaks the hits aimed at you; your summon cards strike through it.");
+            ForgedText.T("power.summoned_ally.title", "Summoned Ally"),
+            ForgedText.T("power.summoned_ally.desc", "A bodyguard that soaks the hits aimed at you; your summon cards strike through it."),
+            ForgedText.T("power.summoned_ally.desc", "A bodyguard that soaks the hits aimed at you; your summon cards strike through it."));
 }

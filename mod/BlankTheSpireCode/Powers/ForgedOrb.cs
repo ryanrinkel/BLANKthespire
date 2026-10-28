@@ -181,8 +181,10 @@ public abstract class ForgedOrb : CustomOrbModel
         get
         {
             var s = Source;
-            string title = s?.Name ?? "Forged Orb";
-            string desc = s != null ? OrbRunner.Describe(s) : "An empty forged orb.";
+            string title = s != null ? ForgedText.Name(s.Loc, s.Name) : ForgedText.T("orb.empty_title", "Forged Orb");
+            string desc;
+            if (s == null) desc = ForgedText.T("orbtip.none", "An empty forged orb.");
+            else using (ForgedText.InClass(OrbClass)) desc = OrbRunner.Describe(s); // i18n: rules text in the game language
             return (List<(string, string)>)new OrbLoc(title, desc, desc);
         }
     }

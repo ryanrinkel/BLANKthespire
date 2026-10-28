@@ -52,9 +52,9 @@ public sealed class SpikeSharpenPower : BlankTheSpirePower
     // Emoji in the title — the in-code tooltip test (no .pck rebuild). Description kept emoji-free/clean.
     public override List<(string, string)>? Localization =>
         (List<(string, string)>)new PowerLoc(
-            "🗡️ Sharpen",
-            "Your attacks deal bonus damage equal to its stacks.",
-            "Your attacks deal bonus damage equal to its stacks.");
+            ForgedText.T("power.sharpen.title", "🗡️ Sharpen"),
+            ForgedText.T("power.sharpen.desc", "Your attacks deal bonus damage equal to its stacks."),
+            ForgedText.T("power.sharpen.desc", "Your attacks deal bonus damage equal to its stacks."));
 
     // Emoji-as-icon experiment: a runtime-rendered PNG of an emoji glyph (see EmojiIconRenderer). Returns null
     // until the render is ready AND proven loadable by Godot's resource loader, so a failure can't hang/break

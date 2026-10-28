@@ -11,6 +11,7 @@ using MegaCrit.Sts2.Core.Entities.Powers; // Phase BL (v64): PowerType for the S
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Powers;
+using BlankTheSpire.BlankTheSpireCode.Engine; // ForgedText (i18n)
 
 namespace BlankTheSpire.BlankTheSpireCode.Powers;
 
@@ -67,9 +68,9 @@ public sealed class ForgedTempStrengthPower : ForgedTempStatPower
     public override string CustomPackedIconPath => "strength_temp.png".PowerImagePath();
     public override string CustomBigIconPath => "strength_temp.png".BigPowerImagePath();
     public override List<(string, string)>? Localization =>
-        (List<(string, string)>)new PowerLoc("Temporary Strength",
-            "Gain Strength for this turn (removed at the end of your turn).",
-            "Gain Strength for this turn (removed at the end of your turn).");
+        (List<(string, string)>)new PowerLoc(ForgedText.T("power.temp_strength.title", "Temporary Strength"),
+            ForgedText.T("power.temp_strength.desc", "Gain Strength for this turn (removed at the end of your turn)."),
+            ForgedText.T("power.temp_strength.desc", "Gain Strength for this turn (removed at the end of your turn)."));
 }
 
 /// <summary>Temporary Dexterity: +Dexterity now, removed at the end of your turn.</summary>
@@ -85,9 +86,9 @@ public sealed class ForgedTempDexterityPower : ForgedTempStatPower
     public override string CustomPackedIconPath => "dexterity_temp.png".PowerImagePath();
     public override string CustomBigIconPath => "dexterity_temp.png".BigPowerImagePath();
     public override List<(string, string)>? Localization =>
-        (List<(string, string)>)new PowerLoc("Temporary Dexterity",
-            "Gain Dexterity for this turn (removed at the end of your turn).",
-            "Gain Dexterity for this turn (removed at the end of your turn).");
+        (List<(string, string)>)new PowerLoc(ForgedText.T("power.temp_dexterity.title", "Temporary Dexterity"),
+            ForgedText.T("power.temp_dexterity.desc", "Gain Dexterity for this turn (removed at the end of your turn)."),
+            ForgedText.T("power.temp_dexterity.desc", "Gain Dexterity for this turn (removed at the end of your turn)."));
 }
 
 /// <summary>Phase AN (v44) — Temporary Thorns: +Thorns now, removed at the end of your turn (a one-turn bristle: the
@@ -107,9 +108,9 @@ public sealed class ForgedTempThornsPower : ForgedTempStatPower
     public override string CustomPackedIconPath => "thorns_temp.png".PowerImagePath();
     public override string CustomBigIconPath => "thorns_temp.png".BigPowerImagePath();
     public override List<(string, string)>? Localization =>
-        (List<(string, string)>)new PowerLoc("Temporary Thorns",
-            "Gain Thorns for this turn (removed at the end of your turn).",
-            "Gain Thorns for this turn (removed at the end of your turn).");
+        (List<(string, string)>)new PowerLoc(ForgedText.T("power.temp_thorns.title", "Temporary Thorns"),
+            ForgedText.T("power.temp_thorns.desc", "Gain Thorns for this turn (removed at the end of your turn)."),
+            ForgedText.T("power.temp_thorns.desc", "Gain Thorns for this turn (removed at the end of your turn)."));
 }
 
 /// <summary>Phase AN (v44) — Temporary Focus: +Focus now, removed at the end of your turn. Orb passives fire in
@@ -130,9 +131,9 @@ public sealed class ForgedTempFocusPower : ForgedTempStatPower
     public override string CustomPackedIconPath => "focus_temp.png".PowerImagePath();
     public override string CustomBigIconPath => "focus_temp.png".BigPowerImagePath();
     public override List<(string, string)>? Localization =>
-        (List<(string, string)>)new PowerLoc("Temporary Focus",
-            "Gain Focus for this turn (removed at the end of your turn).",
-            "Gain Focus for this turn (removed at the end of your turn).");
+        (List<(string, string)>)new PowerLoc(ForgedText.T("power.temp_focus.title", "Temporary Focus"),
+            ForgedText.T("power.temp_focus.desc", "Gain Focus for this turn (removed at the end of your turn)."),
+            ForgedText.T("power.temp_focus.desc", "Gain Focus for this turn (removed at the end of your turn)."));
 }
 
 /// <summary>Phase BL (v64, gap #66) — Temporary Strength DOWN on an ENEMY (Piercing Wail / Dark Shackles): -N Strength now,
@@ -174,7 +175,7 @@ public sealed class ForgedTempStrengthDownPower : ForgedTempStatPower
     public override string CustomPackedIconPath => "strength_down.png".PowerImagePath();
     public override string CustomBigIconPath => "strength_down.png".BigPowerImagePath();
     public override List<(string, string)>? Localization =>
-        (List<(string, string)>)new PowerLoc("Strength Down",
-            "Loses Strength until the end of its turn.",
-            "Loses {Amount} Strength until the end of its turn."); // smartDescription: PowerModel adds "Amount"
+        (List<(string, string)>)new PowerLoc(ForgedText.T("power.strength_down.title", "Strength Down"),
+            ForgedText.T("power.strength_down.desc", "Loses Strength until the end of its turn."),
+            ForgedText.T("power.strength_down.smart", "Loses {Amount} Strength until the end of its turn.")); // smartDescription: PowerModel adds "Amount"
 }

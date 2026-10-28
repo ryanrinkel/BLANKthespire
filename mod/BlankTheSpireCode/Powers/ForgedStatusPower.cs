@@ -226,8 +226,8 @@ public abstract class ForgedStatusPower : BlankTheSpirePower
         get
         {
             var s = Source;
-            string title = s != null ? $"{s.Emoji} {s.Name}".Trim() : "Forged Status";
-            string desc = s != null ? Describe(s) : "An empty forged status.";
+            string title = s != null ? $"{s.Emoji} {ForgedText.Name(s.Loc, s.Name)}".Trim() : ForgedText.T("statustip.empty_title", "Forged Status");
+            string desc = s != null ? s.Loc.LocDescription(ForgedText.Lang) ?? Describe(s) : ForgedText.T("statustip.none", "An empty forged status.");
             return (List<(string, string)>)new PowerLoc(title, desc, desc);
         }
     }
@@ -240,31 +240,32 @@ public abstract class ForgedStatusPower : BlankTheSpirePower
     public static string Describe(StatusSpec s)
     {
         if (!string.IsNullOrWhiteSpace(s.Description)) return s.Description;
-        string who = s.IsBuff ? "Your" : "This enemy's";
+        // i18n: ForgedText keys "statustip.*" (inline English).
+        string who = s.IsBuff ? ForgedText.T("statustip.who.buff", "Your") : ForgedText.T("statustip.who.debuff", "This enemy's");
         bool mult = s.Mode == "multiplicative";
         string body = s.Hook switch
         {
             "damage_dealt" => mult
-                ? $"{who} attacks deal 10% more damage per stack (up to double)."
-                : $"{who} attacks deal bonus damage equal to its stacks.",
+                ? ForgedText.F("statustip.damage_dealt.mult", "{who} attacks deal 10% more damage per stack (up to double).", ("who", who))
+                : ForgedText.F("statustip.damage_dealt.add", "{who} attacks deal bonus damage equal to its stacks.", ("who", who)),
             "damage_taken" => mult
-                ? (s.IsBuff ? "You take 10% more damage per stack (up to double)."
-                            : "This enemy takes 10% more damage per stack (up to double).")
-                : (s.IsBuff ? "You take bonus damage equal to its stacks."
-                            : "This enemy takes bonus damage equal to its stacks."),
-            "block_gained" => "You gain bonus Block equal to its stacks when you gain Block.",
-            "energy_gain"  => "You gain bonus energy equal to its stacks each turn.",
-            "card_draw"    => "You draw bonus cards equal to its stacks.",
-            "damage_over_time" => "At the start of its turn, this enemy loses HP equal to its stacks.", // AQ
-            "hit_count"    => "Your Attacks hit an extra time per stack.",                             // AQ
-            _ => "A forged status.",
+                ? (s.IsBuff ? ForgedText.T("statustip.damage_taken.mult.buff", "You take 10% more damage per stack (up to double).")
+                            : ForgedText.T("statustip.damage_taken.mult.debuff", "This enemy takes 10% more damage per stack (up to double)."))
+                : (s.IsBuff ? ForgedText.T("statustip.damage_taken.add.buff", "You take bonus damage equal to its stacks.")
+                            : ForgedText.T("statustip.damage_taken.add.debuff", "This enemy takes bonus damage equal to its stacks.")),
+            "block_gained" => ForgedText.T("statustip.block_gained", "You gain bonus Block equal to its stacks when you gain Block."),
+            "energy_gain"  => ForgedText.T("statustip.energy_gain", "You gain bonus energy equal to its stacks each turn."),
+            "card_draw"    => ForgedText.T("statustip.card_draw", "You draw bonus cards equal to its stacks."),
+            "damage_over_time" => ForgedText.T("statustip.damage_over_time", "At the start of its turn, this enemy loses HP equal to its stacks."), // AQ
+            "hit_count"    => ForgedText.T("statustip.hit_count", "Your Attacks hit an extra time per stack."),                             // AQ
+            _ => ForgedText.T("statustip.empty", "A forged status."),
         };
         // Decay runs at the end of the OWNER's side's turn: "your" turn for a buff, "its" turn for a debuff on an enemy.
-        string whose = s.IsBuff ? "your" : "its";
+        string whose = s.IsBuff ? ForgedText.T("statustip.whose.buff", "your") : ForgedText.T("statustip.whose.debuff", "its");
         string decay = s.Decay switch
         {
-            "lose_one_eot" => $" Loses 1 stack at the end of {whose} turn.",
-            "lose_all_eot" => $" Expires at the end of {whose} turn.",
+            "lose_one_eot" => ForgedText.F("statustip.decay.one", " Loses 1 stack at the end of {whose} turn.", ("whose", whose)),
+            "lose_all_eot" => ForgedText.F("statustip.decay.all", " Expires at the end of {whose} turn.", ("whose", whose)),
             _ => "",
         };
         return body + decay;

@@ -174,6 +174,15 @@ public sealed record CardSpec(
     string[]? Tags = null,
     int? UpgradedCost = null)
 {
+    /// <summary>i18n (I18N_PLAN C2): the bundle's optional <c>loc</c> strings for this entry, keyed by the GAME's locale
+    /// code ("zhs", ...). Null/absent = English only. A missing field falls back to the English one.</summary>
+    public IReadOnlyDictionary<string, LocText>? Loc { get; init; }
+
+    /// <summary>i18n: true when <see cref="Description"/> was synthesized from the effects (no explicit
+    /// <c>description</c>/<c>text</c> in the card JSON). <see cref="Description"/> is always the ENGLISH rendering; a
+    /// translated language re-renders the effects through <see cref="ForgedText"/> (see <see cref="DataCard"/>).</summary>
+    public bool TextFromEffects { get; init; }
+
     /// <summary>The 1-based forged CLASS slot this spec was loaded for, or 0 for the shared forged-card pool
     /// (and for codegen'd cards). Stamped by <see cref="ForgedCharacters"/> when it reads
     /// <c>user://forged/characters/KK/cards/NN.json</c>, because a card's own slot number is per-class and the

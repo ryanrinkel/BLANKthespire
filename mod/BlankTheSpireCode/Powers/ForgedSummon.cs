@@ -78,7 +78,8 @@ public abstract class ForgedSummon : CustomPetModel, ILocalizationProvider
     // In-code localization (no .pck rebuild): the minion's name under the "monsters" loc table.
     public string? LocTable => "monsters";
     public List<(string, string)>? Localization =>
-        (List<(string, string)>)new MonsterLoc(Source?.Name ?? "Forged Summon", []);
+        (List<(string, string)>)new MonsterLoc(Source != null ? ForgedText.Name(Source.Loc, Source.Name) // i18n: the bundle's loc
+                                                              : ForgedText.T("summon.empty_title", "Forged Summon"), []);
 
     /// <summary>
     /// Re-lay-out the player's summoned pets to the RIGHT of the player. The game's default pet placement

@@ -221,34 +221,37 @@ public static class Conditions
 
     /// <summary>The bare predicate phrase for card text, e.g. "your orbs match". The caller prefixes
     /// "if "/"unless " (per <see cref="Condition.Negate"/>). Kept in lockstep with cardgen.py.</summary>
+    // i18n (I18N_PLAN C1): the inline strings are the English; ForgedText tables override by key ("cond.<kind>").
+    // Known English quirk kept as is: target_has_status prints the raw status id ("the enemy has vulnerable"); a table
+    // gets the localized word as {statusname}.
     public static string Phrase(Condition c) => c.Kind switch
     {
-        "orbs_match"         => "your orbs match",
-        "orb_count_ge"       => c.Orb != null ? $"you have {c.Value}+ {ForgedCards.OrbDisplay(c.Orb)} orbs" // Phase BQ (v68)
-                                                : $"you have {c.Value}+ orbs",
-        "target_has_status"  => $"the enemy has {c.Status}",
-        "no_block"           => "you have no Block",
-        "hp_below_half"      => "your HP is below half",
-        "has_block"          => c.Value > 1 ? $"you have {c.Value}+ Block" : "you have Block",
-        "enemy_count_ge"     => $"there are {c.Value}+ enemies",
-        "turn_at_least"      => $"it is turn {c.Value}+",
-        "turn_at_most"       => $"it is turn {c.Value} or earlier", // Phase BB (v56, gap #59)
-        "hand_size_ge"       => $"you hold {c.Value}+ cards",
-        "retained_last_turn" => "you held this card",
-        "forged_ge"          => $"your Forge is {c.Value}+",
-        "draw_pile_empty"    => "your draw pile is empty",   // Phase P (gap #24)
-        "hp_lost_ge"         => $"you have lost {c.Value} or more HP this turn", // Phase AD (gap #12)
-        "dark_ge"            => $"your Dark is {c.Value}+",              // Phase S (gap #1)
-        "light_ge"           => $"your Light is {c.Value}+",            // Phase S (gap #1)
-        "centered"           => $"you are centered (within {c.Value})", // Phase S (gap #1)
-        "target_hp_below_half" => "the enemy is below half HP",                          // Phase AM (v43)
-        "target_has_block"     => "the enemy has Block",                                 // Phase AM (v43)
-        "energy_ge"            => $"you have {c.Value}+ energy",                         // Phase AM (v43)
-        "cards_played_this_turn_ge" => $"you have played {c.Value}+ cards this turn",   // Phase AM (v43)
-        "exhausted_this_turn"       => "you have Exhausted a card this turn",            // Phase BJ (v62)
-        "played_cards_last_turn_ge" => $"you played {c.Value}+ cards last turn",         // Phase BJ (v62)
-        "target_intends_attack"     => "the enemy intends to attack",                    // Phase BJ (v62)
-        "target_killed"             => "this kills the enemy",                           // Phase BN (v69): AoE cards read "an enemy" (ForgedCards.Describe)
+        "orbs_match"         => ForgedText.T("cond.orbs_match", "your orbs match"),
+        "orb_count_ge"       => c.Orb != null ? ForgedText.F("cond.orb_count_ge.orb", "you have {n}+ {orb} orbs", ("n", c.Value), ("orb", ForgedCards.OrbDisplay(c.Orb)), ("orbname", ForgedCards.OrbWord(c.Orb))) // Phase BQ (v68)
+                                                : ForgedText.F("cond.orb_count_ge", "you have {n}+ orbs", ("n", c.Value)),
+        "target_has_status"  => ForgedText.F("cond.target_has_status", "the enemy has {status}", ("status", c.Status), ("statusname", ForgedCards.StatusWord(c.Status))),
+        "no_block"           => ForgedText.T("cond.no_block", "you have no Block"),
+        "hp_below_half"      => ForgedText.T("cond.hp_below_half", "your HP is below half"),
+        "has_block"          => c.Value > 1 ? ForgedText.F("cond.has_block.n", "you have {n}+ Block", ("n", c.Value)) : ForgedText.T("cond.has_block", "you have Block"),
+        "enemy_count_ge"     => ForgedText.F("cond.enemy_count_ge", "there are {n}+ enemies", ("n", c.Value)),
+        "turn_at_least"      => ForgedText.F("cond.turn_at_least", "it is turn {n}+", ("n", c.Value)),
+        "turn_at_most"       => ForgedText.F("cond.turn_at_most", "it is turn {n} or earlier", ("n", c.Value)), // Phase BB (v56, gap #59)
+        "hand_size_ge"       => ForgedText.F("cond.hand_size_ge", "you hold {n}+ cards", ("n", c.Value)),
+        "retained_last_turn" => ForgedText.T("cond.retained_last_turn", "you held this card"),
+        "forged_ge"          => ForgedText.F("cond.forged_ge", "your Forge is {n}+", ("n", c.Value)),
+        "draw_pile_empty"    => ForgedText.T("cond.draw_pile_empty", "your draw pile is empty"),   // Phase P (gap #24)
+        "hp_lost_ge"         => ForgedText.F("cond.hp_lost_ge", "you have lost {n} or more HP this turn", ("n", c.Value)), // Phase AD (gap #12)
+        "dark_ge"            => ForgedText.F("cond.dark_ge", "your Dark is {n}+", ("n", c.Value)),              // Phase S (gap #1)
+        "light_ge"           => ForgedText.F("cond.light_ge", "your Light is {n}+", ("n", c.Value)),            // Phase S (gap #1)
+        "centered"           => ForgedText.F("cond.centered", "you are centered (within {n})", ("n", c.Value)), // Phase S (gap #1)
+        "target_hp_below_half" => ForgedText.T("cond.target_hp_below_half", "the enemy is below half HP"),                          // Phase AM (v43)
+        "target_has_block"     => ForgedText.T("cond.target_has_block", "the enemy has Block"),                                 // Phase AM (v43)
+        "energy_ge"            => ForgedText.F("cond.energy_ge", "you have {n}+ energy", ("n", c.Value)),                         // Phase AM (v43)
+        "cards_played_this_turn_ge" => ForgedText.F("cond.cards_played_this_turn_ge", "you have played {n}+ cards this turn", ("n", c.Value)),   // Phase AM (v43)
+        "exhausted_this_turn"       => ForgedText.T("cond.exhausted_this_turn", "you have Exhausted a card this turn"),            // Phase BJ (v62)
+        "played_cards_last_turn_ge" => ForgedText.F("cond.played_cards_last_turn_ge", "you played {n}+ cards last turn", ("n", c.Value)),         // Phase BJ (v62)
+        "target_intends_attack"     => ForgedText.T("cond.target_intends_attack", "the enemy intends to attack"),                    // Phase BJ (v62)
+        "target_killed"             => ForgedText.T("cond.target_killed", "this kills the enemy"),                           // Phase BN (v69): AoE cards read "an enemy" (ForgedCards.Describe)
         _ => c.Kind,
     };
 }

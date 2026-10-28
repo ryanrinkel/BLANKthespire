@@ -160,8 +160,12 @@ def _t_describe() -> None:
         got = cardgen.describe(fx, "self")
         check(got == want, f"{fx[0]} -> {got!r} (want {want!r})")
     fc = _cs("Engine", "ForgedCards.cs")
-    for frag in ('"all"    => $"all {many}"', '"up_to"  => $"up to {n} {many}"', 'return $"Exhaust {what} in your {(e.Pile == "draw" ? "draw pile" : "hand")}.";',
-                 '$"Draw cards until you draw {HandKindWords(e.CardKind).One}."', '"non_attack" => ("a non-Attack card", "non-Attack cards")'):
+    # i18n (I18N_PLAN C1): the sentences are whole ForgedText templates now (English inline at the call site).
+    for frag in ('"all"    => Fx("card.exhaust_card.all", "Exhaust all {many} in your {where}.", ("many", many), ("where", where))',
+                 '"up_to"  => Fx("card.exhaust_card.up_to", "Exhaust up to {n} {many} in your {where}.", ("n", n), ("many", many), ("where", where))',
+                 'string where = e.Pile == "draw" ? Tx("pile.draw", "draw pile") : Tx("pile.hand", "hand");',
+                 'Fx("card.draw_until", "Draw cards until you draw {one}.", ("one", HandKindWords(e.CardKind).One))',
+                 '"non_attack" => ("a non-Attack card", "non-Attack cards")'):
         check(frag in fc, f"C# Describe carries {frag!r}")
     lit = cardgen.effect_literal({"op": "exhaust_card", "cards": "up_to", "amount": 2, "card_type": "skill"})
     check(lit == 'new EffectSpec("exhaust_card", 2, Cards: "up_to", CardKind: "skill")', f"C# literal: {lit}")

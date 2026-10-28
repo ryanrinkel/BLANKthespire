@@ -178,14 +178,18 @@ def _t_rules_and_describe() -> None:
         got = cardgen.describe([t], "self")
         check(got == want, f"describe {got!r} == {want!r}")
     fc = _cs("Engine", "ForgedCards.cs")
-    for frag in ('when = $"Whenever you {(t.Trigger == "on_card_drawn" ? "draw" : "play")} {TriggerKindWord(t.CardKind)}";',
-                 'when = $"Every {nth} card you play";', 'when = $"Every {nth} card you draw";',
-                 'when = $"Every {nth} time {when["Whenever ".Length..]}";',
-                 'when = $"This turn, {char.ToLowerInvariant(when[0])}{when[1..]}";',
-                 '"attack" => "an Attack", "skill" => "a Skill", "power" => "a Power",',
-                 '"non_attack" => "a non-Attack card", "status" => "a Status", _ => "a card",',
+    # i18n (I18N_PLAN C1): the head is built from ForgedText templates (English inline); "Whenever {evt}" wraps the
+    # event clause, so "Every {nth} time {evt}" reuses the clause instead of slicing "Whenever " off the head.
+    for frag in ('Fx("evt.draw_kind", "you draw {kind}", ("kind", TriggerKindWord(t.CardKind)))',
+                 'Fx("evt.play_kind", "you play {kind}", ("kind", TriggerKindWord(t.CardKind)))',
+                 'when = Fx("trig.every_n.play", "Every {nth} card you play", ("nth", nth), ("n", t.EveryN));',
+                 'when = Fx("trig.every_n.draw", "Every {nth} card you draw", ("nth", nth), ("n", t.EveryN));',
+                 'when = Fx("trig.every_n.time", "Every {nth} time {evt}", ("nth", nth), ("n", t.EveryN), ("evt", evt));',
+                 'when = Fx("trig.this_turn", "This turn, {when}", ("when", $"{char.ToLowerInvariant(when[0])}{when[1..]}"));',
+                 '"attack" => Tx("noun.one.attack", "an Attack"), "skill" => Tx("noun.one.skill", "a Skill"), "power" => Tx("noun.one.power", "a Power"),',
+                 '"non_attack" => Tx("noun.one.non_attack", "a non-Attack card"), "status" => Tx("noun.one.status", "a Status"), _ => Tx("noun.one.card", "a card"),',
                  'n + (n == 2 ? "nd" : n == 3 ? "rd" : "th")',
-                 'e.Target == "random_enemy" ? " to a random enemy"'):  # Phase BP (v67): + that_enemy follows
+                 'e.Target == "random_enemy" ? Tx("to.random", " to a random enemy")'):  # Phase BP (v67): + that_enemy follows
         check(frag in fc, f"C# fragment present: {frag}")
     lit = cardgen.effect_literal(JUGGLE)
     check(lit.endswith(', CardKind: "attack", EveryN: 3)') and 'Target: "random_enemy"' in lit, f"effect_literal named args: {lit}")

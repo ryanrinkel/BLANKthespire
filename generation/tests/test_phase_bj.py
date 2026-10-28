@@ -267,16 +267,17 @@ def _t_rules_and_describe() -> None:
             continue
         noun = cardgen._scale_phrase(scale)
         check(re.search(r'"' + scale + r'"\s+=> "' + re.escape(noun) + '",', fc) is not None, f"C# ScalePhrase: {scale} => {noun!r}")
-    for frag in ('e.Scale == "target_status_stacks" ? $"the enemy\'s {StatusDisplay(e.Status)}" : ScalePhrase(e.Scale);',
-                 ': e.Scale == "to_hand_size" ? "Draw cards until you have {Cards} in hand."',
-                 'parts.Add(e.Scale == "energy" ? "Double your energy." : "Gain {Energy} energy.");',
+    # i18n (I18N_PLAN C1): ForgedText keys, English inline at the call site (StatusWord = the localized StatusDisplay).
+    for frag in ('e.Scale == "target_status_stacks" ? Fx("scale.target_status_stacks", "the enemy\'s {status}", ("status", StatusWord(e.Status)))',
+                 ': e.Scale == "to_hand_size" ? Tx("card.draw.to_hand_size", "Draw cards until you have {Cards} in hand.")',
+                 'parts.Add(e.Scale == "energy" ? Tx("card.gain_energy.double", "Double your energy.") : Tx("card.gain_energy", "Gain {Energy} energy."));',
                  '"exhaust_pile_size"        => "the cards in your exhaust pile",   // Phase BJ (v62)',
                  '"total_enemy_poison"       => "the total Poison on ALL enemies",  // Phase BJ (v62)'):
         check(frag in fc, f"C# fragment present: {frag}")
     cond = _cs("Engine", "Conditions.cs")
-    for frag in ('"exhausted_this_turn"       => "you have Exhausted a card this turn",',
-                 '"played_cards_last_turn_ge" => $"you played {c.Value}+ cards last turn",',
-                 '"target_intends_attack"     => "the enemy intends to attack",'):
+    for frag in ('"exhausted_this_turn"       => ForgedText.T("cond.exhausted_this_turn", "you have Exhausted a card this turn"),',
+                 '"played_cards_last_turn_ge" => ForgedText.F("cond.played_cards_last_turn_ge", "you played {n}+ cards last turn", ("n", c.Value)),',
+                 '"target_intends_attack"     => ForgedText.T("cond.target_intends_attack", "the enemy intends to attack"),'):  # i18n
         check(frag in cond, f"C# Phrase present: {frag}")
     lit = cardgen.effect_literal(_sc("damage", "target_status_stacks", status="vulnerable"))
     check(lit == 'new EffectSpec("damage", 1, "vulnerable", 1, "target_status_stacks")', f"effect_literal carries the status: {lit}")

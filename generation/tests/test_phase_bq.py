@@ -199,7 +199,9 @@ def _t_engine() -> None:
     for frag in ("if (c.Orb != null) return OrbsOfType(player, c.Orb, c.Value);",
                  "System.Type? type = k > 0 ? ForgedCharacters.ResolveOrbType(k, orb) : null;",
                  'if (type == null && orb is "lightning" or "frost" or "dark") type = EffectRunner.OrbTypeFor(orb);',
-                 "[BQ] orb_count_ge[{orb}] -> ", 'c.Orb != null ? $"you have {c.Value}+ {ForgedCards.OrbDisplay(c.Orb)} orbs"'):
+                 "[BQ] orb_count_ge[{orb}] -> ",
+                 # i18n (I18N_PLAN C1): ForgedText template, English inline; {orb} = the English OrbDisplay
+                 'c.Orb != null ? ForgedText.F("cond.orb_count_ge.orb", "you have {n}+ {orb} orbs", ("n", c.Value), ("orb", ForgedCards.OrbDisplay(c.Orb))'):
         check(frag in co, f"Conditions: {frag[:70]}")
     spec = _cs("Engine", "CardSpec.cs")
     check("bool Keep = false," in spec and "string? Which = null," in spec and "string? Orbs = null," in spec
@@ -245,14 +247,16 @@ CASES = [([{"op": "evoke", "keep": True}], "self", "Evoke your next orb twice.")
          ([{"op": "damage", "amount": 6, "when": {"kind": "orb_count_ge", "value": 1, "orb": "ember"}}], "enemy",
           "Deal {Damage} damage if you have 1+ Ember orbs."),
          ([{"op": "channel_orb", "orb": "frost", "per_enemy": True}, {"op": "exhaust"}], "self", "Channel a Frost orb for each enemy.\nExhaust.")]
-C_FRAGMENTS = ('parts.Add(e.PerEnemy ? $"Channel a {orbName} orb for each enemy."',
-               'parts.Add(e.Keep ? "Evoke your next orb twice."',
-               ': e.Which == "newest" ? (ec > 1 ? $"Evoke your {ec} newest orbs." : "Evoke your newest orb.")',
+# i18n (I18N_PLAN C1): each sentence is a ForgedText key with its English inline at the call site.
+C_FRAGMENTS = ('parts.Add(e.PerEnemy ? Fx("card.channel.per_enemy", "Channel a {orb} orb for each enemy.", ("orb", orbName), ("orbname", orbWord))',
+               'parts.Add(e.Keep ? Tx("card.evoke.keep", "Evoke your next orb twice.")',
+               ': e.Which == "newest" ? (ec > 1 ? Fx("card.evoke.newest_n", "Evoke your {n} newest orbs.", ("n", ec)) : Tx("card.evoke.newest_1", "Evoke your newest orb."))',
                'case "trigger_passive": parts.Add(TriggerPassiveSentence(e)); break;',
-               'string whose = e.Orbs == "all" ? "all your orbs" : "your next orb";',
-               'return n > 1 ? $"Trigger the passive of {whose} {n} times." : $"Trigger the passive of {whose}.";',
-               'case "lose_orb_slot":   parts.Add("Lose 1 Orb Slot."); break;',
-               '"loop"           => "At the start of your turn, trigger your next orb\'s passive.",',
+               'string whose = e.Orbs == "all" ? Tx("orbs.all_yours", "all your orbs") : Tx("orbs.next_yours", "your next orb");',
+               'return n > 1 ? Fx("card.trigger_passive.n", "Trigger the passive of {whose} {n} times.", ("whose", whose), ("n", n))\n'
+               '                     : Fx("card.trigger_passive.1", "Trigger the passive of {whose}.", ("whose", whose));',
+               'case "lose_orb_slot":   parts.Add(Tx("card.lose_orb_slot", "Lose 1 Orb Slot.")); break;',
+               '"loop"           => Tx("card.bm.loop", "At the start of your turn, trigger your next orb\'s passive."),',
                '"orb_count"                   => "the orbs you have channeled",',
                '"orb_types"                   => "the different orbs you have channeled",')
 

@@ -65,9 +65,9 @@ public sealed class ForgedCorruptionPower : BlankTheSpirePower
     }
 
     public override List<(string, string)>? Localization =>
-        (List<(string, string)>)new PowerLoc("Corruption",
-            "Your Skills cost 0. Your Skills Exhaust when played.",
-            "Your Skills cost 0. Your Skills Exhaust when played.");
+        (List<(string, string)>)new PowerLoc(ForgedText.T("power.corruption.title", "Corruption"),
+            ForgedText.T("power.corruption.desc", "Your Skills cost 0. Your Skills Exhaust when played."),
+            ForgedText.T("power.corruption.desc", "Your Skills cost 0. Your Skills Exhaust when played."));
 
     // Emoji icon via the runtime renderer (kicked in MainFile); falls back to the shipped placeholder.
     public override string? CustomPackedIconPath => EmojiIconRenderer.IconPath("corruption") ?? base.CustomPackedIconPath;

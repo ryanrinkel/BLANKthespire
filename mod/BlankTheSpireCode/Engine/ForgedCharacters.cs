@@ -235,6 +235,107 @@ public static class ForgedCharacters
         return result;
     }
 
+    // --- i18n (I18N_PLAN C2): the bundle `loc` block ---------------------------------------------------------------
+
+    /// <summary>Read one section of a <c>loc</c> block for every locale: <c>loc[locale][section]</c> (an object with
+    /// name/description), or with <paramref name="key"/> the entry <c>loc[locale][section][key]</c> matched by English name
+    /// (case-insensitive). Null when no locale has it. Unknown shapes are skipped, never an error.</summary>
+    private static IReadOnlyDictionary<string, LocText>? LocSection(Godot.Collections.Dictionary loc, string section, string? key)
+    {
+        var result = new Dictionary<string, LocText>(StringComparer.Ordinal);
+        foreach (var (locale, block) in loc)
+        {
+            if (block.VariantType != Godot.Variant.Type.Dictionary) continue;
+            var b = block.AsGodotDictionary();
+            if (!b.ContainsKey(section) || b[section].VariantType != Godot.Variant.Type.Dictionary) continue;
+            var sec = b[section].AsGodotDictionary();
+            Godot.Collections.Dictionary? entry = null;
+            if (key == null) entry = sec;
+            else
+                foreach (var (k, v) in sec)
+                    if (v.VariantType == Godot.Variant.Type.Dictionary
+                        && string.Equals(k.AsString().Trim(), key.Trim(), StringComparison.OrdinalIgnoreCase))
+                    { entry = v.AsGodotDictionary(); break; }
+            if (entry == null) continue;
+            string? n = entry.ContainsKey("name") && entry["name"].VariantType == Godot.Variant.Type.String ? entry["name"].AsString() : null;
+            string? ds = entry.ContainsKey("description") && entry["description"].VariantType == Godot.Variant.Type.String ? entry["description"].AsString() : null;
+            if (n != null || ds != null) result[locale.AsString()] = new LocText(n, ds);
+        }
+        return result.Count > 0 ? result : null;
+    }
+
+    private static string NormName(string x) => x.Replace('_', ' ').Trim().ToLowerInvariant();
+
+    /// <summary>The translated name of class <paramref name="k"/>'s custom orb / status / summon (<paramref name="kind"/> =
+    /// "orbs" / "statuses" / "summons") named <paramref name="englishName"/> in the active language, or null (English, no
+    /// class context, no loc). Used by the rules-text renderer when it re-renders a card for a translated language.</summary>
+    public static string? CreativeName(int k, string kind, string? englishName)
+    {
+        if (k < 1 || k > ClassCount || string.IsNullOrWhiteSpace(englishName) || ForgedText.IsEnglish) return null;
+        string lang = ForgedText.Lang, want = NormName(englishName);
+        var cs = SpecForClass(k);
+        return kind switch
+        {
+            "orbs"     => cs.OrbPool.FirstOrDefault(o => o.CustomSpec != null && NormName(o.Name) == want)?.CustomSpec?.Loc.LocName(lang),
+            "statuses" => cs.StatusPool.FirstOrDefault(x => NormName(x.Name) == want)?.Loc.LocName(lang),
+            "summons"  => cs.SummonPool.FirstOrDefault(x => NormName(x.Name) == want)?.Loc.LocName(lang),
+            _ => null,
+        };
+    }
+
+    /// <summary>The translated title of class <paramref name="k"/>'s card <paramref name="cardId"/> in the active language,
+    /// or null (English, no class context, no loc).</summary>
+    public static string? CreativeCardTitle(int k, string? cardId)
+    {
+        if (k < 1 || k > ClassCount || string.IsNullOrWhiteSpace(cardId) || ForgedText.IsEnglish) return null;
+        string lang = ForgedText.Lang;
+        for (int n = 1; n <= CardsPerClass; n++)
+        {
+            var c = CardSpecFor(k, n);
+            if (!c.IsEmpty && c.Id == cardId) return c.Loc.LocName(lang);
+        }
+        return null;
+    }
+
+    /// <summary>Importer half of the loc contract: the bundle's <c>loc</c> minus the per-card entries (those go into each
+    /// card file), to persist with the class file. Null when the bundle has no usable loc block.</summary>
+    private static Godot.Collections.Dictionary? ClassLocForFile(Godot.Collections.Dictionary bundle)
+    {
+        if (!bundle.ContainsKey("loc") || bundle["loc"].VariantType != Godot.Variant.Type.Dictionary) return null;
+        var outLoc = new Godot.Collections.Dictionary();
+        foreach (var (locale, block) in bundle["loc"].AsGodotDictionary())
+        {
+            if (block.VariantType != Godot.Variant.Type.Dictionary) continue;
+            var copy = new Godot.Collections.Dictionary();
+            foreach (var (k, v) in block.AsGodotDictionary())
+                if (k.AsString() != "cards") copy[k] = v;
+            if (copy.Count > 0) outLoc[locale] = copy;
+        }
+        return outLoc.Count > 0 ? outLoc : null;
+    }
+
+    /// <summary>Importer half of the loc contract: <c>{locale: {name, flavor}}</c> for card <paramref name="cardId"/> from the
+    /// bundle's <c>loc.&lt;locale&gt;.cards</c>, or null.</summary>
+    private static Godot.Collections.Dictionary? CardLocForFile(Godot.Collections.Dictionary bundle, string cardId)
+    {
+        if (cardId.Length == 0 || !bundle.ContainsKey("loc") || bundle["loc"].VariantType != Godot.Variant.Type.Dictionary) return null;
+        var outLoc = new Godot.Collections.Dictionary();
+        foreach (var (locale, block) in bundle["loc"].AsGodotDictionary())
+        {
+            if (block.VariantType != Godot.Variant.Type.Dictionary) continue;
+            var b = block.AsGodotDictionary();
+            if (!b.ContainsKey("cards") || b["cards"].VariantType != Godot.Variant.Type.Dictionary) continue;
+            var cards = b["cards"].AsGodotDictionary();
+            if (cards.ContainsKey(cardId) && cards[cardId].VariantType == Godot.Variant.Type.Dictionary)
+                outLoc[locale] = cards[cardId];
+        }
+        return outLoc.Count > 0 ? outLoc : null;
+    }
+
+    /// <summary>i18n regression dump only (<see cref="Testing.DescribeDump"/>): parse a class JSON without registering it.</summary>
+    internal static bool DumpParseClass(string json, out CharacterSpec? spec, out string error) =>
+        TryParseClassJson(json, 1, out spec, out error);
+
     /// <summary>Parse a class JSON. Default pool hue is spread across the class slots when color is omitted.</summary>
     private static bool TryParseClassJson(string json, int k, out CharacterSpec? spec, out string error)
     {
@@ -336,9 +437,25 @@ public static class ForgedCharacters
         // so every pre-v54 class keeps the per-combat counter.
         bool forgePersist = Bool(d, "forge_persist", false);
 
+        // i18n (I18N_PLAN C2): the optional `loc` block (folded into the class file by the importer) attaches each locale's
+        // translated name/description to the character and to every pool entry by its ENGLISH name. Absent on English-only
+        // classes and on every pre-v0.5.0 class file; an older mod never reads the key at all.
+        IReadOnlyDictionary<string, LocText>? charLoc = null;
+        if (d.ContainsKey("loc") && d["loc"].VariantType == Godot.Variant.Type.Dictionary)
+        {
+            var loc = d["loc"].AsGodotDictionary();
+            charLoc = LocSection(loc, "character", null);
+            if (relicSpec != null) relicSpec = relicSpec with { Loc = LocSection(loc, "relic", null) };
+            statusPool = statusPool.Select(x => x with { Loc = LocSection(loc, "statuses", x.Name) }).ToArray();
+            summonPool = summonPool.Select(x => x with { Loc = LocSection(loc, "summons", x.Name) }).ToArray();
+            potionPool = potionPool.Select(x => x with { Loc = LocSection(loc, "potions", x.Name) }).ToArray();
+            orbPool = orbPool.Select(o => o.CustomSpec == null ? o
+                                          : o with { CustomSpec = o.CustomSpec with { Loc = LocSection(loc, "orbs", o.CustomSpec.Name) } }).ToArray();
+        }
+
         spec = new CharacterSpec(name, desc, maxHp, maxEnergy, deck.ToArray(), h, s, v, OrbSlots: orbSlots)
             { OrbPool = orbPool, StatusPool = statusPool, SummonPool = summonPool, Relic = relicSpec,
-              ForgePersist = forgePersist, PotionPool = potionPool };
+              ForgePersist = forgePersist, PotionPool = potionPool, Loc = charLoc };
         error = "";
         return true;
     }
@@ -1380,6 +1497,10 @@ public static class ForgedCharacters
         if (bundle.ContainsKey("relic") && bundle["relic"].VariantType == Godot.Variant.Type.Dictionary
             && !charDict.ContainsKey("relic"))
             charDict["relic"] = bundle["relic"];
+        // i18n (I18N_PLAN C2): the optional top-level `loc` block persists with the class file (minus the per-card entries,
+        // which go into each card file below). Every field is optional; English stays the primary strings.
+        if (ClassLocForFile(bundle) is { } classLoc && !charDict.ContainsKey("loc"))
+            charDict["loc"] = classLoc;
         var cardsArr = bundle["cards"].AsGodotArray();
         if (cardsArr.Count == 0) { error = "bundle has no cards."; return false; }
         if (cardsArr.Count > CardsPerClass)
@@ -1402,7 +1523,10 @@ public static class ForgedCharacters
         {
             if (cardsArr[i].VariantType != Godot.Variant.Type.Dictionary)
             { error = $"card {i + 1} is not a JSON object."; return false; }
-            string cj = Godot.Json.Stringify(cardsArr[i]);
+            var cardDict = cardsArr[i].AsGodotDictionary();
+            if (!cardDict.ContainsKey("loc") && CardLocForFile(bundle, Str(cardDict, "id")) is { } cardLoc)
+                cardDict["loc"] = cardLoc;
+            string cj = Godot.Json.Stringify(cardDict);
             if (!ForgedCards.TryParseCardJson(cj, i + 1, out var cspecCard, out var cerr, allowBasic: true, allowCustomOrbs: true, orbNames: poolOrbNames))
             { error = $"card {i + 1}: {cerr}"; return false; }
             // Phase BQ (v68, gap #78): a slot loss needs a rack to lose it from (3+ starting slots — at 0 a forged class
@@ -1420,10 +1544,10 @@ public static class ForgedCharacters
         int k = explicitSlot > 0 ? explicitSlot
               : (FindClassSlotByName(cspec.Name) ?? FirstFreeClassSlot() ?? -1);
         if (k < 1 || k > ClassCount)
-        { error = $"all {ClassCount} class slots are full — clear one first."; return false; }
+        { error = ForgedText.F("mod.import.slots_full", "all {n} class slots are full — clear one first.", ("n", ClassCount)); return false; }
 
         try { WriteClassFiles(k, Godot.Json.Stringify(charDict), cardJsons); }
-        catch (Exception e) { error = $"failed to write class files: {e.Message}"; return false; }
+        catch (Exception e) { error = ForgedText.F("mod.import.write_failed", "failed to write class files: {err}", ("err", e.Message)); return false; }
 
         classSlot = k;
         error = "";

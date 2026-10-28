@@ -42,6 +42,10 @@ public sealed record OrbSpec(
     OrbEffect[] Evoke,
     string PassiveTiming = "turn_end")
 {
+    /// <summary>i18n (I18N_PLAN C2): the bundle's optional <c>loc</c> strings for this entry, keyed by the GAME's locale
+    /// code ("zhs", ...). Null/absent = English only. A missing field falls back to the English one.</summary>
+    public IReadOnlyDictionary<string, LocText>? Loc { get; init; }
+
     /// <summary>True when the passive list ticks at the start of your turn (Phase AR, v49).</summary>
     public bool PassiveAtTurnStart => PassiveTiming == "turn_start";
 }

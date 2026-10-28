@@ -251,15 +251,19 @@ CASES = [(WHISTLE, "enemy", "Deal {Damage} damage.\nStun the enemy.\nExhaust."),
           "Exhaust 2 random cards in your hand.\nGain Block equal to the cards Exhausted."),
          ([{"op": "exhaust_card", "cards": "all", "card_type": "skill"}], "self", "Exhaust all Skills in your hand."),
          (BOULDER, "self", "At the start of your turn, deal 5 damage to ALL enemies. Increases by 5 each turn.")]
-C_FRAGMENTS = ('case "stun":             parts.Add("Stun the enemy."); break;',
-               'case "discard":     parts.Add(e.Cards == "all" ? "Discard your hand."',
-               'string removed = "Discarded";',
-               'string Sp(EffectSpec x) => x.Scale == "cards_removed" ? $"the cards {removed}" : ScalePhrase(x);',
-               ': e.HitsScale == "cards_removed" ? $"Deal {{Damage}} damage for each card {removed}{dmgSuffix}{ub}."',
-               'case "exhaust_card":    parts.Add(ExhaustCardSentence(e)); removed = "Exhausted"; break;',
-               'if (e.Cards == "all" && e.CardKind == null && e.Pile != "draw") return "Exhaust your hand.";',
-               ': e.HasGrow ? $"deal {e.Amount} damage{to}. Increases by {e.Grow} each turn"',
-               '$"Deal damage equal to {Sp(e)}{dmgSuffix}{ub}."', '$"Gain Block equal to {Sp(e)}."', '$"Draw cards equal to {Sp(e)}."')
+# i18n (I18N_PLAN C1): each sentence is a ForgedText key with its English inline at the call site; the "removed" word
+# and the scale phrase are keyed too and ride {removed} / {what} placeholders.
+C_FRAGMENTS = ('case "stun":             parts.Add(Tx("card.stun", "Stun the enemy.")); break;',
+               'case "discard":     parts.Add(e.Cards == "all" ? Tx("card.discard.all", "Discard your hand.")',
+               'string removed = Tx("removed.discard", "Discarded");',
+               'string Sp(EffectSpec x) => x.Scale == "cards_removed" ? Fx("scale.cards_removed", "the cards {removed}", ("removed", removed)) : ScalePhrase(x);',
+               ': e.HitsScale == "cards_removed" ? Fx("card.damage.hits_removed", "Deal {Damage} damage for each card {removed}{to}{ub}.", ("removed", removed), ("to", dmgSuffix), ("ub", ub))',
+               'case "exhaust_card":    parts.Add(ExhaustCardSentence(e)); removed = Tx("removed.exhaust", "Exhausted"); break;',
+               'if (e.Cards == "all" && e.CardKind == null && e.Pile != "draw") return Tx("card.exhaust_card.hand", "Exhaust your hand.");',
+               ': e.HasGrow ? Fx("frag.damage.grow", "deal {amount} damage{to}. Increases by {grow} each turn", ("amount", e.Amount), ("to", to), ("grow", e.Grow))',
+               'Fx("card.damage.equal", "Deal damage equal to {what}{to}{ub}.", ("what", Sp(e)), ("to", dmgSuffix), ("ub", ub))',
+               'Fx("card.block.equal", "Gain Block equal to {what}.", ("what", Sp(e)))',
+               'Fx("card.draw.equal", "Draw cards equal to {what}.", ("what", Sp(e)))')
 
 
 def _t_rules_and_describe() -> None:

@@ -116,7 +116,9 @@ def _t_generation() -> None:
     d = cardgen.describe(fx, "self")
     check(d.startswith("Whenever you deal damage"), f"describe still opens 'Whenever you deal damage' (got {d!r})")
     fc = (MOD_CODE / "Engine" / "ForgedCards.cs").read_text(encoding="utf-8")
-    check('"on_damage_dealt" => "Whenever you deal damage"' in fc, "C# TriggerFragment unchanged (byte-match contract)")
+    # i18n (I18N_PLAN C1): the head is "Whenever {evt}" + the event clause, English inline in ForgedText calls.
+    check('"on_damage_dealt" => Tx("evt.on_damage_dealt", "you deal damage")' in fc
+          and 'Fx("trig.whenever", "Whenever {evt}", ("evt", evt))' in fc, "C# TriggerFragment unchanged (byte-match contract)")
     plain = CardValidator()
     summon = CardValidator(extra_summons={"Bone Thrall"})
     check(plain.validate(_card(fx)).ok and summon.validate(_card(fx)).ok, "on_damage_dealt -> draw is legal for any class")

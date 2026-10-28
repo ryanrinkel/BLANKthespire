@@ -91,8 +91,10 @@ def _t_engine() -> None:
     fc = _cs("Engine", "ForgedCards.cs")
     for lst in ("SupportedTriggers", "MultiFireTriggers", "OncePerCombatTriggers"):
         check('"on_poison_damage"' in fc.split(f"{lst} =", 1)[1].split("];", 1)[0], f"ForgedCards.{lst} carries on_poison_damage")
-    check('"on_poison_damage" => "Whenever an enemy takes Poison damage"' in fc, "C# TriggerSentence wording")
-    check('"on_poison_damage" => "On Poison Damage"' in tp, "the power's title")
+    # i18n (I18N_PLAN C1): "Whenever {evt}" + the event clause / the title, English inline in ForgedText calls.
+    check('"on_poison_damage" => Tx("evt.on_poison_damage", "an enemy takes Poison damage")' in fc
+          and 'Fx("trig.whenever", "Whenever {evt}", ("evt", evt))' in fc, "C# TriggerSentence wording")
+    check('"on_poison_damage" => ForgedText.T("power.trigger.on_poison_damage", "On Poison Damage")' in tp, "the power's title")
 
 
 def _t_rules_and_describe() -> None:

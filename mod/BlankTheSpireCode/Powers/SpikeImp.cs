@@ -7,6 +7,7 @@ using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Monsters;
 using MegaCrit.Sts2.Core.MonsterMoves.MonsterMoveStateMachine;
 using MegaCrit.Sts2.Core.Nodes.Combat;
+using BlankTheSpire.BlankTheSpireCode.Engine; // ForgedText (i18n)
 
 namespace BlankTheSpire.BlankTheSpireCode.Powers;
 
@@ -48,7 +49,7 @@ public sealed class SpikeImp : CustomPetModel, ILocalizationProvider
     // model's Id.Entry, matching MonsterModel.Title = LocString("monsters", Id.Entry + ".name").
     public string? LocTable => "monsters";
     public List<(string, string)>? Localization =>
-        (List<(string, string)>)new MonsterLoc("Spike Imp", new[] { (AttackMove, "Jab") });
+        (List<(string, string)>)new MonsterLoc(ForgedText.T("monster.spike_imp.name", "Spike Imp"), new[] { (AttackMove, ForgedText.T("monster.spike_imp.jab", "Jab")) });
 
     // Placeholder art: BORROW the game's Osty pet visuals (a real, shipped creature scene with sprite + HP-bar
     // markers) rather than the bare "creature_visuals/fallback" error scene (which renders as the word "error"

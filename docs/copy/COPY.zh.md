@@ -2609,11 +2609,11 @@ Notes: BaseLib按钮宽度固定为324px，文字要非常短。
 
 ### mod.button.clear_slot
 
-    清空栏位
+    清除栏位
 
 ### mod.button.clear_all
 
-    全部清空
+    全部清除
 
 ### mod.button.restart
 
@@ -2633,15 +2633,15 @@ Notes: BaseLib按钮宽度固定为324px，文字要非常短。
 
 ### mod.settings.import_tip
 
-    把blankthespire.com上的角色码（BTSC）粘贴到“角色码”输入框，然后点“导入”。栏位0会自动选择：更新同名角色，或者占用编号最小的空栏位。
+    将来自blankthespire.com的角色码（BTSC）粘贴到“角色码”栏中，然后按“导入”。栏位0会自动选择：更新同名角色，或占用编号最小的空栏位。
 
 ### mod.settings.clear_title
 
-    清空一个角色栏位
+    清除一个角色栏位
 
 ### mod.settings.clear_tip
 
-    移除所选栏位中的锻造角色。请先把上方的“角色栏位”设为1或更大。
+    移除所选栏位中的锻造角色。请先将上方的“角色栏位”设为1或更大。
 
 ### mod.settings.clear_all_title
 
@@ -2649,7 +2649,7 @@ Notes: BaseLib按钮宽度固定为324px，文字要非常短。
 
 ### mod.settings.clear_all_tip
 
-    一次性移除所有导入的角色。此操作无法撤销。
+    一次性移除所有已导入的角色。此操作无法撤销。
 
 ### mod.settings.restart_title
 
@@ -2657,7 +2657,7 @@ Notes: BaseLib按钮宽度固定为324px，文字要非常短。
 
 ### mod.settings.restart_tip
 
-    关闭游戏并通过Steam自动重新打开。导入或清空的角色只有在重启后才会生效。
+    关闭游戏并通过Steam自动重新打开。导入或清除的角色只有在重启后才会生效。
 
 ### mod.dialog.import_title
 
@@ -2665,7 +2665,7 @@ Notes: BaseLib按钮宽度固定为324px，文字要非常短。
 
 ### mod.dialog.import_empty
 
-    请先把角色码粘贴到上方的“角色码”输入框。
+    请先将角色码粘贴到上方的“角色码”栏中。
 
 ### mod.dialog.import_failed_title
 
@@ -2677,7 +2677,7 @@ Notes: BaseLib按钮宽度固定为324px，文字要非常短。
 
 ### mod.dialog.wrong_type_body
 
-    这不是角色码。请粘贴blankthespire.com上的角色码（BTSC）。
+    这不是角色码。请粘贴来自blankthespire.com的角色码（BTSC）。
 
 ### mod.dialog.rejected_title
 
@@ -2685,7 +2685,7 @@ Notes: BaseLib按钮宽度固定为324px，文字要非常短。
 
 ### mod.dialog.rejected_body
 
-    角色码解码成功，但这个角色无法在这里游玩：
+    代码已解码，但这个角色无法在此游玩：
     {err}
 
 ### mod.dialog.imported_title
@@ -2694,35 +2694,35 @@ Notes: BaseLib按钮宽度固定为324px，文字要非常短。
 
 ### mod.dialog.imported_body
 
-    已导入到角色栏位{classSlot:00}。
+    已导入到角色栏位{slot}。
 
-    点击下方的“重启游戏”，然后在角色选择界面选择这个角色。
+    请按下方的“重启游戏”，然后在角色选择界面选择该角色。
 
 ### mod.dialog.clear_title
 
-    清空角色
+    清除角色
 
 ### mod.dialog.clear_need_slot
 
-    请把上方的“角色栏位”设为要清空的栏位（1..{ForgedCharacters.ClassCount}），然后再点一次。
+    请先将上方的“角色栏位”设为要清除的栏位（1..{max}），然后再点击一次。
 
 ### mod.dialog.cleared
 
-    已清空角色栏位{ImportClassSlot:00}。
-    点击“重启游戏”以更新游戏。
+    已清除角色栏位{slot}。
+    请按“重启游戏”以更新游戏。
 
 ### mod.dialog.already_empty
 
-    角色栏位{ImportClassSlot:00}本来就是空的。
+    角色栏位{slot}本来就是空的。
 
 ### mod.dialog.clear_all_title
 
-    清空所有锻造角色
+    清除所有锻造角色
 
 ### mod.dialog.clear_all_body
 
     已移除{n}个锻造角色。空的角色栏位会保持隐藏。
-    点击“重启游戏”以更新游戏。
+    请按“重启游戏”以更新游戏。
 
 ### mod.dialog.restart_title
 
@@ -2730,51 +2730,51 @@ Notes: BaseLib按钮宽度固定为324px，文字要非常短。
 
 ### mod.dialog.restart_nothing
 
-    本次运行尚未导入任何角色。
+    本次运行中尚未导入任何角色。
     （重启仍会应用之前导入的角色。）
 
 ### mod.dialog.restart_failed
 
     无法自动重新启动：
-    {e.Message}
+    {err}
 
-    请手动退出并重新启动游戏以应用更改。
+    请退出并自行重新启动游戏以应用更改。
 
 ### mod.codec.empty
 
-    角色码为空。
+    代码为空。
 
 ### mod.codec.not_bts
 
-    这不是Blank the Spire的角色码。
+    这不是Blank the Spire的代码。
 
 ### mod.codec.bad_magic
 
-    这不是Blank the Spire（BTS1/BTSC）的角色码。
+    这不是Blank the Spire的代码（BTS1/BTSC）。
 
 ### mod.codec.bad_version
 
-    角色码格式错误（版本字段有误）。
+    代码格式错误（版本字段无效）。
 
 ### mod.codec.needs_update
 
-    此角色码需要更新版本的Blank the Spire（角色码为v{ver}，此模组支持v{ForgedCards.VocabVersion}）。请更新模组。
+    这个代码需要更新版本的Blank the Spire（代码为v{ver}，本模组支持v{max}）。请更新模组。
 
 ### mod.codec.corrupted
 
-    角色码已损坏（{e.Message}）。
+    代码已损坏（{err}）。
 
 ### mod.codec.checksum
 
-    角色码已损坏（校验和不匹配，请重新复制）。
+    代码已损坏（校验和不匹配——请重新复制）。
 
 ### mod.import.slots_full
 
-    全部{ClassCount}个角色栏位都已占满，请先清空一个。
+    所有{n}个角色栏位都已占满——请先清除一个。
 
 ### mod.import.write_failed
 
-    写入角色文件失败：{e.Message}
+    写入角色文件失败：{err}
 
 ## Forge console stage headers
 

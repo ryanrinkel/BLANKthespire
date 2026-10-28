@@ -68,7 +68,7 @@ Measure word: 点 for stat-like amounts, 层 for stacking debuffs, counted from 
 | Poison | 中毒 | powers:POISON_POWER.title | 层 |
 | Doom | 灾厄 | powers:DOOM_POWER.title | 层. STS2-only |
 | Intangible | 无实体 | powers:INTANGIBLE_POWER.title | 层 |
-| Artifact | 人工制品 | powers:ARTIFACT_POWER.title | the power text counts it with 次 ("免疫{Amount}次负面效果") |
+| Artifact | 人工制品 | powers:ARTIFACT_POWER.title | the power text counts it with 次 ("免疫{Amount}次负面效果"); the mod's card text counts it with 层 like the other stacking statuses (mod v0.5.0 (ForgedText.zhs.cs), unit.artifact = 层) |
 | Buffer | 缓冲 | powers:BUFFER_POWER.title | 层 |
 | Regen | 再生 | powers:REGEN_POWER.title | 层 (potion text) |
 | Ritual | 仪式 | powers:RITUAL_POWER.title | 层 |
@@ -95,6 +95,11 @@ Measure word: 点 for stat-like amounts, 层 for stacking debuffs, counted from 
 | Retain Hand | 保留手牌 | powers:RETAIN_HAND_POWER.title | |
 | Block Next Turn | 下回合格挡 | powers:BLOCK_NEXT_TURN_POWER.title | |
 | Minion | 爪牙 | powers:MINION_POWER.title | |
+| Sharpen (the mod's Spike-Imp buff) | 磨砺 | mod v0.5.0 (ForgedText.zhs.cs) | power.sharpen.title = "🗡️ 磨砺"; counted with 层 ("获得{n}层🗡️磨砺。") |
+| Blade Empower | 利刃强化 | mod v0.5.0 (ForgedText.zhs.cs) | power.blade_empower.title |
+| Cost Shift | 耗能变动 | mod v0.5.0 (ForgedText.zhs.cs) | power.cost_shift.title; 耗能 as in the cost row of the cards table |
+| Summoned Ally | 召唤盟友 | mod v0.5.0 (ForgedText.zhs.cs) | power.summoned_ally.title (the power on a forged summon) |
+| Bodyguard (the summon's shield/guard power) | 护卫 | mod v0.5.0 (ForgedText.zhs.cs) | power.bodyguard.title, English "Bodyguard" (Powers/ForgedSummonShieldPower.cs); summoned_ally.desc calls the summon 一名…护卫 |
 | debuff | 负面效果 | intents:DEBUFF.description | "apply a debuff" = 施加负面效果 |
 | buff | 强化 | intents:BUFF.title | |
 
@@ -113,6 +118,8 @@ Measure word: 点 for stat-like amounts, 层 for stacking debuffs, counted from 
 | rightmost / leftmost Orb | 最右侧 / 最左侧的充能球 | cards:DUALCAST, cards:CONSUMING_SHADOW | the mod's "next orb" = the rightmost one |
 | Osty | 奥斯提 | monsters:OSTY.name | |
 | summon (our minion, noun) | 召唤物 | UNVERIFIED | the game only names Osty. 召唤物 is the usual Chinese game word |
+| Spike Imp (the mod's spike summon) | 尖刺小鬼 | mod v0.5.0 (ForgedText.zhs.cs) | power.spike_imp.title, monster.spike_imp.name; "[gold]召唤[/gold]一个尖刺小鬼。" |
+| Ethereal (summon that cannot be attacked) | 灵体 | mod v0.5.0 (ForgedText.zhs.cs) | summon.ethereal = "灵体（无法被攻击）". NOT the card keyword Ethereal (虚无) |
 | Sovereign Blade | 君王之剑 | cards:SOVEREIGN_BLADE.title | |
 | Shiv | 小刀 | cards:SHIV.title | 张 |
 | Soul | 灵魂 | cards:SOUL.title | |
@@ -130,7 +137,7 @@ Measure word: 点 for stat-like amounts, 层 for stacking debuffs, counted from 
 | damage | 伤害 | cards:STRIKE_IRONCLAD | 点 |
 | unblocked damage | 未被格挡的伤害 | cards:ENVENOM | |
 | ignoring Block (unblockable hit) | 无视格挡 | UNVERIFIED | the game has no such card. Sentence: "造成{Damage}点伤害，无视格挡。" |
-| Light / Dark (the mod's balance poles) | 光明 / 黑暗 | UNVERIFIED | our own mechanic. 黑暗 matches the Dark orb's word, which may confuse. Review when a balance class ships in Chinese |
+| Light / Dark (the mod's balance poles) | 光明 / 黑暗 | mod v0.5.0 (ForgedText.zhs.cs) | power.balance.title_light/title_dark = "☀️ 光明" / "🌑 黑暗"; "Shift N toward the Light" = 向光明偏移N. Our own mechanic. 黑暗 matches the Dark orb's word, which may confuse. Review when a balance class ships in Chinese |
 
 ### Cards, piles, types, rarities
 
@@ -141,7 +148,7 @@ Measure word: 点 for stat-like amounts, 层 for stacking debuffs, counted from 
 | Status / Curse | 状态 / 诅咒 | gameplay_ui:CARD_TYPE.STATUS / CURSE | 状态牌 |
 | non-Attack card | 非攻击牌 | cards:SECOND_WIND | |
 | Colorless | 无色 | card_library:POOL_COLORLESS_TIP | |
-| Token (card) | 衍生 | gameplay_ui:CARD_RARITY.TOKEN | 衍生牌 |
+| Token (card) | 衍生 | gameplay_ui:CARD_RARITY.TOKEN | 衍生牌. The site's rarity label uses it too (app.rarity.token in COPY.zh.md) |
 | Common / Uncommon / Rare | 普通 / 罕见 / 稀有 | card_library:RARITY_* | |
 | Basic / Starter (rarity) | 基础 / 初始 | gameplay_ui:CARD_RARITY.BASIC, main_menu_ui:CARD_LIBRARY_RARITY_BASIC | |
 | Ancient (rarity) | 先古 | gameplay_ui:CARD_RARITY.ANCIENT | the beings are 先古之民 |
@@ -250,7 +257,7 @@ The conditional suffix the mod weaves in ("… if …") is a fronted clause in t
 | Get a forge token | 获取锻造券 | product | 获取, never 购买 (never say "buy") |
 | donate / donation | 赞助 | product | 捐赠 also natural. Never 购买 / 充值 |
 | class (a forged character) | 角色 | product (game: characters = 角色) | The game calls the five heroes 角色. In descriptive copy, 自制角色 marks ours. Considered 职业 (the community's word for the heroes) and 人物 (as in the mod scene's 人物mod). 角色 wins because it matches the game UI |
-| import code / class code | 角色码 | product | One term for both. "Paste the class code" = 粘贴角色码. `BTSC.` stays Latin |
+| import code / class code | 角色码 | product | One term for both. Confirmed in the mod v0.5.0 (zhs/settings_ui.json IMPORT_CLASS_CODE, IMPORT_SECTION 导入角色码; ForgedText.zhs.cs mod.dialog.*); the mod.codec.* errors say 代码 for a code of unknown type. "Paste the class code" = 粘贴角色码. `BTSC.` stays Latin |
 | Import / Import class | 导入 / 导入角色 | product | |
 | Copy (code) | 复制 | product | |
 | class slot | 角色栏位 | product (栏位 from static_hover_tips:POTION_SLOT) | |
@@ -264,6 +271,7 @@ The conditional suffix the mod weaves in ("… if …") is a fronted clause in t
 | concept (what the user types) | 构想 | product | Considered 创意, 概念 (stiff) |
 | hosted (we run the model) | 托管模式 | product | In a sentence: 由我们提供模型 |
 | bring your own key (BYOK) | 自带密钥（BYOK） | product | Keep "BYOK" in brackets the first time; "API key" = API密钥 |
+| Authored / invented by the class (custom orbs, statuses, mechanics) | 自创 | product (web copy: app.mech.head, console.stage orb line) | not in ForgedText.zhs.cs as of v0.5.0; "自创充能球" = a custom orb |
 | Design model / Card-coding model | 设计模型 / 卡牌编码模型 | product | |
 | splash art | 立绘 | product | the standard Chinese game word for character key art |
 | card art | 卡图 | product | |

@@ -123,7 +123,7 @@ def _t_sly_engine() -> None:
     for lst in ("SupportedOps", "UpgradeAddableKeywords", "KeywordOps"):
         block = fc.split(f"{lst} =", 1)[1].split("];", 1)[0]
         check('"sly"' in block, f"ForgedCards.{lst} carries sly")
-    check('case "sly":         parts.Add("Sly."); break;' in fc, "C# Describe renders 'Sly.'")
+    check('case "sly":         parts.Add(Tx("card.kw.sly", "Sly.")); break;' in fc, "C# Describe renders 'Sly.'")  # i18n: ForgedText
     check("a card can't be both 'sly' and 'retain'" in fc, "C# rejects sly + retain")
     check("'sly' is not allowed on a Power" in fc, "C# rejects sly on a Power")
 
@@ -164,7 +164,8 @@ def _t_turn_at_most() -> None:
     m = re.search(r"Kinds =\s*\[(.*?)\];", cond, re.S)
     check(m is not None and '"turn_at_most"' in m.group(1), "Conditions.Kinds carries turn_at_most")
     check('case "turn_at_most":' in cond and "RoundNumber <= c.Value" in cond, "Eval: RoundNumber <= value")
-    check('"turn_at_most"       => $"it is turn {c.Value} or earlier"' in cond, "Phrase: 'it is turn N or earlier'")
+    check('"turn_at_most"       => ForgedText.F("cond.turn_at_most", "it is turn {n} or earlier", ("n", c.Value))' in cond,
+          "Phrase: 'it is turn N or earlier'")  # i18n: ForgedText {n} placeholder
     check('|| c.Kind == "turn_at_most" // Phase BB (v56)' in cond and "&& c.Value < 1)" in cond,
           "Validate: needs value >= 1")  # Phase BJ (v62) appended played_cards_last_turn_ge to the same list
     schema = json.loads(CARD_SCHEMA.read_text(encoding="utf-8"))

@@ -198,7 +198,7 @@ def _t_engine() -> None:
             ("if (from is not (PileType.Discard or PileType.Draw))", "return_next_turn: never from Exhaust / purged / removed"),
             ("await CardPileCmd.Add(this, PileType.Hand);", "return_next_turn -> Hand"),
             ("$\"[BO] return_next_turn '{Spec.Title ?? Spec.Id}' <- {from}.\"", "the [BO] return_next_turn tag"),
-            ("new CardLoc(Spec.Title, Spec.Description ?? \"\", PickPrompts())", "the custom prompts ride CardLoc ExtraLoc"),
+            ("new CardLoc(title, desc, PickPrompts())", "the custom prompts ride CardLoc ExtraLoc"),  # i18n: title/desc are the localized pair
             ("list.Insert(0, (\"selectionScreenPrompt\", list[0].Item2));", "the first prompt also fills selectionScreenPrompt")):
         check(frag in dc, f"DataCard: {why}")
     spec = _cs("Engine", "CardSpec.cs")
@@ -230,7 +230,8 @@ def _t_engine() -> None:
     tp = _cs("Powers", "ForgedTriggerPower.cs")
     check("public override async Task AfterShuffle(PlayerChoiceContext ctx, Player shuffler)" in tp
           and 'await FireReactive("on_shuffle", ctx);' in tp, "ForgedTriggerPower.AfterShuffle -> FireReactive")
-    check("[BO] on_shuffle fired" in tp and '"on_shuffle" => "On Shuffle"' in tp, "the [BO] on_shuffle tag + power title")
+    check("[BO] on_shuffle fired" in tp and '"on_shuffle" => ForgedText.T("power.trigger.on_shuffle", "On Shuffle")' in tp,
+          "the [BO] on_shuffle tag + power title")  # i18n: ForgedText key
     body = tp.split("public override async Task AfterShuffle", 1)[1].split("\n    }\n", 1)[0]
     check("_combatCtx = ctx" not in body, "AfterShuffle never stores its (possibly hand-draw) ctx")
     fc = _cs("Engine", "ForgedCards.cs")
@@ -280,19 +281,25 @@ CASES = [([{"op": "block", "amount": 9}, {"op": "return_to_hand"}], "self",
          ([_gk("ethereal")], "self", "Choose a card in your hand. It gains Ethereal."),
          ([{"op": "add_trigger", "trigger": "on_shuffle", "effects": [{"op": "block", "amount": 4}]}], "self",
           "Whenever you shuffle your draw pile, gain 4 Block.")]
-C_FRAGMENTS = ('case "return_to_hand":   parts.Add("Returns to your hand after you play it."); break;',
-               'case "to_draw_top":      parts.Add("Goes on top of your draw pile after you play it."); break;',
-               'case "return_next_turn": parts.Add("At the start of your next turn, return this to your hand."); break;',
-               'case "put_back":         parts.Add(e.From == "discard" ? "Put a card from your discard pile on top of your draw pile."',
-               ': "Put a card from your hand on top of your draw pile."); break;',
-               'case "shuffle_hand":     parts.Add("Shuffle your hand and discard pile into your draw pile."); break;',
-               'return $"Put {pick} from your draw pile into your hand.";',
-               'string pick = e.Cards == "choose" ? (n > 1 ? $"{n} {many}" : one) : (n > 1 ? $"{n} random {many}" : $"a random {noun}");',
-               '? (n > 1 ? $"{n} {many} of your choice" : $"{one} of your choice")',
-               'string gains = e.Keyword switch { "sly" => "is Sly this turn", "ethereal" => "gains Ethereal", _ => "gains Retain" };',
-               'return $"Choose {HandKindWords(e.CardKind).One} in your hand. It {gains}.";',
-               'return $"Exhaust {what} in your {(e.Pile == "draw" ? "draw pile" : "hand")}.";',
-               '"on_shuffle"      => "Whenever you shuffle your draw pile",')
+# i18n (I18N_PLAN C1): each sentence is a ForgedText key with its English inline at the call site. The spliced
+# "pick" / "gains" / "what" phrases became one whole template per shape (choose/random x one/many, per keyword).
+C_FRAGMENTS = ('case "return_to_hand":   parts.Add(Tx("card.return_to_hand", "Returns to your hand after you play it.")); break;',
+               'case "to_draw_top":      parts.Add(Tx("card.to_draw_top", "Goes on top of your draw pile after you play it.")); break;',
+               'case "return_next_turn": parts.Add(Tx("card.return_next_turn", "At the start of your next turn, return this to your hand.")); break;',
+               'case "put_back":         parts.Add(e.From == "discard" ? Tx("card.put_back.discard", "Put a card from your discard pile on top of your draw pile.")',
+               ': Tx("card.put_back.hand", "Put a card from your hand on top of your draw pile.")); break;',
+               'case "shuffle_hand":     parts.Add(Tx("card.shuffle_hand", "Shuffle your hand and discard pile into your draw pile.")); break;',
+               'Fx("card.retrieve.draw.choose_n", "Put {n} {many} from your draw pile into your hand.", ("n", n), ("many", many))',
+               'Fx("card.retrieve.draw.choose_1", "Put {one} from your draw pile into your hand.", ("one", one))',
+               'Fx("card.retrieve.draw.random_n", "Put {n} random {many} from your draw pile into your hand.", ("n", n), ("many", many))',
+               'Fx("card.retrieve.draw.random_1", "Put a random {noun} from your draw pile into your hand.", ("noun", noun))',
+               'Fx("card.retrieve.choose_n", "Return {n} {many} of your choice from your {pile} to your hand.", ("n", n), ("many", many), ("pile", pile))',
+               'Fx("card.retrieve.choose_1", "Return {one} of your choice from your {pile} to your hand.", ("one", one), ("pile", pile))',
+               '"sly"      => Fx("card.grant.sly", "Choose {one} in your hand. It is Sly this turn.", ("one", one)),',
+               '"ethereal" => Fx("card.grant.ethereal", "Choose {one} in your hand. It gains Ethereal.", ("one", one)),',
+               '_          => Fx("card.grant.retain", "Choose {one} in your hand. It gains Retain.", ("one", one)),',
+               'string where = e.Pile == "draw" ? Tx("pile.draw", "draw pile") : Tx("pile.hand", "hand");',
+               '"on_shuffle"      => Tx("evt.on_shuffle", "you shuffle your draw pile"),')
 
 
 def _t_rules_and_describe() -> None:

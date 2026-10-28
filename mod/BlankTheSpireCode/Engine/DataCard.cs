@@ -152,9 +152,24 @@ public abstract class DataCard : ConstructedCardModel
     /// In-code localization (BaseLib <see cref="ILocalizationProvider"/>): forged-slot cards carry their
     /// name/text in the spec and inject it at <c>ModelDb.Init</c> — no .pck rebuild. Baked codegen cards
     /// leave Title null and fall back to the shipped .pck cards.json table.
+    /// <para>i18n (I18N_PLAN C1/C2): the title comes from the bundle's <c>loc</c> for the game language when present, and a
+    /// card whose text was synthesized from its effects is re-rendered through <see cref="ForgedText"/> in that language
+    /// (with the card's class as the creative-name context). English returns exactly the parse-time spec strings.</para>
     /// </summary>
-    public override List<(string, string)>? Localization =>
-        Spec.Title != null ? (List<(string, string)>)new CardLoc(Spec.Title, Spec.Description ?? "", PickPrompts()) : null;
+    public override List<(string, string)>? Localization
+    {
+        get
+        {
+            if (Spec.Title == null) return null;
+            string lang = ForgedText.Lang;
+            string title = Spec.Loc.LocName(lang) ?? Spec.Title;
+            string desc = Spec.Description ?? "";
+            if (Spec.TextFromEffects && !ForgedText.IsEnglish)
+                using (ForgedText.InClass(Spec.ClassSlot))
+                    desc = ForgedCards.DescribeSpec(Spec);
+            return (List<(string, string)>)new CardLoc(title, desc, PickPrompts());
+        }
+    }
 
     /// <summary>Phase BO (v66, rule 0.4): honest picker prompts for this card's BO pickers, injected through BaseLib's
     /// <c>CardLoc</c> ExtraLoc pairs (written as <c>cards.&lt;id&gt;.&lt;key&gt;</c>), so no ill-fitting
@@ -170,14 +185,15 @@ public abstract class DataCard : ConstructedCardModel
             switch (e.Op)
             {
                 case "put_back":
-                    key = EffectRunner.PromptPutBack; text = "Choose a card to put on top of your draw pile."; break;
+                    key = EffectRunner.PromptPutBack; text = ForgedText.T("prompt.put_back", "Choose a card to put on top of your draw pile."); break;
                 case "grant_keyword":
                     key = EffectRunner.PromptGrant;
-                    text = e.Keyword switch { "sly" => "Choose a card to make Sly this turn.", "ethereal" => "Choose a card to make Ethereal.",
-                                              _ => "Choose a card to Retain." };
+                    text = e.Keyword switch { "sly" => ForgedText.T("prompt.grant.sly", "Choose a card to make Sly this turn."),
+                                              "ethereal" => ForgedText.T("prompt.grant.ethereal", "Choose a card to make Ethereal."),
+                                              _ => ForgedText.T("prompt.grant.retain", "Choose a card to Retain.") };
                     break;
                 case "retrieve_card" when e.Cards == "choose":
-                    key = EffectRunner.PromptRetrieve; text = "Choose a card to put into your hand."; break;
+                    key = EffectRunner.PromptRetrieve; text = ForgedText.T("prompt.retrieve", "Choose a card to put into your hand."); break;
             }
             if (key != null && list.All(p => p.Item1 != key)) list.Add((key, text!));
         }

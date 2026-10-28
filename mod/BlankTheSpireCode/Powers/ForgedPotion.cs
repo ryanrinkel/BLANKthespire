@@ -89,7 +89,8 @@ public abstract class ForgedPotion : CustomPotionModel
         get
         {
             var s = Source;
-            return s == null ? null : (List<(string, string)>)new PotionLoc(s.Name, s.Description);
+            return s == null ? null // i18n: the bundle's loc for the game language
+                : (List<(string, string)>)new PotionLoc(ForgedText.Name(s.Loc, s.Name), ForgedText.Description(s.Loc, s.Description));
         }
     }
 

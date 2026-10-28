@@ -1,0 +1,20 @@
+{
+  "BLANKTHESPIRE-BLANK_THE_SPIRE.title": "BLANK the spire",
+  "BLANKTHESPIRE-BLANK_THE_SPIRE.titleObject": "BLANK the spire",
+  "BLANKTHESPIRE-BLANK_THE_SPIRE.description": "一块白板。一位数据驱动的英雄，其卡牌、能力与遗物均由一套封闭的效果词汇组合而成——由人手写，或由AI生成。",
+  "BLANKTHESPIRE-BLANK_THE_SPIRE.pronounSubject": "他",
+  "BLANKTHESPIRE-BLANK_THE_SPIRE.pronounObject": "他",
+  "BLANKTHESPIRE-BLANK_THE_SPIRE.pronounPossessive": "他的",
+  "BLANKTHESPIRE-BLANK_THE_SPIRE.possessiveAdjective": "他的",
+  "BLANKTHESPIRE-BLANK_THE_SPIRE.aromaPrinciple": "隐约散发着新鲜JSON的气味。",
+  "BLANKTHESPIRE-BLANK_THE_SPIRE.goldMonologue": "一切都说得通了。",
+  "BLANKTHESPIRE-BLANK_THE_SPIRE.eventDeathPrevention": "还不行。还有更多要谱写。",
+  "BLANKTHESPIRE-BLANK_THE_SPIRE.cardsModifierTitle": "自创",
+  "BLANKTHESPIRE-BLANK_THE_SPIRE.cardsModifierDescription": "由效果词汇组合而成。",
+  "BLANKTHESPIRE-BLANK_THE_SPIRE.banter.alive.endTurnPing": "该你了。",
+  "BLANKTHESPIRE-BLANK_THE_SPIRE.banter.dead.endTurnPing": "……",
+  "THE_ARCHITECT.talk.BLANKTHESPIRE-BLANK_THE_SPIRE.0-0r.char": "BLANK the spire",
+  "THE_ARCHITECT.talk.BLANKTHESPIRE-BLANK_THE_SPIRE.0-0r.next": "……",
+  "THE_ARCHITECT.talk.BLANKTHESPIRE-BLANK_THE_SPIRE.0-1r.ancient": "……",
+  "THE_ARCHITECT.talk.BLANKTHESPIRE-BLANK_THE_SPIRE.0-attack": "……"
+}

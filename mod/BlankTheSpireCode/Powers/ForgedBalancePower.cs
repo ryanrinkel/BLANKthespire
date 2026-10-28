@@ -148,12 +148,15 @@ public sealed class ForgedBalancePower : BlankTheSpirePower
         {
             // Phase BG (gap #61): the number on the icon is how far the gauge leans; the title says which way (live,
             // via the Title override); the text says plainly that the extremes are PENALTIES.
-            string desc = "Your Balance gauge: the number is how far it leans, the name is which way (Dark or Light; " +
-                          "\"Balance\" = centered). Shift it with your cards; it resets each combat. " +
-                          $"PENALTY: while it leans {ExtremeThreshold} or more, the leaning pole punishes you at the start of " +
-                          $"your turn — the Dark drains {DarkExtremeHpLoss} HP, the Light inflicts {LightExtremeWeak} Weak.";
-            return (List<(string, string)>)new PowerLoc("Balance", desc, desc,
-                                                        ("titleDark", "🌑 Dark"), ("titleLight", "☀️ Light"));
+            string desc = ForgedText.F("power.balance.desc",
+                "Your Balance gauge: the number is how far it leans, the name is which way (Dark or Light; " +
+                "\"Balance\" = centered). Shift it with your cards; it resets each combat. " +
+                "PENALTY: while it leans {threshold} or more, the leaning pole punishes you at the start of " +
+                "your turn — the Dark drains {hp} HP, the Light inflicts {weak} Weak.",
+                ("threshold", ExtremeThreshold), ("hp", DarkExtremeHpLoss), ("weak", LightExtremeWeak));
+            return (List<(string, string)>)new PowerLoc(ForgedText.T("power.balance.title", "Balance"), desc, desc,
+                                                        ("titleDark", ForgedText.T("power.balance.title_dark", "🌑 Dark")),
+                                                        ("titleLight", ForgedText.T("power.balance.title_light", "☀️ Light")));
         }
     }
 
