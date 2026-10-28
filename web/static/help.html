@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Help — BLANK the spire</title>
+  <title data-i18n-page="help.meta.title">Help — Blank the Spire</title>
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png" />
   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/static/style.css?v=20261027a" />
+  <link rel="stylesheet" href="/static/style.css?v=20261028b" />
   <style>
     .steps { padding-left: 20px; }
     .steps li { margin: 18px 0; }
@@ -21,18 +21,18 @@
 </head>
 <body>
   <header>
-    <div class="brand">⚒ <strong>BLANK the spire</strong> <span class="sub">help</span></div>
+    <div class="brand">⚒ <strong>Blank the Spire</strong> <span class="sub" data-i18n="help.header.sub">help</span></div>
     <nav>
-      <a class="tab" href="/app">← Back to Forge</a>
-      <a class="tab" href="/download">Get the mod ⬇</a>
-      <a class="tab" href="/archive">The Archive</a>
+      <a class="tab" href="/app" data-i18n="common.nav.back_to_forge">← Back to Forge</a>
+      <a class="tab" href="/download" data-i18n="common.nav.get_mod">Get the Mod ⬇</a>
+      <a class="tab" href="/archive" data-i18n="common.nav.archive">The Archive</a>
     </nav>
   </header>
 
   <main>
     <section class="card">
-      <h1>Where do I paste my code?</h1>
-      <p>Inside the game, not on this site. Forge a class here, copy its import code (it starts with
+      <h1 data-i18n="help.intro.title">Where do I paste my code?</h1>
+      <p data-i18n-html="help.intro.body">Inside the game, not on this site. Forge a class here, copy its import code (it starts with
         <code class="codeish">BTSC.</code>), then in Slay the Spire 2 open the main menu →
         <b>Mod Configuration</b> → <b>BlankTheSpire</b> → paste it into the <b>Class code</b> field under
         <b>Import a class code</b> and press <b>Import</b>. Restart the game and your class appears at
@@ -40,90 +40,91 @@
     </section>
 
     <section class="card">
-      <h2>Step by step</h2>
+      <h2 data-i18n="help.steps.title">Step by step</h2>
       <ol class="steps">
         <li>
-          <b>Forge a class on the site and press Copy code.</b> The code starts with
-          <code class="codeish">BTSC.</code> and ends with a short hash — copy all of it.
+          <span data-i18n-html="help.steps.step_1"><b>Forge a class on the site and press Copy code.</b> The code starts with
+          <code class="codeish">BTSC.</code> and ends with a short hash — copy all of it.</span>
           <figure class="shot">
-            <img src="/static/img/help/step-1.png" alt="The forge result on blankthespire.com with the Copy code button" loading="lazy" />
-            <figcaption>The result view on the site — the import code box and its Copy code button.</figcaption>
+            <img src="/static/img/help/step-1.png" alt="The forge result on blankthespire.com with the Copy code button" loading="lazy" data-i18n-attr="alt:help.steps.step_1_alt" />
+            <figcaption data-i18n="help.steps.step_1_caption">The result view on the site — the import code box and its Copy code button.</figcaption>
           </figure>
         </li>
         <li>
-          <b>Launch Slay the Spire 2 and open the main menu → Mod Configuration.</b> (the mod must be subscribed on
-          <a href="/workshop">Steam Workshop</a> first — once)
+          <span data-i18n-html="help.steps.step_2"><b>Launch Slay the Spire 2 and open the main menu → Mod Configuration.</b> (the mod must be subscribed on
+          <a href="/workshop">Steam Workshop</a> first — once)</span>
           <figure class="shot">
-            <img src="/static/img/help/step-2.png" alt="The Slay the Spire 2 main menu with the Mod Configuration entry highlighted" loading="lazy" />
-            <figcaption>Main menu — the Mod Configuration entry.</figcaption>
+            <img src="/static/img/help/step-2.png" alt="The Slay the Spire 2 main menu with the Mod Configuration entry highlighted" loading="lazy" data-i18n-attr="alt:help.steps.step_2_alt" />
+            <figcaption data-i18n="help.steps.step_2_caption">Main menu — the Mod Configuration entry.</figcaption>
           </figure>
         </li>
         <li>
-          <b>Choose BlankTheSpire</b> from the list of installed mods on the left.
+          <span data-i18n-html="help.steps.step_3"><b>Choose BlankTheSpire</b> from the list of installed mods on the left.</span>
           <figure class="shot">
-            <img src="/static/img/help/step-3.png" alt="The mod list with BlankTheSpire selected and its settings open" loading="lazy" />
-            <figcaption>The mod list — pick BlankTheSpire to open its settings.</figcaption>
+            <img src="/static/img/help/step-3.png" alt="The mod list with BlankTheSpire selected and its settings open" loading="lazy" data-i18n-attr="alt:help.steps.step_3_alt" />
+            <figcaption data-i18n="help.steps.step_3_caption">The mod list — pick BlankTheSpire to open its settings.</figcaption>
           </figure>
         </li>
         <li>
-          <b>Paste the code into the "Class code" field and press Import.</b> (the field sits under
-          <i>Import a class code</i>; leave "Class slot" at 0 and the mod picks a free slot for you)
+          <span data-i18n-html="help.steps.step_4"><b>Paste the code into the "Class code" field and press Import.</b> (the field sits under
+          <i>Import a class code</i>; leave "Class slot" at 0 and the mod picks a free slot for you)</span>
           <figure class="shot">
-            <img src="/static/img/help/step-4.png" alt="The Class code field with a BTSC code pasted in and the Import button ready" loading="lazy" />
-            <figcaption>The Class code field with the code pasted and Import ready to press.</figcaption>
+            <img src="/static/img/help/step-4.png" alt="The Class code field with a BTSC code pasted in and the Import button ready" loading="lazy" data-i18n-attr="alt:help.steps.step_4_alt" />
+            <figcaption data-i18n="help.steps.step_4_caption">The Class code field with the code pasted and Import ready to press.</figcaption>
           </figure>
         </li>
         <li>
-          <b>Restart the game</b> — press <b>Restart game (applies changes)</b> on the same screen.
-          <div class="callout"><b>The restart is REQUIRED.</b> The mod will say so right after the import.
+          <span data-i18n-html="help.steps.step_5"><b>Restart the game</b> — press <b>Restart game (applies changes)</b> on the same screen.</span>
+          <div class="callout" data-i18n-html="help.steps.step_5_callout"><b>The restart is REQUIRED.</b> The mod will say so right after the import.
             A newly imported class is only loaded at startup — it will <b>not</b> appear at character select
             until you fully quit and relaunch the game.</div>
           <figure class="shot">
-            <img src="/static/img/help/step-5.png" alt="The mod's restart-required confirmation after a successful import" loading="lazy" />
-            <figcaption>The confirmation after a successful import — restart before you look for the class.</figcaption>
+            <img src="/static/img/help/step-5.png" alt="The mod's restart-required confirmation after a successful import" loading="lazy" data-i18n-attr="alt:help.steps.step_5_alt" />
+            <figcaption data-i18n="help.steps.step_5_caption">The confirmation after a successful import — restart before you look for the class.</figcaption>
           </figure>
         </li>
         <li>
-          <b>Start a new run and pick your class</b> from the character select screen.
+          <span data-i18n-html="help.steps.step_6"><b>Start a new run and pick your class</b> from the character select screen.</span>
           <figure class="shot">
-            <img src="/static/img/help/step-6.png" alt="The character select screen showing a forged class" loading="lazy" />
-            <figcaption>Character select — your forged class sits alongside the base-game characters.</figcaption>
+            <img src="/static/img/help/step-6.png" alt="The character select screen showing a forged class" loading="lazy" data-i18n-attr="alt:help.steps.step_6_alt" />
+            <figcaption data-i18n="help.steps.step_6_caption">Character select — your forged class sits alongside the base-game characters.</figcaption>
           </figure>
         </li>
       </ol>
     </section>
 
     <section class="card">
-      <h2>Troubleshooting</h2>
+      <h2 data-i18n="help.trouble.title">Troubleshooting</h2>
       <ul class="steps">
-        <li><b>"Code rejected" / "invalid code".</b> Make sure the <i>whole</i> code was copied — including the
+        <li data-i18n-html="help.trouble.rejected"><b>"Code rejected" / "invalid code".</b> Make sure the <i>whole</i> code was copied — including the
           <code class="codeish">BTSC.</code> prefix at the front and the short hash after the final dot. A code
           cut off at either end can't be decoded. The Copy code button always copies the whole thing.</li>
-        <li><b>The class doesn't appear at character select.</b> You didn't restart. Quit the game completely
+        <li data-i18n-html="help.trouble.no_class"><b>The class doesn't appear at character select.</b> You didn't restart. Quit the game completely
           and relaunch — imported classes only load at startup.</li>
-        <li><b>There's no Mods menu / the game isn't modded.</b> The mod isn't installed yet — see
+        <li data-i18n-html="help.trouble.no_mods"><b>There's no Mods menu / the game isn't modded.</b> The mod isn't installed yet — see
           <a href="/download">Get the mod</a>.</li>
-        <li><b>Anything else.</b> <a href="https://github.com/ryanrinkel/BLANKthespire/issues">Report a bug</a>
+        <li data-i18n-html="help.trouble.other"><b>Anything else.</b> <a href="https://github.com/ryanrinkel/BLANKthespire/issues">Report a bug</a>
           on GitHub. If the game crashed, include the lines from
           <code class="codeish">%APPDATA%\SlayTheSpire2\logs\godot.log</code>.</li>
       </ul>
     </section>
 
     <section class="card">
-      <h2>Next</h2>
-      <p><a class="btn primary" href="/app">Forge a class</a>
-         <a class="btn" href="/download">Get the mod</a>
-         <a class="btn" href="https://github.com/ryanrinkel/BLANKthespire" target="_blank" rel="noopener">GitHub</a></p>
+      <h2 data-i18n="help.next.title">Next</h2>
+      <p><a class="btn primary" href="/app" data-i18n="help.next.forge">Forge a class</a>
+         <a class="btn" href="/download" data-i18n="help.next.get_mod">Get the mod</a>
+         <a class="btn" href="https://github.com/ryanrinkel/BLANKthespire" target="_blank" rel="noopener" data-i18n="common.footer.github">GitHub</a></p>
     </section>
   </main>
 
   <footer class="foot">
-    <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> ·
-    <a href="/download">Get the mod</a> ·
-    <a href="https://github.com/ryanrinkel/BLANKthespire" target="_blank" rel="noopener">GitHub</a> ·
-    <a href="mailto:ryan.r.rinkel@gmail.com">Support</a>
-    <p class="foot-note">Unofficial fan project — not affiliated with or endorsed by Mega Crit.</p>
+    <a href="/terms" data-i18n="common.footer.terms">Terms</a> · <a href="/privacy" data-i18n="common.footer.privacy">Privacy</a> ·
+    <a href="/download" data-i18n="common.footer.get_mod">Get the Mod</a> ·
+    <a href="https://github.com/ryanrinkel/BLANKthespire" target="_blank" rel="noopener" data-i18n="common.footer.github">GitHub</a> ·
+    <a href="mailto:ryan.r.rinkel@gmail.com" data-i18n="common.footer.support">Support</a>
+    <p class="foot-note" data-i18n="common.footer.disclaimer">Unofficial fan project — not affiliated with or endorsed by Mega Crit.</p>
   </footer>
-  <script src="/static/help.js"></script>
+  <script src="/static/i18n.js?v=20261028b"></script>
+  <script src="/static/help.js?v=20261028b"></script>
 </body>
 </html>

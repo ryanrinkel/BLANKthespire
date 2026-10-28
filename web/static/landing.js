@@ -1,16 +1,27 @@
 "use strict";
 
-// BLANK the spire — split-flap landing board.
+// Blank the Spire — split-flap landing board.
 // Five tiles spell BLANK on arrival, then every IDLE_MS the board "flips" (Solari/train-board
 // style: each tile steps forward through the alphabet) to a new 5-letter verb that reads as
 // "_____ the spire" — FORGE the spire, CLIMB the spire, BUILD the spire…
 
-const FIRST = "BLANK";
-const WORDS = [
+// The words come from COPY.md (landing.hero.board_first_word / board_words) through i18n.js once its json is
+// in. The tiles roll only through A–Z, so a word that is not exactly five letters A–Z is dropped, and an
+// unusable list falls back to these (the English copy as of 2026-10-27).
+let FIRST = "BLANK";
+let WORDS = [
   "FORGE", "BUILD", "CRAFT", "CLIMB", "SHAPE", "DREAM",
   "BLAZE", "STORM", "BRAVE", "SCALE", "SLASH", "RAISE",
   "CRAVE", "GOOSE", "MOOSE",   // the featured classes' words, so the idle loop sometimes lands on them
 ];
+const BOARD_WORD = /^[A-Z]{5}$/;
+function loadBoardWords() {
+  const first = String(BTS_I18N.t("landing.hero.board_first_word")).trim().toUpperCase();
+  if (BOARD_WORD.test(first)) FIRST = first;
+  const words = String(BTS_I18N.t("landing.hero.board_words")).split(",")
+    .map((w) => w.trim().toUpperCase()).filter((w) => BOARD_WORD.test(w));
+  if (words.length >= 2) WORDS = words;
+}
 
 const SLOTS = 5;
 const IDLE_MS = 2500;        // hold a word this long before flipping to the next
@@ -68,7 +79,8 @@ async function rollTile(flap, target) {
   }
 }
 
-// The "___ the Spire!" blank in the How-it-works step 3, kept in sync with the board.
+// The "___ the Spire!" blank in the How-it-works step 3, kept in sync with the board. (In a translated page
+// i18n.js moves this same node into the translated sentence — data-i18n-slot="word" — so the reference holds.)
 const fillWord = document.getElementById("fill-word");
 const setFill = (w) => { if (fillWord) fillWord.textContent = w[0] + w.slice(1).toLowerCase(); };
 
@@ -107,6 +119,8 @@ function hold(kind, word) { held[kind] = word; flipTo(word); }
 function release(kind) { held[kind] = null; resumeAt = Date.now() + IDLE_MS; }
 
 async function run() {
+  await BTS_I18N.ready;
+  loadBoardWords();
   await flipTo(FIRST);           // land on BLANK first
   while (true) {
     await sleep(IDLE_MS);
@@ -121,6 +135,7 @@ async function run() {
 // The newest four classes from The Archive (/api/featured?limit=4), tiles built by featured.js. Any failure
 // (or an empty Archive) leaves the section hidden, so the page degrades to the plain splash.
 (async () => {
+  await BTS_I18N.ready;
   const items = await fetchArchive(4);
   if (!items.length) return;
 
@@ -135,9 +150,12 @@ async function run() {
 // email is the way in here, or how to reopen the page in the real browser.
 const WV = window.BTS_WEBVIEW;
 if (WV && WV.any) {
-  const who = WV.app ? "the " + WV.app + " browser" : "this in-app browser";
-  document.getElementById("splash-note").textContent = "Sign in by email — " + who
-    + " can't do Google sign-in. Or tap " + (WV.ios ? "···" : "⋮") + " → Open in " + WV.browser + ".";
+  BTS_I18N.ready.then(() => {
+    const who = WV.app ? BTS_I18N.t("landing.hero.webview_who_app", { app: WV.app })
+      : BTS_I18N.t("landing.hero.webview_who_generic");
+    document.getElementById("splash-note").textContent = BTS_I18N.t("landing.hero.signin_note_webview",
+      { who, menu: WV.ios ? "···" : "⋮", browser: WV.browser });
+  });
 }
 
 // Point the button at the right place: already signed in → straight to the app; local dev (no OAuth
@@ -154,6 +172,7 @@ if (WV && WV.any) {
   } catch (_) { /* leave the button pointing at /login */ }
   const EV = window.BTS_EVENT;
   if (EV) {
+    await BTS_I18N.ready;
     EV.keepWelcome(me);
     EV.ribbon(me, (node) => document.querySelector(".splash-actions").before(node));
   }

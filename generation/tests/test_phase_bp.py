@@ -245,7 +245,8 @@ def _t_engine() -> None:
             ("[BP] on_debuff_applied fired", "the [BP] on_debuff_applied tag"),
             ("[BP] on_evoke fired", "the [BP] on_evoke tag"),
             ('MainFile.Logger.Info($"[BP] re-entry blocked ({kind}).");', "the [BP] re-entry tag (the _firing guard held)"),
-            ('"on_card_generated" => "On Card Created", "on_debuff_applied" => "On Debuff Applied"', "the power titles")):
+            ('"on_card_generated" => ForgedText.T("power.trigger.on_card_generated", "On Card Created"), '
+             '"on_debuff_applied" => ForgedText.T("power.trigger.on_debuff_applied", "On Debuff Applied")', "the power titles")):  # i18n
         check(frag in tp, f"ForgedTriggerPower: {why}")
     for hook in ("AfterCardGeneratedForCombat", "AfterPowerAmountChanged", "AfterOrbEvoked"):
         body = tp.split(f"public override async Task {hook}", 1)[1].split("\n    }\n", 1)[0]
@@ -304,20 +305,24 @@ CASES = [([{"op": "block", "amount": 10}, _cd("skill_played", "this_turn", -1)],
             "effects": [{"op": "block", "amount": 4}]}], "self", "Every 3rd time you apply Poison, gain 4 Block."),
          ([{"op": "add_trigger", "trigger": "on_card_generated", "scope": "this_turn", "effects": [{"op": "block", "amount": 2}]}],
           "self", "This turn, whenever you create a card, gain 2 Block.")]
-C_FRAGMENTS = ('if (e.SetZero) return "After you play this, it costs 0 for the rest of combat.";',
-               'if (e.Amount > 0) return $"Costs {e.Amount} more each time you play it.";',
-               'string life = e.Scope == "combat" ? "this combat" : "this turn";',
-               '"played"         => $"Costs {n} less {life} each time you play it.",',
-               '"drawn"          => $"Whenever you draw this, it costs {n} less {life}.",',
-               '"attack_played"  => $"Costs {n} less {life} for each Attack you play.",',
-               '"skill_played"   => $"Costs {n} less {life} for each Skill you play.",',
-               '"card_exhausted" => $"Costs {n} less {life} for each card you Exhaust.",',
-               '_                => $"Costs {n} less {life} for each card you play.",',
+# i18n (I18N_PLAN C1): each sentence is a ForgedText key with its English inline at the call site; the {life} word is
+# the shared Life() helper; trigger heads are "Whenever {evt}" over the event clause; StatusWord = localized StatusDisplay.
+C_FRAGMENTS = ('if (e.SetZero) return Tx("card.cost_delta.set_zero", "After you play this, it costs 0 for the rest of combat.");',
+               'if (e.Amount > 0) return Fx("card.cost_delta.more", "Costs {n} more each time you play it.", ("n", e.Amount));',
+               'private static string Life(EffectSpec e) => e.Scope == "combat" ? Tx("life.combat", "this combat") : Tx("life.turn", "this turn");',
+               '"played"         => Fx("card.cost_delta.played", "Costs {n} less {life} each time you play it.", ("n", n), ("life", life)),',
+               '"drawn"          => Fx("card.cost_delta.drawn", "Whenever you draw this, it costs {n} less {life}.", ("n", n), ("life", life)),',
+               '"attack_played"  => Fx("card.cost_delta.attack_played", "Costs {n} less {life} for each Attack you play.", ("n", n), ("life", life)),',
+               '"skill_played"   => Fx("card.cost_delta.skill_played", "Costs {n} less {life} for each Skill you play.", ("n", n), ("life", life)),',
+               '"card_exhausted" => Fx("card.cost_delta.card_exhausted", "Costs {n} less {life} for each card you Exhaust.", ("n", n), ("life", life)),',
+               '_                => Fx("card.cost_delta.card_played", "Costs {n} less {life} for each card you play.", ("n", n), ("life", life)),',
                'case "cost_delta":    parts.Add(CostDeltaSentence(e)); break;',
-               '"on_card_generated" => "Whenever you create a card",',
-               '"on_debuff_applied" => t.Status != null ? $"Whenever you apply {StatusName(t.Status)}" : "Whenever you apply a debuff",',
-               '"on_evoke"        => "Whenever you Evoke an orb",',
-               ': e.Target == "that_enemy" ? " to that enemy" : "";')
+               '"on_card_generated" => Tx("evt.on_card_generated", "you create a card"),',
+               '"on_debuff_applied" => t.Status != null ? Fx("evt.on_debuff_applied.status", "you apply {status}", ("status", StatusWord(t.Status)))\n'
+               '                                                    : Tx("evt.on_debuff_applied", "you apply a debuff"),',
+               '"on_evoke"        => Tx("evt.on_evoke", "you Evoke an orb"),',
+               'Fx("trig.whenever", "Whenever {evt}", ("evt", evt))',
+               ': e.Target == "that_enemy" ? Tx("to.that_enemy", " to that enemy") : "";')
 
 
 def _t_rules_and_describe() -> None:

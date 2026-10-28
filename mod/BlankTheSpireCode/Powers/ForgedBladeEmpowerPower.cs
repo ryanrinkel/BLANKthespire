@@ -75,9 +75,9 @@ public sealed class ForgedBladeEmpowerPower : BlankTheSpirePower
     }
 
     public override List<(string, string)>? Localization =>
-        (List<(string, string)>)new PowerLoc("Blade Empower",
-            "Your blade deals multiplied damage this turn (cleared at the start of your next turn).",
-            "Your blade deals multiplied damage this turn (cleared at the start of your next turn).");
+        (List<(string, string)>)new PowerLoc(ForgedText.T("power.blade_empower.title", "Blade Empower"),
+            ForgedText.T("power.blade_empower.desc", "Your blade deals multiplied damage this turn (cleared at the start of your next turn)."),
+            ForgedText.T("power.blade_empower.desc", "Your blade deals multiplied damage this turn (cleared at the start of your next turn)."));
 
     public override string? CustomPackedIconPath => EmojiIconRenderer.IconPath("blade_empower") ?? base.CustomPackedIconPath;
     public override string? CustomBigIconPath => EmojiIconRenderer.IconPath("blade_empower") ?? base.CustomBigIconPath;

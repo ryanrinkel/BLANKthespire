@@ -48,32 +48,34 @@ public static class BTS1Codec
     {
         json = "";
         kind = BtsKind.Card;
-        if (string.IsNullOrWhiteSpace(code)) { error = "empty code."; return false; }
+        // i18n: the player-facing reasons go through ForgedText under their docs/copy/COPY.md keys (mod.codec.*).
+        if (string.IsNullOrWhiteSpace(code)) { error = ForgedText.T("mod.codec.empty", "empty code."); return false; }
 
         // Strip ALL whitespace — codes shared via chat/forums often get line-wrapped. base64url + '.' separators
         // contain no whitespace, so this is lossless.
         string clean = new string(code.Where(c => !char.IsWhiteSpace(c)).ToArray());
 
         var parts = clean.Split('.');
-        if (parts.Length != 4) { error = "not a BLANK the spire code."; return false; }
+        if (parts.Length != 4) { error = ForgedText.T("mod.codec.not_bts", "not a Blank the Spire code."); return false; }
         if (parts[0] == CardMagic) kind = BtsKind.Card;
         else if (parts[0] == ClassMagic) kind = BtsKind.Class;
-        else { error = "not a BLANK the spire (BTS1/BTSC) code."; return false; }
+        else { error = ForgedText.T("mod.codec.bad_magic", "not a Blank the Spire (BTS1/BTSC) code."); return false; }
 
         if (!int.TryParse(parts[1], out int ver))
-        { error = "malformed code (bad version field)."; return false; }
+        { error = ForgedText.T("mod.codec.bad_version", "malformed code (bad version field)."); return false; }
         if (ver > ForgedCards.VocabVersion)
         {
-            error = $"this code needs a newer BLANK the spire (code is v{ver}, this mod supports v{ForgedCards.VocabVersion}). Update the mod.";
+            error = ForgedText.F("mod.codec.needs_update", "this code needs a newer Blank the Spire (code is v{ver}, this mod supports v{max}). Update the mod.",
+                                 ("ver", ver), ("max", ForgedCards.VocabVersion));
             return false;
         }
 
         byte[] jsonBytes;
         try { jsonBytes = Gunzip(Base64UrlDecode(parts[2])); }
-        catch (Exception e) { error = $"corrupted code ({e.Message})."; return false; }
+        catch (Exception e) { error = ForgedText.F("mod.codec.corrupted", "corrupted code ({err}).", ("err", e.Message)); return false; }
 
         if (Crc32(jsonBytes).ToString("x8") != parts[3].ToLowerInvariant())
-        { error = "corrupted code (checksum mismatch — try copying it again)."; return false; }
+        { error = ForgedText.T("mod.codec.checksum", "corrupted code (checksum mismatch — try copying it again)."); return false; }
 
         json = Encoding.UTF8.GetString(jsonBytes);
         error = "";

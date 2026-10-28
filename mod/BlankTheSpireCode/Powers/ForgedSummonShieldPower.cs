@@ -9,6 +9,7 @@ using MegaCrit.Sts2.Core.Entities.Powers;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.ValueProps;
+using BlankTheSpire.BlankTheSpireCode.Engine; // ForgedText (i18n)
 
 namespace BlankTheSpire.BlankTheSpireCode.Powers;
 
@@ -51,7 +52,7 @@ public sealed class ForgedSummonShieldPower : BlankTheSpirePower
 
     public override List<(string, string)>? Localization =>
         (List<(string, string)>)new PowerLoc(
-            "Bodyguard",
-            "Your summon takes the powered hits aimed at you, until it falls.",
-            "Your summon takes the powered hits aimed at you, until it falls.");
+            ForgedText.T("power.bodyguard.title", "Bodyguard"),
+            ForgedText.T("power.bodyguard.desc", "Your summon takes the powered hits aimed at you, until it falls."),
+            ForgedText.T("power.bodyguard.desc", "Your summon takes the powered hits aimed at you, until it falls."));
 }

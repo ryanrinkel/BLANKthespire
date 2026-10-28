@@ -181,7 +181,10 @@ def _t_contract() -> None:
     heur = (paths.VOCABULARY.parent / "DESIGN_HEURISTICS.md").read_text(encoding="utf-8")
     check("damage_over_time" in heur and "hit_count" in heur and "multiplicative" in heur, "DESIGN_HEURISTICS.md prices all three")
     app = WEB_APP.read_text(encoding="utf-8")
-    check("damage_over_time:" in app and "hit_count:" in app and 'st.mode === "multiplicative"' in app,
+    en = json.loads((WEB_APP.parent / "i18n" / "en.json").read_text(encoding="utf-8"))["strings"]  # render.js labels come from COPY.md (i18n build) since 2026-10-27
+    check('"damage_over_time"' in app and '"hit_count"' in app and 'st.mode === "multiplicative"' in app
+          and "app.mech.status_hook.damage_over_time" in en and "app.mech.status_hook.hit_count" in en
+          and "app.mech.status_multiplicative" in en,
           "render.js labels both hooks and the multiplicative mode")
     data = pathlib.Path(paths.__file__).parent / "data"
     arch = json.loads((data / "archetypes.json").read_text(encoding="utf-8"))

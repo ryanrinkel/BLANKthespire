@@ -188,22 +188,24 @@ public static class OrbRunner
 
     // --- text (the orb HUD tooltip; I-2 will mirror this in cardgen.py) -----------------------------
 
-    /// <summary>Synthesize an orb's tooltip: "Passive: …. Evoke: …."</summary>
+    /// <summary>Synthesize an orb's tooltip: "Passive: …. Evoke: …." i18n: every string goes through ForgedText (the
+    /// inline text is the English; the fragments share the trigger payload keys "frag.*").</summary>
     public static string Describe(OrbSpec spec)
     {
         string passive = Phrase(spec.Passive);
         string evoke = Phrase(spec.Evoke);
         var parts = new List<string>(2);
         // Phase AR (v49): a turn_start passive says so (the Plasma shape) — the default tick is end of turn.
-        if (passive.Length > 0) parts.Add(spec.PassiveAtTurnStart ? $"Passive (turn start): {passive}" : $"Passive: {passive}");
-        if (evoke.Length > 0) parts.Add($"Evoke: {evoke}");
-        return parts.Count > 0 ? string.Join("\n", parts) : "A forged orb.";
+        if (passive.Length > 0) parts.Add(spec.PassiveAtTurnStart ? ForgedText.F("orbtip.passive_turn_start", "Passive (turn start): {p}", ("p", passive))
+                                                                  : ForgedText.F("orbtip.passive", "Passive: {p}", ("p", passive)));
+        if (evoke.Length > 0) parts.Add(ForgedText.F("orbtip.evoke", "Evoke: {p}", ("p", evoke)));
+        return parts.Count > 0 ? string.Join("\n", parts) : ForgedText.T("orbtip.empty", "A forged orb.");
     }
 
     private static string Phrase(OrbEffect[] effects)
     {
         var frags = effects.Select(Fragment).Where(s => s.Length > 0).ToList();
-        return frags.Count > 0 ? string.Join(", ", frags) + "." : "";
+        return frags.Count > 0 ? string.Join(ForgedText.T("punct.join", ", "), frags) + ForgedText.T("punct.period", ".") : "";
     }
 
     private static string Fragment(OrbEffect oe)
@@ -211,26 +213,29 @@ public static class OrbRunner
         string core = FragmentCore(oe);
         // Phase AR (v49): the gate reads like a card's — "deal 12 damage to ALL enemies if you have 3+ orbs".
         if (core.Length > 0 && oe.When != null)
-            core += " " + (oe.When.Negate ? "unless " : "if ") + Conditions.Phrase(oe.When);
+            core = ForgedCards.Weave(core, oe.When.Negate, Conditions.Phrase(oe.When));
         return core;
     }
 
     private static string FragmentCore(OrbEffect oe)
     {
         var e = oe.Effect;
-        string to = oe.Target switch { "all_enemies" => " to ALL enemies", "enemy" => "", _ => "" };
+        string to = oe.Target switch { "all_enemies" => ForgedText.T("to.all", " to ALL enemies"), "enemy" => "", _ => "" };
+        string who = oe.Target == "all_enemies" ? ForgedText.T("who.all", " to ALL enemies") : "";
         return e.Op switch
         {
-            "damage"        => $"deal {e.Amount} damage{to}",
-            "block"         => $"gain {e.Amount} Block",
-            "draw"          => $"draw {e.Amount} card(s)",
-            "gain_energy"   => $"gain {e.Amount} energy",
-            "heal"          => $"heal {e.Amount} HP",
-            "gain_orb_slot" => $"gain {e.Amount} orb slot(s)",
+            "damage"        => ForgedText.F("frag.damage", "deal {amount} damage{to}", ("amount", e.Amount), ("to", to)),
+            "block"         => ForgedText.F("frag.block", "gain {amount} Block", ("amount", e.Amount)),
+            "draw"          => ForgedText.F("frag.draw", "draw {amount} card(s)", ("amount", e.Amount)),
+            "gain_energy"   => ForgedText.F("frag.gain_energy", "gain {amount} energy", ("amount", e.Amount)),
+            "heal"          => ForgedText.F("frag.heal", "heal {amount} HP", ("amount", e.Amount)),
+            "gain_orb_slot" => ForgedText.F("frag.gain_orb_slot", "gain {amount} orb slot(s)", ("amount", e.Amount)),
             "apply_status"  => EffectRunner.SelfBuffStatuses.Contains(e.Status ?? "")
-                                   ? $"gain {e.Amount} {StatusName(e.Status)}"
-                                   : $"apply {e.Amount} {StatusName(e.Status)}{(oe.Target == "all_enemies" ? " to ALL enemies" : "")}",
-            "channel_orb"   => System.Math.Max(1, e.Amount) > 1 ? $"channel {e.Amount} {e.Orb} orbs" : $"channel a {e.Orb} orb",
+                                   ? ForgedText.F("frag.gain_status", "gain {amount} {status}", ("amount", e.Amount), ("status", ForgedText.T("status." + (e.Status ?? ""), StatusName(e.Status))), ("unit", ForgedCards.StatusUnit(e.Status)))
+                                   : ForgedText.F("frag.apply_status", "apply {amount} {status}{to}", ("amount", e.Amount), ("status", ForgedText.T("status." + (e.Status ?? ""), StatusName(e.Status))), ("unit", ForgedCards.StatusUnit(e.Status)),
+                                                  ("to", oe.Target == "all_enemies" ? ForgedText.T("to.all", " to ALL enemies") : ""), ("who", who)),
+            "channel_orb"   => System.Math.Max(1, e.Amount) > 1 ? ForgedText.F("frag.channel.n", "channel {n} {orb} orbs", ("n", e.Amount), ("orb", e.Orb), ("orbname", ForgedCards.OrbWord(e.Orb)))
+                                                                : ForgedText.F("frag.channel.1", "channel a {orb} orb", ("orb", e.Orb), ("orbname", ForgedCards.OrbWord(e.Orb))),
             _ => "",
         };
     }

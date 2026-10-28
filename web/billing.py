@@ -42,6 +42,7 @@ import os
 from flask import jsonify, request
 from sqlalchemy.exc import IntegrityError
 
+import i18n
 from auth import current_user, require_login
 from db import session_scope
 from models import Purchase, User
@@ -245,7 +246,7 @@ def init_billing(app) -> None:
         in cents. custom_dollars IS a price the caller names, but only as whole dollars inside the published
         bounds, and the cents arithmetic still happens here (custom_info), never in the browser."""
         if not billing_enabled():
-            return jsonify({"error": "donations aren't available right now."}), 503
+            return jsonify(i18n.error_body("server.billing.unavailable")), 503
         user = current_user()
         body = request.get_json(silent=True)
         if not isinstance(body, dict):
@@ -253,18 +254,22 @@ def init_billing(app) -> None:
         tier_id = str(body.get("tier", "") or "").strip()
         if "custom_dollars" in body:
             if tier_id:
-                return jsonify({"error": "send either a tier or a custom amount, not both."}), 400
+                return jsonify(i18n.error_body("server.billing.both")), 400
             chosen = custom_info(body.get("custom_dollars"))
             if chosen is None:
-                return jsonify({
-                    "error": f"custom amounts are whole dollars from ${CUSTOM_MIN_DOLLARS} to "
-                             f"${CUSTOM_MAX_DOLLARS}."}), 400
+                return jsonify(i18n.error_body("server.billing.custom_range",
+                                               CUSTOM_MIN_DOLLARS=CUSTOM_MIN_DOLLARS,
+                                               CUSTOM_MAX_DOLLARS=CUSTOM_MAX_DOLLARS)), 400
         else:
             chosen = tier_info(tier_id)
             if chosen is None:
-                return jsonify({"error": "pick one of the donation amounts."}), 400
+                return jsonify(i18n.error_body("server.billing.pick_tier")), 400
         price_id = chosen["id"]
         net, fee, tokens = chosen["net_cents"], chosen["fee_cents"], chosen["tokens"]
+        # The site language ("en" | "zh", sent by app.js) names the line items and, for zh, sets Stripe's
+        # hosted-page locale. English sends no locale at all, exactly as before (Stripe picks one itself).
+        lang = i18n.normalize_lang(body.get("lang"))
+        extra = {"locale": "zh"} if lang == "zh" else {}
         try:
             sess = _stripe.checkout.Session.create(
                 mode="payment",
@@ -275,14 +280,14 @@ def init_billing(app) -> None:
                     "price_data": {
                         "currency": "usd",
                         "unit_amount": net,
-                        "product_data": {"name": "Donation — BLANK the spire"},
+                        "product_data": {"name": i18n.get_text(lang, "stripe.line_item.donation")},
                     },
                     "quantity": 1,
                 }, {
                     "price_data": {
                         "currency": "usd",
                         "unit_amount": fee,
-                        "product_data": {"name": "Card processing fee"},
+                        "product_data": {"name": i18n.get_text(lang, "stripe.line_item.fee")},
                     },
                     "quantity": 1,
                 }],
@@ -292,10 +297,11 @@ def init_billing(app) -> None:
                 customer_email=user.get("email") or None,
                 success_url=f"{public_base}/app?purchase=success&session_id={{CHECKOUT_SESSION_ID}}",
                 cancel_url=f"{public_base}/app?purchase=cancel",
+                **extra,
             )
         except Exception as e:
             app.logger.warning("stripe donation checkout create failed: %s", e)
-            return jsonify({"error": "couldn't start checkout — try again in a minute."}), 502
+            return jsonify(i18n.error_body("server.billing.checkout_failed")), 502
         return jsonify({"url": sess.url})
 
     @app.route("/webhook/stripe", methods=["POST"])
@@ -317,17 +323,17 @@ def init_billing(app) -> None:
         """Success-redirect fallback: verify the session with Stripe and credit it NOW if the webhook hasn't
         already — so the user's balance is right the moment they land back on /app."""
         if not billing_enabled():
-            return jsonify({"error": "donations aren't available right now."}), 503
+            return jsonify(i18n.error_body("server.billing.unavailable")), 503
         user = current_user()
         session_id = (request.args.get("session_id") or "").strip()
         if not session_id:
-            return jsonify({"error": "session_id is required"}), 400
+            return jsonify(i18n.error_body("server.billing.session_required")), 400
         try:
             sess = _stripe.checkout.Session.retrieve(session_id)
         except Exception:
-            return jsonify({"error": "unknown checkout session"}), 404
+            return jsonify(i18n.error_body("server.billing.unknown_session")), 404
         if _sget(sess, "client_reference_id") != str(user["id"]):
-            return jsonify({"error": "not your checkout session"}), 403
+            return jsonify(i18n.error_body("server.billing.not_your_session")), 403
         credited = False
         balance = None
         if _sget(sess, "payment_status") == "paid":

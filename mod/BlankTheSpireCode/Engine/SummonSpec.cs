@@ -30,7 +30,12 @@ namespace BlankTheSpire.BlankTheSpireCode.Engine;
 /// no payoff. Driven by <see cref="Powers.ForgedSummonPower"/>'s damage hook.</param>
 public sealed record SummonSpec(
     string Name, string Description, int MaxHp, SummonMove[] Moves, bool Attackable = true,
-    SummonAction[]? OnSummon = null, SummonAction[]? OnDeath = null, SummonNthAttack? OnNthAttack = null);
+    SummonAction[]? OnSummon = null, SummonAction[]? OnDeath = null, SummonNthAttack? OnNthAttack = null)
+{
+    /// <summary>i18n (I18N_PLAN C2): the bundle's optional <c>loc</c> strings for this entry, keyed by the GAME's locale
+    /// code ("zhs", ...). Null/absent = English only. A missing field falls back to the English one.</summary>
+    public IReadOnlyDictionary<string, LocText>? Loc { get; init; }
+}
 
 /// <summary>One entry in a summon's move cycle: the ordered actions it performs on a single turn.</summary>
 public sealed record SummonMove(SummonAction[] Actions);

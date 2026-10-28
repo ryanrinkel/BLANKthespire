@@ -85,7 +85,9 @@ public abstract class ForgedRelic : BlankTheSpireRelic
         get
         {
             var s = Source;
-            return s == null ? null : (List<(string, string)>)new RelicLoc(s.Name, s.Description, s.Description);
+            if (s == null) return null;
+            string desc = ForgedText.Description(s.Loc, s.Description); // i18n: the bundle's loc for the game language
+            return (List<(string, string)>)new RelicLoc(ForgedText.Name(s.Loc, s.Name), desc, desc);
         }
     }
 

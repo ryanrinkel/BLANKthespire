@@ -307,9 +307,9 @@ def _t_spread_debuffs() -> None:
 def _t_describe() -> None:
     print("describe byte-match (cardgen.py == ForgedCards.Describe):")
     fc = (MOD_CODE / "Engine" / "ForgedCards.cs").read_text(encoding="utf-8")
-    check('parts.Add($"Spend {Math.Max(1, e.Amount)} Forge.");' in fc,
+    check('parts.Add(Fx("card.spend_forge", "Spend {n} Forge.", ("n", Math.Max(1, e.Amount))));' in fc,  # i18n: ForgedText
           "the C# spend_forge sentence is the literal amount")
-    check("""parts.Add("Copy the target's debuffs to all other enemies.");""" in fc,
+    check("""parts.Add(Tx("card.spread_debuffs", "Copy the target's debuffs to all other enemies."));""" in fc,  # i18n: ForgedText
           "the C# spread_debuffs sentence")
     txt = cardgen.describe([{"op": "spend_forge", "amount": 5}], "enemy")
     check(txt == "Spend 5 Forge.", f"cardgen spend_forge sentence, got {txt!r}")

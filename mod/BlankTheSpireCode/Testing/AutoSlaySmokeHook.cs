@@ -67,6 +67,9 @@ internal static class AutoSlaySmokeHook
 
         string requestPath = RequestPath();
         SmokeRequest? req = ReadAndConsume(requestPath);
+        // i18n regression dump (DescribeDump): always under a smoke request, or on demand via BTS_DESCRIBE_DUMP.
+        if ((req != null && !string.IsNullOrWhiteSpace(req.seed)) || DescribeDump.EnvRequested)
+            DescribeDump.WriteOnce(req != null ? "autoslay smoke" : "BTS_DESCRIBE_DUMP");
         if (req == null || string.IsNullOrWhiteSpace(req.seed)) return; // normal play — no smoke request
 
         _kicked = true;

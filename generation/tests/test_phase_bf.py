@@ -78,7 +78,10 @@ def _t_engine() -> None:
         check("Apply<VigorPower>" in s and '"double_damage" => "Double Damage"' in s, f"{f} apply + name maps")
     fc = _cs("Engine", "ForgedCards.cs")
     check('"vigor", "double_damage"' in fc.split("SupportedStatuses =", 1)[1].split("];", 1)[0], "ForgedCards.SupportedStatuses")
-    check(fc.count('"vigor" => "Vigor", "double_damage" => "Double Damage"') == 2, "both ForgedCards name maps")
+    # i18n (I18N_PLAN C1): StatusName folded into StatusDisplay (one English map); StatusWord localizes it by key.
+    check(fc.count('"vigor" => "Vigor", "double_damage" => "Double Damage"') == 1
+          and 'internal static string StatusWord(string? status) => Tx("status." + (status ?? ""), StatusDisplay(status));' in fc,
+          "both ForgedCards name maps")
     check(not list(MOD_CODE.glob("Powers/*NextAttack*")), "no new power class was written (the base game's are used)")
     for sid in ("vigor", "double_damage"):
         p = paths.VOCABULARY.parent / "statuses" / f"{sid}.json"

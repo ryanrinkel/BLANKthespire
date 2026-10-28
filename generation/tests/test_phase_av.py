@@ -137,7 +137,7 @@ def _t_sacrifice() -> None:
     check('return "sacrifice_summon carries no amount' in fc, "Validate: no amount")
     check('return "at most one \'sacrifice_summon\' effect per card' in fc, "Validate: one per card")
     check('can\'t be a card\'s only effect' in fc, "Validate: never a card's only effect")
-    check('case "sacrifice_summon": parts.Add("Sacrifice your summon.");' in fc,
+    check('case "sacrifice_summon": parts.Add(Tx("card.sacrifice_summon", "Sacrifice your summon."));' in fc,  # i18n: ForgedText key
           "Describe emits the byte-match sentence")
     check('case "sacrifice_summon":' in dc, "DataCard declares no card var for the flag-op")
     check('case "sacrifice_summon":' in er and "await SacrificeSummon(card.Owner, sacHost.SummonClass);" in er,
@@ -176,9 +176,9 @@ def _t_on_nth_attack() -> None:
           "the payoff's OWN attacks are excluded by the re-entrancy guard (try/finally)")
     check("[AV] on_nth_attack" in hook, "the on_nth_attack [AV] tag")
     sr = (MOD_CODE / "Engine" / "SummonRunner.cs").read_text(encoding="utf-8")
-    check('body += $" Every {nth.N}th hit: {ActionsPhrase(nth.Actions)}.";' in sr,
+    check('body += ForgedText.F("summon.every_nth", " Every {n}th hit: {actions}.", ("n", nth.N), ("actions", ActionsPhrase(nth.Actions)));' in sr,  # i18n
           "SummonRunner.Describe appends the every-Nth-hit clause (after On summon / On death)")
-    check(sr.index("On death:") < sr.index("Every {nth.N}th hit"), "... in that order")
+    check(sr.index("On death:") < sr.index("Every {n}th hit"), "... in that order")  # i18n: ForgedText {n} placeholder
 
 
 # --------------------------------------------------------------------------- 3. describe byte-match
@@ -190,7 +190,7 @@ def _t_describe() -> None:
                            {"op": "gain_energy", "amount": 1}], "self")
     check(d2.splitlines()[0] == "Sacrifice your summon.", f"the sacrifice sentence leads (got {d2!r})")
     fc = (MOD_CODE / "Engine" / "ForgedCards.cs").read_text(encoding="utf-8")
-    check('parts.Add("Sacrifice your summon.");' in fc, "the C# side emits the identical literal")
+    check('parts.Add(Tx("card.sacrifice_summon", "Sacrifice your summon."));' in fc, "the C# side emits the identical literal")  # i18n: ForgedText English default
 
 
 # --------------------------------------------------------------------------- 4. the card validator
@@ -329,10 +329,16 @@ def _t_contract() -> None:
 
     js = APP_JS.read_text(encoding="utf-8")
     check('case "sacrifice_summon": return "Sacrifice your minion";' in js, "render.js labels the sacrifice card op")
-    check("Ethereal (cannot be attacked)" in js, "render.js renders an ethereal minion")
-    check("Each turn: " in js and "Turn ${i + 1}" in js, "render.js renders the move cycle (single + rotation)")
-    for label in ("On summon: ", "On death: ", "th hit: "):
-        check(label in js, f"render.js renders '{label.strip()}'")
+    en = json.loads((APP_JS.parent / "i18n" / "en.json").read_text(encoding="utf-8"))["strings"]  # render.js labels come from COPY.md (i18n build) since 2026-10-27
+    check('"app.mech.summon_ethereal"' in js and en.get("app.mech.summon_ethereal") == "Ethereal (cannot be attacked)",
+          "render.js renders an ethereal minion")
+    check('"app.mech.summon_each_turn"' in js and en.get("app.mech.summon_each_turn", "").startswith("Each turn: ")
+          and "n: i + 1" in js and en.get("app.mech.summon_turn_n", "").startswith("Turn {n}: "),
+          "render.js renders the move cycle (single + rotation)")
+    # "Every {n} hit" with an ordinal {n} (nthLabel) since 2026-10-27; it was "Every {n}th hit" ("3th").
+    for key, label in (("app.mech.summon_on_summon", "On summon: "), ("app.mech.summon_on_death", "On death: "),
+                       ("app.mech.summon_every_nth", "Every {n} hit: ")):
+        check(f'"{key}"' in js and en.get(key, "").startswith(label), f"render.js renders '{label.strip()}'")
 
     bp = cf._BlueprintContract(mode="dossier", triad=True, seed=1).system_prompt()
     print(f"  (rule 0.9) blueprint prompt: {len(bp):,} chars (AU left {BP_AU:,}; delta {len(bp) - BP_AU:+,})")

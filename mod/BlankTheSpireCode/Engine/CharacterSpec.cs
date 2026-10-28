@@ -22,6 +22,10 @@ public sealed record CharacterSpec(
     int OrbSlots = 0,
     bool IsEmpty = false)
 {
+    /// <summary>i18n (I18N_PLAN C2): the bundle's optional <c>loc</c> strings for this entry, keyed by the GAME's locale
+    /// code ("zhs", ...). Null/absent = English only. A missing field falls back to the English one.</summary>
+    public IReadOnlyDictionary<string, LocText>? Loc { get; init; }
+
     /// <summary>The class's orb pool (Phase I): the ordered base/custom orb list its cards channel by name.
     /// Empty = not a forged-orb class (channel_orb, if any, uses the base lightning/frost/dark behaviour). Set
     /// via object initializer by <see cref="ForgedCharacters"/>; defaults to empty (incl. the empty-class spec).</summary>

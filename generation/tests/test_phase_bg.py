@@ -51,8 +51,11 @@ def test_balance_gauge() -> None:
     check("RemovePowerInternal" not in sv, "SetValue no longer removes the gauge at 0")
     check("InvokeDisplayAmountChanged();" in sv, "... and refreshes the badge")
     check('public override LocString Title =>' in bp and '".titleDark"' in bp and '".titleLight"' in bp, "the title flips LIVE through a Title override")
-    check('("titleDark", "🌑 Dark"), ("titleLight", "☀️ Light")' in bp, "the extra loc keys are registered via PowerLoc ExtraLoc")
-    check('new PowerLoc("Balance", desc, desc,' in bp, "the baked title is the neutral 'Balance'")
+    # i18n (I18N_PLAN C1): the titles are ForgedText keys, English inline.
+    check('("titleDark", ForgedText.T("power.balance.title_dark", "🌑 Dark"))' in bp
+          and '("titleLight", ForgedText.T("power.balance.title_light", "☀️ Light"))' in bp,
+          "the extra loc keys are registered via PowerLoc ExtraLoc")
+    check('new PowerLoc(ForgedText.T("power.balance.title", "Balance"), desc, desc,' in bp, "the baked title is the neutral 'Balance'")
     check("PENALTY: while it leans" in bp and "the name is which way" in bp, "the description names the penalty and reads the lean/pole")
     check("using MegaCrit.Sts2.Core.Localization;" in bp, "LocString is imported")
 

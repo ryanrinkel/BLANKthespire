@@ -255,16 +255,9 @@ CHARACTER_TMPL = """public sealed class ForgedCharacterSlot{k:02} : PlaceholderC
     public override bool HideFromVanillaCharacterSelect => Spec.IsEmpty;
 
     // In-code localization (no .pck rebuild). Pronouns/banter are sensible defaults; the forge only supplies
-    // name + description. Order matches CharacterLoc(Title, TitleObject, Description, PronounObject,
-    // PronounSubject, PronounPossessive, PossessiveAdjective, AromaPrinciple, EndTurnPingAlive,
-    // EndTurnPingDead, EventDeathPrevention, GoldMonologue, CardsModifierTitle, CardsModifierDescription).
-    public override List<(string, string)>? Localization => Spec.IsEmpty ? null
-        : (List<(string, string)>)new CharacterLoc(
-            Spec.Name, Spec.Name, Spec.Description,
-            "them", "they", "theirs", "their",
-            "Forged from the effect vocabulary.",
-            "Your move.", "...", "Not yet. There is more to compose.", "It all adds up.",
-            "Forged", "Composed from the effect vocabulary.");
+    // name + description (+ an optional per-locale `loc` block). The game-language switch and the CharacterLoc
+    // field order live in ForgedText.CharacterLoc (i18n, I18N_PLAN C2).
+    public override List<(string, string)>? Localization => Spec.IsEmpty ? null : ForgedText.CharacterLoc(Spec);
 }}
 """
 
@@ -273,7 +266,7 @@ def gen_card_slots() -> None:
     cards = "\n".join(CARD_SLOT_LINE.format(n=i) for i in range(1, SLOT_COUNT + 1))
     powers = "\n".join(TRIGGER_POWER_LINE.format(n=i) for i in range(1, SLOT_COUNT + 1))
     body = cards + "\n\n// Phase H3: trigger-power shells (one per slot, bound to the slot's CardSpec).\n" + powers
-    CARD_SLOTS_OUT.write_text(CARD_SLOTS_HEADER + body + "\n", encoding="utf-8")
+    CARD_SLOTS_OUT.write_text(CARD_SLOTS_HEADER + body + "\n", encoding="utf-8", newline="\n")
     print(f"generated {SLOT_COUNT} forged card slots + {SLOT_COUNT} trigger powers -> {CARD_SLOTS_OUT}")
 
 
@@ -299,7 +292,7 @@ def gen_classes() -> None:
             f"        () => ModelDb.Card<ForgedClass{k:02}Card{n:02}>()," for n in range(1, CARDS_PER_CLASS + 1)
         )
         blocks.append(CHARACTER_TMPL.format(k=k, slotcards=slotcards, cards_per_class=CARDS_PER_CLASS))
-    CLASSES_OUT.write_text(CLASSES_HEADER + "\n".join(blocks) + "\n", encoding="utf-8")
+    CLASSES_OUT.write_text(CLASSES_HEADER + "\n".join(blocks) + "\n", encoding="utf-8", newline="\n")  # LF on Windows too
     # per class: card pool + card base (2), card slots, trigger powers, orb / status / summon shells,
     # the relic shell, the potion pool (1) + potion shells, the character (1)
     n_types = CLASS_COUNT * (2 + CARDS_PER_CLASS + CARDS_PER_CLASS + ORBS_PER_CLASS + STATUSES_PER_CLASS

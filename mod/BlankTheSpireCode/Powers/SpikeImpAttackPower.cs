@@ -11,6 +11,7 @@ using MegaCrit.Sts2.Core.Entities.Powers;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.ValueProps;
+using BlankTheSpire.BlankTheSpireCode.Engine; // ForgedText (i18n)
 
 namespace BlankTheSpire.BlankTheSpireCode.Powers;
 
@@ -56,5 +57,5 @@ public sealed class SpikeImpAttackPower : BlankTheSpirePower
     // In-code tooltip for the pet's behaviour buff (no .pck rebuild).
     public override List<(string, string)>? Localization =>
         (List<(string, string)>)new PowerLoc(
-            "Spike Imp", "Attacks for 5 at the end of your turn.", "Attacks for 5 at the end of your turn.");
+            ForgedText.T("power.spike_imp.title", "Spike Imp"), ForgedText.T("power.spike_imp.desc", "Attacks for 5 at the end of your turn."), ForgedText.T("power.spike_imp.desc", "Attacks for 5 at the end of your turn."));
 }

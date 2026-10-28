@@ -3,37 +3,38 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Continue sign-in — BLANK the spire</title>
+  <title data-i18n-page="signin.continue.title">Continue sign-in — Blank the Spire</title>
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png" />
   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="/static/style.css?v=20261028b" />
 </head>
 <body>
   <header>
-    <div class="brand">⚒ <strong>BLANK the spire</strong> <span class="sub">sign in</span></div>
-    <nav><a class="tab" href="/">← Back home</a></nav>
+    <div class="brand">⚒ <strong>Blank the Spire</strong> <span class="sub" data-i18n="signin.header.sub">sign in</span></div>
+    <nav><a class="tab" href="/" data-i18n="common.nav.back_home">← Back home</a></nav>
   </header>
 
   <main>
     <section class="card">
-      <h1>One more click</h1>
-      <p class="muted">Your sign-in link checks out. Press the button to finish signing in.</p>
+      <h1 data-i18n="signin.continue.heading">One more click</h1>
+      <p class="muted" data-i18n="signin.continue.body">Your sign-in link checks out. Press the button to finish signing in.</p>
 
       <!-- No action: the form posts to this same URL. The link is only spent by the POST, because mail
            scanners and corporate proxies fetch every URL in an email and would otherwise burn it first. -->
       <form method="post" class="signin-options">
-        <button class="btn primary" type="submit">Continue to BLANK the spire</button>
+        <button class="btn primary" type="submit" data-i18n="signin.continue.button">Continue to Blank the Spire</button>
       </form>
 
-      <p class="hint">Links expire 15 minutes after they are sent and work only once.</p>
+      <p class="hint" data-i18n="signin.continue.expiry">Links expire 15 minutes after they are sent and work only once.</p>
     </section>
   </main>
 
   <footer class="foot">
-    <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> ·
-    <a href="mailto:ryan.r.rinkel@gmail.com">Support</a>
-    <p class="foot-note">Unofficial fan project — not affiliated with or endorsed by Mega Crit.</p>
+    <a href="/terms" data-i18n="common.footer.terms">Terms</a> · <a href="/privacy" data-i18n="common.footer.privacy">Privacy</a> ·
+    <a href="mailto:ryan.r.rinkel@gmail.com" data-i18n="common.footer.support">Support</a>
+    <p class="foot-note" data-i18n="common.footer.disclaimer">Unofficial fan project — not affiliated with or endorsed by Mega Crit.</p>
   </footer>
+  <script src="/static/i18n.js?v=20261028b"></script>
 </body>
 </html>

@@ -22,7 +22,7 @@ def mail(monkeypatch):
     import auth
     sent: list[tuple[str, str]] = []
     monkeypatch.setattr(auth, "mail_configured", lambda: True)
-    monkeypatch.setattr(auth, "_send_magic_link", lambda email, url: sent.append((email, url)))
+    monkeypatch.setattr(auth, "_send_magic_link", lambda email, url, lang="en": sent.append((email, url)))
     return sent
 
 
@@ -181,7 +181,7 @@ def test_a_send_failure_never_changes_the_answer(client, app_module, monkeypatch
     """Resend being down is our problem, not a different HTTP response (and never a stacktrace)."""
     import auth
 
-    def boom(email, url):
+    def boom(email, url, lang="en"):
         raise RuntimeError("resend is down")
 
     monkeypatch.setattr(auth, "mail_configured", lambda: True)

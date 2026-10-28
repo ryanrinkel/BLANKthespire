@@ -418,18 +418,20 @@ public abstract class ForgedTriggerPower : BlankTheSpirePower
             var t = Trigger;
             string title = t?.Trigger switch
             {
-                "turn_start" => "Turn Start", "ripen" => "Ripen", "on_hp_lost" => "On HP Lost",
-                "on_exhaust" => "On Exhaust", "on_card_played" => "On Card Played",
-                "on_card_drawn" => "On Card Drawn", "on_damage_dealt" => "On Damage Dealt",
-                "on_block_gained" => "On Block Gained", "attacked" => "When Attacked",
-                "on_blade_played" => "On Blade Played", // Phase T
-                "on_poison_damage" => "On Poison Damage", // Phase BE (v59)
-                "on_shuffle" => "On Shuffle", // Phase BO (v66)
-                "on_card_generated" => "On Card Created", "on_debuff_applied" => "On Debuff Applied", // Phase BP (v67)
-                "on_evoke" => "On Evoke", // Phase BP (v67)
-                _ => "Turn End",
+                "turn_start" => ForgedText.T("power.trigger.turn_start", "Turn Start"), "ripen" => ForgedText.T("power.trigger.ripen", "Ripen"), "on_hp_lost" => ForgedText.T("power.trigger.on_hp_lost", "On HP Lost"),
+                "on_exhaust" => ForgedText.T("power.trigger.on_exhaust", "On Exhaust"), "on_card_played" => ForgedText.T("power.trigger.on_card_played", "On Card Played"),
+                "on_card_drawn" => ForgedText.T("power.trigger.on_card_drawn", "On Card Drawn"), "on_damage_dealt" => ForgedText.T("power.trigger.on_damage_dealt", "On Damage Dealt"),
+                "on_block_gained" => ForgedText.T("power.trigger.on_block_gained", "On Block Gained"), "attacked" => ForgedText.T("power.trigger.attacked", "When Attacked"),
+                "on_blade_played" => ForgedText.T("power.trigger.on_blade_played", "On Blade Played"), // Phase T
+                "on_poison_damage" => ForgedText.T("power.trigger.on_poison_damage", "On Poison Damage"), // Phase BE (v59)
+                "on_shuffle" => ForgedText.T("power.trigger.on_shuffle", "On Shuffle"), // Phase BO (v66)
+                "on_card_generated" => ForgedText.T("power.trigger.on_card_generated", "On Card Created"), "on_debuff_applied" => ForgedText.T("power.trigger.on_debuff_applied", "On Debuff Applied"), // Phase BP (v67)
+                "on_evoke" => ForgedText.T("power.trigger.on_evoke", "On Evoke"), // Phase BP (v67)
+                _ => ForgedText.T("power.trigger.turn_end", "Turn End"),
             };
-            string desc = t != null ? ForgedCards.DescribeTrigger(t) : "A forged trigger.";
+            string desc;
+            if (t == null) desc = ForgedText.T("power.trigger.empty", "A forged trigger.");
+            else using (ForgedText.InClass(SourceSpec?.ClassSlot ?? 0)) desc = ForgedCards.DescribeTrigger(t); // i18n: the class's loc names
             return (List<(string, string)>)new PowerLoc(title, desc, desc);
         }
     }

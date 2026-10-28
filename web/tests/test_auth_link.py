@@ -20,7 +20,7 @@ def mail(monkeypatch):
     import auth
     sent: list[tuple[str, str]] = []
     monkeypatch.setattr(auth, "mail_configured", lambda: True)
-    monkeypatch.setattr(auth, "_send_magic_link", lambda email, url: sent.append((email, url)))
+    monkeypatch.setattr(auth, "_send_magic_link", lambda email, url, lang="en": sent.append((email, url)))
     return sent
 
 

@@ -39,4 +39,9 @@ public sealed record StatusSpec(
     bool SingleStack,
     string Decay,
     string Hook,
-    string Mode);
+    string Mode)
+{
+    /// <summary>i18n (I18N_PLAN C2): the bundle's optional <c>loc</c> strings for this entry, keyed by the GAME's locale
+    /// code ("zhs", ...). Null/absent = English only. A missing field falls back to the English one.</summary>
+    public IReadOnlyDictionary<string, LocText>? Loc { get; init; }
+}

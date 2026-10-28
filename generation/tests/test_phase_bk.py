@@ -215,8 +215,9 @@ def _t_rules_and_describe() -> None:
     for src, noun in NOUNS.items():
         check(cardgen._hits_phrase(src) == noun, f"cardgen._hits_phrase({src}) == {noun!r}")
         check(re.search(r'"' + src + r'"\s+=> "' + re.escape(noun) + '",', fc) is not None, f"C# HitsPhrase: {src} => {noun!r}")
-    for frag in ('? $"Deal {{Damage}} damage X times{dmgSuffix}{ub}."',
-                 ': $"Deal {{Damage}} damage for each {HitsPhrase(e.HitsScale)}{dmgSuffix}{ub}.");'):
+    # i18n (I18N_PLAN C1): ForgedText templates, English inline; {to}/{ub}/{what} are the named placeholders.
+    for frag in ('? Fx("card.damage.hits_x", "Deal {Damage} damage X times{to}{ub}.", ("to", dmgSuffix), ("ub", ub))',
+                 ': Fx("card.damage.hits_each", "Deal {Damage} damage for each {what}{to}{ub}.", ("what", HitsPhrase(e.HitsScale)), ("to", dmgSuffix), ("ub", ub)));'):
         check(frag in fc, f"C# Describe fragment: {frag}")
     check(cardgen.effect_literal(_hs("x", 5)) == 'new EffectSpec("damage", 5, HitsScale: "x")', "effect_literal: HitsScale")
     check(cardgen.effect_literal(_hs("cards_in_hand", 3, unblockable=True))

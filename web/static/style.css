@@ -121,6 +121,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .advanced > summary:hover { color: var(--ink); }
 .advanced[open] { border-top: 1px solid var(--line); margin-top: 14px; padding-top: 8px; }
 .hint { font-size: 12px; color: var(--muted); margin: 6px 0 0; }
+/* The per-forge language selector under the concept box (I18N plan C2). */
+.forge-lang { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 8px; font-size: 13px; color: var(--muted); }
+.forge-lang select.in { width: auto; min-width: 0; padding: 4px 8px; margin-bottom: 0; }
+.forge-lang .hint { margin: 0; flex-basis: 100%; }
 /* The forge button (app.js renderForgeButton): centred, never disabled except mid-forge (2026-10-26). */
 .forge-actions { display: flex; justify-content: center; margin-top: 16px; }
 .forge-actions .btn { margin-top: 0; }
@@ -684,7 +688,7 @@ body:not(.is-phone) .phone-only { display: none !important; }
   padding: 10px 14px; border: 1px solid var(--accent2); border-radius: 12px; font-size: 14px; line-height: 1.45;
   text-align: left; color: var(--ink); background: linear-gradient(135deg, rgba(124,92,255,.18), var(--panel)); }
 .event-ribbon-icon { flex: none; }
-.event-ribbon b { color: var(--accent); }
+.event-ribbon b, .event-ribbon strong { color: var(--accent); }
 /* On /login it sits under the lede, inside the card. */
 .card .event-ribbon { max-width: none; margin: 4px 0 14px; }
 /* The one-time "an event gave you N tokens" notice at the top of the forge tab (app.js renderWelcome). */
@@ -710,3 +714,14 @@ body:not(.is-phone) .phone-only { display: none !important; }
 .admin-event-form .form-actions .btn { margin-top: 4px; }
 #admin-event-note.err, #admin-events-note.err { color: var(--danger); }
 #admin-event-note.ok, #admin-events-note.ok { color: var(--accent); }
+
+/* Language toggle (i18n.js renderToggle, docs/plans/I18N_PLAN.md "A. Website"): "EN | 中文", appended to the
+   end of every header nav (pushed right), or fixed top-right on pages without a header (the landing page). */
+.lang-toggle { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; font-size: 13px;
+  white-space: nowrap; }
+.lang-toggle .lang-opt { background: none; border: none; color: var(--muted); padding: 4px 6px; border-radius: 6px;
+  cursor: pointer; font: inherit; }
+.lang-toggle .lang-opt:hover { color: var(--ink); }
+.lang-toggle .lang-opt.active { color: var(--ink); background: var(--panel2); cursor: default; }
+.lang-toggle .lang-sep { color: var(--line); }
+.lang-toggle.floating { position: absolute; top: 10px; right: 12px; z-index: 5; }

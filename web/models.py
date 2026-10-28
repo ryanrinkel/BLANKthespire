@@ -150,6 +150,9 @@ class ForgedClass(Base):
     nomination_note: Mapped[str | None] = mapped_column(String(200), default=None, nullable=True)
     featured_at: Mapped[datetime | None] = mapped_column(DateTime, default=None, nullable=True)
     featured_word: Mapped[str | None] = mapped_column(String(5), default=None, nullable=True)
+    # The forge language (I18N plan C2): "en", or the site language the class was forged in ("zh"), whose
+    # translated creative strings ride bundle_json's `loc` block. Patched in by db._ensure_class_columns.
+    lang: Mapped[str] = mapped_column(String(8), default="en", server_default="en")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, server_default=func.now(), onupdate=func.now())
@@ -172,7 +175,36 @@ class ForgedClass(Base):
             "nominated": self.nominated_at is not None and self.featured_at is None,
             "featured": self.featured_at is not None,
             "featured_word": self.featured_word if self.featured_at is not None else None,
+            "lang": self.lang or "en",
+            **({"loc": loc} if (loc := self.loc_summary()) else {}),
         }
+
+    def loc_summary(self) -> dict | None:
+        """The list-view slice of the bundle's `loc` block: {locale: {"character": {name?, description?}}}, or
+        None (English forge / no translation). The translated NAME is left out once the owner renamed the
+        class (the list shows `name`, the owner's own words then). Only non-English rows parse the bundle."""
+        if (self.lang or "en") == "en":
+            return None
+        import json
+        try:
+            bundle = json.loads(self.bundle_json or "{}")
+        except ValueError:
+            return None
+        block = bundle.get("loc") if isinstance(bundle, dict) else None
+        if not isinstance(block, dict):
+            return None
+        en_name = str((bundle.get("character") or {}).get("name") or "")
+        out = {}
+        for locale, entry in block.items():
+            ch = entry.get("character") if isinstance(entry, dict) else None
+            if not isinstance(ch, dict):
+                continue
+            keep = {k: ch[k] for k in ("name", "description") if isinstance(ch.get(k), str) and ch[k]}
+            if "name" in keep and self.name and self.name != en_name:
+                keep.pop("name")
+            if keep:
+                out[locale] = {"character": keep}
+        return out or None
 
     def detail(self) -> dict:
         """Full shape: identity + cards + code, for the result view / re-open."""
@@ -184,6 +216,9 @@ class ForgedClass(Base):
             "cards": bundle.get("cards", []),
             "relic": bundle.get("relic"),
             "archetypes": bundle.get("archetypes") or [],  # [] for classes forged before this was stored
+            # The whole translated block ({locale: {character, archetypes, cards, relic, pools}}); {} on an
+            # English forge. Overrides summary()'s character-only slice.
+            "loc": bundle.get("loc") if isinstance(bundle.get("loc"), dict) else {},
             "code": self.code,
             "splash_hash": self.splash_hash,  # app layer turns these into absolute *_url fields
             "sprite_hash": self.sprite_hash,

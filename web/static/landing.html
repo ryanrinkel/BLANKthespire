@@ -3,72 +3,72 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>BLANK the spire</title>
-  <meta name="description" content="Forge your own Slay the Spire 2 class: Describe a class in a sentence and play it in-game. Or play a class from The Archive — no account needed." />
+  <title data-i18n="landing.meta.title">Blank the Spire</title>
+  <meta name="description" content="Blank the Spire: Create your own custom, playable classes for Slay the Spire 2!" data-i18n-attr="content:landing.meta.description" />
   <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="BLANK the spire" />
-  <meta property="og:title" content="BLANK the spire — forge your own Slay the Spire 2 class" />
-  <meta property="og:description" content="Describe a class in a sentence and play it in-game. Or play a class from The Archive — no account needed." />
+  <meta property="og:site_name" content="Blank the Spire" />
+  <meta property="og:title" content="Blank the Spire — forge your own Slay the Spire 2 class" data-i18n-attr="content:landing.meta.og_title" />
+  <meta property="og:description" content="Describe a class in a sentence and play it in-game. Or play a class from The Archive — no account needed." data-i18n-attr="content:landing.meta.og_description" />
   <meta property="og:url" content="https://blankthespire.com/" />
   <meta property="og:image" content="https://blankthespire.com/static/img/og-landing.png" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="BLANK the spire — forge your own Slay the Spire 2 class" />
+  <meta name="twitter:title" content="Blank the Spire — forge your own Slay the Spire 2 class" />
   <meta name="twitter:description" content="Describe a class in a sentence and play it in-game. Or play a class from The Archive — no account needed." />
   <meta name="twitter:image" content="https://blankthespire.com/static/img/og-landing.png" />
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png" />
   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/static/style.css?v=20261027a" />
+  <link rel="stylesheet" href="/static/style.css?v=20261028b" />
 </head>
 <body class="landing">
   <main class="splash">
     <!-- Split-flap board: five fill-in-the-blank tiles, built by landing.js -->
-    <div id="board" class="board" aria-label="BLANK the spire" role="img"></div>
+    <div id="board" class="board" aria-label="Blank the Spire" role="img" data-i18n-attr="aria-label:landing.hero.board_label"></div>
 
-    <p class="splash-sub">the spire</p>
+    <p class="splash-sub" data-i18n="landing.hero.subtitle">the Spire</p>
 
     <!-- Say "PC" before anything else: an ad viewer on a phone can't play it there. -->
-    <p class="splash-pc">A free mod for Slay the Spire 2 on Steam. Forge on any device; play on your PC.</p>
+    <p class="splash-pc" data-i18n="landing.hero.pc_note">A free mod for Slay the Spire 2 on Steam. Forge from browser on any device; play on your PC.</p>
 
-    <p class="splash-tag muted">How will you fill in the Blank?</p>
+    <p class="splash-tag muted" data-i18n="landing.hero.tagline">How will you fill in the Blank?</p>
 
     <!-- Primary: forge your own (landing.js repoints #signin to /app or /dev-login). The Archive strip below
          stays hidden until /api/featured returns classes, so a failed fetch leaves today's page. -->
     <div class="splash-actions">
-      <a id="signin" class="btn primary splash-go" href="/login">Create Your Own Class</a>
+      <a id="signin" class="btn primary splash-go" href="/login" data-i18n="landing.hero.cta">Create Your Own Class</a>
     </div>
 
     <!-- landing.js swaps this for the email-first copy inside an in-app browser (webview.js). -->
-    <p id="splash-note" class="splash-note muted">No password. Sign in with Google, GitHub or email to forge and keep your classes.</p>
+    <p id="splash-note" class="splash-note muted" data-i18n="landing.hero.signin_note">No password quick sign-in. Sign in with Google, GitHub or email to forge and keep your classes.</p>
   </main>
 
   <!-- The Archive: the newest four curated classes anyone can open without an account; tiles built by
        landing.js (featured.js) from /api/featured?limit=4. -->
-  <section id="featured" class="how featured hidden" aria-label="The Archive">
-    <h2 class="how-title">The Archive</h2>
-    <p class="how-sub muted">Classes other players forged. Play one now — no account needed.</p>
+  <section id="featured" class="how featured hidden" aria-label="The Archive" data-i18n-attr="aria-label:landing.archive.title">
+    <h2 class="how-title" data-i18n="landing.archive.title">The Archive</h2>
+    <p class="how-sub muted" data-i18n="landing.archive.sub">Classes from other Blankers. Play one now — no account needed.</p>
     <div id="featured-grid" class="featured-grid"></div>
-    <p class="featured-more"><a href="/archive">Browse The Archive →</a></p>
+    <p class="featured-more"><a href="/archive" data-i18n="landing.archive.more">Browse The Archive →</a></p>
   </section>
 
-  <section class="how" aria-label="How it works">
-    <h2 class="how-title">What is going on here??</h2>
-    <p class="how-sub muted">Three steps:</p>
+  <section class="how" aria-label="How it works" data-i18n-attr="aria-label:landing.how.label">
+    <h2 class="how-title" data-i18n="landing.how.title">What is going on here??</h2>
+    <p class="how-sub muted" data-i18n="landing.how.sub">Three steps:</p>
 
     <ol class="steps">
       <li class="step">
         <span class="step-num">1</span>
         <div class="step-body">
-          <h3>Subscribe to the mod</h3>
-          <p>Grab BLANK the spire on the <a href="/workshop" target="_blank" rel="noopener">Steam Workshop</a> &mdash; it&rsquo;s free.</p>
+          <h3 data-i18n="landing.how.step_1_title">Subscribe to the mod</h3>
+          <p data-i18n-html="landing.how.step_1_body">Grab Blank the Spire on the <a href="/workshop" target="_blank" rel="noopener">Steam Workshop</a> &mdash; it&rsquo;s free.</p>
         </div>
       </li>
 
       <li class="step">
         <span class="step-num">2</span>
         <div class="step-body">
-          <h3>Play a class from The Archive &mdash; or describe your own</h3>
-          <p>Open one from <a href="#featured">The Archive</a>, or sign in and explain your idea in plain
+          <h3 data-i18n="landing.how.step_2_title">Play a class from The Archive &mdash; or describe your own</h3>
+          <p data-i18n-html="landing.how.step_2_body">Open one from <a href="#featured">The Archive</a>, or sign in and explain your idea in plain
              language. Robot Overlords build a playable class &mdash; cards, mechanics, identity and all. 🤖</p>
         </div>
       </li>
@@ -76,31 +76,32 @@
       <li class="step">
         <span class="step-num">3</span>
         <div class="step-body">
-          <h3>Paste the code into the mod&rsquo;s settings menu</h3>
-          <p>Restart the game, and <span id="fill-word" class="fill">Blank</span> the Spire!</p>
+          <h3 data-i18n="landing.how.step_3_title">Paste the code into the mod&rsquo;s settings menu</h3>
+          <p data-i18n-html="landing.how.step_3_body">Restart the game, and <span id="fill-word" class="fill" data-i18n-slot="word">Blank</span> the Spire!</p>
         </div>
       </li>
     </ol>
   </section>
 
-  <section class="how pricing-section" aria-label="Pricing">
-    <h2 class="how-title">What does it cost?</h2>
+  <section class="how pricing-section" aria-label="Pricing" data-i18n-attr="aria-label:landing.pricing.label">
+    <h2 class="how-title" data-i18n="landing.pricing.title">What does it cost?</h2>
     <ul class="pricing">
-      <li><b>Bring your own API key</b> — free, unlimited forging. Anthropic, OpenAI, Google, OpenRouter and more; your provider bills you. Your key stays only in your browser.</li>
-      <li><b>Or let us run it on our models.</b> $3 → 2 tokens, $5 → 4, $10 → 10 (card fee added at checkout). One token forges one class on our models.</li>
-      <li><b>The mod is free</b> and open source — there is nothing to buy. Donations cover the cost of tokens when you run them without an API key.</li>
+      <li data-i18n-html="landing.pricing.byok"><strong>Bring your own API key</strong> — free, unlimited forging. Anthropic, OpenAI, Google, OpenRouter and more; your provider bills you. Your key stays only in your browser.</li>
+      <li data-i18n-html="landing.pricing.hosted"><strong>Or let us run it on our models.</strong> $3 → 2 tokens, $5 → 4, $10 → 10 (card fee added at checkout). One token forges one class on our models.</li>
+      <li data-i18n-html="landing.pricing.free"><strong>The mod is free</strong> and open source — there is nothing to buy. Donations cover the cost of tokens when you run them without an API key.</li>
     </ul>
   </section>
 
   <footer class="foot">
-    <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> ·
-    <a href="mailto:ryan.r.rinkel@gmail.com">Support</a>
-    <p class="foot-note">Unofficial fan project — not affiliated with or endorsed by Mega Crit.</p>
+    <a href="/terms" data-i18n="common.footer.terms">Terms</a> · <a href="/privacy" data-i18n="common.footer.privacy">Privacy</a> ·
+    <a href="mailto:ryan.r.rinkel@gmail.com" data-i18n="common.footer.support">Support</a>
+    <p class="foot-note" data-i18n="common.footer.disclaimer">Unofficial fan project — not affiliated with or endorsed by Mega Crit.</p>
   </footer>
 
-  <script src="/static/webview.js?v=20261013"></script>
-  <script src="/static/signup-event.js?v=20261026d"></script>
-  <script src="/static/featured.js?v=20261026b"></script>
-  <script src="/static/landing.js?v=20261026d"></script>
+  <script src="/static/i18n.js?v=20261028b"></script>
+  <script src="/static/webview.js?v=20261028b"></script>
+  <script src="/static/signup-event.js?v=20261028b"></script>
+  <script src="/static/featured.js?v=20261028b"></script>
+  <script src="/static/landing.js?v=20261028b"></script>
 </body>
 </html>

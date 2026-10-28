@@ -199,7 +199,8 @@ def _t_engine() -> None:
     check('new() { ["temp_strength_down"] = 9, ["strength_down"] = 3, ["doom"] = 12 };' in fc and "PayloadDoomMax = 5;" in fc,
           "the caps (temp 9 / permanent 3 / Doom 12, payload Doom 5)")
     check('"temp_strength_down" => "Strength Down", "strength_down" => "Strength Down", "doom" => "Doom",' in fc
-          and fc.count('"doom" => "Doom"') == 2, "StatusDisplay + StatusName")
+          and fc.count('"doom" => "Doom"') == 1  # i18n: StatusName folded into StatusDisplay; StatusWord localizes it
+          and 'Tx("status." + (status ?? ""), StatusDisplay(status))' in fc, "StatusDisplay + StatusName")
     for frag in ("return $\"'{list[i].Op}' must come BEFORE the card's debuffs (the Expose order: strip, then debuff).\";",
                  "if (e.Op != \"heal\" && !(e.Op == \"apply_status\" && e.Status == \"doom\"))",
                  'return "at most one \'strength_down\' effect per card (raise the amount instead).";',
@@ -221,13 +222,14 @@ CASES = [([_st("temp_strength_down", 6)], "all_enemies", "Apply Strength Down to
           "Deal damage equal to the enemy's Doom."),
          ([{"op": "damage", "amount": 8, "when": {"kind": "target_has_status", "status": "doom"}}], "enemy",
           "Deal {Damage} damage if the enemy has doom.")]
-C_FRAGMENTS = ('case "strip_block":    parts.Add("Remove all of the enemy\'s Block."); break;',
-               'case "strip_artifact": parts.Add("Remove the enemy\'s Artifact."); break;',
-               'TargetType.AllEnemies => "ALL enemies lose {StrengthLoss} Strength.",',
-               'TargetType.RandomEnemy => "A random enemy loses {StrengthLoss} Strength.",',
-               '_ => "The enemy loses {StrengthLoss} Strength.",',
-               'parts.Add("Apply Doom equal to the unblocked damage dealt.");',
-               '"target_has_status"  => $"the enemy has {c.Status}",')
+# i18n (I18N_PLAN C1): each sentence is a ForgedText key with its English inline at the call site.
+C_FRAGMENTS = ('case "strip_block":    parts.Add(Tx("card.strip_block", "Remove all of the enemy\'s Block.")); break;',
+               'case "strip_artifact": parts.Add(Tx("card.strip_artifact", "Remove the enemy\'s Artifact.")); break;',
+               'TargetType.AllEnemies => Tx("card.strength_down.all", "ALL enemies lose {StrengthLoss} Strength."),',
+               'TargetType.RandomEnemy => Tx("card.strength_down.random", "A random enemy loses {StrengthLoss} Strength."),',
+               '_ => Tx("card.strength_down", "The enemy loses {StrengthLoss} Strength."),',
+               'parts.Add(Tx("card.doom.unblocked", "Apply Doom equal to the unblocked damage dealt."));',
+               '"target_has_status"  => ForgedText.F("cond.target_has_status", "the enemy has {status}", ("status", c.Status)')
 
 
 def _t_rules_and_describe() -> None:

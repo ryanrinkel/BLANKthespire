@@ -1,7 +1,8 @@
 "use strict";
 // featured.js — the tile for one class from The Archive (/api/featured), shared by the landing strip
 // (landing.js, which ties hover/focus to its split-flap board through the optional hooks) and the
-// /archive page (archive.js). Plain globals, no module: both pages load this file before their own.
+// /archive page (archive.js). Plain globals, no module: both pages load this file before their own, and
+// both await BTS_I18N.ready before they build a tile (the tile strings come from i18n.js).
 
 const FEATURED_DESC_MAX = 110;
 
@@ -28,7 +29,8 @@ function featuredPlaceholder(word) {
 function featuredTile(item, hooks) {
   hooks = hooks || {};
   const word = String(item.word || "").toUpperCase();
-  const name = item.name || item.blurb || word;
+  // a class forged in the site's language shows its translated name/description (bundle `loc`, I18N plan C2)
+  const name = BTS_I18N.locField(item, "character", null, "name", item.name || item.blurb || word);
   const a = document.createElement("a");
   a.className = "featured-tile";
   a.href = item.share_url;
@@ -37,7 +39,7 @@ function featuredTile(item, hooks) {
     const img = document.createElement("img");
     img.className = "featured-art";
     img.src = item.splash_thumb_url;
-    img.alt = "Splash art for " + name;
+    img.alt = BTS_I18N.t("archive.tile.splash_alt", { name });
     img.loading = "lazy";
     img.decoding = "async";
     img.width = 320;
@@ -55,12 +57,14 @@ function featuredTile(item, hooks) {
   const w = document.createElement("span");
   w.className = "featured-word";
   w.textContent = word;
-  cap.append(w, " the spire");
+  // archive.tile.caption "{word} the spire": the word keeps its own span wherever the language puts it
+  const capParts = BTS_I18N.t("archive.tile.caption").split("{word}");
+  cap.append(capParts[0], w, capParts.slice(1).join(""));
   const h = document.createElement("h3");
   h.className = "featured-name";
   h.textContent = name;
   body.append(cap, h);
-  const desc = clip(item.description, FEATURED_DESC_MAX);
+  const desc = clip(BTS_I18N.locField(item, "character", null, "description", item.description), FEATURED_DESC_MAX);
   if (desc) {
     const p = document.createElement("p");
     p.className = "featured-desc";
@@ -70,7 +74,7 @@ function featuredTile(item, hooks) {
   if (item.card_count) {
     const n = document.createElement("p");
     n.className = "featured-meta";
-    n.textContent = item.card_count + " cards";
+    n.textContent = BTS_I18N.t("archive.tile.cards", { count: item.card_count });
     body.appendChild(n);
   }
   a.appendChild(body);

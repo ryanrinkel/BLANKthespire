@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>{{TITLE}} — BLANK the spire</title>
+  <title>{{TITLE}} — Blank the Spire</title>
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png" />
   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png" />
@@ -11,7 +11,7 @@
   <!-- Unfurl card. Stamped server-side by app.deck_page (every value html.escape'd) so crawlers, which
        never run our JS, still see the class name, blurb and splash art. -->
   <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="BLANK the spire" />
+  <meta property="og:site_name" content="Blank the Spire" />
   <meta property="og:title" content="{{TITLE}}" />
   <meta property="og:description" content="{{DESC}}" />
   <meta property="og:image" content="{{IMAGE}}" />
@@ -22,16 +22,16 @@
   <meta name="twitter:image" content="{{IMAGE}}" />
   <meta name="description" content="{{DESC}}" />
 
-  <link rel="stylesheet" href="/static/style.css?v=20261027a" />
-  <link rel="stylesheet" href="/static/deck.css?v=20261013" />
+  <link rel="stylesheet" href="/static/style.css?v=20261028b" />
+  <link rel="stylesheet" href="/static/deck.css?v=20261028b" />
 </head>
 <body>
   <header>
-    <div class="brand">⚒ <strong>BLANK the spire</strong> <span class="sub">a forged class</span></div>
+    <div class="brand">⚒ <strong>Blank the Spire</strong> <span class="sub" data-i18n="deck.header.sub">a forged class</span></div>
     <nav>
-      <a class="tab" href="/archive">The Archive</a>
-      <a class="tab" href="/app">Forge your own →</a>
-      <a class="tab" href="/download">Get the mod ⬇</a>
+      <a class="tab" href="/archive" data-i18n="common.nav.archive">The Archive</a>
+      <a class="tab" href="/app" data-i18n="common.nav.forge_your_own">Forge your own →</a>
+      <a class="tab" href="/download" data-i18n="common.nav.get_mod">Get the Mod ⬇</a>
     </nav>
   </header>
 
@@ -39,7 +39,7 @@
        rather than being written into a script block. -->
   <main id="deck" data-slug="{{SLUG}}" data-api="/api/deck/{{SLUG}}">
     <section class="card">
-      <p id="lede" class="muted">Someone forged this class with BLANK the spire — copy the code below to play it, or
+      <p id="lede" class="muted" data-i18n-html="deck.lede">Someone forged this class with Blank the Spire — copy the code below to play it, or
         <a href="/app">forge your own</a>.</p>
     </section>
 
@@ -52,24 +52,25 @@
            steps first; the card grid is the browse-after. -->
       <div class="play-row">
         <div class="codebox">
-          <label class="lbl small" for="r-code">Class import code</label>
+          <label class="lbl small" for="r-code" data-i18n="app.result.code_label">Class import code</label>
           <textarea id="r-code" rows="3" readonly></textarea>
           <div class="play-actions">
-            <button id="copy-code" class="btn" type="button">Copy code</button>
+            <button id="copy-code" class="btn" type="button" data-i18n="app.result.copy_code">Copy code</button>
             <!-- Phones only (render.js body.is-phone): the share sheet, to get this page onto the PC. -->
             <button id="send-pc" class="btn phone-only" type="button"
-                    title="Share this class to your PC (AirDrop, Messages, Notes, Mail…)">📲 Send to my PC</button>
-            <button id="remix" class="btn primary" type="button">Forge your own twist</button>
+                    title="Share this class to your PC (AirDrop, Messages, Notes, Mail…)"
+                    data-i18n="app.handoff.send_pc" data-i18n-attr="title:deck.play.send_pc_tip">📲 Send to my PC</button>
+            <button id="remix" class="btn primary" type="button" data-i18n="deck.play.remix">Forge your own twist</button>
           </div>
         </div>
         <div class="play-how">
-          <h3 class="play-title">Already have the mod?</h3>
+          <h3 class="play-title" data-i18n="deck.play.title">Already have the mod?</h3>
           <ol class="play-steps">
-            <li>Subscribe on <a href="/workshop" target="_blank" rel="noopener">Steam Workshop</a>.</li>
-            <li>In Slay the Spire 2: <em>Mods → BLANK the spire → Import a class code</em> → paste → <em>Import</em>.</li>
-            <li>Restart the game and pick the class.</li>
+            <li data-i18n-html="deck.play.step_1">Subscribe on <a href="/workshop" target="_blank" rel="noopener">Steam Workshop</a>.</li>
+            <li data-i18n-html="deck.play.step_2">In Slay the Spire 2: <em>Mods → Blank the Spire → Import a class code</em> → paste → <em>Import</em>.</li>
+            <li data-i18n="deck.play.step_3">Restart the game and pick the class.</li>
           </ol>
-          <p class="hint"><a href="/help">Full guide with screenshots</a></p>
+          <p class="hint"><a href="/help" data-i18n="deck.play.full_guide">Full guide with screenshots</a></p>
         </div>
       </div>
 
@@ -83,14 +84,15 @@
   <div id="toast" class="toast hidden"></div>
 
   <footer class="foot">
-    <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a> ·
-    <a href="/help">Help</a> ·
-    <a href="https://github.com/ryanrinkel/BLANKthespire" target="_blank" rel="noopener">GitHub</a> ·
-    <a href="mailto:ryan.r.rinkel@gmail.com">Support</a>
-    <p class="foot-note">Unofficial fan project — not affiliated with or endorsed by Mega Crit.</p>
+    <a href="/terms" data-i18n="common.footer.terms">Terms</a> · <a href="/privacy" data-i18n="common.footer.privacy">Privacy</a> ·
+    <a href="/help" data-i18n="common.nav.help">Help</a> ·
+    <a href="https://github.com/ryanrinkel/BLANKthespire" target="_blank" rel="noopener" data-i18n="common.footer.github">GitHub</a> ·
+    <a href="mailto:ryan.r.rinkel@gmail.com" data-i18n="common.footer.support">Support</a>
+    <p class="foot-note" data-i18n="common.footer.disclaimer">Unofficial fan project — not affiliated with or endorsed by Mega Crit.</p>
   </footer>
 
-  <script src="/static/render.js?v=20261027a"></script>
-  <script src="/static/deck.js?v=20261026b"></script>
+  <script src="/static/i18n.js?v=20261028b"></script>
+  <script src="/static/render.js?v=20261028b"></script>
+  <script src="/static/deck.js?v=20261028b"></script>
 </body>
 </html>

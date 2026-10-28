@@ -246,8 +246,13 @@ def _t_contract() -> None:
     bp = cf._BlueprintContract(mode="dossier", triad=True, seed=1).system_prompt()
     print(f"  (rule 0.9) blueprint prompt: {len(bp):,} chars (unchanged by AS — the relic vocab is not embedded there)")
     app = WEB_APP.read_text(encoding="utf-8")
-    check('attack_base: "damage on every attack"' in app and 'max_hp: "max HP"' in app, "render.js labels both modifiers")
-    check("h.every_n" in app and "h.card_type" in app and 'on_hp_lost: "On HP lost"' in app, "render.js renders every_n / card_type (+ the missing on_hp_lost label)")
+    en = json.loads((WEB_APP.parent / "i18n" / "en.json").read_text(encoding="utf-8"))["strings"]  # render.js labels come from COPY.md (i18n build) since 2026-10-27
+    check('"attack_base"' in app and '"max_hp"' in app
+          and en.get("app.relic.mod.attack_base") == "{amount} damage on every attack"
+          and en.get("app.relic.mod.max_hp") == "{amount} max HP", "render.js labels both modifiers")
+    check("h.every_n" in app and "h.card_type" in app and '"on_hp_lost"' in app
+          and en.get("app.relic.trigger.on_hp_lost") == "On HP lost",
+          "render.js renders every_n / card_type (+ the missing on_hp_lost label)")
 
 
 def main() -> int:

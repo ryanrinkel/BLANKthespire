@@ -132,27 +132,30 @@ public static class SummonRunner
 
     // --- text (the behaviour-buff tooltip; K-2 mirrors this in cardgen.py) --------------------------
 
-    /// <summary>Synthesize the minion's behaviour blurb: "Each turn: …." or a per-turn rotation.</summary>
+    /// <summary>Synthesize the minion's behaviour blurb: "Each turn: …." or a per-turn rotation. i18n: ForgedText keys
+    /// "summon.*" (the fragments share the trigger payload keys "frag.*"). The English "Every 3th hit" ordinal is a known
+    /// quirk, kept as is.</summary>
     public static string Describe(SummonSpec spec)
     {
         // K-3a: an ethereal summon can't be hit, so its HP is cosmetic — lead with "Ethereal" instead of HP.
-        string hp = spec.Attackable ? $"{spec.MaxHp} HP" : "Ethereal (cannot be attacked)";
+        string hp = spec.Attackable ? ForgedText.F("summon.hp", "{hp} HP", ("hp", spec.MaxHp)) : ForgedText.T("summon.ethereal", "Ethereal (cannot be attacked)");
         string body;
-        if (spec.Moves.Length == 0) body = "A forged summon.";
-        else if (spec.Moves.Length == 1) body = $"{hp}. Each turn: {MovePhrase(spec.Moves[0])}.";
+        if (spec.Moves.Length == 0) body = ForgedText.T("summon.empty", "A forged summon.");
+        else if (spec.Moves.Length == 1) body = ForgedText.F("summon.each_turn", "{hp}. Each turn: {move}.", ("hp", hp), ("move", MovePhrase(spec.Moves[0])));
         else
         {
-            var rotation = string.Join("; ", spec.Moves.Select((m, i) => $"Turn {i + 1}: {MovePhrase(m)}"));
-            body = $"{hp}. Rotates — {rotation}.";
+            var rotation = string.Join(ForgedText.T("summon.rotation_join", "; "),
+                spec.Moves.Select((m, i) => ForgedText.F("summon.turn_n", "Turn {n}: {move}", ("n", i + 1), ("move", MovePhrase(m)))));
+            body = ForgedText.F("summon.rotates", "{hp}. Rotates — {rotation}.", ("hp", hp), ("rotation", rotation));
         }
         // K-3b: append the swarm triggers if present.
         if (spec.OnSummon is { Length: > 0 } os)
-            body += $" On summon: {ActionsPhrase(os)}.";
+            body += ForgedText.F("summon.on_summon", " On summon: {actions}.", ("actions", ActionsPhrase(os)));
         if (spec.OnDeath is { Length: > 0 } od)
-            body += $" On death: {ActionsPhrase(od)}.";
+            body += ForgedText.F("summon.on_death", " On death: {actions}.", ("actions", ActionsPhrase(od)));
         // Phase AV (v52): the every-Nth-hit payoff.
         if (spec.OnNthAttack is { Actions.Length: > 0 } nth)
-            body += $" Every {nth.N}th hit: {ActionsPhrase(nth.Actions)}.";
+            body += ForgedText.F("summon.every_nth", " Every {n}th hit: {actions}.", ("n", nth.N), ("actions", ActionsPhrase(nth.Actions)));
         return body;
     }
 
@@ -160,26 +163,29 @@ public static class SummonRunner
     private static string ActionsPhrase(SummonAction[] actions)
     {
         var frags = actions.Select(Fragment).Where(s => s.Length > 0).ToList();
-        return frags.Count > 0 ? string.Join(", ", frags) : "do nothing";
+        return frags.Count > 0 ? string.Join(ForgedText.T("punct.join", ", "), frags) : ForgedText.T("frag.nothing", "do nothing");
     }
 
     private static string MovePhrase(SummonMove move)
     {
         var frags = move.Actions.Select(Fragment).Where(s => s.Length > 0).ToList();
-        return frags.Count > 0 ? string.Join(", ", frags) : "do nothing";
+        return frags.Count > 0 ? string.Join(ForgedText.T("punct.join", ", "), frags) : ForgedText.T("frag.nothing", "do nothing");
     }
 
     private static string Fragment(SummonAction a)
     {
-        string to = a.Target == "all_enemies" ? " to ALL enemies" : "";
+        string to = a.Target == "all_enemies" ? ForgedText.T("to.all", " to ALL enemies") : "";
+        string who = a.Target == "all_enemies" ? ForgedText.T("who.all", " to ALL enemies") : "";
+        string status = ForgedText.T("status." + (a.Status ?? ""), StatusName(a.Status));
         return a.Op switch
         {
-            "attack"    => a.Hits > 1 ? $"deal {a.Amount}×{a.Hits} damage{to}" : $"deal {a.Amount} damage{to}",
-            "block"     => $"gain {a.Amount} Block",
-            "heal_self" => $"heal {a.Amount} HP",
+            "attack"    => a.Hits > 1 ? ForgedText.F("summon.attack_multi", "deal {amount}×{hits} damage{to}", ("amount", a.Amount), ("hits", a.Hits), ("to", to))
+                                      : ForgedText.F("frag.damage", "deal {amount} damage{to}", ("amount", a.Amount), ("to", to)),
+            "block"     => ForgedText.F("frag.block", "gain {amount} Block", ("amount", a.Amount)),
+            "heal_self" => ForgedText.F("frag.heal", "heal {amount} HP", ("amount", a.Amount)),
             "apply_status" => EffectRunner.SelfBuffStatuses.Contains(a.Status ?? "")
-                                 ? $"gain {a.Amount} {StatusName(a.Status)}"
-                                 : $"apply {a.Amount} {StatusName(a.Status)}{to}",
+                                 ? ForgedText.F("frag.gain_status", "gain {amount} {status}", ("amount", a.Amount), ("status", status), ("unit", ForgedCards.StatusUnit(a.Status)))
+                                 : ForgedText.F("frag.apply_status", "apply {amount} {status}{to}", ("amount", a.Amount), ("status", status), ("unit", ForgedCards.StatusUnit(a.Status)), ("to", to), ("who", who)),
             _ => "",
         };
     }

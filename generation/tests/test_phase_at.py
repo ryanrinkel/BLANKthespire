@@ -116,7 +116,9 @@ def _t_generation() -> None:
     d = cardgen.describe(fx, "self")
     check(d.startswith("Whenever you deal damage"), f"describe still opens 'Whenever you deal damage' (got {d!r})")
     fc = (MOD_CODE / "Engine" / "ForgedCards.cs").read_text(encoding="utf-8")
-    check('"on_damage_dealt" => "Whenever you deal damage"' in fc, "C# TriggerFragment unchanged (byte-match contract)")
+    # i18n (I18N_PLAN C1): the head is "Whenever {evt}" + the event clause, English inline in ForgedText calls.
+    check('"on_damage_dealt" => Tx("evt.on_damage_dealt", "you deal damage")' in fc
+          and 'Fx("trig.whenever", "Whenever {evt}", ("evt", evt))' in fc, "C# TriggerFragment unchanged (byte-match contract)")
     plain = CardValidator()
     summon = CardValidator(extra_summons={"Bone Thrall"})
     check(plain.validate(_card(fx)).ok and summon.validate(_card(fx)).ok, "on_damage_dealt -> draw is legal for any class")
@@ -159,7 +161,9 @@ def _t_contract() -> None:
               and ex["card"]["effects"][0]["effects"][0]["op"] == "buff_summon", "the exemplar IS the on_damage_dealt -> buff_summon engine")
     check(len(pool["exemplars"]) >= 113, f"pool grew to >= 113 (got {len(pool['exemplars'])})")
     app = WEB_APP.read_text(encoding="utf-8")
-    check('on_damage_dealt: "On damage dealt"' in app, "render.js keeps the on_damage_dealt label (no new token)")
+    en = json.loads((WEB_APP.parent / "i18n" / "en.json").read_text(encoding="utf-8"))["strings"]  # render.js labels come from COPY.md (i18n build) since 2026-10-27
+    check('"on_damage_dealt"' in app and en.get("app.relic.trigger.on_damage_dealt") == "On damage dealt",
+          "render.js keeps the on_damage_dealt label (no new token)")
     bp = cf._BlueprintContract(mode="dossier", triad=True, seed=1).system_prompt()
     print(f"  (rule 0.9) blueprint prompt: {len(bp):,} chars (the ONE ceiling lives in tests/test_harness_v2.py)")
     # AT's rule-0.9 contribution is a WORDING swap in VOCABULARY / card.schema.json / RELIC_VOCABULARY (asserted

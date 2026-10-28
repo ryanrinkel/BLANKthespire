@@ -226,20 +226,24 @@ CASES = [([{"op": "draw", "amount": 3}, _st("no_draw", 1)], "self",
          ([{"op": "block", "amount": 5}, {"op": "block_next_turn", "amount": 1, "scale": "block"}], "self",
           "Gain {Block} Block.\nNext turn, gain Block equal to your current Block."),
          ([{"op": "block", "amount": 12}, {"op": "retain_hand"}], "self", "Gain {Block} Block.\nRetain your hand this turn.")]
-C_FRAGMENTS = ('"no_draw"        => "You cannot draw additional cards this turn.",',
-               '"no_energy_gain" => "You cannot gain energy this turn.",',
-               '"no_block_gain"       => "You cannot gain Block from cards for {NoBlockTurns} turns.",',
-               '"dex_decay"      => "At the start of your turn, lose {DexDecay} Dexterity.",',
-               '"focus_decay"    => "At the start of your turn, lose {FocusDecay} Focus.",',
-               '"lose_strength"  => "Lose {SelfStrengthLoss} Strength.",',
-               '"lose_dexterity" => "Lose {SelfDexterityLoss} Dexterity.",',
-               '"lose_focus"     => "Lose {SelfFocusLoss} Focus.",',
-               '"echo_form"      => "The first card you play each turn is played twice.",',
-               'string what = n > 1 ? $"your next {n} {single}s are" : $"your next {single} is";',
-               '? $"{char.ToUpperInvariant(what[0])}{what[1..]} played twice."',
-               ': $"This turn, {what} played twice.";',
-               'parts.Add(e.Scale == "block" ? "Next turn, gain Block equal to your current Block." : "Next turn, gain {NextTurnBlock} Block.");',
-               'case "retain_hand":    parts.Add("Retain your hand this turn."); break;')
+# i18n (I18N_PLAN C1): each sentence is a ForgedText key with its English inline at the call site. ReplayNextSentence
+# no longer splices a "what" phrase + capitalizes it: the four shapes (Power / this-turn x one / many) are whole templates.
+C_FRAGMENTS = ('"no_draw"        => Tx("card.bm.no_draw", "You cannot draw additional cards this turn."),',
+               '"no_energy_gain" => Tx("card.bm.no_energy_gain", "You cannot gain energy this turn."),',
+               '"no_block_gain"       => Tx("card.bm.no_block_gain", "You cannot gain Block from cards for {NoBlockTurns} turns."),',
+               '"dex_decay"      => Tx("card.bm.dex_decay", "At the start of your turn, lose {DexDecay} Dexterity."),',
+               '"focus_decay"    => Tx("card.bm.focus_decay", "At the start of your turn, lose {FocusDecay} Focus."),',
+               '"lose_strength"  => Tx("card.bm.lose_strength", "Lose {SelfStrengthLoss} Strength."),',
+               '"lose_dexterity" => Tx("card.bm.lose_dexterity", "Lose {SelfDexterityLoss} Dexterity."),',
+               '"lose_focus"     => Tx("card.bm.lose_focus", "Lose {SelfFocusLoss} Focus."),',
+               '"echo_form"      => Tx("card.bm.echo_form", "The first card you play each turn is played twice."),',
+               'Fx("card.replay_next.power_n", "Your next {n} {many} are played twice.", ("n", n), ("many", many))',
+               'Fx("card.replay_next.power_1", "Your next {single} is played twice.", ("single", single))',
+               'Fx("card.replay_next.n", "This turn, your next {n} {many} are played twice.", ("n", n), ("many", many))',
+               'Fx("card.replay_next.1", "This turn, your next {single} is played twice.", ("single", single))',
+               'parts.Add(e.Scale == "block" ? Tx("card.block_next_turn.equal", "Next turn, gain Block equal to your current Block.")\n'
+               '                                                 : Tx("card.block_next_turn", "Next turn, gain {NextTurnBlock} Block."));',
+               'case "retain_hand":    parts.Add(Tx("card.retain_hand", "Retain your hand this turn.")); break;')
 
 
 def _t_rules_and_describe() -> None:
