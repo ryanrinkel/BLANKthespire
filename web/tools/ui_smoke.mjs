@@ -4,7 +4,9 @@
 //     STRIPE_SECRET_KEY=sk_test_smoke PORT=5077 uv run --project ../generation python app.py
 // (the dummy Stripe key only flips /api/billing to {enabled:true} so the donate tiers + custom-amount row
 //  render; nothing in these scenarios ever hits Stripe)
-// then, from web/tools:  node ui_smoke.mjs http://127.0.0.1:5077 <outdir> forge|v3|byok-narrow|byok-models|library|account|pages|art|lost|archive|featured|webview|phone|events|lang|forge-zh
+// then, from web/tools:  node ui_smoke.mjs http://127.0.0.1:5077 <outdir> forge|v3|byok-narrow|byok-models|library|account|pages|art|lost|archive|featured|webview|phone|events|lang|forge-zh|signin-code
+// (`signin-code`: the 6-digit sign-in code; with no mail provider the dev server returns the link + code in
+//  the /api/auth/email/start JSON, which the scenario reads as its mailbox — no extra dev endpoint)
 // (`archive` needs BTSWEB_ADMIN_EMAILS=unlimited@example.com and is best run first on a fresh DB: it puts a class
 //  in The Archive through the UI, which is what `featured` then shows on the landing strip)
 // (`lang` needs a web/static/i18n/zh.json with at least one translated landing string and one console.* rule)
@@ -1020,12 +1022,14 @@ if (scenario === "forge") {
       board_top: top(document.getElementById('board')), pc_top: top(document.querySelector('.splash-pc')),
       overflow: document.documentElement.scrollWidth > window.innerWidth}; })()`);
   check(land.wv.ios && land.wv.any && land.wv.app === "YouTube", "webview.js: iPhone WKWebView detected, YouTube from utm", JSON.stringify(land.wv));
-  check(land.note === "Sign in by email — the YouTube browser can't do Google sign-in. Or tap ··· → Open in Safari.",
-        "landing note swapped for the webview copy", land.note);
-  check(land.pc === "A free mod for Slay the Spire 2 on Steam. Forge on any device; play on your PC." && land.pc_top > land.board_top,
-        "PC line under the board", JSON.stringify(land));
-  check(!land.featured_hidden && land.board_top < land.featured_top && land.featured_top < land.cta_top && !land.overflow,
-        "phone hero order: board, featured strip, then the CTA; no sideways scroll", JSON.stringify(land));
+  // Expected copy comes from the built strings (docs/copy/COPY.md -> en.json), not literals, so a copy edit
+  // cannot silently stale this scenario. 2026-10-22: the CTA sits ABOVE the featured strip on phones (Ryan's call).
+  const en = (await (await fetch(`${base}/static/i18n/en.json`)).json()).strings;
+  const expNote = en["landing.hero.signin_note_webview"].replace("{who}", "the YouTube browser").replace("{menu}", "···").replace("{browser}", "Safari");
+  check(land.note === expNote, "landing note swapped for the webview copy", `${land.note} !== ${expNote}`);
+  check(land.pc === en["landing.hero.pc_note"] && land.pc_top > land.board_top, "PC line under the board", JSON.stringify(land));
+  check(!land.featured_hidden && land.board_top < land.cta_top && land.cta_top < land.featured_top && !land.overflow,
+        "phone hero order: board, CTA, then the featured strip; no sideways scroll", JSON.stringify(land));
   await shot("webview-landing-390");
   await shot("webview-landing-390-fold", false);
 
@@ -1508,6 +1512,102 @@ if (scenario === "forge") {
     const real = d.differKeys.filter((k) => !RUNTIME.includes(k));
     check(real.length === 0 && d.missing.length === 0, `(e) /${p} in English matches en.json`, JSON.stringify(d));
   }
+} else if (scenario === "signin-code") {
+  // 2026-10-29: the 6-digit code mailed with every magic link, typed into the tab where sign-in started (a
+  // desktop mail app such as QQ Mail opens the link in its own embedded browser, so the session lands THERE).
+  // The dev server has no mail provider, so /api/auth/email/start hands the link AND the code back in its JSON
+  // (dev auth only) — that JSON is the "mailbox": a fetch wrapper installed before submitting keeps it in
+  // window.__start. Signed out first (the top-level dev-login is undone by clearing cookies).
+  await send("Network.enable");
+  await send("Network.setCacheDisabled", { cacheDisabled: true });
+  await send("Network.clearBrowserCookies");
+  const EMAIL = `smoke-code-${Date.now()}@example.com`;
+  const codeState = `(() => { const vis = (e) => !!e && !e.classList.contains('hidden') && e.offsetParent !== null;
+    return {path: location.pathname, form: vis(document.getElementById('email-form')), box: vis(document.getElementById('code-box')),
+      sent: document.getElementById('code-sent').textContent, err: vis(document.getElementById('code-error')) ? document.getElementById('code-error').textContent : "",
+      label: document.querySelector('#code-form label').textContent, button: document.getElementById('code-submit').textContent,
+      overflow: document.documentElement.scrollWidth > window.innerWidth}; })()`;
+  const submitCode = async (code) => {
+    await evaluate(`(() => { document.getElementById('code').value = ${JSON.stringify(code)};
+      document.getElementById('code-form').requestSubmit(); return 1; })()`);
+    await sleep(900);
+  };
+
+  await nav(`${base}/login`); await sleep(500);
+  await evaluate(`sessionStorage.clear()`);
+  await evaluate(`(() => { const f = window.fetch; window.fetch = async (...a) => { const r = await f(...a);
+    if (String(a[0]).includes('/api/auth/email/start')) window.__start = await r.clone().json(); return r; }; return 1; })()`);
+  await evaluate(`(() => { document.getElementById('email').value = ${JSON.stringify(EMAIL)};
+    document.getElementById('email-form').requestSubmit(); return 1; })()`);
+  await sleep(900);
+  const mailbox = await json(`window.__start || null`);
+  check(!!mailbox && mailbox.ok && /^\d{6}$/.test(mailbox.code || "") && (mailbox.link || "").includes("/auth/email/"),
+        "dev mailbox: start answered with the link and a 6-digit code", JSON.stringify(mailbox));
+  const s1 = await json(codeState);
+  check(!s1.form && s1.box && s1.sent === "Check your inbox — the link expires in 15 minutes."
+        && s1.label === "Or type the 6-digit code from the email:" && s1.button === "Sign in" && !s1.err,
+        "after Email me a link: the form is swapped for the code box", JSON.stringify(s1));
+  await shot("signin-code-box");
+
+  // Wrong code: the error line, still signed out.
+  const wrong = `${(Number(mailbox.code) + 1) % 1000000}`.padStart(6, "0");
+  await submitCode(wrong);
+  const s2 = await json(codeState);
+  check(s2.path === "/login" && s2.err === "That code doesn't match — check the newest email and try again." && s2.button === "Sign in",
+        "wrong code: the mismatch message, button restored", JSON.stringify(s2));
+  const me0 = await evaluate(`fetch('/api/me').then(r => r.json())`);
+  check(me0.user === null, "wrong code: still signed out", JSON.stringify(me0.user));
+  await shot("signin-code-wrong");
+
+  // A reload keeps the code box (sessionStorage), then the right code (typed with a space) signs in.
+  await nav(`${base}/login`); await sleep(500);
+  const s3 = await json(codeState);
+  check(!s3.form && s3.box && !s3.err, "reload: straight back to the code box", JSON.stringify(s3));
+  await submitCode(`${mailbox.code.slice(0, 3)} ${mailbox.code.slice(3)}`);
+  await sleep(800);
+  const landed = await json(`({path: location.pathname, pending: sessionStorage.getItem('bts.signin.pending')})`);
+  const me1 = await evaluate(`fetch('/api/me').then(r => r.json())`);
+  check(landed.path === "/app" && me1.user && me1.user.email === EMAIL && landed.pending === null,
+        "right code: lands signed in on /app, pending address cleared", JSON.stringify({landed, user: me1.user && me1.user.email}));
+  await shot("signin-code-landed", false);
+
+  // The link from the same email is now dead (single use across link + code), and its landing page
+  // carries the hand-off line.
+  const linkPath = new URL(mailbox.link).pathname;
+  const dead = await evaluate(`fetch(${JSON.stringify(linkPath)}).then(r => r.status)`);
+  check(dead === 410, "the link of a code-spent row is dead (410)", String(dead));
+  await sleep(200);  // the probe's own expected 410 is not a page error
+  for (let i = errors.length - 1; i >= 0; i--) if (errors[i].includes("410") && errors[i].includes(linkPath)) errors.splice(i, 1);
+  await send("Network.clearBrowserCookies");
+  await nav(`${base}/login`); await sleep(400);
+  await evaluate(`sessionStorage.clear()`);
+  const fresh = await evaluate(`fetch('/api/auth/email/start', {method: 'POST', headers: {'Content-Type': 'application/json',
+    'X-Requested-With': 'fetch'}, body: JSON.stringify({email: ${JSON.stringify("handoff-" + EMAIL)}})}).then(r => r.json())`);
+  await nav(fresh.link); await sleep(500);
+  const cont = await json(`({line: (document.querySelector('[data-i18n="signin.continue.code_handoff"]') || {}).textContent || "",
+    hasCode: document.body.textContent.includes(${JSON.stringify(fresh.code)})})`);
+  check(cont.line.startsWith("Started signing in on another browser?") && !cont.hasCode,
+        "continue page: hand-off line, no code on the page", JSON.stringify(cont));
+  await shot("signin-code-continue", false);
+
+  // Phone width: the code box fits without sideways scroll; "Send a new link" brings the form back filled in.
+  await send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+  await send("Network.clearBrowserCookies");
+  await nav(`${base}/login`); await sleep(500);
+  await evaluate(`sessionStorage.clear()`);
+  await evaluate(`(() => { document.getElementById('email').value = 'phone-' + ${JSON.stringify(EMAIL)};
+    document.getElementById('email-form').requestSubmit(); return 1; })()`);
+  await sleep(900);
+  const p1 = await json(codeState);
+  check(p1.box && !p1.overflow, "phone: code box shown, no sideways scroll", JSON.stringify(p1));
+  await shot("signin-code-390", false);
+  await evaluate(`document.getElementById('code-resend').click()`);
+  await sleep(300);
+  const p2 = await json(`({state: ${codeState}, email: document.getElementById('email').value,
+    pending: sessionStorage.getItem('bts.signin.pending')})`);
+  check(p2.state.form && !p2.state.box && p2.email === "phone-" + EMAIL && p2.pending === null,
+        "Send a new link: the email form is back, address filled in", JSON.stringify(p2));
+  await send("Emulation.clearDeviceMetricsOverride");
 } else if (scenario === "forge-zh") {
   // 2026-10-27 (docs/plans/I18N_PLAN.md C2, phase 3): the per-forge language selector and a Chinese forge end to
   // end on the dev-only offline demo. The fake generator answers btsgen.loc's translate contract with a

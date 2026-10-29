@@ -57,7 +57,7 @@ function featuredTile(item, hooks) {
   const w = document.createElement("span");
   w.className = "featured-word";
   w.textContent = word;
-  // archive.tile.caption "{word} the spire": the word keeps its own span wherever the language puts it
+  // archive.tile.caption "{word} the Spire": the word keeps its own span wherever the language puts it
   const capParts = BTS_I18N.t("archive.tile.caption").split("{word}");
   cap.append(capParts[0], w, capParts.slice(1).join(""));
   const h = document.createElement("h3");

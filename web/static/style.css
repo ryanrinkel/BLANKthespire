@@ -725,3 +725,15 @@ body:not(.is-phone) .phone-only { display: none !important; }
 .lang-toggle .lang-opt.active { color: var(--ink); background: var(--panel2); cursor: default; }
 .lang-toggle .lang-sep { color: var(--line); }
 .lang-toggle.floating { position: absolute; top: 10px; right: 12px; z-index: 5; }
+
+/* Sign-in code box (signin.html #code-box, signin.js): after "Email me a link", the 6-digit code from the same
+   email signs this tab in when the link opened in another browser (a desktop mail app's own, ...). */
+.signin-code { margin-top: 14px; }
+.signin-code .signin-sent { margin: 0 0 10px; }
+.signin-code-row { display: flex; gap: 8px; align-items: stretch; flex-wrap: wrap; }
+.signin-code-row .in { margin-bottom: 0; flex: 1 1 140px; min-width: 0; max-width: 220px; font-size: 20px;
+  letter-spacing: 0.12em; font-variant-numeric: tabular-nums; text-align: center; }
+.signin-code-row .btn { margin: 0; }
+.signin-code-error { color: var(--danger); font-size: 13px; }
+.signin-code-resend { margin-top: 12px; }
+.signin-handoff { margin-top: 10px; }

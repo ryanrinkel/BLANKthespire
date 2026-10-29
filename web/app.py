@@ -1424,7 +1424,7 @@ def forge_class_route():
         keeps going and a late success still lands in the library."""
         transitioned, state = _settle_forge_job(
             forge_id, ok=False, error=i18n.get_text("en", "server.forge.too_long_job",
-                                                    intFORGE_MAX_SECONDS=int(FORGE_MAX_SECONDS)))
+                                                    max_seconds=int(FORGE_MAX_SECONDS)))
         if transitioned:
             data = i18n.error_body("server.forge.too_long")
             if reserved:

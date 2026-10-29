@@ -7,7 +7,7 @@
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png" />
   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/static/style.css?v=20261028b" />
+  <link rel="stylesheet" href="/static/style.css?v=20261029a" />
 </head>
 <body>
   <header>
@@ -47,6 +47,25 @@
         <p id="email-error" class="hint hidden" data-i18n="signin.email.error">That didn’t go through — try again in a moment.</p>
       </form>
 
+      <!-- After "Email me a link": the same email also carries a 6-digit code, typed HERE when the link opens
+           in some other browser (a desktop mail app's embedded one, ...). signin.js swaps the email form for
+           this box and remembers the pending address in sessionStorage, so a reload keeps it. -->
+      <div id="code-box" class="signin-code hidden">
+        <p id="code-sent" class="signin-sent" data-i18n="signin.email.sent">Check your inbox — the link expires in 15 minutes.</p>
+        <form id="code-form" class="signin-code-form">
+          <label class="lbl small" for="code" data-i18n="signin.code.label">Or type the 6-digit code from the email:</label>
+          <div class="signin-code-row">
+            <input id="code" class="in signin-code-in" type="text" inputmode="numeric" autocomplete="one-time-code"
+                   maxlength="12" placeholder="123 456" spellcheck="false" required />
+            <button id="code-submit" class="btn primary" type="submit" data-i18n="signin.code.button">Sign in</button>
+          </div>
+          <p id="code-error" class="hint signin-code-error hidden" role="alert"></p>
+          <p class="hint" data-i18n="signin.code.hint">Use it when the link opens somewhere else — another browser, or your mail app's own. It works once, for 15 minutes.</p>
+        </form>
+        <p id="code-dev" class="hidden"></p>
+        <button id="code-resend" class="btn ghost signin-code-resend" type="button" data-i18n="signin.code.resend">Send a new link</button>
+      </div>
+
       <!-- The no-account path: featured classes on the splash. Hidden in link mode by signin.js. -->
       <p id="try-instead" class="muted signin-try" data-i18n-html="signin.try_instead">Just want to play one? <a href="/#featured">Try a featured class</a> — no account needed.</p>
 
@@ -67,9 +86,9 @@
     <p class="foot-note" data-i18n="common.footer.disclaimer">Unofficial fan project — not affiliated with or endorsed by Mega Crit.</p>
   </footer>
 
-  <script src="/static/i18n.js?v=20261028b"></script>
-  <script src="/static/webview.js?v=20261028b"></script>
-  <script src="/static/signup-event.js?v=20261028b"></script>
-  <script src="/static/signin.js?v=20261028b"></script>
+  <script src="/static/i18n.js?v=20261029a"></script>
+  <script src="/static/webview.js?v=20261029a"></script>
+  <script src="/static/signup-event.js?v=20261029a"></script>
+  <script src="/static/signin.js?v=20261029a"></script>
 </body>
 </html>

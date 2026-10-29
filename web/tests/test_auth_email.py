@@ -22,7 +22,8 @@ def mail(monkeypatch):
     import auth
     sent: list[tuple[str, str]] = []
     monkeypatch.setattr(auth, "mail_configured", lambda: True)
-    monkeypatch.setattr(auth, "_send_magic_link", lambda email, url, lang="en": sent.append((email, url)))
+    monkeypatch.setattr(auth, "_send_magic_link",
+                        lambda email, url, lang="en", code="": sent.append((email, url)))
     return sent
 
 
@@ -88,6 +89,7 @@ def test_dev_auth_without_mail_returns_the_link_instead_of_sending(client, monke
     body = start(client, "devlink@example.com").get_json()
     assert sent == []
     assert body["ok"] is True and body["link"].startswith("http://testserver/auth/email/")
+    assert len(body["code"]) == 6 and body["code"].isdigit()  # the dev "mailbox" carries the code too
 
 
 def test_api_me_advertises_email_login(client):
@@ -181,7 +183,7 @@ def test_a_send_failure_never_changes_the_answer(client, app_module, monkeypatch
     """Resend being down is our problem, not a different HTTP response (and never a stacktrace)."""
     import auth
 
-    def boom(email, url, lang="en"):
+    def boom(email, url, lang="en", code=""):
         raise RuntimeError("resend is down")
 
     monkeypatch.setattr(auth, "mail_configured", lambda: True)

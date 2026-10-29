@@ -30,7 +30,7 @@ root for everything else (`mod/...`, `generation/...`, `workshop/...`).
 - how we refer to the game: "Slay the Spire 2" in full; "STS2" acceptable when need shorthand, in the Linux install steps.
 - how we refer to tokens: "Get a forge token", "one token forges one class"; never "buy" (the only "buy" today is "there is nothing to buy").
 - how we refer to the thing a player makes: a "class" they "forge"; it gives an "import code" / "class code" that starts with `BTSC.`; the public showcase is "The Archive".
-- how we refer to the in-game path: currently three spellings (see Notes on `help.intro.body`); pick one.
+- how we refer to the in-game path: "main menu → Mod Configuration → BlankTheSpire → Import a class code → Import → Restart game", one spelling everywhere (see Notes on `help.intro.body`). Shorten by dropping hops, never by renaming one.
 
 ## Shared (header, footer, toasts)
 
@@ -54,7 +54,7 @@ Where: static/help.html:26; static/download.html:33 (header nav link)
 ### common.nav.get_mod
 Where: static/index.html:20; static/help.html:27; static/deck.html:34; static/archive.html:28 (header nav link)
 
-    Get the Mod ⬇
+    Get the mod ⬇
 
 ### common.nav.archive
 Where: static/index.html:18; static/help.html:28; static/download.html:35; static/deck.html:32 (header nav link)
@@ -95,7 +95,7 @@ Notes: mailto link.
 ### common.footer.get_mod
 Where: static/help.html:122 (footer)
 
-    Get the Mod
+    Get the mod
 
 ### common.footer.github
 Where: static/help.html:123; static/download.html:156; static/deck.html:88; static/archive.html:46 (footer)
@@ -171,7 +171,7 @@ Notes: exactly five letters A–Z: the board has five tiles and rolls only throu
 
 ### landing.hero.board_words
 Where: static/landing.js:9-13 (WORDS, the idle loop)
-Notes: comma-separated list; each word exactly five letters A–Z and reads as "_____ the spire". GOOSE / MOOSE / CRAVE are featured classes' words.
+Notes: comma-separated list; each word exactly five letters A–Z and reads as "_____ the Spire". GOOSE / MOOSE / CRAVE are featured classes' words.
 
     FORGE, BUILD, CRAFT, CLIMB, SHAPE, DREAM, BLAZE, STORM, BRAVE, SCALE, SLASH, RAISE, CRAVE, GOOSE, MOOSE
 
@@ -184,7 +184,7 @@ Where: static/landing.html:28 (p.splash-sub under the board)
 Where: static/landing.html:31 (p.splash-pc)
 Notes: says "PC" first on purpose: ad visitors arrive on phones.
 
-    A free mod for Slay the Spire 2 on Steam. Forge from browser on any device; play on your PC.
+    A free mod for Slay the Spire 2 on Steam. Forge from your browser on any device; play on your PC.
 
 ### landing.hero.tagline
 Where: static/landing.html:33 (p.splash-tag)
@@ -200,7 +200,7 @@ Notes: button label, keep short.
 ### landing.hero.signin_note
 Where: static/landing.html:42 (p#splash-note under the button)
 
-    No password quick sign-in. Sign in with Google, GitHub or email to forge and keep your classes.
+    No passwords, ever. Sign in with Google, GitHub or email to forge and keep your classes.
 
 ### landing.hero.signin_note_webview
 Where: static/landing.js:139-140 (replaces landing.hero.signin_note inside an in-app browser)
@@ -608,7 +608,7 @@ Where: static/index.html:165 (link-style button under the Forge button)
 Where: static/index.html:172-174 (one-line tutorial banner under the Forge button)
 Notes: shown until dismissed.
 
-    Describe a class, press Forge, copy the code, paste it in-game (Mods → Blank the Spire → Import a class code → Import → restart). [Full guide with screenshots](/help)
+    Describe a class, press Forge, copy the code, paste it in-game (main menu → Mod Configuration → BlankTheSpire → Import a class code → Import → Restart game). [Full guide with screenshots](/help)
 
 ### app.phone_banner.body
 Where: static/index.html:182-183 (phone banner)
@@ -727,7 +727,7 @@ Where: static/index.html:265 (li)
 ### app.play.step_2
 Where: static/index.html:266 (li)
 
-    In Slay the Spire 2: Mods → Blank the Spire → *Import a class code* → paste → Import.
+    In Slay the Spire 2: main menu → Mod Configuration → BlankTheSpire → *Import a class code* → paste → Import.
 
 ### app.play.step_3
 Where: static/index.html:267 (li)
@@ -1392,12 +1392,12 @@ Where: static/app.js:1073 (result bar title)
 Where: static/app.js:1054 (what Copy share link puts on the clipboard)
 Notes: {name} = class name or app.share.name_fallback; {description} = first ~140 characters of the description, trailing punctuation stripped; {url} = the /deck link.
 
-    "{name}" — {description}. Play it: {url}
+    {name} — {description}. Play it: {url}
 
 ### app.share.text_no_description
 Where: static/app.js:1054
 
-    "{name}". Play it: {url}
+    {name}. Play it: {url}
 
 ### app.share.name_fallback
 Where: static/app.js:1053; also web/app.py:400 (deck page title fallback)
@@ -1640,9 +1640,9 @@ Where: static/app.js:1527 (button)
 
 ### app.donate.custom_rule
 Where: static/app.js:1524 (line under the amount box; followed by app.donate.fee_line once an amount is valid)
-Notes: {min} = minimum dollars (11).
+Notes: {min} = minimum dollars (11), {max} = maximum dollars (500), both from /api/billing (web/billing.py CUSTOM_MIN_DOLLARS / CUSTOM_MAX_DOLLARS). Says "whole dollars" because app.donate.toast_bad_amount asks for one.
 
-    ${min} and up: one token per dollar.
+    Whole dollars, ${min} to ${max} — one token per dollar.
 
 ### app.donate.toast_bad_amount
 Where: static/app.js:1578 (toast)
@@ -1714,12 +1714,12 @@ Where: static/app.js:1656 (toast)
 ### app.checkout.toast_thanks_plain
 Where: static/app.js:1657 (toast when the donation carried no tokens)
 
-    Thank you!
+    Thank you! Your donation went through.
 
 ### app.checkout.toast_processing
 Where: static/app.js:1674 (toast)
 
-    Your balance will update shortly.
+    Payment is processing — your balance will update shortly.
 
 ### app.share_sheet.title
 Where: static/render.js:28 (OS share sheet title, "Send to my PC")
@@ -2131,13 +2131,13 @@ Notes: added 2026-10-27 by the i18n build, owner to review. Lowercase, as the da
 Where: static/render.js (status decay: {decay} in app.mech.status_decays. The English is the raw value as the site printed it before (underscores as spaces); worth rewording)
 Notes: added 2026-10-27 by the i18n build, owner to review. Lowercase, as the data value; the code capitalises where the line needs it.
 
-    lose one eot
+    loses 1 at end of each turn
 
 ### app.decay.lose_all_eot
 Where: static/render.js (same table as the entry above)
 Notes: added 2026-10-27 by the i18n build, owner to review. Lowercase, as the data value; the code capitalises where the line needs it.
 
-    lose all eot
+    wears off at end of turn
 
 ### app.feedback.cat.great
 Where: static/render.js:429 (feedback category button)
@@ -2234,7 +2234,7 @@ Where: static/help.html:34 (h1)
 
 ### help.intro.body
 Where: static/help.html:35-39 (p)
-Notes: the in-game path is spelled three ways on the site: here "main menu → Mod Configuration → BlankTheSpire"; app/deck/tutorial/email "Mods → Blank the Spire"; download page "main menu → mod settings → Blank the Spire".
+Notes: the ONE in-game path spelling, used by every page, the email and the Workshop description: "main menu → Mod Configuration → BlankTheSpire → Import a class code → Import → Restart game" (shortened by dropping hops where a sentence needs fewer). "Mod Configuration" is BaseLib's English main-menu label (BaseLib/localization/eng/main_menu_ui.json, BASELIB-MOD_CONFIGURATION). The mod list shows "BlankTheSpire", not the manifest name "Blank the Spire": BaseLib's NModConfigSubmenu.GetModTitle reads settings_ui `BLANKTHESPIRE.mod_title`, which the mod does not define, and falls back to the config class's root namespace. The last three hops are the mod's own settings_ui.json labels (IMPORT_SECTION, IMPORT_BUTTON, RESTART_BUTTON).
 
     Inside the game, not on this site. Forge a class here, copy its import code (it starts with `BTSC.`), then in Slay the Spire 2 open the main menu → **Mod Configuration** → **BlankTheSpire** → paste it into the **Class code** field under **Import a class code** and press **Import**. Restart the game and your class appears at character select.
 
@@ -2358,7 +2358,7 @@ Where: static/help.html:102-103 (li)
 ### help.trouble.no_mods
 Where: static/help.html:104-105 (li)
 
-    **There's no Mods menu / the game isn't modded.** The mod isn't installed yet — see [Get the mod](/download).
+    **There's no Mod Configuration entry / the game isn't modded.** The mod isn't installed yet — see [Get the mod](/download).
 
 ### help.trouble.other
 Where: static/help.html:106-108 (li)
@@ -2446,7 +2446,7 @@ Where: static/download.html:60 (li)
 ### download.play.step_2
 Where: static/download.html:61-63 (li)
 
-    In-game: main menu → **mod settings** → **Blank the Spire** → paste into **Import a class code** → **Import** → **Restart**. ([Where do I paste my code?](/help))
+    In-game: main menu → **Mod Configuration** → **BlankTheSpire** → paste into **Import a class code** → **Import** → **Restart game**. ([Where do I paste my code?](/help))
 
 ### download.play.step_3
 Where: static/download.html:64 (li)
@@ -2687,7 +2687,7 @@ Where: static/deck.html:68 (li)
 ### deck.play.step_2
 Where: static/deck.html:69 (li)
 
-    In Slay the Spire 2: *Mods → Blank the Spire → Import a class code* → paste → *Import*.
+    In Slay the Spire 2: *main menu → Mod Configuration → BlankTheSpire → Import a class code* → paste → *Import*.
 
 ### deck.play.step_3
 Where: static/deck.html:70 (li)
@@ -2762,7 +2762,7 @@ Where: static/archive.html:40 (empty state)
 Where: static/featured.js:58 (tile caption on the landing strip and /archive)
 Notes: {word} = the class's five-letter board word, upper case.
 
-    {word} the spire
+    {word} the Spire
 
 ### archive.tile.splash_alt
 Where: static/featured.js:40 (img alt)
@@ -2965,6 +2965,51 @@ Where: static/signin-expired.html:25 (primary button)
 
     Get a new sign-in link
 
+### signin.code.label
+Where: static/signin.html (label in the code box, shown once the link is sent)
+
+    Or type the 6-digit code from the email:
+
+### signin.code.hint
+Where: static/signin.html (hint under the code box)
+
+    Use it when the link opens somewhere else — another browser, or your mail app's own. It works once, for 15 minutes.
+
+### signin.code.button
+Where: static/signin.html (code box button); static/signin.js (restored after a failure)
+
+    Sign in
+
+### signin.code.checking
+Where: static/signin.js (code box button while checking)
+
+    Checking…
+
+### signin.code.wrong
+Where: static/signin.js (code box error)
+
+    That code doesn't match — check the newest email and try again.
+
+### signin.code.expired
+Where: static/signin.js (code box error)
+
+    That code has expired or was already used. Send a new link below.
+
+### signin.code.too_many
+Where: static/signin.js (code box error)
+
+    Too many tries. Send a new link below.
+
+### signin.code.resend
+Where: static/signin.html (button under the code box; brings the email form back)
+
+    Send a new link
+
+### signin.continue.code_handoff
+Where: static/signin-continue.html (hint under the Continue button)
+
+    Started signing in on another browser? Go back there and type the code from the email instead — this button only signs you in here.
+
 ## Email
 
 ### email.magic.subject
@@ -2982,6 +3027,18 @@ Notes: {url} = the single-use link. Deliberately plain text with one URL (HTML m
     
     This link expires in 15 minutes. If you didn't ask for it, ignore this email.
 
+### email.magic.body_code
+Where: web/auth.py _send_magic_link (magic-link body with the sign-in code, plain text only; replaces email.magic.body since 2026-10-29)
+Notes: {url} = the single-use link; {code} = the 6-digit code, printed as "482 913". Same rules as email.magic.body: plain text, one URL, short.
+
+    Here is your sign-in link for Blank the Spire:
+
+    {url}
+
+    Or enter this code where you started signing in: {code}
+
+    The link and the code expire in 15 minutes and work once. If you didn't ask for them, ignore this email.
+
 ### email.class.subject
 Where: web/app.py:1888 ("Email it to me" subject)
 Notes: {name} = class name.
@@ -2991,7 +3048,7 @@ Notes: {name} = class name.
 ### email.class.intro
 Where: web/app.py:1889 (text), web/app.py:1897 (HTML, with {name} in bold)
 
-    Here is "{name}", the class you forged on Blank the Spire.
+    Here is {name}, the class you forged on Blank the Spire.
 
 ### email.class.open_on_pc
 Where: web/app.py:1890 (text), web/app.py:1898 (HTML); followed by the /deck link
@@ -3001,7 +3058,7 @@ Where: web/app.py:1890 (text), web/app.py:1898 (HTML); followed by the /deck lin
 ### email.class.paste_code
 Where: web/app.py:1891-1892 (text, with "->" arrows), web/app.py:1899-1900 (HTML, with → arrows and *Import a class code* in italics); followed by the import code
 
-    Or paste this import code in-game (Mods → Blank the Spire → *Import a class code* → Import, then restart the game):
+    Or paste this import code in-game (main menu → Mod Configuration → BlankTheSpire → *Import a class code* → Import, then restart the game):
 
 ### email.class.no_mod_text
 Where: web/app.py:1894 (text version)
@@ -3101,9 +3158,9 @@ Where: web/app.py:1427-1428 (forge error event)
 
 ### server.forge.too_long_job
 Where: web/app.py:1425 (stored job error, shown when a lost browser polls)
-Notes: {int(FORGE_MAX_SECONDS)} = the cap in seconds.
+Notes: {max_seconds} = the cap in whole seconds (BTSWEB_FORGE_MAX_SECONDS).
 
-    the forge ran past {int(FORGE_MAX_SECONDS)}s and was abandoned
+    the forge ran past {max_seconds}s and was abandoned
 
 ### server.forge.restarted
 Where: web/app.py:1067 (stored job error after a deploy restart, shown when a lost browser polls)
@@ -3403,7 +3460,7 @@ Notes: canonical copy. workshop/DESCRIPTION.bbcode has the same text; it differs
     [olist]
     [*]Subscribe to this mod (BaseLib is a dependency and installs automatically).
     [*]Go to [url=https://blankthespire.com]blankthespire.com[/url] and forge a class — you'll get an import code starting with [b]BTSC.[/b] (No time to forge? The site lists ready-made starter classes to copy.)
-    [*]In-game: main menu → Mods → Blank the Spire → paste the code into [b]Import a class code[/b] → Import → Restart when prompted.
+    [*]In-game: main menu → Mod Configuration → BlankTheSpire → paste the code into [b]Import a class code[/b] → Import → Restart game.
     [*]Start a new run and pick your forged class.
     [/olist]
     

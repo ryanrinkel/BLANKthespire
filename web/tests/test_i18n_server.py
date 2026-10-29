@@ -97,8 +97,10 @@ def test_magic_link_email_in_english_by_default(client, outbox):
     msg = outbox[-1]
     assert msg["subject"] == "Your Blank the Spire sign-in link" and msg["html"] is None
     assert msg["text"].startswith("Here is your sign-in link for Blank the Spire:\n\nhttp://testserver/auth/email/")
-    assert msg["text"].endswith("\n\nThis link expires in 15 minutes. If you didn't ask for it, ignore this "
-                                "email.\n")
+    # Since 2026-10-29 the body is email.magic.body_code: the link plus the 6-digit sign-in code.
+    assert "\n\nOr enter this code where you started signing in: " in msg["text"]
+    assert msg["text"].endswith("\n\nThe link and the code expire in 15 minutes and work once. If you didn't "
+                                "ask for them, ignore this email.\n")
 
 
 def test_magic_link_email_picks_the_language_and_falls_back_per_key(client, outbox, i18n_dir):
@@ -107,7 +109,7 @@ def test_magic_link_email_picks_the_language_and_falls_back_per_key(client, outb
     msg = outbox[-1]
     assert msg["subject"] == "你的 Blank the Spire 登录链接"
     assert msg["text"].startswith("Here is your sign-in link for Blank the Spire:")  # English fallback
-    i18n_dir({"email.magic.subject": "主题", "email.magic.body": "登录链接：\n\n{url}\n\n十五分钟内有效。"})
+    i18n_dir({"email.magic.subject": "主题", "email.magic.body_code": "登录链接：\n\n{url}\n\n验证码：{code}\n\n十五分钟内有效。"})
     _start(client, "zh-mail2@example.com", lang="zh")
     msg = outbox[-1]
     assert msg["subject"] == "主题"
@@ -168,11 +170,12 @@ def test_checkout_error_carries_a_code(client, stripe_stub):
 def test_class_email_english_and_chinese(app_module, i18n_dir):
     subject, text, html = app_module._class_mail("Plague <Doctor>", "http://x/deck/abc", "BTSC.code")
     assert subject == "Your Slay the Spire 2 class: Plague <Doctor>"
-    assert text.startswith('Here is "Plague <Doctor>", the class you forged on Blank the Spire.\n\n')
-    assert "(Mods -> Blank the Spire -> Import a class code -> Import, then restart the game):" in text
+    assert text.startswith('Here is Plague <Doctor>, the class you forged on Blank the Spire.\n\n')
+    assert ("(main menu -> Mod Configuration -> BlankTheSpire -> Import a class code -> Import, "
+            "then restart the game):") in text
     assert "<b>Plague &lt;Doctor&gt;</b>" in html and "<em>Import a class code</em>" in html
     assert "BTSC.code" in text and "BTSC.code" in html
     i18n_dir({"email.class.subject": "你的杀戮尖塔 2 职业：{name}"})
     subject, text, _ = app_module._class_mail("Plague", "http://x/deck/abc", "BTSC.code", "zh")
     assert subject == "你的杀戮尖塔 2 职业：Plague"
-    assert text.startswith('Here is "Plague"')  # untranslated keys stay English
+    assert text.startswith('Here is Plague,')  # untranslated keys stay English

@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import functools
 import hashlib
+import hmac
 import os
 import secrets
 import threading
@@ -25,6 +26,7 @@ from datetime import datetime, timedelta, timezone
 
 import requests
 from flask import jsonify, redirect, request, send_from_directory, session, url_for
+from sqlalchemy import update
 
 import i18n
 import promo
@@ -77,6 +79,12 @@ MAIL_ENV_VARS = ("RESEND_API_KEY", "BTSWEB_MAIL_FROM")
 RESEND_ENDPOINT = "https://api.resend.com/emails"
 LINK_TTL = timedelta(minutes=15)      # how long an emailed link stays usable
 LINK_SWEEP_AFTER = timedelta(hours=24)  # used or not, a link row is dead weight after a day
+# The sign-in code mailed with every link (2026-10-29): 6 digits, same row, same expiry, same single use.
+# A desktop mail app (QQ Mail's embedded Chromium, ...) opens the link in ITS browser, so the session lands
+# there; the code is typed into the tab where sign-in started instead. CODE_MAX_ATTEMPTS wrong guesses
+# against a row kill it — link included — so a guesser gets 5 tries per link, never 10^6.
+CODE_DIGITS = 6
+CODE_MAX_ATTEMPTS = 5
 
 
 def mail_configured() -> bool:
@@ -300,6 +308,31 @@ def _token_hash(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
+def _new_code() -> str:
+    """A fresh sign-in code: CODE_DIGITS uniform random digits (leading zeros kept)."""
+    return f"{secrets.randbelow(10 ** CODE_DIGITS):0{CODE_DIGITS}d}"
+
+
+def _code_hash(token_hash: str, code: str) -> str:
+    """What login_links.code_hash stores: sha256 over the row's token_hash and the code, so the same code on
+    two rows never hashes alike. A million codes are cheap to brute-force from a dump, which is fine — the
+    row is dead within 15 minutes and the hash never leaves the server."""
+    return hashlib.sha256(f"{token_hash}:{code}".encode("utf-8")).hexdigest()
+
+
+def _normalize_code(raw) -> str:
+    """The digits the person typed ("482 913", "482-913", full-width digits from a CJK keyboard), or "" when
+    that is not exactly CODE_DIGITS digits."""
+    digits = "".join(str(int(c)) for c in str(raw or "")[:64] if c.isdecimal())
+    return digits if len(digits) == CODE_DIGITS else ""
+
+
+def _format_code(code: str) -> str:
+    """482913 -> "482 913": easier to read off one screen and type into another."""
+    half = len(code) // 2
+    return f"{code[:half]} {code[half:]}"
+
+
 def _normalize_email(raw: str) -> str:
     """strip().lower(), or "" when it is not plausibly an address. Syntax only — no MX lookup and no
     disposable-domain list: throwaway addresses are deliberately allowed (the IP/global forge caps are the
@@ -345,11 +378,15 @@ def _send_mail(to: str, subject: str, html: str | None, text: str) -> None:
     resp.raise_for_status()
 
 
-def _send_magic_link(email: str, url: str, lang: str = "en") -> None:
-    """Send one sign-in link. Deliberately plain text, one URL, no tracking pixels or click-wrapping.
-    Subject and body are COPY.md's email.magic.* in the language the sign-in page was showing (per-key
-    English fallback, web/i18n.py). Module-level so tests can swap it for a capture stub."""
-    body = i18n.get_text(lang, "email.magic.body", url=url) + "\n"
+def _send_magic_link(email: str, url: str, lang: str = "en", code: str = "") -> None:
+    """Send one sign-in link and its code. Deliberately plain text, one URL, no tracking pixels or
+    click-wrapping (there is no HTML variant). Subject and body are COPY.md's email.magic.* in the language
+    the sign-in page was showing (per-key English fallback, web/i18n.py). Module-level so tests can swap it
+    for a capture stub."""
+    if code:
+        body = i18n.get_text(lang, "email.magic.body_code", url=url, code=_format_code(code)) + "\n"
+    else:  # a caller without a code (none today) still gets the original link-only body
+        body = i18n.get_text(lang, "email.magic.body", url=url) + "\n"
     _send_mail(email, i18n.get_text(lang, "email.magic.subject"), None, body)
 
 
@@ -401,19 +438,69 @@ magic_limiter = MagicLinkLimiter()
 # "Email it to me" (POST /api/classes/<id>/email, phone hand-off): keyed by user id (the address is the
 # account's own, so a per-address cap is the same thing), 5 per hour; plus a per-IP hourly backstop.
 class_mail_limiter = MagicLinkLimiter(per_email=5, email_window_s=3600, per_ip=20, ip_window_s=3600)
+# POST /api/auth/email/code: every attempt counts (right or wrong). 10 per address per 15 minutes is two
+# rows' worth of CODE_MAX_ATTEMPTS; 30 per IP per hour stops one address spraying guesses across many
+# inboxes. Over a cap the answer is "too_many" whatever the address — no account is revealed by it.
+code_limiter = MagicLinkLimiter(per_email=10, email_window_s=15 * 60, per_ip=30, ip_window_s=3600)
+
+
+def _spend(s, row_id: int, now: datetime) -> bool:
+    """Stamp used_at on one login_links row IF it is still unspent and not locked out — a conditional
+    UPDATE, so of two racing spends (the link's POST and the code, or two tabs) exactly one sees rowcount 1.
+    This is the single place a row is consumed; the link and the code both come through it."""
+    res = s.execute(update(LoginLink)
+                    .where(LoginLink.id == row_id, LoginLink.used_at.is_(None),
+                           LoginLink.code_attempts < CODE_MAX_ATTEMPTS)
+                    .values(used_at=now)
+                    .execution_options(synchronize_session=False))
+    return res.rowcount == 1
 
 
 def _claim_link(token: str, *, consume: bool) -> str | None:
-    """The address a live magic link belongs to, or None when it is unknown, expired or already used.
-    consume=True stamps used_at inside the same transaction, so a link can only ever be spent once."""
+    """The address a live magic link belongs to, or None when it is unknown, expired, already used (by its
+    link OR its code — same row) or locked by CODE_MAX_ATTEMPTS wrong codes. consume=True spends the row
+    (_spend), so a link can only ever be spent once."""
     now = _utc_naive(_now())
     with session_scope() as s:
         row = s.query(LoginLink).filter_by(token_hash=_token_hash(token)).one_or_none()
-        if row is None or row.used_at is not None or row.expires_at is None or row.expires_at < now:
+        if (row is None or row.used_at is not None or row.expires_at is None or row.expires_at < now
+                or (row.code_attempts or 0) >= CODE_MAX_ATTEMPTS):
             return None
-        if consume:
-            row.used_at = now
+        if consume and not _spend(s, row.id, now):
+            return None
         return row.email
+
+
+def _claim_code(email: str, code: str) -> str:
+    """Check a typed sign-in code against the address's live rows and spend the one it matches.
+
+    Returns "ok", "wrong", "expired" or "too_many". Every live row is compared (hmac.compare_digest), because
+    someone who asked three times may type the code from any of the three emails. A miss counts one attempt
+    against EVERY live row of the address, so the guess budget per address is CODE_MAX_ATTEMPTS, not that
+    times the number of links. An address with no rows at all answers "wrong", exactly like a bad code for
+    an address that has one, so this cannot tell anyone which addresses asked for a link."""
+    now = _utc_naive(_now())
+    with session_scope() as s:
+        rows = s.query(LoginLink).filter_by(email=email).all()
+        if not rows or not code:
+            return "wrong"
+        unspent = [r for r in rows if r.used_at is None and r.expires_at is not None and r.expires_at >= now
+                   and r.code_hash]
+        live = [r for r in unspent if (r.code_attempts or 0) < CODE_MAX_ATTEMPTS]
+        if not live:
+            return "too_many" if unspent else "expired"
+        match = None
+        for r in live:  # no early exit: every live row costs the same compare
+            if hmac.compare_digest(r.code_hash, _code_hash(r.token_hash, code)) and match is None:
+                match = r
+        if match is not None:
+            return "ok" if _spend(s, match.id, now) else "expired"
+        s.execute(update(LoginLink)
+                  .where(LoginLink.id.in_([r.id for r in live]))
+                  .values(code_attempts=LoginLink.code_attempts + 1)
+                  .execution_options(synchronize_session=False))
+        left = [r for r in live if (r.code_attempts or 0) + 1 < CODE_MAX_ATTEMPTS]
+        return "wrong" if left else "too_many"
 
 
 def require_login(fn):
@@ -538,6 +625,7 @@ def init_auth(app) -> None:
             return jsonify(answer)
 
         token = secrets.token_urlsafe(32)
+        code = _new_code()
         now = _now()
         with session_scope() as s:
             # Sweep: a day-old row is dead whether it was used or abandoned. Cheap, and it keeps the table
@@ -547,19 +635,48 @@ def init_auth(app) -> None:
             # created_at is set explicitly (rather than left to server_default) so every row in the table is
             # naive UTC on MySQL too, which is what the sweep and the expiry check compare against.
             s.add(LoginLink(email=email, token_hash=_token_hash(token), ip=ip,
+                            code_hash=_code_hash(_token_hash(token), code), code_attempts=0,
                             created_at=_utc_naive(now), expires_at=_utc_naive(now + LINK_TTL)))
         url = f"{_public_url()}/auth/email/{token}"
 
         if mail_configured():
             try:
-                _send_magic_link(email, url, lang=lang)
+                _send_magic_link(email, url, lang=lang, code=code)
             except Exception as exc:  # a dead mail provider must not change the answer (or leak a stacktrace)
                 app.logger.warning("magic-link send failed for %s: %s", email, exc)
             return jsonify(answer)
         # No mail configured ⇒ email_login_enabled() only said yes because of the dev bypass: hand the link
-        # back so local dev is one click, and log it for the terminal.
-        app.logger.info("magic sign-in link for %s: %s", email, url)
-        return jsonify({**answer, "link": url})
+        # and its code back (this JSON is the dev "mailbox" — the UI smoke reads the code from it), and log
+        # both for the terminal.
+        app.logger.info("magic sign-in link for %s: %s (code %s)", email, url, code)
+        return jsonify({**answer, "link": url, "code": code})
+
+    @app.route("/api/auth/email/code", methods=["POST"])
+    def api_email_code():
+        """Sign in with the code from the magic-link email, typed into the tab where sign-in started.
+
+        Body {email, code}. Success: the row is spent (the link dies with it), the session is set exactly as
+        the link's POST sets it, and the answer is {ok: true, next: "/app"} (or /app#account in link mode).
+        Failure is a 200 {ok: false, reason: "wrong" | "expired" | "too_many"}; an unknown address is
+        "wrong", same as a bad code. Under /api/, so app.py's X-Requested-With guard covers it (CSRF)."""
+        if not email_login_enabled():
+            return jsonify(i18n.error_body("server.auth.email_not_configured")), 503
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict):
+            body = {}
+        email = _normalize_email(body.get("email", ""))
+        code = _normalize_code(body.get("code", ""))
+        if not code_limiter.check(email, _client_ip()):
+            return jsonify({"ok": False, "reason": "too_many"})
+        result = _claim_code(email, code) if email else "wrong"
+        if result != "ok":
+            return jsonify({"ok": False, "reason": result})
+        # The same door as the link's POST below: the code proves the inbox just as the click does.
+        signed_in_as = (current_user() or {}).get("id")
+        user = _resolve_identity(Profile("email", email, email, True, email.split("@")[0]),
+                                 current_user_id=signed_in_as)
+        _login_session(user)
+        return jsonify({"ok": True, "next": _landing(user, signed_in_as)})
 
     @app.route("/auth/email/<token>", methods=["GET", "POST"])
     def auth_email(token):

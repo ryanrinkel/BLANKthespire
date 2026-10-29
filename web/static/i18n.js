@@ -44,7 +44,7 @@
 (function () {
   "use strict";
 
-  var VERSION = "20261028b";  // cache-buster for the json files; bump with the page ?v= stamps
+  var VERSION = "20261029a";  // cache-buster for the json files; bump with the page ?v= stamps
   var STORE_KEY = "bts.lang";
   // game: the game's locale code a forged class's `loc` block is keyed by (btsgen.loc.GAME_LOCALE)
   var LANGUAGES = [{ code: "en", label: "EN" }, { code: "zh", label: "中文", game: "zhs" }];

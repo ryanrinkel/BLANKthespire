@@ -7,7 +7,7 @@
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png" />
   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/static/style.css?v=20261028b" />
+  <link rel="stylesheet" href="/static/style.css?v=20261029a" />
 </head>
 <body>
   <header>
@@ -17,7 +17,7 @@
       <button id="nav-library" class="tab" data-i18n="app.nav.library">My Classes</button>
       <a class="tab" href="/archive" data-i18n="common.nav.archive">The Archive</a>
       <button id="nav-account" class="tab" data-i18n="app.nav.account">Account</button>
-      <a class="tab" href="/download" data-i18n="common.nav.get_mod">Get the Mod ⬇</a>
+      <a class="tab" href="/download" data-i18n="common.nav.get_mod">Get the mod ⬇</a>
       <a class="tab" href="/help" title="Where do I paste my class code?" data-i18n="app.nav.help" data-i18n-attr="title:app.nav.help_tip">Help ?</a>
       <span class="spacer"></span>
       <span id="tokens" class="tokens hidden" title="Tokens are spent by the 'Use a token' forge option. Press Forge to get one." data-i18n-attr="title:app.header.tokens_tip"></span>
@@ -181,7 +181,7 @@
       <div id="v3-banner" class="banner tutorial hidden" role="status">
         <span class="banner-icon" aria-hidden="true">⚒</span>
         <p id="v3-banner-text" class="tutorial-body" data-i18n-html="app.tutorial.body">Describe a class, press Forge, copy the code, paste it in-game
-          (Mods → Blank the Spire → Import a class code → Import → restart).
+          (main menu → Mod Configuration → BlankTheSpire → Import a class code → Import → Restart game).
           <a class="tutorial-more" href="/help">Full guide with screenshots</a></p>
         <button id="v3-banner-x" class="banner-x" aria-label="Dismiss" data-i18n-attr="aria-label:common.dismiss">×</button>
       </div>
@@ -276,7 +276,7 @@
           <h3 class="play-title" data-i18n="app.play.title">Play it</h3>
           <ol class="play-steps">
             <li data-i18n-html="app.play.step_1"><a href="/workshop" target="_blank" rel="noopener">Subscribe to the mod on Steam Workshop</a> (once).</li>
-            <li data-i18n-html="app.play.step_2">In Slay the Spire 2: Mods → Blank the Spire → <em>Import a class code</em> → paste → Import.</li>
+            <li data-i18n-html="app.play.step_2">In Slay the Spire 2: main menu → Mod Configuration → BlankTheSpire → <em>Import a class code</em> → paste → Import.</li>
             <li data-i18n="app.play.step_3">Restart the game and pick your class.</li>
           </ol>
           <p class="hint"><a href="/help" data-i18n="app.play.where">Where do I paste this?</a></p>
@@ -506,8 +506,8 @@
 
   <!-- ?v= busts the 1-hour static cache on deploy: bump all three whenever any file changes. i18n.js loads first (BTS_I18N); render.js holds
        the class renderers shared with the public /deck page and must load first. -->
-  <script src="/static/i18n.js?v=20261028b"></script>
-  <script src="/static/render.js?v=20261028b"></script>
-  <script src="/static/app.js?v=20261028b"></script>
+  <script src="/static/i18n.js?v=20261029a"></script>
+  <script src="/static/render.js?v=20261029a"></script>
+  <script src="/static/app.js?v=20261029a"></script>
 </body>
 </html>

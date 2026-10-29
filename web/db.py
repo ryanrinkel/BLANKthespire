@@ -179,6 +179,22 @@ def _ensure_forge_usage_columns() -> None:
             conn.execute(text("ALTER TABLE forge_usage ADD COLUMN metered_cost_micros INTEGER"))
 
 
+def _ensure_login_link_columns() -> None:
+    """Same forward-only migration for `login_links`: add the sign-in code columns (LoginLink.code_hash,
+    code_attempts) to databases made before codes existed. Old rows get NULL / 0, so their codes never match
+    and their links keep working until they expire. Idempotent; SQLite + MySQL."""
+    insp = inspect(engine)
+    if "login_links" not in insp.get_table_names():
+        return  # create_all will make it fresh with the columns already present
+    cols = {c["name"] for c in insp.get_columns("login_links")}
+    if "code_hash" not in cols:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE login_links ADD COLUMN code_hash VARCHAR(64)"))
+    if "code_attempts" not in cols:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE login_links ADD COLUMN code_attempts INTEGER NOT NULL DEFAULT 0"))
+
+
 def _backfill_slugs() -> None:
     """Give every class row without a slug a fresh random one (idempotent; safe on every boot)."""
     with engine.begin() as conn:
@@ -218,6 +234,7 @@ def init_db() -> None:
     _ensure_purchase_columns()
     _ensure_forge_usage_columns()
     _ensure_admin_action_columns()
+    _ensure_login_link_columns()
     _backfill_slugs()  # rows inserted by code paths that predate the slug (belt and braces)
     _ensure_identities()  # every user needs an identity row before the first sign-in of this boot
 

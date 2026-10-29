@@ -7,7 +7,7 @@
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png" />
   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/static/style.css?v=20261028b" />
+  <link rel="stylesheet" href="/static/style.css?v=20261029a" />
 </head>
 <body>
   <header>
@@ -27,6 +27,10 @@
       </form>
 
       <p class="hint" data-i18n="signin.continue.expiry">Links expire 15 minutes after they are sent and work only once.</p>
+      <!-- 2026-10-29: a desktop mail app (QQ Mail, ...) opens the link in its OWN embedded browser, so pressing
+           Continue signs in there, not in the browser the person started in. The email also carries a code
+           for that tab; this line points back to it (the code itself is never on this page). -->
+      <p class="hint signin-handoff" data-i18n="signin.continue.code_handoff">Started signing in on another browser? Go back there and type the code from the email instead — this button only signs you in here.</p>
     </section>
   </main>
 
@@ -35,6 +39,6 @@
     <a href="mailto:ryan.r.rinkel@gmail.com" data-i18n="common.footer.support">Support</a>
     <p class="foot-note" data-i18n="common.footer.disclaimer">Unofficial fan project — not affiliated with or endorsed by Mega Crit.</p>
   </footer>
-  <script src="/static/i18n.js?v=20261028b"></script>
+  <script src="/static/i18n.js?v=20261029a"></script>
 </body>
 </html>

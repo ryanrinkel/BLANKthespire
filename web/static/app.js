@@ -1556,7 +1556,7 @@ function renderCustomAmount(container, cfg) {
     + `<button id="${base}-btn" class="btn" type="button">${appH("app.donate.custom_button")}</button></div>`
     + `<p id="${base}-line" class="hint custom-line"></p>`;
   const input = el(`${base}-input`), btn = el(`${base}-btn`), line = el(`${base}-line`);
-  const sentence = appT("app.donate.custom_rule", { min });
+  const sentence = appT("app.donate.custom_rule", { min, max });
   const sync = () => {
     const n = customDollars(input.value, c);
     btn.textContent = n ? appT("app.donate.custom_button_n", { count: n * per }) : appT("app.donate.custom_button");
@@ -2283,7 +2283,7 @@ async function adminArchiveAct(btn, id, act, name) {
   let body;
   if (act === "feature") {
     const first = String(name || "").trim().split(/\s+/)[0].toUpperCase();
-    const word = prompt(`The five-letter board word for "${name}" (A–Z), shown as "<WORD> the spire":`,
+    const word = prompt(`The five-letter board word for "${name}" (A–Z), shown as "<WORD> the Spire":`,
       /^[A-Z]{5}$/.test(first) ? first : "");
     if (word === null) return;
     const w = String(word).trim().toUpperCase();

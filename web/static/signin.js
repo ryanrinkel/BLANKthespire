@@ -50,9 +50,109 @@ function webviewLayout(emailLogin) {
   }
 }
 
-// The magic link: POST the address, then swap the form for "check your inbox". The server answers the same
-// way whether it sent anything or not (rate limit, bad syntax), so there is nothing to branch on — and
-// nothing here ever reveals whether an account exists.
+// The pending address (2026-10-29): the email carries a 6-digit code as well as the link, for when the link
+// opens in some other browser — a desktop mail app's embedded Chromium, say, which then holds the session
+// instead of this tab. The address is remembered for the tab (sessionStorage) so a reload keeps the code box;
+// it expires with the link (15 minutes).
+const PENDING_KEY = "bts.signin.pending";
+const PENDING_MS = 15 * 60 * 1000;
+
+function loadPending() {
+  try {
+    const p = JSON.parse(sessionStorage.getItem(PENDING_KEY) || "null");
+    if (p && typeof p.email === "string" && p.email && Date.now() - Number(p.at || 0) < PENDING_MS) return p.email;
+    sessionStorage.removeItem(PENDING_KEY);
+  } catch (_) { /* storage blocked or junk: no pending address */ }
+  return "";
+}
+
+function savePending(email) {
+  try {
+    if (email) sessionStorage.setItem(PENDING_KEY, JSON.stringify({ email, at: Date.now() }));
+    else sessionStorage.removeItem(PENDING_KEY);
+  } catch (_) { /* storage blocked: the code box just won't survive a reload */ }
+}
+
+let pendingEmail = "";
+
+// Swap the email form for "check your inbox" + the code box. `devLink` / `devCode`: dev auth with no mail
+// provider hands them back instead of sending.
+function showCodeBox(email, devLink, devCode) {
+  pendingEmail = email;
+  const form = el("email-form"), box = el("code-box");
+  form.after(box);  // follows the form wherever webviewLayout moved it
+  form.classList.add("hidden");
+  box.classList.remove("hidden");
+  el("code-error").classList.add("hidden");
+  const dev = el("code-dev");
+  dev.replaceChildren();
+  dev.classList.toggle("hidden", !devLink);
+  if (devLink) {
+    const a = document.createElement("a");
+    a.className = "btn ghost";
+    a.href = devLink;
+    a.textContent = "Open the sign-in link (local dev)" + (devCode ? " · code " + devCode : "");
+    dev.appendChild(a);
+  }
+  const input = el("code");
+  input.value = "";
+  try { input.focus({ preventScroll: true }); } catch (_) { /* old browsers */ }
+}
+
+function wireCodeBox() {
+  const form = el("code-form");
+  const button = el("code-submit");
+  const fail = (key) => {
+    const err = el("code-error");
+    err.textContent = t(key);
+    err.classList.remove("hidden");
+  };
+  form.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const code = el("code").value.trim();
+    if (!code || !pendingEmail) return;
+    el("code-error").classList.add("hidden");
+    button.disabled = true;
+    button.textContent = t("signin.code.checking");
+
+    let data = null;
+    try {
+      const r = await fetch("/api/auth/email/code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Requested-With": "fetch" },
+        body: JSON.stringify({ email: pendingEmail, code }),
+      });
+      data = await r.json();
+    } catch (_) { /* offline: fall through to the generic error */ }
+
+    if (data && data.ok) {
+      savePending("");
+      window.location.assign(data.next || "/app");
+      return;
+    }
+    button.disabled = false;
+    button.textContent = t("signin.code.button");
+    if (!data || !data.reason) { fail("signin.email.error"); return; }
+    fail(["expired", "too_many"].includes(data.reason) ? "signin.code." + data.reason : "signin.code.wrong");
+  });
+
+  // "Send a new link": back to the email form, address filled in (and editable, for a typo).
+  el("code-resend").addEventListener("click", () => {
+    savePending("");
+    const emailForm = el("email-form");
+    el("code-box").classList.add("hidden");
+    emailForm.classList.remove("hidden");
+    el("email").value = pendingEmail;
+    const btn = emailForm.querySelector("button");
+    btn.disabled = false;
+    btn.textContent = t("signin.email.button");
+    el("email").focus();
+  });
+}
+
+// The magic link: POST the address, then swap the form for "check your inbox" and the code box. The server
+// answers the same way whether it sent anything or not (rate limit, bad syntax), so there is nothing to
+// branch on — and nothing here ever reveals whether an account exists.
 function wireEmailForm() {
   const form = el("email-form");
   const button = form.querySelector("button");
@@ -81,19 +181,8 @@ function wireEmailForm() {
       return;
     }
 
-    const sent = document.createElement("div");
-    sent.className = "signin-sent";
-    const p = document.createElement("p");
-    p.textContent = t("signin.email.sent");
-    sent.appendChild(p);
-    if (data.link) {  // dev auth with no mail provider: the link comes back instead of being sent
-      const a = document.createElement("a");
-      a.className = "btn primary";
-      a.href = data.link;
-      a.textContent = "Open the sign-in link (local dev)";
-      sent.appendChild(a);
-    }
-    form.replaceWith(sent);
+    savePending(email);
+    showCodeBox(email, data.link, data.code);  // data.link/code: dev auth with no mail provider only
   });
 }
 
@@ -141,6 +230,9 @@ function wireEmailForm() {
     el("email-form").classList.remove("hidden");
     if (providers.length) el("or").classList.remove("hidden");
     wireEmailForm();
+    wireCodeBox();
+    const pending = loadPending();  // a reload after "Email me a link": straight back to the code box
+    if (pending) showCodeBox(pending);
   }
   if (me && me.dev_auth) el("dev-signin").classList.remove("hidden");
   if (!providers.length && !(me && (me.dev_auth || me.email_login))) {

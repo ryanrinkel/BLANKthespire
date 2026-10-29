@@ -134,7 +134,7 @@ Notes: 与上方英文翻牌板连读成“_____ the Spire”，保持英文。
 
 ### landing.hero.signin_note
 
-    无需密码，快速登录。使用Google、GitHub或邮箱登录，即可锻造并保存你的角色。
+    永远不需要密码。使用Google、GitHub或邮箱登录，即可锻造并保存你的角色。
 
 ### landing.hero.signin_note_webview
 
@@ -437,7 +437,7 @@ Notes: {word}是翻牌板当前的英文单词（Blank、Forge……），与“
 
 ### app.tutorial.body
 
-    描述一个角色，点“锻造”，复制角色码，粘贴到游戏里（模组配置 → Blank the Spire → 导入角色码 → 导入 → 重启）。[带截图的完整指南](/help)
+    描述一个角色，点“锻造”，复制角色码，粘贴到游戏里（主菜单 → 模组配置 → BlankTheSpire → 导入角色码 → 导入 → 重启游戏）。[带截图的完整指南](/help)
 
 ### app.phone_banner.body
 
@@ -529,7 +529,7 @@ Notes: {word}是翻牌板当前的英文单词（Blank、Forge……），与“
 
 ### app.play.step_2
 
-    在《Slay the Spire 2》中：模组配置 → Blank the Spire → *导入角色码* → 粘贴 → 导入。
+    在《Slay the Spire 2》中：主菜单 → 模组配置 → BlankTheSpire → *导入角色码* → 粘贴 → 导入。
 
 ### app.play.step_3
 
@@ -1021,11 +1021,11 @@ Notes: 英文版以空格开头；中文不需要空格。
 
 ### app.share.text
 
-    “{name}”：{description}。来玩：{url}
+    {name}：{description}。来玩：{url}
 
 ### app.share.text_no_description
 
-    “{name}”。来玩：{url}
+    {name}。来玩：{url}
 
 ### app.share.name_fallback
 
@@ -1199,7 +1199,7 @@ Notes: 英文版以空格开头；中文不需要空格。
 
 ### app.donate.custom_rule
 
-    ${min}及以上：每1美元1张锻造券。
+    整数美元，${min}到${max}：每1美元1张锻造券。
 
 ### app.donate.toast_bad_amount
 
@@ -1247,11 +1247,11 @@ Notes: 英文版以空格开头；中文不需要空格。
 
 ### app.checkout.toast_thanks_plain
 
-    谢谢你！
+    谢谢你！你的赞助已完成。
 
 ### app.checkout.toast_processing
 
-    你的余额很快就会更新。
+    付款处理中，你的余额很快就会更新。
 
 ### app.share_sheet.title
 
@@ -1641,7 +1641,7 @@ Notes: 这里是储君的游戏内关键词Forge，按术语表用“铸造”�
     角色码要粘贴到哪里？
 
 ### help.intro.body
-Notes: 游戏内路径统一写作“主菜单 → 模组配置 → BlankTheSpire”。“模组配置”是BaseLib自带的简体中文名称（BaseLib localization/zhs/main_menu_ui.json）。
+Notes: 游戏内路径统一写作“主菜单 → 模组配置 → BlankTheSpire → 导入角色码 → 导入 → 重启游戏”（句子只需要前几步时从末尾截短）。模组列表显示的是BlankTheSpire（BaseLib找不到mod_title时用命名空间），不是清单里的“Blank the Spire”。“模组配置”是BaseLib自带的简体中文名称（BaseLib localization/zhs/main_menu_ui.json）。
 
     在游戏里，而不是在这个网站上。先在这里锻造一个角色，复制它的角色码（以`BTSC.`开头），然后在《Slay the Spire 2》中打开主菜单 → **模组配置** → **BlankTheSpire**，在**导入角色码**下方的**角色码**输入框中粘贴，再点**导入**。重启游戏后，你的角色就会出现在角色选择界面。
 
@@ -1739,7 +1739,7 @@ Notes: 游戏内路径统一写作“主菜单 → 模组配置 → BlankTheSpir
 
 ### help.trouble.no_mods
 
-    **没有模组菜单／游戏没有加载模组。**模组还没有安装，请查看[获取模组](/download)。
+    **主菜单里没有“模组配置”／游戏没有加载模组。**模组还没有安装，请查看[获取模组](/download)。
 
 ### help.trouble.other
 
@@ -1809,7 +1809,7 @@ Notes: 游戏内路径统一写作“主菜单 → 模组配置 → BlankTheSpir
 
 ### download.play.step_2
 
-    在游戏中：主菜单 → **模组配置** → **BlankTheSpire** → 粘贴到**导入角色码** → **导入** → **重启**。（[角色码要粘贴到哪里？](/help)）
+    在游戏中：主菜单 → **模组配置** → **BlankTheSpire** → 粘贴到**导入角色码** → **导入** → **重启游戏**。（[角色码要粘贴到哪里？](/help)）
 
 ### download.play.step_3
 
@@ -1999,7 +1999,7 @@ Notes: 角色码内的角色名是英文数据，游戏里显示英文名，所�
 
 ### deck.play.step_2
 
-    在《Slay the Spire 2》中：*模组配置 → Blank the Spire → 导入角色码* → 粘贴 → *导入*。
+    在《Slay the Spire 2》中：*主菜单 → 模组配置 → BlankTheSpire → 导入角色码* → 粘贴 → *导入*。
 
 ### deck.play.step_3
 
@@ -2056,9 +2056,9 @@ Notes: 角色码内的角色名是英文数据，游戏里显示英文名，所�
     档案馆里还什么都没有。
 
 ### archive.tile.caption
-Notes: {word}是翻牌板上的5字母英文单词，与“the spire”连成英文短语，保留英文。
+Notes: {word}是翻牌板上的5字母英文单词，与“the Spire”连成英文短语，保留英文。
 
-    {word} the spire
+    {word} the Spire
 
 ### archive.tile.splash_alt
 
@@ -2214,6 +2214,42 @@ Notes: {word}是翻牌板上的5字母英文单词，与“the spire”连成英
 
     获取新的登录链接
 
+### signin.code.label
+
+    或者输入邮件中的6位验证码：
+
+### signin.code.hint
+
+    如果链接在别处打开（另一个浏览器，或邮件应用自带的浏览器），就在这里输入验证码。验证码15分钟内有效，只能使用一次。
+
+### signin.code.button
+
+    登录
+
+### signin.code.checking
+
+    正在验证……
+
+### signin.code.wrong
+
+    验证码不正确，请查看最新的一封邮件后重试。
+
+### signin.code.expired
+
+    验证码已过期或已被使用。请在下方重新发送链接。
+
+### signin.code.too_many
+
+    尝试次数过多。请在下方重新发送链接。
+
+### signin.code.resend
+
+    重新发送链接
+
+### signin.continue.code_handoff
+
+    是在另一个浏览器里开始登录的？回到那里输入邮件中的验证码即可。这个按钮只会在当前窗口登录。
+
 ## Email
 
 ### email.magic.subject
@@ -2228,13 +2264,23 @@ Notes: {word}是翻牌板上的5字母英文单词，与“the spire”连成英
 
     此链接15分钟后失效。如果这不是你本人的请求，请忽略这封邮件。
 
+### email.magic.body_code
+
+    这是你的Blank the Spire登录链接：
+
+    {url}
+
+    或者在你开始登录的页面输入此验证码：{code}
+
+    链接和验证码15分钟后失效，且只能使用一次。如果这不是你本人的请求，请忽略这封邮件。
+
 ### email.class.subject
 
     你的《Slay the Spire 2》角色：{name}
 
 ### email.class.intro
 
-    这是你在Blank the Spire上锻造的角色“{name}”。
+    这是你在Blank the Spire上锻造的角色：{name}。
 
 ### email.class.open_on_pc
 
@@ -2242,7 +2288,7 @@ Notes: {word}是翻牌板上的5字母英文单词，与“the spire”连成英
 
 ### email.class.paste_code
 
-    或者在游戏中粘贴这段角色码（模组配置 → Blank the Spire → *导入角色码* → 导入，然后重启游戏）：
+    或者在游戏中粘贴这段角色码（主菜单 → 模组配置 → BlankTheSpire → *导入角色码* → 导入，然后重启游戏）：
 
 ### email.class.no_mod_text
 
@@ -2320,7 +2366,7 @@ Notes: {word}是翻牌板上的5字母英文单词，与“the spire”连成英
 
 ### server.forge.too_long_job
 
-    锻造运行超过{int(FORGE_MAX_SECONDS)}秒，已被放弃
+    锻造运行超过{max_seconds}秒，已被放弃
 
 ### server.forge.restarted
 
@@ -2560,7 +2606,7 @@ Notes: 标题保留“Blank the Spire”，后接中文标语。
     [olist]
     [*]订阅此模组（BaseLib是依赖项，会自动安装）。
     [*]前往[url=https://blankthespire.com]blankthespire.com[/url]锻造一个角色，你会得到一段以[b]BTSC.[/b]开头的角色码。（没时间锻造？网站上列出了现成的入门角色，直接复制即可。）
-    [*]在游戏中：主菜单 → 模组配置 → Blank the Spire → 把角色码粘贴到[b]导入角色码[/b] → 导入 → 按提示重启。
+    [*]在游戏中：主菜单 → 模组配置 → BlankTheSpire → 把角色码粘贴到[b]导入角色码[/b] → 导入 → 重启游戏。
     [*]开始新的一局游戏，选择你锻造的角色。
     [/olist]
 

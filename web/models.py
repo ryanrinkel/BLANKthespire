@@ -119,6 +119,14 @@ class LoginLink(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     expires_at: Mapped[datetime] = mapped_column(DateTime)
     used_at: Mapped[datetime | None] = mapped_column(DateTime, default=None, nullable=True)
+    # The 6-digit code mailed WITH the link (2026-10-29): typed into the tab where sign-in started, for when
+    # the mail client opens the link in a different browser (a desktop mail app's embedded Chromium, ...).
+    # Same row, so link and code share used_at / expires_at and spending either one spends both. Only
+    # auth._code_hash(token_hash, code) is stored. NULL on rows made before codes existed (no code matches).
+    # code_attempts counts wrong guesses against this row; at auth.CODE_MAX_ATTEMPTS the row is dead (link
+    # included). Added to old databases by db._ensure_login_link_columns.
+    code_hash: Mapped[str | None] = mapped_column(String(64), default=None, nullable=True)
+    code_attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
 
 
 class ForgedClass(Base):
