@@ -280,3 +280,46 @@ def test_the_staged_factory_carries_the_profile_per_stage(monkeypatch):
     forge._make_gen_factory(dict(GEMINI_KEY), hosted=False, fake=False)(_MapComposeContract(True),
                                                                         max_tokens=12000)
     assert seen[0]["extra_body"] == {"reasoning_effort": "low"}
+
+
+def test_generate_art_relays_only_the_moderation_rungs_to_the_forge_log(app_module, monkeypatch, tmp_path):
+    """2026-11-01 class 97: every tier refused on moderation. The neutral-prompt rung (BYOK-safe: it reuses
+    the forge's own backend) rescues the splash; the forge's SSE sink hears the rung lines, never the routine
+    progress lines that carry server paths; the ledger prices the call that answered."""
+    from btsgen.art.png import encode_rgb
+    from btsgen.art.request import ImageResult
+
+    class Picky:  # the forge's own (BYOK) backend: refuses the named prompt, accepts the neutral one
+        name = "user_openai"
+
+        def __init__(self):
+            self.prompts = []
+
+        def available(self):
+            return True
+
+        def generate(self, req):
+            self.prompts.append(req.prompt)
+            if "Umbreon" in req.prompt:
+                return ImageResult(ok=False, backend=self.name, model="gpt-image-2",
+                                   error="HTTP 400: Your request was rejected by the safety system")
+            req.out_path.parent.mkdir(parents=True, exist_ok=True)
+            req.out_path.write_bytes(encode_rgb(2, 2, bytes(12)))
+            return ImageResult(ok=True, backend=self.name, model="gpt-image-2", path=req.out_path,
+                               cost_usd=0.044, width=2, height=2)
+
+    class Meter:
+        def __init__(self):
+            self.rows = []
+
+        def add_art(self, kind, model, cost):
+            self.rows.append((kind, model, cost))
+
+    monkeypatch.setattr(app_module, "STATIC_FORGED_DIR", tmp_path)
+    be, meter, events, bundle = Picky(), Meter(), [], {}
+    out = {"character": {"id": "umbreon", "name": "Umbreon, the Red Cloaked"}, "concept": "a dark sorcerer"}
+    digest = app_module._generate_art("splash", 97, out, bundle, meter, be, events.append)
+    assert digest and bundle.get("splash_url") and len(be.prompts) == 2
+    assert meter.rows == [("splash", "gpt-image-2", 0.044)]
+    assert events and all(e.startswith("splash: ") for e in events)
+    assert any("neutral prompt" in e for e in events) and not any(str(tmp_path) in e for e in events)

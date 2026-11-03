@@ -12,7 +12,8 @@ they are separate knobs. Env:
                                        visible drop and Ryan flagged it at once — mini stays for CARDS)
     BTSGEN_OPENROUTER_SPRITE_MODEL     transparent (sprite) model, default 'openai/gpt-image-2.5-flare'
                                        — only the OpenAI GPT Image family and Sourceful Riverflow
-                                       advertise background=transparent on OpenRouter (catalog 2026-09-17)
+                                       advertise background=transparent on OpenRouter (catalog 2026-09-17);
+                                       any other model is chroma-keyed (see supports_alpha)
     BTSGEN_OPENROUTER_CARD_MODEL       card model, default 'openai/gpt-5-image-mini'
     BTSGEN_OPENROUTER_CARD_MODELS      the per-image FALLBACK LADDER for cards, a comma list of
                                        'model[@quality]', default
@@ -75,6 +76,20 @@ _RATIOS = {"1:1": 1.0, "3:2": 1.5, "2:3": 2 / 3, "4:3": 4 / 3, "3:4": 0.75, "16:
 # aspect_ratio: not supported. Accepted: 1:1, 3:2, 2:3, auto" for a 16:9 splash — every hosted splash was
 # silently falling through to the direct-OpenAI backend). Families not listed take any _RATIOS tag.
 _FAMILY_RATIOS = {"openai/": ("1:1", "3:2", "2:3")}
+
+
+# Who can paint a real alpha channel on OpenRouter (catalog 2026-09-17): the OpenAI GPT Image family and
+# Sourceful Riverflow. Any OTHER model asked for a transparent asset (the moderation fallback's FLUX.2 Klein
+# sprite, or a non-alpha BTSGEN_OPENROUTER_SPRITE_MODEL) gets no `background` param — FLUX 400s on it — and
+# is CHROMA-KEYED instead, exactly like the Gemini / xAI backends: the prompt asks for a flat #00FF00 field
+# (openai_images.BACKDROP_PROMPT) and art/keying.py turns it into alpha before the file is written.
+_ALPHA_PREFIXES = ("openai/",)
+_ALPHA_MARKERS = ("riverflow",)
+
+
+def supports_alpha(model: str | None) -> bool:
+    m = (model or "").lower()
+    return m.startswith(_ALPHA_PREFIXES) or any(k in m for k in _ALPHA_MARKERS)
 
 
 def allowed_ratios(model: str | None) -> tuple[str, ...] | None:
@@ -162,8 +177,12 @@ class OpenRouterImageBackend:
     def build_payload(self, req: ImageRequest, model: str | None = None,
                       quality: str | None = None) -> dict:
         model = model or self.model_for(req)
+        prompt = req.prompt
+        if req.transparent and not supports_alpha(model):
+            from .openai_images import BACKDROP_PROMPT  # lazy: openai_images imports this module
+            prompt = prompt.rstrip() + BACKDROP_PROMPT
         body: dict = {
-            "model": model, "prompt": req.prompt, "n": 1,
+            "model": model, "prompt": prompt, "n": 1,
             "aspect_ratio": nearest_ratio(req.size, allowed=allowed_ratios(model)),
             "quality": (quality or self.quality_for(req)).strip().lower(),
             "output_format": "png",
@@ -172,7 +191,9 @@ class OpenRouterImageBackend:
         if res:
             body["resolution"] = res
         if req.transparent:
-            body["background"] = "transparent"
+            if supports_alpha(model):
+                body["background"] = "transparent"
+            # else: no param (FLUX 400s on it) — the green backdrop is keyed out in _one
         elif kind_of(req) == "card" and model.startswith("openai/"):
             # gpt-5-image-mini hands back ~half-transparent cut-outs when nothing is asked (measured
             # 2026-09-18); a card portrait is an opaque scene like the shipped STS art. Only the OpenAI
@@ -236,16 +257,35 @@ class OpenRouterImageBackend:
             return ImageResult(ok=False, backend=self.name, model=model,
                                error=f"model returned non-PNG data (media_type={mt}); pick a model with png output")
 
+        cost = metered_cost(payload)
+        if req.transparent and not supports_alpha(model):
+            # the render is opaque on a #00FF00 field: key it to the RGBA cut-out the mod autocrops. A failed
+            # key must not ship a green rectangle as the combat model — fail this attempt instead.
+            try:
+                img_bytes, dims = _keyed_png(img_bytes)
+            except Exception as e:
+                return ImageResult(ok=False, backend=self.name, model=model, cost_usd=cost,
+                                   error=f"chroma key failed: {type(e).__name__}: {e}")
+
         try:
             req.out_path.parent.mkdir(parents=True, exist_ok=True)
             req.out_path.write_bytes(img_bytes)
         except OSError as e:
             return ImageResult(ok=False, backend=self.name, model=model, error=f"write failed: {e}")
 
-        cost = metered_cost(payload)
         w, h = dims
         return ImageResult(ok=True, backend=self.name, model=model, path=req.out_path,
                            cost_usd=cost, width=w, height=h)
+
+
+def _keyed_png(img_bytes: bytes) -> tuple[bytes, tuple[int, int]]:
+    """Chroma-key a green-backdrop PNG (art/keying.py) into RGBA PNG bytes + their (width, height)."""
+    import io
+    from ..keying import chroma_key  # lazy: Pillow is only needed on this path
+    out = chroma_key(img_bytes)
+    buf = io.BytesIO()
+    out.save(buf, format="PNG")
+    return buf.getvalue(), out.size
 
 
 def metered_cost(payload) -> float | None:

@@ -9,17 +9,16 @@ from __future__ import annotations
 from .request import ClassArt, StyleProfile
 
 
-def splash_prompt(art: ClassArt, style: StyleProfile, enriched_body: str | None = None) -> str:
-    parts = [f'Splash art for "{art.name}", a playable class in a dark-fantasy deckbuilder.']
-    _append_concept(parts, art)
-    if enriched_body:
-        parts.append(enriched_body)
+def splash_prompt(art: ClassArt, style: StyleProfile, enriched_body: str | None = None,
+                  neutral: bool = False) -> str:
+    """`neutral=True` is the moderation fallback's last rung (see moderation.py / _append_body): no class
+    name, no verbatim concept, no forge-written description, no enrichment — only the theme motifs, the
+    composition rule and the style suffix."""
+    if neutral:
+        parts = ["Splash art for an original playable hero class in a dark-fantasy deckbuilder."]
     else:
-        if art.description:
-            parts.append(art.description)
-        if art.concept:
-            parts.append(f"Concept: {art.concept}.")
-        _append_theme(parts, art)
+        parts = [f'Splash art for "{art.name}", a playable class in a dark-fantasy deckbuilder.']
+    _append_body(parts, art, enriched_body, neutral)
     # In-game the splash is a full-bleed character-select background and the menu UI covers the left
     # ~two-thirds of the screen — only the right third reads clearly. gpt-image-1 has no layout
     # controls, so composition is steered entirely by this prompt text.
@@ -37,24 +36,20 @@ def splash_prompt(art: ClassArt, style: StyleProfile, enriched_body: str | None 
     return " ".join(p.strip() for p in parts if p and p.strip())
 
 
-def sprite_prompt(art: ClassArt, style: StyleProfile, enriched_body: str | None = None) -> str:
+def sprite_prompt(art: ClassArt, style: StyleProfile, enriched_body: str | None = None,
+                  neutral: bool = False) -> str:
     """The combat-model sprite: one whole subject, cut out on alpha, facing right (the player side faces
     its enemies to the right in battle; the mod handles cropping/scaling/animation).
 
     Subject-NEUTRAL on purpose (2026-09-21): the old wording ("character ... head to feet, standing ... feet near
     the bottom") made a Sherman tank render as a bipedal mech — the model grew legs to satisfy "feet". A class
     can be a person, a creature, a vehicle, a machine or an object, so the pose/framing clause names the subject's
-    top and base generically and forbids anthropomorphizing."""
-    parts = [f'Full-body combat sprite of "{art.name}", the playable class of a dark-fantasy deckbuilder.']
-    _append_concept(parts, art)
-    if enriched_body:
-        parts.append(enriched_body)
+    top and base generically and forbids anthropomorphizing. `neutral=True`: see splash_prompt."""
+    if neutral:
+        parts = ["Full-body combat sprite of an original playable hero class of a dark-fantasy deckbuilder."]
     else:
-        if art.description:
-            parts.append(art.description)
-        if art.concept:
-            parts.append(f"Concept: {art.concept}.")
-        _append_theme(parts, art)
+        parts = [f'Full-body combat sprite of "{art.name}", the playable class of a dark-fantasy deckbuilder.']
+    _append_body(parts, art, enriched_body, neutral)
     parts.append(
         "Exactly one subject, shown whole from its top to its base (a person from head to feet, a vehicle from "
         "turret to treads, a creature from crown to paws), in an idle battle-ready pose, facing right in "
@@ -69,6 +64,28 @@ def sprite_prompt(art: ClassArt, style: StyleProfile, enriched_body: str | None 
     if style.prompt_suffix:
         parts.append(style.prompt_suffix)
     return " ".join(p.strip() for p in parts if p and p.strip())
+
+
+def _append_body(parts: list[str], art: ClassArt, enriched_body: str | None, neutral: bool) -> None:
+    """The "what to draw" middle of the splash/sprite prompt.
+
+    NEUTRAL (the moderation fallback's rung 2 — both vendors already refused the full prompt): drop every
+    line that carries the player's own words or a proper noun — the verbatim concept, the "Concept:" echo,
+    the forge-written description (it routinely repeats the class name and the concept's nouns, e.g. a
+    Pokemon name) and any LLM enrichment (written FROM the concept). Keep only the flavor / imagery motifs
+    (archetype names when the bundle has no skin): the theme still reads, the triggering subject does not."""
+    if neutral:
+        _append_theme(parts, art)
+        return
+    _append_concept(parts, art)
+    if enriched_body:
+        parts.append(enriched_body)
+    else:
+        if art.description:
+            parts.append(art.description)
+        if art.concept:
+            parts.append(f"Concept: {art.concept}.")
+        _append_theme(parts, art)
 
 
 def _append_concept(parts: list[str], art: ClassArt) -> None:

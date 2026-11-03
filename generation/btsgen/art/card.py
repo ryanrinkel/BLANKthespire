@@ -21,6 +21,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from .moderation import looks_moderated  # noqa: F401  (re-exported: card.looks_moderated is public API)
 from .prompt import _append_concept, _append_theme
 from .request import ClassArt, ImageResult, StyleProfile
 from .styles import CARD_STYLE
@@ -84,9 +85,12 @@ def forge_card_art(source, card: dict, *, backend=None, style: StyleProfile | No
             if dims:
                 res.width, res.height = dims
 
+    # moderation_fallback=False: cards run their OWN moderation retry below (strip the prose), and the
+    # openrouter card ladder already carries FLUX.2 Klein as its second rung — splash/sprite climb the shared
+    # rungs in splash._forge_asset instead.
     res = _forge_asset("card", build, source, backend=backend, style=style, out_dir=out_dir,
                        out_path=out_path, on_event=on_event, stem_suffix=_slug(card_id),
-                       enrich=False, postprocess=post)
+                       enrich=False, postprocess=post, moderation_fallback=False)
     if res.ok or not looks_moderated(res.error) or not card_flavor_line(card):
         return res
     # The card's own prose tripped a safety filter ("Gallows Humor — laughs hardest with a noose at his
@@ -101,18 +105,8 @@ def forge_card_art(source, card: dict, *, backend=None, style: StyleProfile | No
 
     retry = _forge_asset("card", build_bare, source, backend=backend, style=style, out_dir=out_dir,
                          out_path=out_path, on_event=on_event, stem_suffix=_slug(card_id),
-                         enrich=False, postprocess=post)
+                         enrich=False, postprocess=post, moderation_fallback=False)
     return retry if retry.ok else res
-
-
-_MODERATION_MARKERS = ("moderation", "flagged", "safety", "content policy", "blocked this request",
-                       "content_policy", "safety_violations", "rejected by the safety")
-
-
-def looks_moderated(error) -> bool:
-    """Whether a backend error reads like a content-safety block rather than a transport/param fault."""
-    e = str(error or "").lower()
-    return any(m in e for m in _MODERATION_MARKERS)
 
 
 def card_prompt(art: ClassArt, card: dict, style: StyleProfile) -> str:

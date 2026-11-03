@@ -638,19 +638,32 @@ def _byok_art_backend(mode: str, key: dict | None):
     return cls(api_key=api_key)
 
 
-def _generate_art(kind: str, class_id: int, out: dict, bundle: dict, meter=None, backend=None) -> str | None:
+def _generate_art(kind: str, class_id: int, out: dict, bundle: dict, meter=None, backend=None,
+                  on_event=None) -> str | None:
     """Best-effort: render one art asset ('splash' = select-screen background, 'sprite' = the standing
     combat model) to static/forged/<id>/<kind>.png and return its content digest (or None if no backend
     is configured / generation failed). Mutates `bundle` in place to carry `<kind>_url` so the
     re-encoded import code delivers it to the mod. `meter` (a forge.UsageMeter) gets the image's model and
     metered cost for the ledger. `backend` (None = the server's BTSGEN_IMAGE_BACKEND chain) is a BYOK
-    forge's own backend instance/name from _byok_art_backend. NEVER raises — a forge must succeed even if
+    forge's own backend instance/name from _byok_art_backend. `on_event(str)` (the forge's SSE sink) gets
+    ONLY the moderation-fallback lines ("splash: moderation blocked every tier — ..."), never the routine
+    progress lines (they carry server file paths). NEVER raises — a forge must succeed even if
     image generation doesn't."""
+    def note(msg: str) -> None:
+        if not str(msg).startswith(f"{kind}: "):  # the btsgen.art moderation-rung lines; the rest is noise
+            return
+        app.logger.warning("class %s %s", class_id, msg)
+        if on_event is not None:
+            try:
+                on_event(msg)
+            except Exception:  # noqa: BLE001 — a broken progress sink must never break a forge
+                pass
+
     try:
         from btsgen.art import class_art_from_bundle, forge_splash, forge_sprite  # lazy: never block app boot
         forge = forge_sprite if kind == "sprite" else forge_splash
         dest = STATIC_FORGED_DIR / str(class_id) / f"{kind}.png"
-        res = forge(class_art_from_bundle(out), out_path=dest, backend=backend)
+        res = forge(class_art_from_bundle(out), out_path=dest, backend=backend, on_event=note)
         if not (res.ok and res.path):
             app.logger.warning("%s not produced for class %s: %s", kind, class_id, res.error or "no backend")
             return None
@@ -958,8 +971,8 @@ def _persist_class(user_id: int, concept: str, out: dict, forge_meta: dict | Non
 
     from concurrent.futures import ThreadPoolExecutor
     with ThreadPoolExecutor(max_workers=4) as pool:
-        f_splash = pool.submit(_generate_art, "splash", class_id, out, bundle, meter, art_backend)
-        f_sprite = pool.submit(_generate_art, "sprite", class_id, out, bundle, meter, art_backend)
+        f_splash = pool.submit(_generate_art, "splash", class_id, out, bundle, meter, art_backend, on_event)
+        f_sprite = pool.submit(_generate_art, "sprite", class_id, out, bundle, meter, art_backend, on_event)
         f_relic = pool.submit(_generate_relic_icon, class_id, out, bundle)  # emoji fetch: free either way
         # The card pack runs INSIDE this pool (it owns a nested worker pool of its own) so the code
         # returned below already carries every URL — the mod gets one code, not a code plus a promise.

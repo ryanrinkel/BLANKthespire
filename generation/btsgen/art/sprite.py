@@ -6,6 +6,8 @@ the file infix (<id>.sprite.<ext>). The mod consumes the result via the bundle's
 it autocrops the alpha padding, resizes to its stage height, and drives tween micro-animations."""
 from __future__ import annotations
 
+from functools import partial
+
 from .prompt import sprite_prompt
 from .request import ImageResult, StyleProfile
 from .splash import _forge_asset
@@ -17,4 +19,4 @@ def forge_sprite(source, *, backend=None, style: StyleProfile | None = None,
     """`source`: a ClassArt or a forge bundle dict. Best-effort: never raises, ok=False is normal."""
     return _forge_asset("sprite", sprite_prompt, source, backend=backend,
                         style=style or SPRITE_STYLE, out_dir=out_dir, out_path=out_path,
-                        on_event=on_event)
+                        on_event=on_event, neutral_builder=partial(sprite_prompt, neutral=True))
