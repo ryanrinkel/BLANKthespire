@@ -277,7 +277,25 @@ body.no-art .lr-art, body.no-art .r-art, body.no-art .cc-art { display: none !im
 .pack-per { font-size: 11px; color: var(--muted); }
 .pricing { margin: 6px 0 0; padding-left: 18px; font-size: 14px; line-height: 1.5; }
 .pricing li { margin-bottom: 6px; }
-.pricing-section .pricing { max-width: 640px; margin: 8px auto 0; text-align: left; }
+/* landing "What does it cost?": the same cards as the "What is going on here??" steps (CSS only, so the
+   i18n strings keep their inline <strong> lead-ins); the badge glyph stands in for the step number */
+.pricing-section .pricing { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; text-align: left;
+  font-size: 14px; color: var(--muted); }
+.pricing-section .pricing li {
+  position: relative; margin: 0; padding: 18px 20px 18px 74px; min-height: 38px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+}
+.pricing-section .pricing li::before {
+  position: absolute; left: 20px; top: 18px; width: 38px; height: 38px; border-radius: 50%;
+  display: grid; place-items: center; font-weight: 800; font-size: 15px; color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+}
+.pricing-section .pricing li:nth-child(1)::before { content: "$0"; }
+.pricing-section .pricing li:nth-child(2)::before { content: "$"; font-size: 17px; }
+.pricing-section .pricing li:nth-child(3)::before { content: "\2665"; font-size: 17px; }
+.pricing-section .pricing strong { color: var(--ink); font-size: 16px; }
+.pricing-section .how-title { margin-bottom: 32px; }
+@media (max-width: 520px) { .pricing-section .how-title { margin-bottom: 22px; } .pricing-section .pricing li { padding-left: 68px; } .pricing-section .pricing li::before { left: 16px; } }
 .foot-note { margin: 8px 0 0; font-size: 11px; }
 .refunded { color: var(--danger); }
 
@@ -492,8 +510,9 @@ body.landing a:focus-visible { outline: 2px solid var(--accent); outline-offset:
 /* --- landing: how it works -------------------------------------------------------------------- */
 .how {
   max-width: 860px; margin: 0 auto; padding: 16px 20px 96px;
-  border-top: 1px solid var(--line);
 }
+/* one divider width for every landing section (The Archive is wider than the 860px column) */
+.how::before { content: ""; display: block; max-width: 820px; height: 1px; margin: -16px auto 0; background: var(--line); }
 .how-title { text-align: center; font-size: clamp(20px, 4vw, 30px); margin: 36px 0 6px; }
 .how-sub { text-align: center; margin: 0 0 32px; font-size: 15px; }
 .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 16px; }
