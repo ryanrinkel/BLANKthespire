@@ -35,6 +35,8 @@ as_app git fetch --quiet origin
 as_app git pull --ff-only --quiet origin main
 after="$(as_app git rev-parse HEAD)"
 echo "== pulled $before -> $after"
+# What is being A/B tested right now (web/experiments.py; plan AB_TESTING_PLAN.md 3.10) — every deploy restates it.
+echo "== $(as_app "$VENV/bin/python" -c 'import sys; sys.path.insert(0, "web"); import experiments; print(experiments.summary_line())' 2>/dev/null || echo 'live experiments: (could not read registry)')"
 
 # 2. Dependencies, only if the dependency files changed (or the venv / pytest is missing).
 if [[ ! -x "$VENV/bin/python" ]] || ! as_app git diff --quiet "$before" "$after" -- web/requirements.txt generation/pyproject.toml; then

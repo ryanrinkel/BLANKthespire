@@ -756,3 +756,39 @@ body:not(.is-phone) .phone-only { display: none !important; }
 .signin-code-error { color: var(--danger); font-size: 13px; }
 .signin-code-resend { margin-top: 12px; }
 .signin-handoff { margin-top: 10px; }
+
+/* Admin-only experiment badge (ab-badge.js, docs/plans/AB_TESTING_PLAN.md 3.10): a small fixed pill in the
+   bottom-right corner, built only when /api/me says the viewer is an admin. Capped at 60vw so on a 390px
+   phone it stays clear of the centred splash CTA. */
+.ab-badges { position: fixed; right: 10px; bottom: 10px; z-index: 1000; display: flex; flex-direction: column;
+  align-items: flex-end; gap: 6px; max-width: 60vw; }
+.ab-badge { background: rgba(14, 12, 22, 0.92); color: #e8e4f4; border: 1px solid var(--line);
+  border-radius: 999px; padding: 5px 11px; font-size: 12px; line-height: 1.35;
+  box-shadow: 0 4px 14px rgba(0,0,0,.45); }
+.ab-badge a { color: var(--accent); display: inline; white-space: nowrap; }
+
+/* Operator Experiments card (#experiments, app.js renderExperiments): one block per experiment, words then
+   numbers. The 11-column table scrolls sideways inside .table-scroll instead of widening the card. */
+#experiments .exp { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 12px; }
+#experiments .exp:first-child { border-top: 0; margin-top: 8px; padding-top: 0; }
+#experiments .exp-head { line-height: 1.45; }
+#experiments .exp-head code { background: var(--panel2); border-radius: 4px; padding: 0 4px; }
+#experiments .exp-status { margin: 6px 0 4px; font-size: 13px; }
+.exp-pill { display: inline-block; border-radius: 999px; padding: 1px 9px; font-size: 12px; font-weight: 600;
+  border: 1px solid var(--line); background: var(--panel2); color: var(--muted); }
+.exp-pill.running { color: #7fb0e6; border-color: #3f5f86; }
+.exp-pill.due { color: var(--rare); border-color: #8a7330; }
+.exp-pill.winner { color: var(--uncommon); border-color: #2f7a62; }
+.exp-pill.ended, .exp-pill.pending { color: var(--muted); }
+#experiments .exp-hyp { margin: 6px 0; font-size: 14px; }
+#experiments .exp-arms { margin: 4px 0 0; padding-left: 18px; font-size: 14px; }
+#experiments .exp-arms li { margin: 2px 0; }
+/* Header labels may wrap ("new / accounts") and the device chips sit small under the arm, so the table fits
+   the 686px card at desktop width; on a phone it scrolls. */
+#experiments .exp-table th { white-space: normal; vertical-align: bottom; }
+#experiments .exp-table th, #experiments .exp-table td { padding: 5px 4px; }
+#experiments .exp-table td:first-child { min-width: 118px; }
+#experiments .exp-table td:first-child .muted { font-size: 11px; }
+#experiments .exp-table td.num .muted { font-size: 11px; }
+#experiments .exp-readout { margin: 8px 0 0; font-size: 13px; }
+#experiments-rule { margin-top: 14px; }

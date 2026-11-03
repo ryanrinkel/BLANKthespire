@@ -132,6 +132,10 @@ Notes: 与上方英文翻牌板连读成“_____ the Spire”，保持英文。
 
     创造你的角色
 
+### landing.hero.cta_b
+
+    锻造一个角色 — 用你自己的 API 密钥免费
+
 ### landing.hero.signin_note
 
     永远不需要密码。使用Google、GitHub或邮箱登录，即可锻造并保存你的角色。

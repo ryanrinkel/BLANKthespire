@@ -73,6 +73,22 @@ How a visitor is counted (all per UTC day, by client IP, so every number here is
                    the all-time per-class record the operator panel shows next to each account: first and
                    last fetch (UTC), fetches, (day, ip) sessions ≈ imports, distinct player IPs, which
                    assets, which mod versions. A browser opening the same URL is not an import.
+  * experiments  — page A/B tests (web/experiments.py, docs/plans/AB_TESTING_PLAN.md 3.4). Nothing new is
+                   logged and nothing is stored: the arm a visitor was served is RECOMPUTED here with the
+                   same experiments.arm_for(ip, ua, exp) app.py used at serve time, from the IP and the
+                   IP's FIRST non-bot user agent of the UTC day (the rule the device class uses, so one IP
+                   sits in one arm per day). Recorded per day: who got a non-bot GET <exp.page> 200 (the
+                   exposure; "/" includes "/?utm_source=…"), the first UA, and the overlays the per-arm
+                   table needs — login (GET /login 200), provider (GET /login/<provider> 2xx/3xx or POST
+                   /api/auth/email/start 200), download (GET /download 200), plus the existing depth
+                   buckets, workshop, deck and archive. An IP that sent any ?ab= override that day is the
+                   operator previewing an arm: it is dropped from that day's experiment counts (never from
+                   the ordinary numbers). Per experiment live today or ended within EXPERIMENT_KEEP_DAYS,
+                   traffic.json["experiments"][name] holds per-arm unique IPs at their deepest across the
+                   run (an IP is counted once, under the arm of its first exposure day), the device split,
+                   a daily series, and the decision read (experiments.decide / days_to_decision). Only
+                   days >= started (and < ended) count. Without experiments.py the report still runs and
+                   "experiments" is {}.
 """
 from __future__ import annotations
 
@@ -90,6 +106,15 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
+
+# web/experiments.py: the one registry + arm_for shared with app.py. Stdlib-only, so it imports under the
+# droplet's plain /usr/bin/python3. A missing/broken module must never stop the ordinary numbers.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+try:
+    import experiments as _exp
+except Exception as e:   # noqa: BLE001 — degrade to "no experiments", keep reporting
+    _exp = None
+    print(f"experiments module unavailable ({e}); traffic.json gets no experiment numbers", file=sys.stderr)
 
 WINDOWS = (7, 30, 90, 0)   # days; 0 = everything the logs hold. Mirrors ADMIN_STATS_WINDOWS in app.py.
 TOP_N = 12
@@ -135,6 +160,14 @@ REFERER_SKIP_HOSTS = {"accounts.google.com", "localhost"}
 # following it) is NOT an import.
 IMPORT_RE = re.compile(r"^/static/forged/(?P<cid>\d+)/(?P<asset>splash\.png|sprite\.png|relic\.png|cards\.zip)$")
 MOD_UA_PREFIX = "BlankTheSpire/"
+
+# Experiments (see the docstring): overlays the per-arm table needs on top of the existing buckets.
+LOGIN_PATH = "/login"
+PROVIDER_RE = re.compile(r"^/login/[^/?]+$")       # GET /login/<provider>: the OAuth hop (302) started
+EMAIL_START_PATH = "/api/auth/email/start"           # POST: the magic-link / code form submitted
+DOWNLOAD_PATH = "/download"
+EXPERIMENT_KEEP_DAYS = 30   # an ended experiment stays on the card this long (plan 3.7 step 5)
+EXPERIMENT_OVERLAYS = ("login", "provider", "workshop", "deck", "archive", "download")
 
 
 IOS_RE = re.compile(r"iPhone|iPad|iPod")
@@ -211,6 +244,13 @@ def campaign_key(target: str) -> str | None:
     return f"{src}/{camp}" if camp else src
 
 
+def has_ab_override(target: str) -> bool:
+    """True when the URL carries an ``ab=`` parameter (``/?ab=hero:b``): the operator previewing an arm."""
+    if "?" not in target:
+        return False
+    return "ab" in parse_qs(target.split("?", 1)[1], keep_blank_values=True)
+
+
 def _open(path: str):
     if path.endswith(".gz"):
         return gzip.open(path, "rt", encoding="utf-8", errors="replace")
@@ -229,8 +269,13 @@ def _day_key(day: str) -> str | None:
 class Tally:
     """Everything we keep per day while streaming the log; the JSON is derived at the end."""
 
-    def __init__(self, self_hosts: set[str]):
+    def __init__(self, self_hosts: set[str], experiments=None):
         self.self_hosts = self_hosts
+        # The registry (tests pass their own); every experiment, live or not — filtered at output time.
+        if experiments is None:
+            experiments = list(_exp.EXPERIMENTS) if _exp is not None else []
+        self.experiments = list(experiments)
+        self.exp_pages: set[str] = {e.page for e in self.experiments}
         self.requests: dict[str, int] = defaultdict(int)
         self.bot_requests: dict[str, int] = defaultdict(int)
         self.landing: dict[str, set] = defaultdict(set)
@@ -253,6 +298,16 @@ class Tally:
         self.imports: dict[int, dict] = {}
         self.imported: dict[str, set] = defaultdict(set)
         self.import_fetches: dict[str, int] = defaultdict(int)
+        # Experiments (plan 3.4): per day, ip -> the raw UA of that IP's FIRST non-bot request (the UA the
+        # arm is recomputed from); per day and experiment page, the IPs that got a GET <page> 200; per day,
+        # the IPs that sent ?ab= (operator previews, dropped from that day's experiment counts); and the
+        # overlays the per-arm table adds to the existing buckets.
+        self.first_ua: dict[str, dict[str, str]] = defaultdict(dict)
+        self.page_hits: dict[str, dict[str, set]] = defaultdict(lambda: defaultdict(set))
+        self.operator: dict[str, set] = defaultdict(set)
+        self.login: dict[str, set] = defaultdict(set)
+        self.provider: dict[str, set] = defaultdict(set)
+        self.download: dict[str, set] = defaultdict(set)
 
     def add(self, line: str) -> None:
         m = LINE_RE.match(line)
@@ -280,14 +335,27 @@ class Tally:
         path = target.split("?", 1)[0]
         if ip not in self.device[day]:
             self.device[day][ip] = device_class(ua)
+            self.first_ua[day][ip] = ua
+        if has_ab_override(target):
+            self.operator[day].add(ip)
+        if method == "POST" and path == EMAIL_START_PATH and status == "200":
+            self.provider[day].add(ip)
         if method != "GET":
             return
         if path == WORKSHOP_PATH and status in WORKSHOP_STATUSES:
             # The Steam redirect answers 302; it is the one path where a non-200 still counts.
             self.workshop[day].add(ip)
             self.engaged[day].add(ip)
+        if PROVIDER_RE.match(path) and status[0] in "23":
+            self.provider[day].add(ip)   # the OAuth start answers 302 to the provider
         if status != "200":
             return
+        if path in self.exp_pages:
+            self.page_hits[day][path].add(ip)
+        if path == LOGIN_PATH:
+            self.login[day].add(ip)
+        if path == DOWNLOAD_PATH:
+            self.download[day].add(ip)
         if path == "/":
             self.landing[day].add(ip)
         if ENGAGED_RE.match(path) and not SPLASH_FETCH_RE.match(path):
@@ -441,6 +509,95 @@ class Tally:
                           for k, ips in sorted(camp_ips.items(), key=lambda kv: (-len(kv[1]), kv[0]))[:TOP_N]],
         }
 
+    # -- experiments (plan 3.4) ---------------------------------------------------------------------
+
+    def _shown(self, exp, today: str) -> bool:
+        """Live on `today`, or ended within EXPERIMENT_KEEP_DAYS (the card keeps those, plan 3.7)."""
+        if _exp.is_live(exp, today):
+            return True
+        return exp.ended is not None and 0 <= _days_between(exp.ended, today) <= EXPERIMENT_KEEP_DAYS
+
+    def experiments_out(self, today: str) -> dict[str, dict]:
+        """traffic.json["experiments"]: per registry experiment live today or recently ended, the per-arm
+        numbers rebuilt from the log. Empty when experiments.py could not be imported."""
+        if _exp is None:
+            return {}
+        return {exp.name: self._experiment(exp, today) for exp in self.experiments if self._shown(exp, today)}
+
+    def _experiment(self, exp, today: str) -> dict:
+        arms = list(exp.arms)
+        days = [d for d in self.days()
+                if d >= exp.started and d <= today and (exp.ended is None or d < exp.ended)]
+        arm_of: dict[str, str] = {}     # ip -> arm of its FIRST exposure day (counted once across the run)
+        dev_of: dict[str, str] = {}
+        # Unions over counted days, operators dropped per day.
+        signed_in: set = set(); clicked_any: set = set(); browser_any: set = set(); landing_any: set = set()
+        overlay: dict[str, set] = {k: set() for k in EXPERIMENT_OVERLAYS}
+        daily = []
+        for day in days:
+            ops = self.operator[day]
+            exposed = self.page_hits[day][exp.page] - ops
+            day_arm = {ip: _exp.arm_for(ip, self.first_ua[day].get(ip, ""), exp) for ip in exposed}
+            for ip in sorted(exposed):
+                if ip not in arm_of:
+                    arm_of[ip] = day_arm[ip]
+                    dev_of[ip] = self.device[day].get(ip, "desktop")
+            si, c, b, _l = self._depth(day)
+            signed_in |= si - ops
+            clicked_any |= (self.landing[day] & self.engaged[day]) - ops
+            browser_any |= self.browser[day] - ops
+            landing_any |= self.landing[day] - ops
+            day_overlay = {"login": self.login[day], "provider": self.provider[day],
+                           "workshop": self.workshop[day], "deck": self.deck[day],
+                           "archive": self.archive[day], "download": self.download[day]}
+            for k, ips in day_overlay.items():
+                overlay[k] |= ips - ops
+            day_metric = {"clicked": c, "signed_in": si, **day_overlay}[exp.primary]
+            daily.append({
+                "day": day,
+                "exposures": {a: sum(1 for v in day_arm.values() if v == a) for a in arms},
+                "primary": {a: sum(1 for ip, v in day_arm.items() if v == a and ip in day_metric) for a in arms},
+            })
+
+        # Exclusive depth per exposed IP, deepest across the run — the window() logic.
+        clicked = clicked_any - signed_in
+        browser = browser_any - signed_in - clicked
+        landing_only = landing_any - signed_in - clicked - browser
+        per_arm: dict[str, dict] = {}
+        for a in arms:
+            ips = {ip for ip, v in arm_of.items() if v == a}
+            row = {"exposures": len(ips), "clicked": len(ips & clicked), "browser": len(ips & browser),
+                   "landing_only": len(ips & landing_only), "signed_in": len(ips & signed_in)}
+            for k in EXPERIMENT_OVERLAYS:
+                row[k] = len(ips & overlay[k])
+            row["primary"] = row[exp.primary]
+            devices = dict.fromkeys(DEVICES, 0)
+            for ip in ips:
+                devices[dev_of.get(ip, "desktop")] += 1
+            row["devices"] = devices
+            # keep the column order stable for readers of the JSON
+            per_arm[a] = {k: row[k] for k in ("exposures", "clicked", "browser", "landing_only", "signed_in",
+                                               *EXPERIMENT_OVERLAYS, "primary", "devices")}
+
+        cutoff = _shift_day(today, -6)
+        last7 = sum(sum(r["exposures"].values()) for r in daily if r["day"] >= cutoff)
+        rate_7d = last7 / 7 / len(arms) if arms else 0.0
+        ctrl = per_arm.get("a") or {}
+        control_rate = (ctrl["primary"] / ctrl["exposures"]) if ctrl.get("exposures") else None
+        return {
+            "name": exp.name, "page": exp.page, "arms": arms, "weights": list(exp.weights),
+            "started": exp.started, "planned_end": exp.planned_end, "ended": exp.ended, "winner": exp.winner,
+            "primary": exp.primary, "hypothesis": exp.hypothesis, "arms_text": dict(exp.arms_text),
+            "per_arm": per_arm,
+            "daily": daily,
+            "exposure_rate_7d": rate_7d,
+            "decision": _exp.decide(exp, {a: {"exposures": r["exposures"], "primary": r["primary"]}
+                                          for a, r in per_arm.items()}, today),
+            "control_rate": control_rate,
+            "days_to_decision": _exp.days_to_decision(control_rate, rate_7d) if control_rate is not None else None,
+            "sample_size_per_arm": _exp.sample_size_per_arm(control_rate) if control_rate is not None else None,
+        }
+
 
 def _shift_day(day: str, delta: int) -> str:
     from datetime import date, timedelta
@@ -448,8 +605,13 @@ def _shift_day(day: str, delta: int) -> str:
     return (date(y, m, d) + timedelta(days=delta)).isoformat()
 
 
-def build(paths: list[str], self_hosts: set[str], today: str | None = None) -> dict:
-    tally = Tally(self_hosts)
+def _days_between(a: str, b: str) -> int:
+    from datetime import date
+    return (date.fromisoformat(b) - date.fromisoformat(a)).days
+
+
+def build(paths: list[str], self_hosts: set[str], today: str | None = None, experiments=None) -> dict:
+    tally = Tally(self_hosts, experiments=experiments)
     for p in paths:
         with _open(p) as fh:
             for line in fh:
@@ -464,6 +626,7 @@ def build(paths: list[str], self_hosts: set[str], today: str | None = None) -> d
         "daily": tally.daily(),
         "windows": {str(w): tally.window(w, today) for w in WINDOWS},
         "imports": tally.imports_out(),
+        "experiments": tally.experiments_out(today),
     }
 
 
@@ -540,7 +703,7 @@ def main() -> int:
     w7 = data["windows"]["7"]
     print(f"traffic.json: {len(data['daily'])} days ({data['first_day']}..{data['last_day']}), "
           f"last 7d humans={w7['humans']} signed_in={w7['signed_in']} browser={w7['browser']}; "
-          f"goaccess={data['goaccess']}")
+          f"goaccess={data['goaccess']} experiments={len(data['experiments'])}")
     return 0
 
 

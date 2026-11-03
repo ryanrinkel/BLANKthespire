@@ -18,7 +18,7 @@
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png" />
   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/static/style.css?v=20261102a" />
+  <link rel="stylesheet" href="/static/style.css?v=20261103a" />
 </head>
 <body class="landing">
   <main class="splash">
@@ -34,8 +34,17 @@
 
     <!-- Primary: forge your own (landing.js repoints #signin to /app or /dev-login). The Archive strip below
          stays hidden until /api/featured returns classes, so a failed fetch leaves today's page. -->
+    <!-- Experiment "hero" (registry: web/experiments.py). The <!-ab name:arm-> ... <!-/ab-> blocks are
+         stripped server-side by web/pages.py: each visitor gets exactly ONE arm (so one #signin), chosen
+         from IP + User-Agent; /?ab=hero:b previews an arm. Ending the experiment in the registry serves
+         the winner to everyone; then delete the markers and the losing arm here. -->
     <div class="splash-actions">
+      <!--ab hero:a-->
       <a id="signin" class="btn primary splash-go" href="/login" data-i18n="landing.hero.cta">Create Your Own Class</a>
+      <!--/ab-->
+      <!--ab hero:b-->
+      <a id="signin" class="btn primary splash-go" href="/login" data-i18n="landing.hero.cta_b">Forge a class — free with your own API key</a>
+      <!--/ab-->
     </div>
 
     <!-- landing.js swaps this for the email-first copy inside an in-app browser (webview.js). -->
@@ -100,6 +109,7 @@
 
   <script src="/static/i18n.js?v=20261029a"></script>
   <script src="/static/webview.js?v=20261029a"></script>
+  <script src="/static/ab-badge.js?v=20261103a"></script>
   <script src="/static/signup-event.js?v=20261029a"></script>
   <script src="/static/featured.js?v=20261029a"></script>
   <script src="/static/landing.js?v=20261029a"></script>

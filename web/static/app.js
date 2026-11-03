@@ -1424,6 +1424,7 @@ async function loadAccount() {
     toast(appT("app.account.toast_load_failed"));
   }
   loadStats();
+  loadExperiments();
   loadTraffic();
   loadAdminUsers();
   loadAdminArchive();
@@ -1829,6 +1830,85 @@ function renderStatsChart(daily, series = STATS_SERIES, boxId = "stats-chart",
   const legend = `<div class="stats-legend">` + STATS_SERIES.map((s) =>
     `<span><i style="background:${s.color}"></i>${esc(s.label)}</span>`).join("") + `</div>`;
   box.innerHTML = legend + `<div class="stats-wrap">${svg}</div>`;
+}
+
+// --- admin: page experiments --------------------------------------------------------------------------
+// Same gate as the stats card. /api/admin/experiments = the registry (web/experiments.py, the truth: a new
+// experiment is listed the moment it deploys) merged with traffic.json's per-arm numbers
+// (tools/traffic_report.py). Words first, then numbers (docs/plans/AB_TESTING_PLAN.md 3.5). The read-out
+// sentence is composed server-side (ab_report.readout) so this card and the Monday mail say the same thing.
+// The last three columns come from the database once Phase 2 stamps users.signup_ab; until then "—".
+const EXP_COLS = [
+  { key: "clicked", label: "clicked" },
+  { key: "login", label: "/login" },
+  { key: "provider", label: "provider" },
+  { key: "signed_in", label: "signed in" },
+  { key: "workshop", label: "workshop" },
+];
+const EXP_DB_COLS = [
+  { key: "new_accounts", label: "new accounts" },
+  { key: "first_forge", label: "first forge" },
+  { key: "donated", label: "donated" },
+];
+
+async function loadExperiments() {
+  const card = el("experiments");
+  if (!card) return;
+  if (!ME || !ME.admin) { card.classList.add("hidden"); return; }
+  card.classList.remove("hidden");
+  try {
+    const r = await fetch("/api/admin/experiments");
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    renderExperiments(await r.json());
+  } catch (e) {
+    el("experiments-note").textContent = "Couldn't load experiments: " + e.message;
+  }
+}
+
+// "2026-11-03" -> "Nov 3" (UTC, so the day never shifts with the viewer's timezone).
+function fmtDayShort(s) {
+  if (!s) return "?";
+  const d = new Date(s + "T00:00:00Z");
+  return isNaN(d) ? s : d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+}
+
+function renderExperiments(d) {
+  const list = d.experiments || [];
+  el("experiments-today").textContent = d.today ? `today ${d.today} (UTC)` : "";
+  el("experiments-rule").textContent = d.rule_text || "";
+  el("experiments-note").textContent = d.available ? ""
+    : `${d.reason || "No traffic summary yet."} The experiments below come from the registry; their numbers appear once the traffic timer has run.`;
+  el("experiments-list").innerHTML = list.length ? list.map(experimentBlock).join("")
+    : `<p class="hint">Nothing is being tested: no experiment is live or ended in the last 30 days. Add one in web/experiments.py (write its row in docs/experiments/LOG.md first).</p>`;
+}
+
+function experimentBlock(x) {
+  const arms = x.arms || [], perArm = x.per_arm || {}, acc = x.accounts, dec = x.decision || {};
+  const label = x.primary_label || x.primary;
+  const cols = EXP_COLS.some((c) => c.key === x.primary) ? EXP_COLS : [...EXP_COLS, { key: "primary", label }];
+  const head = `<div class="exp-head">🧪 <b>${esc(x.name)}</b> on <code>${esc(x.page)}</code> — day ${fmtInt(x.day)} of ${fmtInt(x.of)} `
+    + `(started ${esc(fmtDayShort(x.started))}, decision due ${esc(fmtDayShort(x.planned_end))}) · primary metric: <b>${esc(label)}</b></div>`;
+  const left = x.status_kind !== "ended" && dec.days_left > 0 ? ` <span class="muted">${fmtInt(dec.days_left)} days left</span>` : "";
+  const status = `<div class="exp-status"><span class="exp-pill ${esc(x.status_kind || "running")}">${esc(dec.status || "")}</span>${left}</div>`;
+  const hyp = `<p class="exp-hyp"><i>Hypothesis:</i> ${esc(x.hypothesis || "")}</p>`;
+  const armLines = `<ul class="exp-arms">` + arms.map((a, i) =>
+    `<li><b>${esc(a)}${i === 0 ? " (control)" : ""}:</b> ${esc((x.arms_text || {})[a] || "")} · `
+    + `<a href="${esc((x.preview || {})[a] || "#")}" target="_blank" rel="noopener">see it</a>`
+    + (x.status_kind === "ended" && x.winner === a ? ` <span class="exp-pill winner">shipped</span>` : "") + `</li>`).join("") + `</ul>`;
+  const phase2 = `<span class="muted" title="account attribution starts with Phase 2">—</span>`;
+  const headRow = `<tr><th>arm</th><th class="num">exposures</th>`
+    + cols.map((c) => `<th class="num">${esc(c.label)}${c.key === x.primary || c.key === "primary" ? "&nbsp;★" : ""}</th>`).join("")
+    + EXP_DB_COLS.map((c) => `<th class="num" title="${acc ? "" : "account attribution starts with Phase 2"}">${esc(c.label)}</th>`).join("") + `</tr>`;
+  const rows = arms.map((a, i) => {
+    const r = perArm[a] || {}, n = Number(r.exposures || 0), chips = deviceChips(r.devices);
+    return `<tr><td>${esc(a)}${i === 0 ? " (control)" : ""}${chips ? `<div class="muted">${esc(chips)}</div>` : ""}</td>`
+      + `<td class="num">${fmtInt(n)}</td>`
+      + cols.map((c) => `<td class="num">${fmtInt(r[c.key])}${n ? ` <span class="muted">(${pct(Number(r[c.key] || 0), n)})</span>` : ""}</td>`).join("")
+      + EXP_DB_COLS.map((c) => `<td class="num">${acc && acc[a] ? fmtInt(acc[a][c.key]) : phase2}</td>`).join("") + `</tr>`;
+  }).join("");
+  const table = `<div class="table-scroll"><table class="stats-table exp-table">${headRow}${rows}</table></div>`;
+  return `<div class="exp exp-${esc(x.status_kind || "running")}">${head}${status}${hyp}${armLines}${table}`
+    + `<p class="exp-readout">${esc(x.readout || "")}</p></div>`;
 }
 
 // --- admin: site traffic ------------------------------------------------------------------------------

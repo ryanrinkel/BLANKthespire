@@ -147,7 +147,7 @@ def test_every_header_links_the_archive(client, app_module):
 
 
 def test_landing_promotes_the_archive(client):
-    body = client.get("/").get_data(as_text=True)
+    body = client.get("/?ab=hero:a").get_data(as_text=True)   # pin the control arm of experiment "hero"
     assert '<h2 class="how-title" data-i18n="landing.archive.title">The Archive</h2>' in body
     assert 'href="/archive" data-i18n="landing.archive.more">Browse The Archive' in body
     assert "Or play a class from The Archive — no account needed." in body

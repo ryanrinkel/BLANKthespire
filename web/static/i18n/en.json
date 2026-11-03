@@ -625,6 +625,7 @@
   "landing.hero.board_label": "Blank the Spire",
   "landing.hero.board_words": "FORGE, BUILD, CRAFT, CLIMB, SHAPE, DREAM, BLAZE, STORM, BRAVE, SCALE, SLASH, RAISE, CRAVE, GOOSE, MOOSE",
   "landing.hero.cta": "Create Your Own Class",
+  "landing.hero.cta_b": "Forge a class — free with your own API key",
   "landing.hero.pc_note": "A free mod for Slay the Spire 2 on Steam. Forge from your browser on any device; play on your PC.",
   "landing.hero.signin_note": "No passwords, ever. Sign in with Google, GitHub or email to forge and keep your classes.",
   "landing.hero.signin_note_webview": "Sign in by email — {who} can't do Google sign-in. Or tap {menu} → Open in {browser}.",

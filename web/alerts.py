@@ -1,4 +1,5 @@
-"""Operator email alerts — today, one kind: "the hosted forge's account is out of credit".
+"""Operator email alerts: "the hosted forge's account is out of credit", and (bottom of the file) the page
+experiments' Monday digest + planned-end / winner mail.
 
 btsgen.alerts fires an event when a HOSTED tier (our OpenRouter / Ollama keys) or the server-keyed image
 endpoint answers 402 (or a 429 that talks about credit). This module turns that into ONE plain-text email
@@ -22,6 +23,7 @@ import time
 
 import requests
 
+import ab_report
 from auth import ADMIN_EMAILS, RESEND_ENDPOINT, mail_configured
 
 _log = logging.getLogger("btsweb.alerts")
@@ -151,3 +153,127 @@ def install() -> None:
     """Register the listener with btsgen (idempotent). Called once at app import."""
     from btsgen import alerts as _bts_alerts
     _bts_alerts.register(_on_credit_exhausted)
+
+
+# --- page experiments: Monday digest + planned-end / winner mail (docs/plans/AB_TESTING_PLAN.md 3.10) ----
+# Pure composers over the same per-experiment list the admin Experiments card reads
+# (ab_report.build_experiments_payload); tools/experiments_mail.py (btsweb-experiments.timer, daily) owns the
+# I/O: reading traffic.json, the "already sent" state file, and calling send_experiments_mail.
+
+EXP_SUBJECT_PREFIX = "[BLANK the spire]"
+
+
+def public_base_url() -> str:
+    """The site the preview links point at — the same env var app.py's PUBLIC_BASE_URL reads."""
+    return os.environ.get("BTSWEB_PUBLIC_URL", "https://blankthespire.com").rstrip("/")
+
+
+def _rate(n, of) -> str:
+    return f"{n} ({100 * n / of:.1f}%)" if of else f"{n}"
+
+
+def _experiment_block(e: dict) -> list[str]:
+    """One experiment in words, then numbers: the plain-text twin of the admin card's block."""
+    arms = e.get("arms") or []
+    d = e.get("decision") or {}
+    ps = d.get("p_beats_control") or {}
+    label = e.get("primary_label") or e.get("primary")
+    per_arm = e.get("per_arm") or {}
+    base = public_base_url()
+    lines = [
+        f"{e.get('name')} on {e.get('page')} — day {e.get('day')} of {e.get('of')} "
+        f"(started {e.get('started')}, decision due {e.get('planned_end')}, {d.get('days_left', '?')} days left)",
+        f"Status: {d.get('status', '?')}",
+        f"Hypothesis: {e.get('hypothesis')}",
+        f"Primary metric: {label}",
+        "",
+    ]
+    for i, a in enumerate(arms):
+        tag = f"{a} (control)" if i == 0 else a
+        lines.append(f"  {tag}: {(e.get('arms_text') or {}).get(a, '')}")
+        row = per_arm.get(a) or {}
+        n = int(row.get("exposures") or 0)
+        bits = [f"exposures {n}", f"{label} {_rate(int(row.get('primary') or 0), n)}"]
+        if i > 0:
+            p = ps.get(a)
+            bits.append(f"P({a} beats {arms[0]}) {'—' if p is None else f'{p:.2f}'}")
+        dv = row.get("devices") or {}
+        if dv:
+            bits.append(f"desktop {dv.get('desktop', 0)} / phone {dv.get('phone', 0)} / "
+                        f"webview {dv.get('phone_webview', 0)}")
+        lines.append("     " + " · ".join(bits))
+    lines += ["", e.get("readout") or ab_report.readout(e), "", "Preview (opens that arm for you only):"]
+    for a, path in (e.get("preview") or {}).items():
+        lines.append(f"  {a}: {base}{path}")
+    return lines
+
+
+def _mail_footer() -> list[str]:
+    return ["", ab_report.rule_sentence(), "", f"The card: {public_base_url()}/app#account (Experiments)",
+            "Record: docs/experiments/LOG.md"]
+
+
+def experiments_digest(payload: list[dict], today: str) -> tuple[str, str] | None:
+    """The Monday "what am I testing right now" mail: one block per LIVE experiment; None when none is."""
+    live = [e for e in payload or [] if e.get("live")]
+    if not live:
+        return None
+    heads = "; ".join(f"{e.get('name')} {ab_report.p_phrase(e)}".strip() for e in live)
+    subject = f"{EXP_SUBJECT_PREFIX} experiments: {len(live)} live — {heads}"
+    lines = [f"Live page experiments on {today} (UTC):", ""]
+    for i, e in enumerate(live):
+        if i:
+            lines += ["", "-" * 60, ""]
+        lines += _experiment_block(e)
+    lines += _mail_footer()
+    return subject, "\n".join(lines) + "\n"
+
+
+def experiments_due(payload: list[dict], today: str, already_sent: dict | None = None) -> list[tuple[str, str, str]]:
+    """(key, subject, body) per mail that is due and not in ``already_sent`` (key -> date sent):
+    ``end:<name>`` once `today >= planned_end` on a not-ended experiment, ``winner:<name>`` once the
+    decision rule names a winner before anyone ended it."""
+    sent = already_sent or {}
+    out: list[tuple[str, str, str]] = []
+    for e in payload or []:
+        if e.get("ended"):
+            continue
+        name = e.get("name")
+        d = e.get("decision") or {}
+        pp = ab_report.p_phrase(e, " = ")
+        if today >= (e.get("planned_end") or "9999") and f"end:{name}" not in sent:
+            head = f"{name} reached its planned end — {pp}."
+            body = [head + " Decide: set winner or keep control.", "",
+                    "To end it: set ended + winner in web/experiments.py (winner \"a\" keeps the control), "
+                    "deploy, then remove the losing arm's markers and i18n keys and fill in the LOG row.", ""]
+            out.append((f"end:{name}", f"{EXP_SUBJECT_PREFIX} {head}",
+                        "\n".join(body + _experiment_block(e) + _mail_footer()) + "\n"))
+        w = d.get("winner_by_rule")
+        if w and f"winner:{name}" not in sent:
+            head = f"{name} has a winner by the rule: {w}"
+            body = [f"{head} ({pp}, {d.get('days_running')} days, every arm ≥ the minimum exposures).",
+                    "Nothing changes for visitors until you end it: set ended + winner in web/experiments.py and "
+                    "deploy.", ""]
+            out.append((f"winner:{name}", f"{EXP_SUBJECT_PREFIX} {head}",
+                        "\n".join(body + _experiment_block(e) + _mail_footer()) + "\n"))
+    return out
+
+
+def send_experiments_mail(subject: str, body: str) -> bool:
+    """Send one experiments mail synchronously (the caller is a oneshot CLI). False = not sent."""
+    to = recipients()
+    if not to:
+        _log.warning("experiments mail %r not sent: no recipients (BTSWEB_ALERT_EMAILS / BTSWEB_ADMIN_EMAILS)",
+                     subject)
+        return False
+    if not mail_configured():
+        _log.warning("experiments mail %r not sent: mail is not configured (RESEND_API_KEY + BTSWEB_MAIL_FROM)",
+                     subject)
+        return False
+    try:
+        _send_mail(to, subject, body)
+    except Exception:  # noqa: BLE001 — logged; the CLI retries on its next run
+        _log.exception("experiments mail %r failed", subject)
+        return False
+    _log.warning("experiments mail sent to %s: %s", ", ".join(to), subject)
+    return True

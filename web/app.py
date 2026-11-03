@@ -36,8 +36,11 @@ if os.environ.get("BTSWEB_NO_DOTENV", "").strip() not in ("1", "true", "yes"):
 
 from auth import (current_user, init_auth, is_admin, is_production, is_unlimited,  # noqa: E402
                   require_login, session_age, user_is_unlimited)
+import ab_report  # noqa: E402
 import alerts as _alerts  # noqa: E402
+import experiments  # noqa: E402
 import i18n  # noqa: E402
+import pages  # noqa: E402
 import auth as _auth  # noqa: E402  (module attrs: tests swap the mailer / mail_configured)
 from billing import init_billing  # noqa: E402
 from db import FEATURED_WORD_RE as _FEATURED_WORD_RE  # noqa: E402
@@ -150,11 +153,16 @@ init_db()
 init_auth(app)
 init_billing(app)
 # (forge-job reconciliation runs below, once the settle helpers are defined — see _reconcile_forge_jobs.)
+# Page experiments (docs/plans/AB_TESTING_PLAN.md): a bad registry raises here, so it fails the deploy's test
+# step before the restart; the boot line restates what is running on every restart (plan 3.10 item 5).
+experiments.validate()
+# warning, not info: nothing configures Flask's logger level, so under gunicorn info lines never reach journald.
+app.logger.warning("%s", experiments.summary_line())
 
 
 
 def _client_ip() -> str:
-    return request.headers.get("X-Forwarded-For", request.remote_addr or "?").split(",")[0].strip()
+    return pages.client_ip()
 
 
 # --- forge admission control: bounded concurrency + a FIFO wait line -----------------------------
@@ -277,8 +285,9 @@ os.environ["ANTHROPIC_API_KEY"] = ""
 
 @app.route("/")
 def index():
-    """Public splash (the split-flap landing). Continue → /login → the app."""
-    return send_from_directory(app.static_folder, "landing.html")
+    """Public splash (the split-flap landing). Continue → /login → the app. Served through pages.serve_page
+    so experiment arms (web/experiments.py) are drawn per visitor and the markers never reach the browser."""
+    return pages.serve_page("landing.html", page="/")
 
 
 @app.route("/favicon.ico")
@@ -336,35 +345,35 @@ def workshop():
 def download():
     """Public install + download page (no login). The release zip lives under static/releases/; the version
     is stamped from the mod manifest at request time (the page is a tiny template with one placeholder)."""
-    page = (WEB_DIR / "static" / "download.html").read_text(encoding="utf-8")
-    page = (page.replace("{{VERSION}}", mod_version())
-                .replace("{{WORKSHOP_URL}}", WORKSHOP_URL)
-                .replace("{{GITHUB_URL}}", GITHUB_URL))
-    return Response(page, mimetype="text/html")
+    def stamp(page: str) -> str:
+        return (page.replace("{{VERSION}}", mod_version())
+                    .replace("{{WORKSHOP_URL}}", WORKSHOP_URL)
+                    .replace("{{GITHUB_URL}}", GITHUB_URL))
+    return pages.serve_page("download.html", page="/download", transform=stamp)
 
 
 @app.route("/help")
 def help_page():
     """Public "where do I paste my code?" walkthrough (no login) — the page every in-game step links to."""
-    return send_from_directory(app.static_folder, "help.html")
+    return pages.serve_page("help.html", page="/help")
 
 
 @app.route("/archive")
 def archive_page():
     """The Archive: the public showcase of featured classes (no login). archive.js fills it from /api/featured."""
-    return send_from_directory(app.static_folder, "archive.html")
+    return pages.serve_page("archive.html", page="/archive")
 
 
 @app.route("/terms")
 def terms():
     """Public Terms of Service (incl. the refund policy Stripe Checkout links to)."""
-    return send_from_directory(app.static_folder, "terms.html")
+    return pages.serve_page("terms.html", page="/terms")
 
 
 @app.route("/privacy")
 def privacy():
     """Public privacy policy — what we store (and what we deliberately don't, e.g. BYOK keys)."""
-    return send_from_directory(app.static_folder, "privacy.html")
+    return pages.serve_page("privacy.html", page="/privacy")
 
 
 # A forged class can only be played by importing its code, so a shared link has to SHOW the code. /deck/<slug>
@@ -403,13 +412,13 @@ def deck_page(slug: str):
         image = _splash_url(cls.id, cls.splash_hash) if cls.splash_hash else ""
     if len(desc) > DECK_DESC_MAX:
         desc = desc[:DECK_DESC_MAX - 1].rstrip() + "…"
-    page = (WEB_DIR / "static" / "deck.html").read_text(encoding="utf-8")
+    page = pages.read_static("deck.html")
     # Every value lands inside an HTML attribute (og:*/twitter:*) or text node — escape with quote=True so a
     # class named `" onload=` can't break out of the meta tag it is stamped into.
     for key, value in (("{{TITLE}}", title), ("{{DESC}}", desc), ("{{IMAGE}}", image),
                        ("{{URL}}", f"{PUBLIC_BASE_URL}/deck/{slug}"), ("{{SLUG}}", slug)):
         page = page.replace(key, html_escape(value, quote=True))
-    return Response(page, mimetype="text/html")
+    return pages.finish_page(page, page="/deck")
 
 
 @app.route("/healthz")
@@ -2491,17 +2500,43 @@ def admin_traffic():
     err = _admin_or_403()
     if err:
         return err
-    path = TRAFFIC_DIR / "traffic.json"
-    if not path.is_file():
-        return jsonify({"available": False,
-                        "reason": "No traffic summary yet — is btsweb-traffic.timer installed and running?"})
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as e:
-        return jsonify({"available": False, "reason": f"traffic.json unreadable: {e}"}), 500
+    data, reason, status = _read_traffic()
+    if data is None:
+        return jsonify({"available": False, "reason": reason}), status
     data["available"] = True
     data["report"] = (TRAFFIC_DIR / "goaccess.html").is_file()
     return jsonify(data)
+
+
+def _read_traffic() -> tuple[dict | None, str | None, int]:
+    """(traffic.json, None, 200), or (None, why, status): 200 while the timer has never run, 500 when the
+    file is there but unreadable. Read per request — the timer rewrites it every 15 min."""
+    path = TRAFFIC_DIR / "traffic.json"
+    if not path.is_file():
+        return None, "No traffic summary yet — is btsweb-traffic.timer installed and running?", 200
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        return None, f"traffic.json unreadable: {e}", 500
+    if not isinstance(data, dict):
+        return None, "traffic.json unreadable: not a JSON object", 500
+    return data, None, 200
+
+
+@app.route("/api/admin/experiments")
+@require_login
+def admin_experiments():
+    """The Experiments card (docs/plans/AB_TESTING_PLAN.md 3.5): the registry (web/experiments.py, the truth
+    — a deploy that adds an experiment lists it at once) merged with traffic.json["experiments"]. Without a
+    traffic summary the experiments are still listed, with no exposures; `available` says which."""
+    err = _admin_or_403()
+    if err:
+        return err
+    data, reason, _status = _read_traffic()
+    today = experiments.today_utc()
+    return jsonify({"available": data is not None, "reason": reason, "today": today,
+                    "rule": ab_report.rule(), "rule_text": ab_report.rule_sentence(),
+                    "experiments": ab_report.build_experiments_payload(data, today)})
 
 
 @app.route("/admin/traffic")

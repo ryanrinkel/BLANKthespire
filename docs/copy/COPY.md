@@ -197,6 +197,12 @@ Notes: button label, keep short.
 
     Create Your Own Class
 
+### landing.hero.cta_b
+Where: static/landing.html (primary button, arm b of the `<!--ab hero:b-->` block)
+Notes: arm b of experiment "hero" (web/experiments.py); goes away with the experiment (the losing arm's key is removed when it ends).
+
+    Forge a class — free with your own API key
+
 ### landing.hero.signin_note
 Where: static/landing.html:42 (p#splash-note under the button)
 

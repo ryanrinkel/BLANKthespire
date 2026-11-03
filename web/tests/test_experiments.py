@@ -407,3 +407,193 @@ def test_module_is_stdlib_only():
         elif isinstance(node, ast.ImportFrom):
             mods.add((node.module or "").split(".")[0])
     assert mods <= {"__future__", "dataclasses", "hashlib", "re", "random", "math", "datetime"}
+
+
+# ================================================================================ route level (pages.py)
+# The splash and the other public pages are served through pages.serve_page / finish_page: arms drawn from
+# IP + UA, markers stripped, data-ab stamped, no shared caching, and never a cookie.
+
+import re as _re  # noqa: E402
+
+from conftest import login  # noqa: E402
+
+ADMIN = "unlimited@example.com"
+UA = "Mozilla/5.0 test-agent"
+ARM_TEXT = {"a": "Create Your Own Class", "b": "Forge a class — free with your own API key"}
+PRIVACY_SENTENCE = ("We sometimes show two versions of a page to different visitors and compare, in aggregate, "
+                    "how far each version's visitors got, using the same server logs described above. Nothing "
+                    "is stored on your device for this.")
+
+
+@pytest.fixture()
+def day(monkeypatch):
+    """Pin 'today' inside the hero experiment's window so the route tests do not drift with the calendar."""
+    monkeypatch.setattr(ex, "today_utc", lambda: "2026-11-10")
+    return "2026-11-10"
+
+
+def _hero():
+    return next(e for e in ex.EXPERIMENTS if e.name == "hero")
+
+
+def _get(client, path, ip="203.0.113.7", ua=UA):
+    return client.get(path, headers={"User-Agent": ua, "X-Forwarded-For": ip})
+
+
+def _arm_in(body: str) -> str:
+    has_a, has_b = ARM_TEXT["a"] in body, ARM_TEXT["b"] in body
+    assert has_a != has_b, "exactly one hero arm must be in the page"
+    return "a" if has_a else "b"
+
+
+def _assert_page_headers(r):
+    assert r.headers["Content-Type"] == "text/html; charset=utf-8"
+    assert r.headers["Cache-Control"] == "private, no-cache"
+    assert "User-Agent" in r.headers.get("Vary", "")
+    assert "Set-Cookie" not in r.headers
+
+
+def _ip_for_arm(arm: str) -> str:
+    for i in range(256):
+        ip = f"198.51.100.{i}"
+        if ex.arm_for(ip, UA, _hero()) == arm:
+            return ip
+    raise AssertionError(f"no ip drew arm {arm}")
+
+
+def test_splash_serves_one_arm_matching_the_hash(client, day):
+    ip = "203.0.113.7"
+    r = _get(client, "/", ip)
+    assert r.status_code == 200
+    body = r.get_data(as_text=True)
+    assert body.count('id="signin"') == 1
+    assert "<!--ab" not in body and "<!--/ab" not in body
+    want = ex.arm_for(ip, UA, _hero())
+    assert _arm_in(body) == want
+    assert _re.search(r'<html[^>]*\sdata-ab="hero:%s"' % want, body)
+    _assert_page_headers(r)
+    assert _get(client, "/", ip).get_data(as_text=True) == body   # same visitor, same page
+
+
+def test_splash_both_arms_reachable_by_ip(client, day):
+    for arm in ("a", "b"):
+        body = _get(client, "/", _ip_for_arm(arm)).get_data(as_text=True)
+        assert _arm_in(body) == arm
+        assert f'data-ab="hero:{arm}"' in body
+
+
+def test_override_is_for_that_request_only(client, day):
+    ip = _ip_for_arm("a")
+    body = _get(client, "/?ab=hero:b", ip).get_data(as_text=True)
+    assert _arm_in(body) == "b"
+    assert 'data-ab="hero:b"' in body
+    _assert_page_headers(_get(client, "/?ab=hero:b", ip))
+    assert _arm_in(_get(client, "/", ip).get_data(as_text=True)) == "a"   # nothing remembered
+    ip_b = _ip_for_arm("b")
+    assert _arm_in(_get(client, "/?ab=hero:a", ip_b).get_data(as_text=True)) == "a"
+    assert _arm_in(_get(client, "/?ab=hero:zzz", ip_b).get_data(as_text=True)) == "b"   # junk ignored
+
+
+def test_no_set_cookie_on_public_pages(client, day):
+    for path in ("/", "/?ab=hero:b", "/login", "/help"):
+        r = _get(client, path)
+        assert r.status_code == 200, path
+        assert "Set-Cookie" not in r.headers, path
+
+
+def test_ended_experiment_serves_winner_to_everyone(client, day, monkeypatch):
+    ended = dataclasses.replace(_hero(), ended="2026-11-05", winner="b")
+    ips = (_ip_for_arm("a"), _ip_for_arm("b"))
+    monkeypatch.setattr(ex, "EXPERIMENTS", [ended])
+    for ip in ips:
+        assert _arm_in(_get(client, "/", ip).get_data(as_text=True)) == "b"
+    body = _get(client, "/?ab=hero:a").get_data(as_text=True)
+    assert _arm_in(body) == "b"
+    assert 'data-ab="hero:b"' in body
+
+
+def test_empty_registry_serves_control_without_data_ab(client, day, monkeypatch):
+    monkeypatch.setattr(ex, "EXPERIMENTS", [])
+    r = _get(client, "/?ab=hero:b")
+    body = r.get_data(as_text=True)
+    assert _arm_in(body) == "a"
+    assert "data-ab" not in body
+    assert "<!--ab" not in body and "<!--/ab" not in body
+    assert body.count('id="signin"') == 1
+    _assert_page_headers(r)
+
+
+def test_other_public_pages_go_through_the_helper(client, app_module, day):
+    from test_pages import _make_class
+    for path in ("/login", "/help", "/download", "/archive", "/terms", "/privacy"):
+        r = client.get(path, headers={"User-Agent": UA})
+        assert r.status_code == 200, path
+        _assert_page_headers(r)
+        assert "data-ab" not in r.get_data(as_text=True), path   # no experiment on these pages
+    body = client.get("/download").get_data(as_text=True)
+    assert app_module.WORKSHOP_URL in body
+    assert app_module.mod_version() in body and "{{VERSION}}" not in body
+    slug = _make_class(app_module, client)
+    r = client.get(f"/deck/{slug}", headers={"User-Agent": UA})
+    assert r.status_code == 200
+    assert r.headers["Cache-Control"] == "private, no-cache"
+    assert "User-Agent" in r.headers.get("Vary", "")
+    assert "The Tempest" in r.get_data(as_text=True)
+
+
+def test_login_page_experiment_arms_strip(client, day, monkeypatch):
+    """A /login experiment works through auth.py's route the same way (markers injected via read_static)."""
+    import pages
+    login_exp = dataclasses.replace(_hero(), name="signin_t", page="/login")
+    monkeypatch.setattr(ex, "EXPERIMENTS", [login_exp])
+    real = pages.read_static
+    extra = "<!--ab signin_t:a-->ARM-A<!--/ab--><!--ab signin_t:b-->ARM-B<!--/ab-->"
+    monkeypatch.setattr(pages, "read_static", lambda name: real(name) + (extra if name == "signin.html" else ""))
+    body = _get(client, "/login?ab=signin_t:b").get_data(as_text=True)
+    assert "ARM-B" in body and "ARM-A" not in body
+    assert 'data-ab="signin_t:b"' in body
+
+
+def test_api_me_admin_carries_experiments(client, day):
+    user = login(client, ADMIN)
+    assert user["admin"] is True
+    hero = next(e for e in user["experiments"] if e["name"] == "hero")
+    h = _hero()
+    assert hero["page"] == "/"
+    assert hero["arms"] == list(h.arms)
+    assert hero["arms_text"] == h.arms_text
+    assert hero["hypothesis"] == h.hypothesis
+    assert hero["started"] == h.started and hero["planned_end"] == h.planned_end
+    assert hero["day"] == ex._days_between(h.started, "2026-11-10") + 1
+    assert hero["of"] == ex._days_between(h.started, h.planned_end)
+    assert hero["arm"] in h.arms
+    me = client.get("/api/me", headers={"User-Agent": UA, "X-Forwarded-For": "203.0.113.7"}).get_json()
+    hero = next(e for e in me["user"]["experiments"] if e["name"] == "hero")
+    assert hero["arm"] == ex.arm_for("203.0.113.7", UA, h)
+
+
+def test_api_me_plain_user_and_signed_out_have_no_experiments(app_module, day):
+    c = app_module.app.test_client()
+    assert c.get("/api/me").get_json()["user"] is None
+    user = login(c, "plain-ab@example.com")
+    assert user["admin"] is False
+    assert "experiments" not in user
+
+
+def test_privacy_sentence_and_badge_script(client):
+    body = client.get("/privacy").get_data(as_text=True)
+    assert PRIVACY_SENTENCE in " ".join(body.split())
+    r = client.get("/static/ab-badge.js")
+    assert r.status_code == 200
+    assert "experiments" in r.get_data(as_text=True)
+    r.close()
+    for path in ("/", "/login"):
+        assert "/static/ab-badge.js?v=" in client.get(path).get_data(as_text=True), path
+
+
+def test_boot_wiring(app_module):
+    import pages
+    assert app_module.experiments is ex
+    assert app_module.pages is pages
+    ex.validate()   # the registry app.py validated at import is still valid
+    assert ex.summary_line().startswith("live experiments:")

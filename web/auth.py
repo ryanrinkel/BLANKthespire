@@ -28,7 +28,9 @@ import requests
 from flask import jsonify, redirect, request, send_from_directory, session, url_for
 from sqlalchemy import update
 
+import experiments
 import i18n
+import pages
 import promo
 from db import session_scope
 from models import Identity, LoginLink, PromoGrant, Promotion, User
@@ -349,9 +351,26 @@ def _normalize_email(raw: str) -> str:
 
 
 def _client_ip() -> str:
-    """The caller's address, same derivation as app._client_ip (duplicated rather than imported: app imports
-    auth, not the other way round). ProxyFix + BTSWEB_BEHIND_PROXY keep this honest behind nginx."""
-    return request.headers.get("X-Forwarded-For", request.remote_addr or "?").split(",")[0].strip()
+    """The caller's address — pages.client_ip, the one derivation app._client_ip and the experiment arms
+    share (pages imports neither app nor auth). ProxyFix + BTSWEB_BEHIND_PROXY keep this honest behind nginx."""
+    return pages.client_ip()
+
+
+def _admin_experiments() -> list[dict]:
+    """Every live experiment, worded for the admin page badge. ``arm`` is the arm THIS request's IP + UA
+    draws (the page the badge sits on reads its own ``data-ab`` first, which also reflects a ``?ab=``)."""
+    today = experiments.today_utc()
+    day0 = datetime.fromisoformat(today).date()
+    ip, ua = pages.client_ip(), request.headers.get("User-Agent", "")
+    out = []
+    for e in experiments.live_experiments(day=today):
+        started = datetime.fromisoformat(e.started).date()
+        end = datetime.fromisoformat(e.planned_end).date()
+        out.append({"name": e.name, "page": e.page, "arms": list(e.arms), "arms_text": dict(e.arms_text),
+                    "hypothesis": e.hypothesis, "started": e.started, "planned_end": e.planned_end,
+                    "day": (day0 - started).days + 1, "of": (end - started).days,
+                    "arm": experiments.arm_for(ip, ua, e)})
+    return out
 
 
 def _public_url() -> str:
@@ -564,7 +583,8 @@ def init_auth(app) -> None:
         this account (_resolve_identity rule 2). signin.js renders that case as "Link another sign-in"."""
         if current_user() is not None and request.args.get("link") != "1":
             return redirect("/app")
-        return send_from_directory(app.static_folder, "signin.html")
+        # Through the shared page helper so a /login experiment's arms are drawn server-side (pages.py).
+        return pages.serve_page("signin.html", page="/login")
 
     @app.route("/login/<provider>")
     def login_provider(provider):
@@ -728,11 +748,16 @@ def init_auth(app) -> None:
                     grant, label = g
                     welcome = {"label": label or "", "tokens": int(grant.tokens or 0)}
                     grant.seen_at = _utc_naive(_now())
+            admin = is_admin(user.get("email", ""))
             user = {**user, "token_balance": bal,
                     "unlimited": unlimited,
                     "welcome_grant": welcome,
-                    "admin": is_admin(user.get("email", "")),
+                    "admin": admin,
                     "identities": _identities_of(user["id"])}
+            if admin:
+                # The admin-only page badge (static/ab-badge.js, plan 3.10 item 1). A plain user never gets
+                # this key, and no badge markup exists in the HTML.
+                user["experiments"] = _admin_experiments()
         # email_login gates signin.js's email form: mail configured, or the dev bypass standing in for it.
         # mail: this deploy can send mail (Resend) — gates the "Email it to me" class hand-off button.
         return jsonify({"user": user, "dev_auth": _dev_auth_enabled(),

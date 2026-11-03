@@ -1,0 +1,12 @@
+# Daily at 09:05 UTC: btsweb-experiments.service. The digest goes out on Mondays; the planned-end / winner
+# mails on whichever day they come due. Persistent=true runs a missed tick after downtime; the state file
+# keeps that from double-sending.
+[Unit]
+Description=BLANK the spire — page-experiment mail, daily 09:05 UTC
+
+[Timer]
+OnCalendar=*-*-* 09:05:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target

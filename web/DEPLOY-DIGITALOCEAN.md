@@ -157,6 +157,24 @@ which class, first/last fetch, mod version) and the traffic card as "Imported in
 sent no user agent through v0.4.0 (logged as `-`); later builds send `BlankTheSpire/<version>`. Added
 2026-10-06 — nothing before that date is knowable.
 
+### Experiments mail (Monday digest + planned-end mail)
+
+Page experiments (`web/experiments.py`, plan `docs/plans/AB_TESTING_PLAN.md`) are read on the operator
+page's **Experiments** card (`/api/admin/experiments`, above "Site traffic"), from the same `traffic.json`.
+A daily timer (09:05 UTC) mails the operator list (`BTSWEB_ALERT_EMAILS`, else `BTSWEB_ADMIN_EMAILS`;
+needs `RESEND_API_KEY` + `BTSWEB_MAIL_FROM`): on Mondays one block per live experiment, nothing when none is
+live; on any day, once per experiment, "reached its planned end" and "has a winner by the rule". What was
+sent is kept in `/opt/btsweb/traffic/experiments_mail.json`, so re-runs never double-send. Runs as root in
+the app venv (it reads the root-written traffic dir):
+
+```bash
+sudo cp /opt/btsweb/web/deploy/btsweb-experiments.{service,timer} /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now btsweb-experiments.timer
+# see what Monday's digest (and any due mail) would say, without sending or touching the state file:
+cd /opt/btsweb/web && sudo ../.venv/bin/python tools/experiments_mail.py --dry-run --digest
+systemctl list-timers btsweb-experiments.timer                               # next run
+```
+
 ## 6. nginx + TLS
 
 ```bash

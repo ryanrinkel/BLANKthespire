@@ -7,7 +7,7 @@
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png" />
   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/static/style.css?v=20261102a" />
+  <link rel="stylesheet" href="/static/style.css?v=20261103a" />
 </head>
 <body>
   <header>
@@ -349,6 +349,20 @@
       <p id="stats-note" class="hint"></p>
     </section>
 
+    <!-- Admin-only, same gate as the stats card: page experiments (A/B tests), live or ended < 30 days.
+         Built by app.js loadExperiments() from /api/admin/experiments = the registry (web/experiments.py)
+         merged with traffic.json's per-arm numbers. Words first (hypothesis, arms), then the numbers. -->
+    <section id="experiments" class="card hidden">
+      <div class="stats-head">
+        <h2>Experiments</h2>
+        <span class="spacer"></span>
+        <span id="experiments-today" class="hint"></span>
+      </div>
+      <div id="experiments-list"></div>
+      <p id="experiments-rule" class="hint"></p>
+      <p id="experiments-note" class="hint"></p>
+    </section>
+
     <!-- Admin-only, same gate as the stats card: who is visiting the site. Built by app.js loadTraffic()
          from /api/admin/traffic, which is the nginx access log summarised by tools/traffic_report.py
          (no analytics script anywhere on the site). The "full report" link opens the GoAccess page. -->
@@ -508,6 +522,6 @@
        the class renderers shared with the public /deck page and must load first. -->
   <script src="/static/i18n.js?v=20261029a"></script>
   <script src="/static/render.js?v=20261029a"></script>
-  <script src="/static/app.js?v=20261029a"></script>
+  <script src="/static/app.js?v=20261103a"></script>
 </body>
 </html>

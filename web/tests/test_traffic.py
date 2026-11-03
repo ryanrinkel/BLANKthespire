@@ -421,3 +421,196 @@ def test_unreadable_summary_is_a_500(client, app_module):
     login(client, ADMIN)
     r = client.get("/api/admin/traffic")
     assert r.status_code == 500 and r.get_json()["available"] is False
+
+
+# --- experiments (plan 3.4): the arm is recomputed from IP + first UA, nothing new is logged ------------
+
+import dataclasses  # noqa: E402
+
+import experiments  # noqa: E402  (web/ is on sys.path via traffic_report)
+
+HERO = experiments.Experiment(
+    name="hero", page="/", arms=("a", "b"), weights=(50, 50), salt="s", started="2026-11-03",
+    planned_end="2026-12-15", primary="login", hypothesis="h", arms_text={"a": "A", "b": "B"})
+NOV4 = "04/Nov/2026"
+
+
+def ips_in(arm, n, ua=UA_CHROME, prefix=60, exp=HERO):
+    """The first n synthetic IPs whose hash lands in `arm` for this UA (so a test can route visitors)."""
+    out, i = [], 0
+    while len(out) < n:
+        ip = f"{prefix}.{i // 250}.{i % 250}.7"
+        i += 1
+        if experiments.arm_for(ip, ua, exp) == arm:
+            out.append(ip)
+    return out
+
+
+def tally(lines, exps=(HERO,)):
+    t = tr.Tally({"blankthespire.com"}, experiments=list(exps))
+    for ln in lines:
+        t.add(ln)
+    return t
+
+
+def test_experiment_arms_are_rebuilt_from_ip_and_first_ua():
+    a1, a2 = ips_in("a", 2)
+    (b1,) = ips_in("b", 1)
+    # an IP whose FIRST UA of the day (phone) draws b and whose later UA (desktop) would draw a
+    i = 0
+    while True:
+        x = f"70.0.{i}.1"
+        if experiments.arm_for(x, UA_PHONE, HERO) == "b" and experiments.arm_for(x, UA_CHROME, HERO) == "a":
+            break
+        i += 1
+    t = tally([
+        line(a1, NOV4, "/"),
+        line(a2, NOV4, "/?utm_source=youtube&utm_campaign=x"),   # a tagged splash IS an exposure
+        line(b1, NOV4, "/"),
+        line(x, NOV4, "/help", ua=UA_PHONE, time="09:00:00"),
+        line(x, NOV4, "/", ua=UA_CHROME, time="09:05:00"),
+        line("80.0.0.1", NOV4, "/", status=302),                  # not a 200
+        line("80.0.0.2", NOV4, "/", ua=GOOGLEBOT),                # a bot
+        line("80.0.0.3", NOV4, "/login"),                         # never saw the page
+        line("80.0.0.4", "02/Nov/2026", "/"),                     # before started
+    ])
+    out = t.experiments_out("2026-11-04")
+    assert set(out) == {"hero"}
+    e = out["hero"]
+    for ip, arm in ((a1, "a"), (a2, "a"), (b1, "b"), (x, "b")):
+        assert experiments.arm_for(ip, t.first_ua["2026-11-04"][ip], HERO) == arm
+    assert e["per_arm"]["a"]["exposures"] == 2 and e["per_arm"]["b"]["exposures"] == 2
+    assert [r["day"] for r in e["daily"]] == ["2026-11-04"]          # the 2nd is before started
+    assert e["daily"][0]["exposures"] == {"a": 2, "b": 2}
+    assert (e["name"], e["page"], e["arms"], e["weights"], e["primary"]) == ("hero", "/", ["a", "b"], [50, 50], "login")
+    assert e["arms_text"] == {"a": "A", "b": "B"} and e["ended"] is None and e["winner"] is None
+    # x clicked past the splash (/help); the others only landed
+    assert e["per_arm"]["b"]["clicked"] == 1 and e["per_arm"]["b"]["landing_only"] == 1
+    assert e["per_arm"]["a"]["landing_only"] == 2
+    # x's device is its first request's: phone
+    assert e["per_arm"]["b"]["devices"] == {"desktop": 1, "phone": 1, "phone_webview": 0}
+
+
+def test_operator_previews_are_dropped_from_that_days_experiment_counts():
+    (op,) = ips_in("a", 1, prefix=61)
+    (v,) = ips_in("b", 1, prefix=62)
+    t = tally([
+        line(op, NOV4, "/?ab=hero:b"),
+        line(op, NOV4, "/"),
+        line(op, NOV4, "/login"),
+        line(v, NOV4, "/"),
+        line(op, "05/Nov/2026", "/"),      # the next day, no ?ab=: an ordinary visitor again
+    ])
+    e = t.experiments_out("2026-11-05")["hero"]
+    assert t.operator["2026-11-04"] == {op}
+    assert e["daily"][0]["exposures"] == {"a": 0, "b": 1}
+    assert e["daily"][1]["exposures"] == {"a": 1, "b": 0}
+    # the operator's /login on the 4th is not a login for the experiment...
+    assert e["per_arm"]["a"]["login"] == 0 and e["per_arm"]["a"]["exposures"] == 1
+    # ...but its ordinary depth buckets are untouched
+    d4 = {r["day"]: r for r in t.daily()}["2026-11-04"]
+    assert d4["landing"] == 2 and d4["clicked"] == 1
+
+
+def test_experiment_overlays_per_arm():
+    a1, a2 = ips_in("a", 2, prefix=63)
+    b1, b2 = ips_in("b", 2, prefix=63)
+    t = tally([
+        line(a1, NOV4, "/"), line(a1, NOV4, "/login"), line(a1, NOV4, "/login/google", status=302),
+        line(a2, NOV4, "/"), line(a2, NOV4, "/workshop", status=302), line(a2, NOV4, "/deck/x"),
+        line(a2, NOV4, "/archive"),
+        line(b1, NOV4, "/"), line(b1, NOV4, "/login"),
+        line(b1, NOV4, "/api/auth/email/start", method="POST"),
+        line(b2, NOV4, "/"), line(b2, NOV4, "/download"),
+        line(b2, NOV4, "/api/auth/email/start", method="POST", status=429),   # refused: not a provider
+    ])
+    e = t.experiments_out("2026-11-04")["hero"]
+    pa, pb = e["per_arm"]["a"], e["per_arm"]["b"]
+    assert (pa["login"], pa["provider"], pa["workshop"], pa["deck"], pa["archive"], pa["download"]) == (1, 1, 1, 1, 1, 0)
+    assert (pb["login"], pb["provider"], pb["workshop"], pb["deck"], pb["archive"], pb["download"]) == (1, 1, 0, 0, 0, 1)
+    assert pa["primary"] == pa["login"] == 1 and pb["primary"] == 1
+    assert e["daily"][0]["primary"] == {"a": 1, "b": 1}
+    assert pa["clicked"] == 2 and pb["clicked"] == 2
+
+
+def test_experiment_counts_an_ip_once_at_its_deepest_and_splits_devices():
+    (a1,) = ips_in("a", 1, prefix=64)
+    (bp,) = ips_in("b", 1, ua=UA_IOS_WEBVIEW, prefix=65)
+    t = tally([
+        line(a1, NOV4, "/"),                                     # landing only on the 4th
+        line(a1, "05/Nov/2026", "/"), line(a1, "05/Nov/2026", "/api/me"),
+        line(a1, "05/Nov/2026", "/api/forge-estimate"),          # signed in on the 5th
+        line(bp, NOV4, "/", ua=UA_IOS_WEBVIEW), line(bp, NOV4, "/api/me", ua=UA_IOS_WEBVIEW),
+    ])
+    e = t.experiments_out("2026-11-05")["hero"]
+    pa, pb = e["per_arm"]["a"], e["per_arm"]["b"]
+    assert (pa["exposures"], pa["signed_in"], pa["clicked"], pa["browser"], pa["landing_only"]) == (1, 1, 0, 0, 0)
+    assert (pb["exposures"], pb["signed_in"], pb["browser"]) == (1, 0, 1)
+    assert pa["devices"] == {"desktop": 1, "phone": 0, "phone_webview": 0}
+    assert pb["devices"] == {"desktop": 0, "phone": 0, "phone_webview": 1}
+    assert [r["exposures"] for r in e["daily"]] == [{"a": 1, "b": 1}, {"a": 1, "b": 0}]
+    # 3 exposures in the last 7 days over 2 arms
+    assert e["exposure_rate_7d"] == pytest.approx(3 / 7 / 2)
+
+
+def _synthetic(logins_a, logins_b, n=300):
+    lines = []
+    for arm, hits in (("a", logins_a), ("b", logins_b)):
+        for k, ip in enumerate(ips_in(arm, n, prefix=66 if arm == "a" else 67)):
+            lines.append(line(ip, NOV4, "/"))
+            if k < hits:
+                lines.append(line(ip, NOV4, "/login"))
+    return tally(lines).experiments_out("2026-11-04")["hero"]
+
+
+def test_p_beats_control_identical_arms_and_clear_winner():
+    same = _synthetic(30, 30)
+    assert same["per_arm"]["a"]["exposures"] == 300 == same["per_arm"]["b"]["exposures"]
+    assert same["decision"]["p_beats_control"]["b"] == pytest.approx(0.5, abs=0.1)
+    clear = _synthetic(15, 90)
+    assert clear["decision"]["p_beats_control"]["b"] > 0.95
+    assert clear["decision"]["min_exposures_met"] is True
+    assert clear["decision"]["min_days_met"] is False and clear["decision"]["winner_by_rule"] is None
+    assert clear["control_rate"] == pytest.approx(15 / 300)
+
+
+def test_days_to_decision_needs_a_control_rate():
+    e = _synthetic(30, 30)
+    assert isinstance(e["days_to_decision"], float) and e["days_to_decision"] > 0
+    assert isinstance(e["sample_size_per_arm"], int) and e["sample_size_per_arm"] > 0
+    none = _synthetic(0, 5, n=20)
+    assert none["control_rate"] == 0 and none["days_to_decision"] is None and none["sample_size_per_arm"] is None
+    empty = tally([]).experiments_out("2026-11-04")["hero"]
+    assert empty["control_rate"] is None and empty["days_to_decision"] is None
+    assert empty["per_arm"]["a"]["exposures"] == 0 and empty["daily"] == []
+
+
+def test_ended_experiments_drop_off_after_30_days():
+    ended = dataclasses.replace(HERO, ended="2026-11-20", winner="b")
+    (a1,) = ips_in("a", 1, exp=ended, prefix=68)
+    lines = [line(a1, NOV4, "/"), line(a1, "25/Nov/2026", "/")]   # the 25th is after ended: not counted
+    e = tally(lines, (ended,)).experiments_out("2026-11-30")["hero"]      # 10 days after: still shown
+    assert [r["day"] for r in e["daily"]] == ["2026-11-04"] and e["winner"] == "b"
+    assert e["decision"]["status"] == "ended — winner b"
+    assert tally(lines, (ended,)).experiments_out("2026-12-25") == {}       # 35 days after: gone
+    future = dataclasses.replace(HERO, name="later", started="2026-12-01", planned_end="2026-12-30")
+    assert tally(lines, (future,)).experiments_out("2026-11-30") == {}     # not started yet
+
+
+def test_build_uses_the_real_registry_by_default(tmp_path):
+    (tmp_path / "access.log").write_text(line("90.0.0.1", NOV4, "/"), encoding="utf-8")
+    paths = tr._sorted_logs(str(tmp_path / "access.log*"))
+    data = tr.build(paths, {"blankthespire.com"}, today="2026-11-04")
+    assert "hero" in data["experiments"]
+    assert sum(r["exposures"] for r in data["experiments"]["hero"]["per_arm"].values()) == 1
+    assert tr.build(paths, {"blankthespire.com"}, today="2026-11-04", experiments=[])["experiments"] == {}
+
+
+def test_cli_json_has_experiments(logs, tmp_path, monkeypatch, capsys):
+    out = tmp_path / "out"
+    monkeypatch.setattr(sys, "argv", ["traffic_report.py", "--log-glob", str(logs / "access.log*"),
+                                      "--out-dir", str(out), "--no-goaccess"])
+    assert tr.main() == 0
+    data = json.loads((out / "traffic.json").read_text())
+    assert data["experiments"] == {}     # the Sep sample predates every experiment
+    assert "experiments=0" in capsys.readouterr().out

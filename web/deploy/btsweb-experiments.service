@@ -1,0 +1,15 @@
+# Page-experiment mail (docs/plans/AB_TESTING_PLAN.md 3.10): the Monday digest of live experiments, and a
+# one-time mail when an experiment reaches its planned end or the decision rule names a winner. Reads
+# /opt/btsweb/traffic/traffic.json (written by btsweb-traffic.service, as root) and keeps what it sent in
+# /opt/btsweb/traffic/experiments_mail.json, so it runs as root too. Runs in the app venv with the app's
+# env (Resend key + From + BTSWEB_ADMIN_EMAILS / BTSWEB_ALERT_EMAILS). Installed with
+# btsweb-experiments.timer — see DEPLOY-DIGITALOCEAN.md "Experiments mail".
+[Unit]
+Description=BLANK the spire — page-experiment digest + planned-end mail
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/btsweb/web
+EnvironmentFile=-/opt/btsweb/web/.env
+ExecStart=/opt/btsweb/.venv/bin/python tools/experiments_mail.py --traffic-dir /opt/btsweb/traffic
+Nice=10
