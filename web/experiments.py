@@ -75,7 +75,9 @@ EXPERIMENTS: list[Experiment] = [
     # control is always arm a = today's page
     Experiment(
         name="hero", page="/", arms=("a", "b"), weights=(50, 50),
-        salt="2026-11-03", started="2026-11-03", planned_end="2026-12-15",
+        # Deployed 2026-11-03 18:06 UTC; started the NEXT day so day 1 is clean (visitors earlier on the
+        # 3rd all saw the control but would be hashed into both arms by the report).
+        salt="2026-11-03", started="2026-11-04", planned_end="2026-12-16",
         primary="login",
         hypothesis=("Saying 'free with your own API key' on the button lifts /login opens, because the cost "
                     "question stops people before the pricing section far below the fold."),

@@ -15,6 +15,6 @@ experiment has run at least 14 days; otherwise, at the planned end, keep the con
 
 | name | page | arms | primary metric | started | planned end | result | decision |
 |---|---|---|---|---|---|---|---|
-| hero | `/` | a: "Create Your Own Class" (control) / b: "Forge a class — free with your own API key" | `/login` opened | 2026-11-03 | 2026-12-15 | (running) | — |
+| hero | `/` | a: "Create Your Own Class" (control) / b: "Forge a class — free with your own API key" | `/login` opened | 2026-11-04 | 2026-12-16 | (running) | — |
 
 **hero** hypothesis: Saying 'free with your own API key' on the button lifts /login opens, because the cost question stops people before the pricing section far below the fold.
