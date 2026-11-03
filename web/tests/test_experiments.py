@@ -109,10 +109,15 @@ def test_served_arms_ended_returns_winner_ignores_override():
         assert ex.served_arms(ip, ua, "/", {"hero": "a"}, day="2026-12-02", experiments=reg) == {"hero": "b"}
 
 
-def test_served_arms_not_started_is_control():
+def test_served_arms_not_started_is_control_unless_previewed():
+    """Before the start day every visitor gets the control — but ?ab= still previews an arm, so the
+    operator can check both arms between the deploy and the start (2026-11-03: the 'see it' links showed
+    the control at both arms for the rest of the deploy day)."""
     reg = [mk(name="hero", started="2026-12-01", planned_end="2026-12-31")]
     for ip, ua in pairs(50):
-        assert ex.served_arms(ip, ua, "/", {"hero": "b"}, day="2026-11-30", experiments=reg) == {"hero": "a"}
+        assert ex.served_arms(ip, ua, "/", None, day="2026-11-30", experiments=reg) == {"hero": "a"}
+        assert ex.served_arms(ip, ua, "/", {"hero": "b"}, day="2026-11-30", experiments=reg) == {"hero": "b"}
+        assert ex.served_arms(ip, ua, "/", {"hero": "zz"}, day="2026-11-30", experiments=reg) == {"hero": "a"}
 
 
 def test_served_arms_only_that_page_registry_order():

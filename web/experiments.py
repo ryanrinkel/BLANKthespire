@@ -223,17 +223,18 @@ def parse_override(raw: str | None, experiments=None) -> dict[str, str]:
 
 def served_arms(ip: str, ua: str, page: str, override: dict[str, str] | None = None,
                 day: str | None = None, experiments=None) -> dict[str, str]:
-    """Arm per registry experiment on ``page``: live -> override or hash; ended -> winner; future -> a."""
+    """Arm per registry experiment on ``page``: live -> override or hash; ended -> winner; not started yet ->
+    override or a (so the operator can preview the arms before the start day)."""
     day = day or today_utc()
     override = override or {}
     out: dict[str, str] = {}
     for exp in _reg(experiments):
         if exp.page != page:
             continue
+        forced = override.get(exp.name)
         if day < exp.started:
-            out[exp.name] = "a"
+            out[exp.name] = forced if forced in exp.arms else "a"
         elif is_live(exp, day):
-            forced = override.get(exp.name)
             out[exp.name] = forced if forced in exp.arms else arm_for(ip, ua, exp)
         else:
             out[exp.name] = exp.winner or "a"
