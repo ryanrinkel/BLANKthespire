@@ -20,8 +20,12 @@ How a visitor is counted (all per UTC day, by client IP, so every number here is
   * landing      — GET / answered 200: the public splash.
   * clicked      — a landing visitor who ALSO fetched a page past the splash that day (/login, /app,
                    /help, /download, /deck/…, /archive, /terms, /privacy, /auth/…, /api/…, /workshop). Not
-                   /api/featured or /api/me: the splash's own JS (landing.js) fetches both on every load,
-                   so either would make every landing look engaged.
+                   what the splash's own JS fetches on every load (SPLASH_FETCH_RE): /api/me (landing.js),
+                   /api/featured plus the Archive strip's /api/deck/<slug>/art/… thumbs (featured.js),
+                   and /api/promo/active (signup-event.js, the sign-up ribbon check). Any of those would
+                   make every JS-running landing look engaged (until 2026-11-03 the thumbs and the promo
+                   check did exactly that: the Oct 7-12 ad read 621/684 "clicked" vs ~50 real). A bare
+                   /api/deck/<slug> still counts: that is the /deck page loading a class.
   * browser      — GET /api/me answered 200. landing.js (splash), signin.js (/login) and app.js (/app)
                    all call it on load, so this means "a real browser ran our JS" — a bot filter, NOT
                    signed-in use. (Until 2026-10-13 this bucket was called "app" and the card labelled it
@@ -104,8 +108,10 @@ BOT_UA_RE = re.compile(
     re.IGNORECASE)
 # Pages past the splash. /api covers the app's own calls (a real browser on /app), /auth the OAuth hops.
 ENGAGED_RE = re.compile(r"^/(login|app|help|download|deck/|archive$|terms|privacy|auth/|api/|workshop$)")
-# ...minus what the splash's own JS (landing.js) fetches on every load.
-SPLASH_API_PATHS = {"/api/featured", "/api/me"}
+# ...minus what the splash's own JS fetches on every load: /api/me (landing.js), /api/featured and the
+# Archive strip's /api/deck/<slug>/art/… thumbs (featured.js), /api/promo/active (signup-event.js).
+# Plain /api/deck/<slug> is NOT here: that is the /deck page loading a class, past the splash.
+SPLASH_FETCH_RE = re.compile(r"^/api/(me|featured|promo/active)$|^/api/deck/[^/?]+/art/")
 BROWSER_PATH = "/api/me"
 # Only a signed-in /app answers 200 here (both routes are @require_login). app.js boot() fetches
 # /api/forge-estimate once /api/me reports a user; /api/classes is the library tab.
@@ -284,7 +290,7 @@ class Tally:
             return
         if path == "/":
             self.landing[day].add(ip)
-        if ENGAGED_RE.match(path) and path not in SPLASH_API_PATHS:
+        if ENGAGED_RE.match(path) and not SPLASH_FETCH_RE.match(path):
             self.engaged[day].add(ip)
         if path == BROWSER_PATH:
             self.browser[day].add(ip)

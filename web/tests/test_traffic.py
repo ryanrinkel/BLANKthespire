@@ -286,6 +286,31 @@ def test_campaign_rows_carry_reach_and_devices(funnel):
                                             "devices": {"desktop": 1, "phone": 1, "phone_webview": 3}}
 
 
+def test_splash_js_fetches_are_not_click_throughs():
+    """Since 2026-10-05 the splash's Archive strip (featured.js) also loads four /api/deck/<slug>/art/splash
+    thumbs, and since 2026-10-27 signup-event.js checks /api/promo/active: none of that is a click past the
+    splash. Before the fix every JS-running ad visitor read as "clicked" (621/684 on the Oct 7-12 ad)."""
+    def splash_load(ip):
+        return [line(ip, "26/Oct/2026", AD, ua=UA_IOS_WEBVIEW),
+                *(line(ip, "26/Oct/2026", p, ua=UA_IOS_WEBVIEW)
+                  for p in ("/api/me", "/api/featured?limit=4", "/api/promo/active",
+                            *(f"/api/deck/s{i}/art/splash?v=aaaaaaaa" for i in range(4))))]
+    t = tr.Tally({"blankthespire.com"})
+    for ln in (*splash_load("50.50.50.50"),                                                  # splash only
+               *splash_load("51.51.51.51"), line("51.51.51.51", "26/Oct/2026", "/deck/s0", ua=UA_IOS_WEBVIEW),
+               *splash_load("52.52.52.52"), line("52.52.52.52", "26/Oct/2026", "/api/deck/s1", ua=UA_IOS_WEBVIEW)):
+        t.add(ln)
+    d = {r["day"]: r for r in t.daily()}["2026-10-26"]
+    assert (d["signed_in"], d["clicked"], d["browser"], d["landing_only"]) == (0, 2, 1, 0)
+    assert d["featured"] == 1   # 52's /api/deck/s1 only; nobody's art thumbs
+    w = t.window(0, "2026-10-26")
+    assert (w["humans"], w["clicked"], w["browser"], w["landing_only"]) == (3, 2, 1, 0)
+    assert w["featured"] == 1
+    camps = {c["campaign"]: c for c in w["campaigns"]}
+    row = camps["youtube/promo-oct26"]
+    assert (row["visitors"], row["clicked"], row["browser"], row["signed_in"]) == (3, 2, 3, 0)
+
+
 def test_imports_are_the_mods_art_fetches(logs):
     """A forged code counts as imported when THE MOD fetched the class's art from /static/forged/<id>/:
     the UA-less builds and the "BlankTheSpire/<v>" ones alike, 200s only, the four import assets only.
