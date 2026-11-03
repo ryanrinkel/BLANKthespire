@@ -75,6 +75,12 @@ class User(Base):
     # ForgeJob.refunded / ForgeUsage.ok (portable across SQLite and MySQL). The boot migration
     # (db._ensure_user_columns) adds it to databases that predate it, defaulting everyone to 0.
     unlimited_tokens: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    # Page experiments, Phase 2 (docs/plans/AB_TESTING_PLAN.md 3.6): the arms label ("hero:b", space-separated
+    # experiments.data_ab) of the page versions this account's first session saw, stamped ONCE when the account
+    # is born (auth._resolve_identity rule 4) and never rewritten. A label, no identifier — no IP, no UA, no
+    # visitor id — and it goes with the account when the account is deleted. NULL = no experiment was live at
+    # sign-up (or the account predates the column). Added to old databases by db._ensure_user_columns.
+    signup_ab: Mapped[str | None] = mapped_column(String(200), default=None, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     classes: Mapped[list["ForgedClass"]] = relationship(
@@ -351,6 +357,13 @@ class ForgeUsage(Base):
     metered_cost_micros: Mapped[int | None] = mapped_column(Integer, default=None, nullable=True)
     ok: Mapped[int] = mapped_column(Integer, default=1)  # 1 = the forge succeeded
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
+def billed_micros(metered: int | None, est: int | None) -> int | None:
+    """One ForgeUsage row's cost to us: the METERED cost when the provider reported one, else the rate-table
+    estimate, else None (unpriced / not ours). The one rule every money reader uses (app.admin_stats,
+    app._promo_stats, ab_accounts)."""
+    return metered if metered is not None else est
 
 
 class ForgeJob(Base):

@@ -4,7 +4,8 @@ Run once a day by deploy/btsweb-experiments.timer (09:05 UTC), in the app VENV w
 key, From address, BTSWEB_ADMIN_EMAILS / BTSWEB_ALERT_EMAILS):
 
 * Mondays: the digest — one block per live experiment (hypothesis, exposures and the primary metric per arm,
-  P(beats control), days left). Nothing at all when nothing is live.
+  P(beats control), days left; plus new accounts / forged / donated per arm from users.signup_ab when the
+  database is reachable). Nothing at all when nothing is live.
 * Any day: "<name> reached its planned end" once `planned_end` passes on an experiment nobody ended, and
   "<name> has a winner by the rule" once the decision rule names one — each at most once, ever.
 
@@ -85,7 +86,16 @@ def main(argv: list[str] | None = None) -> int:
     traffic_dir = Path(args.traffic_dir)
     state_path = Path(args.state) if args.state else traffic_dir / "experiments_mail.json"
     traffic = _read_json(traffic_dir / "traffic.json")
-    payload = ab_report.build_experiments_payload(traffic if isinstance(traffic, dict) else None, today)
+    # Phase 2: new accounts / forged / donated per arm, from the database (the unit runs with the app's env,
+    # so BTSWEB_DATABASE_URL is set). Imported inside a try: a DB-less dry run still mails the log side.
+    accounts = None
+    try:
+        import ab_accounts
+        accounts = ab_accounts.accounts_payload(ab_report.shown_experiments(today), today)
+    except Exception as e:  # noqa: BLE001
+        print(f"account attribution unavailable: {e}", file=sys.stderr)
+    payload = ab_report.build_experiments_payload(traffic if isinstance(traffic, dict) else None, today,
+                                                  accounts=accounts)
 
     state = _read_json(state_path)
     state = state if isinstance(state, dict) else {}

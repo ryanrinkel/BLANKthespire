@@ -172,6 +172,15 @@ def _rate(n, of) -> str:
     return f"{n} ({100 * n / of:.1f}%)" if of else f"{n}"
 
 
+def _accounts_line(acc: dict) -> str:
+    """Phase 2 (users.signup_ab): what this arm's NEW accounts did — never returning users (plan 3.6)."""
+    n = int(acc.get("accounts") or 0)
+    cost = acc.get("hosted_cost_usd")
+    return (f"new accounts {n} · forged {_rate(int(acc.get('forged') or 0), n)} · "
+            f"donated {_rate(int(acc.get('donated') or 0), n)} · hosted cost "
+            f"${float(cost or 0):.2f}")
+
+
 def _experiment_block(e: dict) -> list[str]:
     """One experiment in words, then numbers: the plain-text twin of the admin card's block."""
     arms = e.get("arms") or []
@@ -179,6 +188,7 @@ def _experiment_block(e: dict) -> list[str]:
     ps = d.get("p_beats_control") or {}
     label = e.get("primary_label") or e.get("primary")
     per_arm = e.get("per_arm") or {}
+    accounts = e.get("accounts") if isinstance(e.get("accounts"), dict) else None
     base = public_base_url()
     lines = [
         f"{e.get('name')} on {e.get('page')} — day {e.get('day')} of {e.get('of')} "
@@ -202,6 +212,11 @@ def _experiment_block(e: dict) -> list[str]:
             bits.append(f"desktop {dv.get('desktop', 0)} / phone {dv.get('phone', 0)} / "
                         f"webview {dv.get('phone_webview', 0)}")
         lines.append("     " + " · ".join(bits))
+        acc = (accounts or {}).get(a)
+        if isinstance(acc, dict):
+            lines.append("     " + _accounts_line(acc))
+    if accounts is None and e.get("accounts_reason"):
+        lines.append(f"  (new accounts / forged / donated: {e['accounts_reason']})")
     lines += ["", e.get("readout") or ab_report.readout(e), "", "Preview (opens that arm for you only):"]
     for a, path in (e.get("preview") or {}).items():
         lines.append(f"  {a}: {base}{path}")

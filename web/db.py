@@ -95,6 +95,11 @@ def _ensure_user_columns() -> None:
         # to 0 — i.e. nothing changes for them: unlimited stays whatever BTSWEB_UNLIMITED_EMAILS already said.
         with engine.begin() as conn:
             conn.execute(text("ALTER TABLE users ADD COLUMN unlimited_tokens INTEGER NOT NULL DEFAULT 0"))
+    if "signup_ab" not in cols:
+        # Page experiments, Phase 2 (User.signup_ab): which page versions the account's first session saw.
+        # Accounts that predate it stay NULL — they were never attributed to any arm, which is correct.
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN signup_ab VARCHAR(200)"))
 
 
 def _ensure_class_columns() -> None:

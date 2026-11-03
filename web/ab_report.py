@@ -123,18 +123,28 @@ def readout(entry: dict) -> str:
     return text
 
 
-def build_experiments_payload(traffic_data: dict | None, today: str | None = None,
-                              experiments: list | None = None) -> list[dict]:
-    """One entry per registry experiment shown on the card (live, not started yet, or ended within 30 days).
-    ``experiments`` overrides the registry (tests)."""
+def shown_experiments(today: str | None = None, experiments: list | None = None) -> list:
+    """The registry experiments the card / mail show today (what ab_accounts.accounts_payload is asked for)."""
     today = today or _exp.today_utc()
     reg = _exp.EXPERIMENTS if experiments is None else experiments
+    return [exp for exp in reg if _shown(exp, today)]
+
+
+ACCOUNTS_UNAVAILABLE = "account attribution lookup failed (database unreadable)"
+
+
+def build_experiments_payload(traffic_data: dict | None, today: str | None = None,
+                              experiments: list | None = None,
+                              accounts: dict | None = None) -> list[dict]:
+    """One entry per registry experiment shown on the card (live, not started yet, or ended within 30 days).
+    ``experiments`` overrides the registry (tests). ``accounts`` is ab_accounts.accounts_payload's
+    ``{name: {arm: {accounts, forged, donated, hosted_cost_usd}}}`` (Phase 2, from the database — passed in so
+    this module stays DB-free); an experiment missing from it gets ``accounts: None`` + ``accounts_reason``."""
+    today = today or _exp.today_utc()
     block = (traffic_data or {}).get("experiments") if isinstance(traffic_data, dict) else None
     block = block if isinstance(block, dict) else {}
     out = []
-    for exp in reg:
-        if not _shown(exp, today):
-            continue
+    for exp in shown_experiments(today, experiments):
         entry = {k: getattr(exp, k) for k in _REG_FIELDS}
         entry.update(arms=list(exp.arms), weights=list(exp.weights), arms_text=dict(exp.arms_text),
                      describe=_exp.describe(exp, today),
@@ -163,7 +173,15 @@ def build_experiments_payload(traffic_data: dict | None, today: str | None = Non
             entry["day"] = 0
         entry["of"] = _exp._days_between(exp.started, exp.planned_end)
         entry["preview"] = {a: f"{exp.page}?ab={exp.name}:{a}" for a in exp.arms}
-        entry["accounts"] = None   # Phase 2 (users.signup_ab): new accounts / first forge / donated per arm
+        # Phase 2 (users.signup_ab): new accounts / first forge / donated per arm, from the database.
+        acc = (accounts or {}).get(exp.name) if isinstance(accounts, dict) else None
+        if isinstance(acc, dict) and acc:
+            entry["accounts"] = {a: dict(acc.get(a) or {"accounts": 0, "forged": 0, "donated": 0,
+                                                       "hosted_cost_usd": 0.0}) for a in exp.arms}
+        else:
+            entry["accounts"] = None
+            if accounts is not None:   # asked for and missing = the lookup failed (None = not asked)
+                entry["accounts_reason"] = ACCOUNTS_UNAVAILABLE
         entry["readout"] = readout(entry)
         out.append(entry)
     return out

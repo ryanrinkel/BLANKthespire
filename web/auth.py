@@ -17,6 +17,7 @@ from __future__ import annotations
 import functools
 import hashlib
 import hmac
+import logging
 import os
 import secrets
 import threading
@@ -25,7 +26,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 import requests
-from flask import jsonify, redirect, request, send_from_directory, session, url_for
+from flask import has_request_context, jsonify, redirect, request, send_from_directory, session, url_for
 from sqlalchemy import update
 
 import experiments
@@ -34,6 +35,8 @@ import pages
 import promo
 from db import session_scope
 from models import Identity, LoginLink, PromoGrant, Promotion, User
+
+log = logging.getLogger(__name__)
 
 GOOGLE_METADATA = "https://accounts.google.com/.well-known/openid-configuration"
 _oauth = None  # set by init_auth when at least one provider's credentials are present
@@ -202,6 +205,15 @@ def _profile_github(client, token) -> Profile:
 _PROFILE = {"google": _profile_google, "discord": _profile_discord, "github": _profile_github}
 
 
+def _signup_ab_or_none(p: Profile) -> str | None:
+    """signup_arms_label(), but an experiment problem can never cost anyone their sign-in (plan 3.6)."""
+    try:
+        return signup_arms_label()
+    except Exception as e:  # noqa: BLE001
+        log.warning("signup_ab stamp failed for a new %s account; storing none: %s", p.provider, e)
+        return None
+
+
 def _resolve_identity(p: Profile, *, current_user_id: int | None = None) -> dict:
     """Identity -> user: the one door every provider comes through. In order:
     1. identities(provider, subject) exists          -> that user (the normal repeat sign-in)
@@ -225,8 +237,11 @@ def _resolve_identity(p: Profile, *, current_user_id: int | None = None) -> dict
                 user = matches[0]
         if user is None:
             # google_sub is the legacy NOT NULL UNIQUE column; "provider:subject" keeps it unique forever.
+            # signup_ab: the page-experiment arms this sign-up request's IP + UA draws (plan 3.6) — stamped
+            # here and only here, so a repeat sign-in or a linked provider (rules 1-3) never rewrites it.
             user = User(google_sub=f"{p.provider}:{p.subject}",
-                        email=email if p.email_verified else "", name=p.name or "")
+                        email=email if p.email_verified else "", name=p.name or "",
+                        signup_ab=_signup_ab_or_none(p))
             s.add(user)
             s.flush()
             # Rule 4 is the ONLY place an account is born, so it is the only place a sign-up event pays out
@@ -371,6 +386,24 @@ def _admin_experiments() -> list[dict]:
                     "day": (day0 - started).days + 1, "of": (end - started).days,
                     "arm": experiments.arm_for(ip, ua, e)})
     return out
+
+
+SIGNUP_AB_MAX = 200   # users.signup_ab is VARCHAR(200)
+
+
+def signup_arms_label() -> str | None:
+    """The arms label stamped on a brand-new account (users.signup_ab, plan 3.6): ``experiments.data_ab`` of
+    the arm THIS request's IP + UA draws for every LIVE experiment, whatever page it is on (``"hero:b"``).
+    None when there is no request context or nothing is live — never "". No ``?ab=`` override: a forced
+    preview is the operator, not a visitor. Only the label is kept; the IP and UA it came from are not."""
+    if not has_request_context():
+        return None
+    live = experiments.live_experiments()
+    if not live:
+        return None
+    ip, ua = pages.client_ip(), request.headers.get("User-Agent", "")
+    label = experiments.data_ab({e.name: experiments.arm_for(ip, ua, e) for e in live})
+    return label[:SIGNUP_AB_MAX] or None
 
 
 def _public_url() -> str:

@@ -36,6 +36,7 @@ if os.environ.get("BTSWEB_NO_DOTENV", "").strip() not in ("1", "true", "yes"):
 
 from auth import (current_user, init_auth, is_admin, is_production, is_unlimited,  # noqa: E402
                   require_login, session_age, user_is_unlimited)
+import ab_accounts  # noqa: E402
 import ab_report  # noqa: E402
 import alerts as _alerts  # noqa: E402
 import experiments  # noqa: E402
@@ -50,7 +51,8 @@ from forge import (ELEMENT_KINDS, VALID_FEEDBACK_CATEGORIES, ForgeError, UsageMe
                    append_card_feedback, append_element_feedback, forge_to_bundle, list_models,
                    normalize_lang, verify_byok_models)
 from models import (AdminAction, ForgeJob, ForgeUsage, ForgedCard, ForgedClass, Identity,  # noqa: E402
-                    PromoGrant, Promotion, Purchase, User, new_slug, spend_token, unspend_token)
+                    PromoGrant, Promotion, Purchase, User, billed_micros, new_slug, spend_token,
+                    unspend_token)
 import promo as _promo  # noqa: E402
 
 # Generated art (Track 2/3): the class splash, the combat sprite, the relic icon and the per-card portrait
@@ -2367,7 +2369,7 @@ def admin_stats():
             if not is_art:
                 for f in ("calls", "input_tokens", "cached_tokens", "output_tokens"):
                     hosted[f] += int(getattr(r, f) or 0)
-            billed = r.metered_cost_micros if r.metered_cost_micros is not None else r.est_cost_micros
+            billed = billed_micros(r.metered_cost_micros, r.est_cost_micros)
             if billed is not None:
                 cost_micros += int(billed)
                 priced = True
@@ -2534,9 +2536,12 @@ def admin_experiments():
         return err
     data, reason, _status = _read_traffic()
     today = experiments.today_utc()
+    # Phase 2 (plan 3.6): new accounts / first forge / donated per arm from users.signup_ab. {} on a DB error,
+    # which leaves each entry's accounts None with an accounts_reason — the log side still renders.
+    accounts = ab_accounts.accounts_payload(ab_report.shown_experiments(today), today)
     return jsonify({"available": data is not None, "reason": reason, "today": today,
                     "rule": ab_report.rule(), "rule_text": ab_report.rule_sentence(),
-                    "experiments": ab_report.build_experiments_payload(data, today)})
+                    "experiments": ab_report.build_experiments_payload(data, today, accounts=accounts)})
 
 
 @app.route("/admin/traffic")
@@ -2902,7 +2907,7 @@ def _promo_stats(s, promo_ids: list[int]) -> dict[int, dict]:
     for uid, at, metered, est in (s.query(ForgeUsage.user_id, ForgeUsage.created_at,
                                           ForgeUsage.metered_cost_micros, ForgeUsage.est_cost_micros)
                                   .filter(ForgeUsage.user_id.in_(uids), ForgeUsage.mode == "token").all()):
-        billed = metered if metered is not None else est
+        billed = billed_micros(metered, est)
         if billed is not None and after(uid, at):
             pid = since[uid][0]
             cost[pid] = cost.get(pid, 0) + int(billed)

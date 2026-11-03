@@ -4,12 +4,15 @@
 //     STRIPE_SECRET_KEY=sk_test_smoke PORT=5077 uv run --project ../generation python app.py
 // (the dummy Stripe key only flips /api/billing to {enabled:true} so the donate tiers + custom-amount row
 //  render; nothing in these scenarios ever hits Stripe)
-// then, from web/tools:  node ui_smoke.mjs http://127.0.0.1:5077 <outdir> forge|v3|byok-narrow|byok-models|library|account|pages|art|lost|archive|featured|webview|phone|events|lang|forge-zh|signin-code
+// then, from web/tools:  node ui_smoke.mjs http://127.0.0.1:5077 <outdir> forge|v3|byok-narrow|byok-models|library|account|pages|art|lost|archive|featured|webview|phone|events|lang|forge-zh|signin-code|ab
 // (`signin-code`: the 6-digit sign-in code; with no mail provider the dev server returns the link + code in
 //  the /api/auth/email/start JSON, which the scenario reads as its mailbox — no extra dev endpoint)
 // (`archive` needs BTSWEB_ADMIN_EMAILS=unlimited@example.com and is best run first on a fresh DB: it puts a class
 //  in The Archive through the UI, which is what `featured` then shows on the landing strip)
 // (`lang` needs a web/static/i18n/zh.json with at least one translated landing string and one console.* rule)
+// (`ab`: page experiments (AB_TESTING_PLAN.md 3.8). Needs BTSWEB_ADMIN_EMAILS=unlimited@example.com — it reads the
+//  live registry from the admin's /api/me, forces every arm with ?ab=name:arm, checks the admin badge (also at
+//  390 px, clear of the CTA), a plain user's page and that the unforced arm is stable for one IP + UA)
 // (`forge-zh`: the class-language selector + a fake forge in 中文, checked on the result, library and /deck)
 // (needs a package.json with {"type":"module"} next to it, or rename to .mjs — it is already .mjs).
 
@@ -858,7 +861,7 @@ if (scenario === "forge") {
         && page.words[0] === "GOOSE" && page.hrefs[0] === `/deck/${target.slug}` && page.tiles === api.length && page.empty_hidden,
         "/archive: newest tile is GOOSE, one tile per featured class", JSON.stringify(page));
   console.log("archive tiles:", page.tiles, JSON.stringify(page.words));
-  check(page.nav.join("|") === "Forge your own →|Get the Mod ⬇|Help", "/archive header nav", JSON.stringify(page.nav));
+  check(page.nav.join("|") === "Forge your own →|Get the mod ⬇|Help", "/archive header nav", JSON.stringify(page.nav));
   await shot("archive-desktop");
   await send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
   await nav(`${base}/archive`); await sleep(1500);
@@ -911,7 +914,7 @@ if (scenario === "forge") {
       with_art: tiles.filter(t => t.querySelector('img')).length}; })()`);
   check(!strip.hidden && strip.tiles > 0 && strip.tiles <= 4 && strip.hrefs.every((h) => /^\/deck\/[A-Za-z0-9_-]{20,}$/.test(h)),
         "Archive strip rendered (at most 4) with deck links", JSON.stringify(strip));
-  check(strip.heading === "The Archive" && strip.sub === "Classes other players forged. Play one now — no account needed."
+  check(strip.heading === "The Archive" && strip.sub === "Classes from other Blankers. Play one now — no account needed."
         && strip.more === "/archive" && strip.more_text === "Browse The Archive →",
         "strip heading, sub-line and 'Browse The Archive' link", JSON.stringify(strip));
   check(strip.imgs.length > 0 && strip.imgs.every(Boolean), "tile art loaded (or the placeholder where a class has none)",
@@ -1066,7 +1069,7 @@ if (scenario === "forge") {
   await shot("safari-login-390");
   await nav(`${base}/`); await sleep(800);
   const sl = await json(`({note: document.getElementById('splash-note').textContent, any: window.BTS_WEBVIEW.any})`);
-  check(!sl.any && sl.note.startsWith("No password. Sign in with Google"), "Safari landing keeps the default note", JSON.stringify(sl));
+  check(!sl.any && sl.note.startsWith("No passwords, ever. Sign in with Google"), "Safari landing keeps the default note", JSON.stringify(sl));
 
   // (d) desktop keeps the old hero order: CTA above the featured strip.
   await send("Emulation.clearDeviceMetricsOverride");
@@ -1701,6 +1704,133 @@ if (scenario === "forge") {
     await shot("forge-zh-e-deck-en", false);
   }
   await evaluate(`localStorage.clear()`);
+} else if (scenario === "ab") {
+  // Page experiments (docs/plans/AB_TESTING_PLAN.md 3.8 + 3.10): the live registry is read from /api/me as the
+  // admin (user.experiments), so a new experiment is covered without editing this scenario. For every arm of
+  // every live experiment: ?ab=name:arm is stamped on <html data-ab>, no <!--ab marker reaches the browser,
+  // the landing keeps exactly one #signin and still boots. Then the admin badge (desktop + phone, clear of the
+  // CTA), a plain user (no badge, no experiments key) and determinism without ?ab=. Needs
+  // BTSWEB_ADMIN_EMAILS=unlimited@example.com.
+  await send("Network.enable");
+  await send("Network.setCacheDisabled", { cacheDisabled: true });
+  const en = (await (await fetch(`${base}/static/i18n/en.json`)).json()).strings;
+  const me = async () => JSON.parse(await evaluate(`fetch('/api/me').then((r) => r.json()).then(JSON.stringify)`));
+  const rectsOverlap = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+  const waitBadge = async () => {
+    for (let i = 0; i < 15; i++) {
+      if (await evaluate(`!!document.querySelector('.ab-badges .ab-badge')`)) return true;
+      await sleep(200);
+    }
+    return false;
+  };
+  // What a page looks like after load (the landing-specific parts are null elsewhere).
+  const pageState = `(() => { const s = document.querySelectorAll('#signin'), go = s[0], f = document.getElementById('featured');
+    return {ab: document.documentElement.dataset.ab || '', marker: document.documentElement.outerHTML.includes('<!--ab'),
+      closer: document.documentElement.outerHTML.includes('<!--/ab'), signins: s.length,
+      text: go ? go.textContent.trim() : null, key: go ? go.dataset.i18n : null, href: go ? go.getAttribute('href') : null,
+      board: document.getElementById('board') ? document.getElementById('board').children.length : null,
+      featured_hidden: f ? f.classList.contains('hidden') : null,
+      tiles: document.querySelectorAll('#featured-grid .featured-tile').length,
+      badges: document.querySelectorAll('.ab-badge').length,
+      overflow: document.documentElement.scrollWidth > window.innerWidth}; })()`;
+
+  // (1) the live registry, from the admin's /api/me
+  await nav(`${base}/dev-login?email=unlimited@example.com`);
+  const adminMe = await me();
+  const exps = (adminMe.user && adminMe.user.experiments) || [];
+  check(adminMe.user && adminMe.user.admin === true && Array.isArray(adminMe.user.experiments) && exps.length > 0
+        && exps.every((e) => e.name && e.page && Array.isArray(e.arms) && e.arms[0] === "a" && e.arms.length >= 2
+                       && e.arms.every((a) => typeof (e.arms_text || {})[a] === "string" && e.arms_text[a].length > 0)
+                       && e.arms.includes(e.arm)),
+        "(1) admin /api/me: user.experiments lists the live registry (name, page, arms, arms_text, arm)",
+        JSON.stringify(exps.map((e) => ({ name: e.name, page: e.page, arms: e.arms, arm: e.arm }))));
+  console.log("live experiments:", exps.map((e) => `${e.name}@${e.page}[${e.arms.join(",")}]`).join(" "));
+
+  // (2) every arm of every live experiment, forced with ?ab=
+  for (const e of exps) {
+    const texts = {};
+    for (const arm of e.arms) {
+      await nav(`${base}${e.page}?ab=${e.name}:${arm}`); await sleep(1500);
+      const st = await json(pageState);
+      const tag = `(2) ${e.page}?ab=${e.name}:${arm}`;
+      check(st.ab.split(/\s+/).includes(`${e.name}:${arm}`), `${tag}: <html data-ab> carries ${e.name}:${arm}`, st.ab);
+      check(!st.marker && !st.closer, `${tag}: no <!--ab marker in the page`, JSON.stringify({ marker: st.marker, closer: st.closer }));
+      if (e.page === "/") {
+        texts[arm] = st.text;
+        // landing.js points the CTA at /app for a signed-in visitor (/dev-login when signed out on a dev server)
+        check(st.signins === 1 && /^\/(app|dev-login)/.test(st.href || "") && st.board > 0,
+              `${tag}: exactly one #signin (href ${st.href}), split-flap board built`, JSON.stringify(st));
+        check(st.featured_hidden ? st.tiles === 0 : st.tiles > 0,
+              `${tag}: Archive strip ${st.featured_hidden ? "hidden (none featured)" : "has " + st.tiles + " tiles"}`, JSON.stringify(st));
+        check(!!st.key && en[st.key] === st.text, `${tag}: #signin text is its i18n string (${st.key})`, JSON.stringify({ text: st.text, en: en[st.key] }));
+        check(!st.overflow, `${tag}: no sideways scroll`);
+        if (e.name === "hero") {
+          const want = arm === "a" ? "Create Your Own Class" : arm === "b" ? "Forge a class — free with your own API key" : null;
+          if (want) check(st.text === want, `${tag}: hero CTA reads "${want}"`, st.text);
+        }
+      }
+      if (e.name === "hero" && (arm === "a" || arm === "b")) await shot(`ab-${arm}`, false);
+      else await shot(`ab-${e.name}-${arm}`, false);
+    }
+    if (e.page === "/" && e.name === "hero") {
+      check(new Set(Object.values(texts)).size === e.arms.length && texts.a === "Create Your Own Class",
+            `(2) ${e.name}: the arms show different CTAs, arm a is the control text`, JSON.stringify(texts));
+    }
+  }
+
+  // (3) the admin badge, desktop 1200 then phone 390x844, for each experiment's non-control arm
+  for (const e of exps) {
+    const arm = e.arms[e.arms.length - 1];
+    await nav(`${base}${e.page}?ab=${e.name}:${arm}`);
+    const built = await waitBadge();
+    const bd = await json(`(() => { const p = [...document.querySelectorAll('.ab-badges .ab-badge')]
+        .find((x) => x.textContent.includes(${JSON.stringify(`🧪 ${e.name} ·`)}));
+      return {pill: !!p, text: p ? p.textContent : '', links: p ? [...p.querySelectorAll('a')].map((a) => a.getAttribute('href')) : []}; })()`);
+    check(built && bd.pill && bd.text.includes(`you see ${arm}`), `(3) ${e.page}?ab=${e.name}:${arm}: admin badge says "you see ${arm}"`, JSON.stringify(bd));
+    check(e.arms.every((a) => bd.links.some((h) => h.includes(`?ab=${e.name}:${a}`))) && bd.links.includes("/app#account"),
+          `(3) ${e.name}: badge links every arm (?ab=${e.name}:x) + results`, JSON.stringify(bd.links));
+    if (e.page === "/") {
+      const geo = await json(`(() => { const r = (el) => { const b = el.getBoundingClientRect(); return {left: b.left, right: b.right, top: b.top, bottom: b.bottom}; };
+        return {badge: r(document.querySelector('.ab-badges')), cta: r(document.getElementById('signin')), w: innerWidth, h: innerHeight}; })()`);
+      check(!rectsOverlap(geo.badge, geo.cta), `(3) ${e.name} desktop: badge clear of #signin`, JSON.stringify(geo));
+    }
+  }
+  await send("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+  for (const e of exps.filter((x) => x.page === "/")) {
+    const arm = e.arms[e.arms.length - 1];
+    await nav(`${base}/?ab=${e.name}:${arm}`);
+    const built = await waitBadge();
+    const geo = await json(`(() => { const r = (el) => { const b = el.getBoundingClientRect(); return {left: Math.round(b.left), right: Math.round(b.right), top: Math.round(b.top), bottom: Math.round(b.bottom)}; };
+      return {badge: r(document.querySelector('.ab-badges')), cta: r(document.getElementById('signin')), w: innerWidth, h: innerHeight,
+        overflow: document.documentElement.scrollWidth > innerWidth}; })()`);
+    check(built && !rectsOverlap(geo.badge, geo.cta) && geo.badge.right <= geo.w && geo.badge.bottom <= geo.h && geo.badge.left >= 0 && !geo.overflow,
+          `(3) ${e.name} phone 390: badge inside the viewport, does not intersect #signin, no sideways scroll`, JSON.stringify(geo));
+    await shot(e.name === "hero" ? `ab-${arm}-phone` : `ab-${e.name}-${arm}-phone`, false);
+  }
+  await send("Emulation.clearDeviceMetricsOverride"); await sleep(300);
+
+  // (4) a plain visitor: signed out, then a signed-in non-admin — no badge, no experiments key
+  const signOut = () => evaluate(`fetch('/logout', {method: 'POST', headers: {'X-Requested-With': 'fetch'}}).then((r) => r.status)`);
+  await signOut();
+  await nav(`${base}/`); await sleep(1500);
+  const out0 = await json(pageState);
+  const outMe = await me();
+  check(outMe.user === null && out0.badges === 0 && out0.signins === 1 && /^\/(login|dev-login)/.test(out0.href || ""),
+        "(4) signed out: /api/me user null, no .ab-badge, one #signin pointing at sign-in", JSON.stringify({ user: outMe.user, ...out0 }));
+  await nav(`${base}/dev-login?email=smoke-ab-plain@example.com`);
+  await nav(`${base}/`); await sleep(1500);
+  const pl = await json(pageState);
+  const plMe = await me();
+  check(plMe.user && plMe.user.admin === false && !("experiments" in plMe.user) && pl.badges === 0 && pl.signins === 1
+        && pl.href === "/app" && !pl.marker,
+        "(4) signed-in non-admin: no experiments key, no .ab-badge, one #signin -> /app", JSON.stringify({ admin: plMe.user && plMe.user.admin, keys: Object.keys(plMe.user || {}), ...pl }));
+
+  // (5) determinism: no ?ab=, three loads, same arm each time — and the arm the server reported for this IP + UA
+  const seen = [];
+  for (let i = 0; i < 3; i++) { await nav(`${base}/`); seen.push(await evaluate(`document.documentElement.dataset.ab || ''`)); }
+  const expected = exps.filter((e) => e.page === "/").map((e) => `${e.name}:${e.arm}`).join(" ");
+  check(seen.every((s) => s === seen[0]) && seen[0].length > 0, "(5) three plain loads of / draw the same arm", JSON.stringify(seen));
+  check(seen[0] === expected, "(5) ...and it is the arm /api/me computed for this IP + UA", `${seen[0]} vs ${expected}`);
 }
 console.log(errors.length ? "CONSOLE ERRORS:\n" + errors.join("\n") : "no console errors");
 ws.close(); chrome.kill();

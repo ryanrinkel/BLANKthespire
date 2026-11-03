@@ -1837,7 +1837,8 @@ function renderStatsChart(daily, series = STATS_SERIES, boxId = "stats-chart",
 // experiment is listed the moment it deploys) merged with traffic.json's per-arm numbers
 // (tools/traffic_report.py). Words first, then numbers (docs/plans/AB_TESTING_PLAN.md 3.5). The read-out
 // sentence is composed server-side (ab_report.readout) so this card and the Monday mail say the same thing.
-// The last three columns come from the database once Phase 2 stamps users.signup_ab; until then "—".
+// The last three columns come from the database (Phase 2: users.signup_ab, stamped when an account is born;
+// ab_accounts.py counts them per arm). x.accounts is null when that lookup failed — then they stay "—".
 const EXP_COLS = [
   { key: "clicked", label: "clicked" },
   { key: "login", label: "/login" },
@@ -1846,9 +1847,10 @@ const EXP_COLS = [
   { key: "workshop", label: "workshop" },
 ];
 const EXP_DB_COLS = [
-  { key: "new_accounts", label: "new accounts" },
-  { key: "first_forge", label: "first forge" },
-  { key: "donated", label: "donated" },
+  { key: "accounts", label: "new accounts",
+    title: "accounts created on/after the start whose first session saw this arm; returning users are never here" },
+  { key: "forged", label: "first forge", title: "of those new accounts, the ones with at least one finished forge" },
+  { key: "donated", label: "donated", title: "of those new accounts, the ones with at least one paid donation" },
 ];
 
 async function loadExperiments() {
@@ -1895,19 +1897,27 @@ function experimentBlock(x) {
     `<li><b>${esc(a)}${i === 0 ? " (control)" : ""}:</b> ${esc((x.arms_text || {})[a] || "")} · `
     + `<a href="${esc((x.preview || {})[a] || "#")}" target="_blank" rel="noopener">see it</a>`
     + (x.status_kind === "ended" && x.winner === a ? ` <span class="exp-pill winner">shipped</span>` : "") + `</li>`).join("") + `</ul>`;
-  const phase2 = `<span class="muted" title="account attribution starts with Phase 2">—</span>`;
+  const noAcc = x.accounts_reason || "account attribution unavailable";
+  const dash = `<span class="muted" title="${esc(noAcc)}">—</span>`;
   const headRow = `<tr><th>arm</th><th class="num">exposures</th>`
     + cols.map((c) => `<th class="num">${esc(c.label)}${c.key === x.primary || c.key === "primary" ? "&nbsp;★" : ""}</th>`).join("")
-    + EXP_DB_COLS.map((c) => `<th class="num" title="${acc ? "" : "account attribution starts with Phase 2"}">${esc(c.label)}</th>`).join("") + `</tr>`;
+    + EXP_DB_COLS.map((c) => `<th class="num" title="${esc(acc ? c.title : noAcc)}">${esc(c.label)}</th>`).join("") + `</tr>`;
+  const dbCell = (row, c) => {
+    if (!row) return dash;
+    const v = Number(row[c.key] || 0), n = Number(row.accounts || 0);
+    return fmtInt(v) + (c.key !== "accounts" && n ? ` <span class="muted">(${pct(v, n)})</span>` : "");
+  };
   const rows = arms.map((a, i) => {
     const r = perArm[a] || {}, n = Number(r.exposures || 0), chips = deviceChips(r.devices);
     return `<tr><td>${esc(a)}${i === 0 ? " (control)" : ""}${chips ? `<div class="muted">${esc(chips)}</div>` : ""}</td>`
       + `<td class="num">${fmtInt(n)}</td>`
       + cols.map((c) => `<td class="num">${fmtInt(r[c.key])}${n ? ` <span class="muted">(${pct(Number(r[c.key] || 0), n)})</span>` : ""}</td>`).join("")
-      + EXP_DB_COLS.map((c) => `<td class="num">${acc && acc[a] ? fmtInt(acc[a][c.key]) : phase2}</td>`).join("") + `</tr>`;
+      + EXP_DB_COLS.map((c) => `<td class="num">${dbCell(acc && acc[a], c)}</td>`).join("") + `</tr>`;
   }).join("");
   const table = `<div class="table-scroll"><table class="stats-table exp-table">${headRow}${rows}</table></div>`;
-  return `<div class="exp exp-${esc(x.status_kind || "running")}">${head}${status}${hyp}${armLines}${table}`
+  const cost = acc ? `<p class="muted exp-cost">hosted cost of those forges: `
+    + arms.map((a) => `${esc(a)} $${Number((acc[a] || {}).hosted_cost_usd || 0).toFixed(2)}`).join(" · ") + `</p>` : "";
+  return `<div class="exp exp-${esc(x.status_kind || "running")}">${head}${status}${hyp}${armLines}${table}${cost}`
     + `<p class="exp-readout">${esc(x.readout || "")}</p></div>`;
 }
 

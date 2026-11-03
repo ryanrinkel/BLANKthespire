@@ -87,7 +87,8 @@ def test_listed_from_the_registry_without_a_traffic_summary(client, app_module, 
     names = [e["name"] for e in body["experiments"]]
     assert names == ["hero", "recent"]          # pcnote ended > 30 days ago
     hero = body["experiments"][0]
-    assert hero["per_arm"] == {} and hero["accounts"] is None and hero["live"] is True
+    assert hero["per_arm"] == {} and hero["live"] is True
+    assert set(hero["accounts"]) == {"a", "b"} and "accounts_reason" not in hero   # Phase 2: from the DB
     assert hero["decision"]["status"] == "running — not yet"
     assert hero["hypothesis"] == "Saying the price lifts /login opens."
     assert "No exposures yet" in hero["readout"]
@@ -158,3 +159,114 @@ def test_payload_lists_a_not_yet_started_experiment():
                                                                               planned_end="2026-12-31")])
     assert e["live"] is False and e["day"] == 0 and e["decision"]["status"] == "not started"
     assert e["status_kind"] == "pending"
+
+
+# --- Phase 2: account attribution (users.signup_ab -> ab_accounts) ------------------------------------
+# A name no other test's dev-login can stamp ("hero" is live in the real registry), so the counts are exact.
+
+ACCT = _exp(name="acct", page="/archive", started="2026-11-03", planned_end="2026-12-15")
+
+
+@pytest.fixture(scope="module")
+def acct_seed(app_module):
+    """a: one new account that forged (plus one created BEFORE the start, ignored); b: two new accounts, one
+    a donor, one with hosted cost; plus a NULL label and a look-alike token that must not match."""
+    from datetime import datetime
+    from models import ForgeJob, ForgeUsage, Purchase, User
+
+    def at(day):
+        return datetime.fromisoformat(day)
+
+    with app_module.session_scope() as s:
+        rows = {
+            "a1": User(google_sub="acct:a1", email="acct-a1@example.com", signup_ab="acct:a",
+                       created_at=at("2026-11-05 10:00:00")),
+            "a_old": User(google_sub="acct:a_old", email="acct-aold@example.com", signup_ab="acct:a",
+                          created_at=at("2026-10-01 10:00:00")),
+            "b1": User(google_sub="acct:b1", email="acct-b1@example.com", signup_ab="acct:b",
+                       created_at=at("2026-11-06 12:00:00")),
+            "b2": User(google_sub="acct:b2", email="acct-b2@example.com", signup_ab="other:a acct:b",
+                       created_at=at("2026-11-07 12:00:00")),
+            "none": User(google_sub="acct:none", email="acct-none@example.com", signup_ab=None,
+                         created_at=at("2026-11-08 12:00:00")),
+            "lookalike": User(google_sub="acct:look", email="acct-look@example.com", signup_ab="xacct:b",
+                              created_at=at("2026-11-08 12:00:00")),
+        }
+        s.add_all(rows.values())
+        s.flush()
+        ids = {k: u.id for k, u in rows.items()}
+        s.add_all([
+            ForgeJob(id="acct-job-a1", user_id=ids["a1"], status="done"),
+            ForgeJob(id="acct-job-b1", user_id=ids["b1"], status="failed"),       # not a finished forge
+            ForgeJob(id="acct-job-old", user_id=ids["a_old"], status="done"),     # outside the window
+            Purchase(user_id=ids["b1"], stripe_session_id="cs_acct_b1", tokens=4, amount_cents=500,
+                     status="paid"),
+            Purchase(user_id=ids["a1"], stripe_session_id="cs_acct_a1", tokens=2, amount_cents=300,
+                     status="refunded"),                                          # not paid
+            ForgeUsage(user_id=ids["b2"], forge_id="acct-f-b2", mode="token", metered_cost_micros=500_000,
+                       est_cost_micros=100_000),                                  # metered wins
+            ForgeUsage(user_id=ids["b2"], forge_id="acct-f-b2", mode="token", est_cost_micros=250_000),
+            ForgeUsage(user_id=ids["b2"], forge_id="acct-f-b2b", mode="byok", est_cost_micros=9_000_000),
+        ])
+    return ids
+
+
+def test_accounts_per_arm_counts_new_accounts_forges_donations_and_cost(app_module, acct_seed):
+    import ab_accounts
+    got = ab_accounts.accounts_per_arm(ACCT, TODAY)
+    assert got == {"a": {"accounts": 1, "forged": 1, "donated": 0, "hosted_cost_usd": 0.0},
+                   "b": {"accounts": 2, "forged": 0, "donated": 1, "hosted_cost_usd": 0.75}}
+
+
+def test_accounts_per_arm_on_an_ended_experiment_stops_at_ended(app_module, acct_seed):
+    import ab_accounts
+    ended = _exp(name="acct", page="/archive", started="2026-11-03", planned_end="2026-12-15",
+                 ended="2026-11-06", winner="a")
+    got = ab_accounts.accounts_per_arm(ended, TODAY)
+    assert got["a"]["accounts"] == 1 and got["b"]["accounts"] == 0   # b1 was created ON the end day
+
+
+def test_accounts_lookup_failure_returns_empty(app_module, acct_seed, monkeypatch):
+    import ab_accounts
+
+    def boom(*a, **k):
+        raise RuntimeError("db down")
+    monkeypatch.setattr(ab_accounts, "_per_arm", boom)
+    assert ab_accounts.accounts_per_arm(ACCT, TODAY) == {}
+    assert ab_accounts.accounts_payload([ACCT], TODAY) == {}
+
+
+def test_route_fills_accounts_per_arm(client, app_module, acct_seed, monkeypatch):
+    _traffic_dir(app_module)
+    monkeypatch.setattr(experiments, "EXPERIMENTS", [ACCT])
+    monkeypatch.setattr(experiments, "today_utc", lambda: TODAY)
+    login(client, ADMIN)
+    [e] = client.get("/api/admin/experiments").get_json()["experiments"]
+    assert e["accounts"]["a"] == {"accounts": 1, "forged": 1, "donated": 0, "hosted_cost_usd": 0.0}
+    assert e["accounts"]["b"] == {"accounts": 2, "forged": 0, "donated": 1, "hosted_cost_usd": 0.75}
+
+    import ab_accounts
+
+    def boom(*a, **k):
+        raise RuntimeError("db down")
+    monkeypatch.setattr(ab_accounts, "_per_arm", boom)
+    [e] = client.get("/api/admin/experiments").get_json()["experiments"]
+    assert e["accounts"] is None and "lookup failed" in e["accounts_reason"]
+
+
+def test_mail_digest_shows_the_account_columns(app_module, acct_seed):
+    import ab_accounts
+    import alerts
+    accounts = ab_accounts.accounts_payload([ACCT], TODAY)
+    payload = ab_report.build_experiments_payload(None, TODAY, experiments=[ACCT], accounts=accounts)
+    _subject, body = alerts.experiments_digest(payload, TODAY)
+    assert "new accounts 1 · forged 1 (100.0%) · donated 0 (0.0%) · hosted cost $0.00" in body
+    assert "new accounts 2 · forged 0 (0.0%) · donated 1 (50.0%) · hosted cost $0.75" in body
+
+    failed = ab_report.build_experiments_payload(None, TODAY, experiments=[ACCT], accounts={})
+    assert failed[0]["accounts"] is None
+    _subject, body = alerts.experiments_digest(failed, TODAY)
+    assert "new accounts / forged / donated: account attribution lookup failed" in body
+    # not asked at all (a caller that never passes accounts): no columns, no complaint
+    plain = ab_report.build_experiments_payload(None, TODAY, experiments=[ACCT])
+    assert plain[0]["accounts"] is None and "accounts_reason" not in plain[0]
