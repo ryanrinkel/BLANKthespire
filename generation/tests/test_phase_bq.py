@@ -208,7 +208,7 @@ def _t_engine() -> None:
           and "bool PerEnemy = false" in spec and "string? Orb = null);" in spec, "EffectSpec Keep / Which / Orbs / PerEnemy + Condition.Orb")
     dc = _cs("Engine", "DataCard.cs")
     check('case "trigger_passive":' in dc and 'case "lose_orb_slot":' in dc
-          and 'case "loop":           Power<LoopPower>(vname, e.Amount, up); break;' in dc, "DataCard declares the new ops + Loop's hover tip")
+          and '["loop"]               = (typeof(LoopPower), null),' in _cs("Engine", "ForgedCards.cs"), "DataCard declares the new ops + Loop's hover tip")
     fc = _cs("Engine", "ForgedCards.cs")
     check(set(NEW_OPS) <= _set(fc, "SupportedOps") and not (set(NEW_OPS) & _set(fc, "TriggerOps")), "the two ops: supported, card-only")
     check("loop" in _set(fc, "SupportedStatuses") and set(NEW_SCALES) <= _set(fc, "SupportedScales"), "loop status + the two scales")
@@ -237,7 +237,7 @@ CASES = [([{"op": "evoke", "keep": True}], "self", "Evoke your next orb twice.")
          ([{"op": "trigger_passive", "orbs": "all", "amount": 2}], "self", "Trigger the passive of all your orbs 2 times."),
          ([{"op": "apply_status", "status": "loop", "amount": 1}], "self", "At the start of your turn, trigger your next orb's passive."),
          ([{"op": "lose_orb_slot"}, {"op": "apply_status", "status": "strength", "amount": 2}], "self",
-          "Lose 1 Orb Slot.\nGain Strength."),
+          "Lose 1 Orb Slot.\nGain {StrengthPower} Strength."),
          ([{"op": "damage", "amount": 7}, {"op": "draw", "amount": 1, "scale": "orb_types"}], "enemy",
           "Deal {Damage} damage.\nDraw cards equal to the different orbs you have channeled."),
          ([{"op": "damage", "amount": 1, "scale": "orb_count"}], "all_enemies", "Deal damage equal to the orbs you have channeled to ALL enemies."),

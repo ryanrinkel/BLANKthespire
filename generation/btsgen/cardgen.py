@@ -74,6 +74,43 @@ _BUFFS = {
     "temp_thorns", "temp_focus",  # Phase AN (v44)
     "vigor", "double_damage",  # Phase BF (v60)
 }
+# GitHub #2 (2b): status -> the DynamicVar key of the PowerVar DataCard declares for it (the base-game PowerVar ctor keys
+# an unnamed PowerVar<T> by typeof(T).Name; three BM powers declare a NAMED var). Absent = no PowerVar (strength_down's
+# "StrengthLoss", the lose_* plain vars). The card text prints the amount as this placeholder ("Apply {PoisonPower}
+# Poison."), resolved by the game. Lockstep with ForgedCards.StatusPowerVars.
+STATUS_POWER_VAR = {
+    "vulnerable": "VulnerablePower", "weak": "WeakPower", "frail": "FrailPower", "poison": "PoisonPower",
+    "doom": "DoomPower", "temp_strength_down": "ForgedTempStrengthDownPower",
+    "strength": "StrengthPower", "dexterity": "DexterityPower", "thorns": "ThornsPower", "regen": "RegenPower",
+    "metallicize": "PlatingPower", "artifact": "ArtifactPower", "buffer": "BufferPower",
+    "intangible": "IntangiblePower", "ritual": "RitualPower", "blur": "BlurPower",
+    "temp_strength": "ForgedTempStrengthPower", "temp_dexterity": "ForgedTempDexterityPower",
+    "barricade": "BarricadePower", "focus": "FocusPower",
+    "temp_thorns": "ForgedTempThornsPower", "temp_focus": "ForgedTempFocusPower",
+    "vigor": "VigorPower", "double_damage": "DoubleDamagePower",
+    "no_draw": "NoDrawPower", "no_energy_gain": "NoEnergyGainPower", "no_block_gain": "NoBlockTurns",
+    "dex_decay": "DexDecay", "focus_decay": "FocusDecay", "echo_form": "EchoFormPower", "loop": "LoopPower",
+}
+
+
+def status_power_var_key(status):
+    """GitHub #2 (2b): the PowerVar key of a status (None = it declares none). Mirrors ForgedCards.StatusPowerVarKey."""
+    return STATUS_POWER_VAR.get(status)
+
+
+def _status_var_ref(effects: list, i: int) -> str:
+    """GitHub #2 (2b): the amount placeholder of the i-th apply_status: "{PoisonPower}", or the suffixed var of the
+    `when`-gated second copy ("{Weak2}", the StatusDisplay stem + occurrence, a space keyed as '-'); "" when the effect
+    declares no PowerVar. Mirrors ForgedCards.StatusVarRef."""
+    e = effects[i]
+    st = e.get("status")
+    key = status_power_var_key(st)
+    if key is None or (st == "doom" and e.get("scale")):
+        return ""
+    occ = sum(1 for j in range(i) if effects[j].get("op") == "apply_status" and effects[j].get("status") == st)
+    if occ:
+        key = f"{STATUS_NAME.get(st, st)}{occ + 1}"
+    return "{" + key.replace(" ", "-") + "}"
 
 
 def _orb_display(orb) -> str:
@@ -840,7 +877,7 @@ def describe(effects: list[dict], target: str) -> str:
     def _sp(x: dict) -> str:
         return f"the cards {removed}" if str(x.get("scale", "")).lower() == "cards_removed" else _effect_scale_phrase(x)
 
-    for e in effects:
+    for ei, e in enumerate(effects):
         before = len(parts)
         op = e["op"]
         if op == "damage":
@@ -1097,7 +1134,8 @@ def describe(effects: list[dict], target: str) -> str:
             name = STATUS_NAME.get(e["status"], e["status"])
             buff = e["status"] in _BUFFS
             verb = "Gain" if buff else "Apply"
-            parts.append(f'{verb} {name}{"" if buff else dmg_suffix}.')  # AJ (v40): random_enemy suffix too
+            amount = _status_var_ref(effects, ei)  # GitHub #2 (2b): "Apply {PoisonPower} Poison." (the game fills the number)
+            parts.append(f'{verb} {amount + " " if amount else ""}{name}{"" if buff else dmg_suffix}.')  # AJ (v40): random_enemy suffix too
         # Phase H: weave the condition into the gated effect's sentence ("… if your orbs match.").
         when = e.get("when")
         if isinstance(when, dict) and len(parts) > before:

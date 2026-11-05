@@ -344,57 +344,31 @@ public abstract class DataCard : ConstructedCardModel
                                     ? ForgedCards.StatusVarName(Spec.Effects, i) : null;
                     switch (e.Status)
                     {
-                        case "vulnerable":     Power<VulnerablePower>(vname, e.Amount, up); break;
-                        case "weak":           Power<WeakPower>(vname, e.Amount, up); break;
-                        case "frail":          Power<FrailPower>(vname, e.Amount, up); break;
-                        case "poison":         Power<PoisonPower>(vname, e.Amount, up); break;
                         // Phase BL (v64, gap #67): the base game's generic DoomPower (sealed, concrete — NoEscape applies it
                         // with a plain PowerCmd.Apply). The Blight Strike form (scale damage_dealt_unblocked) declares no var:
                         // its amount is this play's unblocked damage (EffectRunner applies it literally).
-                        case "doom":           if (!e.IsScaled) Power<DoomPower>(vname, e.Amount, up); break;
-                        // Phase BL (v64, gap #66): enemy Strength loss. The temp shell is our Debuff-typed
-                        // ForgedTempStrengthDownPower (the PowerVar gives the hover tip; EffectRunner applies it literally).
-                        // The PERMANENT form must NOT reuse Power<StrengthPower> — that PowerVar is positive (it would GIVE
-                        // the enemy Strength) and collides with a self `strength` on the same card — so it declares the
+                        case "doom":           if (e.IsScaled) break; goto default;
+                        // Phase BL (v64, gap #66): enemy Strength loss. The temp shell (temp_strength_down) is our Debuff-typed
+                        // ForgedTempStrengthDownPower in the table (the PowerVar gives the hover tip; EffectRunner applies it
+                        // literally). The PERMANENT form must NOT reuse Power<StrengthPower> — that PowerVar is positive (it would
+                        // GIVE the enemy Strength) and collides with a self `strength` on the same card — so it declares the
                         // base PiercingWail / DarkShackles var name "StrengthLoss" ({StrengthLoss} in the text).
-                        case "temp_strength_down": Power<ForgedTempStrengthDownPower>(vname, e.Amount, up); break;
                         case "strength_down":  WithVar("StrengthLoss", e.Amount, up); break;
-                        case "strength":       Power<StrengthPower>(vname, e.Amount, up); break;
-                        case "dexterity":      Power<DexterityPower>(vname, e.Amount, up); break;
-                        case "thorns":         Power<ThornsPower>(vname, e.Amount, up); break;
-                        case "regen":          Power<RegenPower>(vname, e.Amount, up); break;
-                        case "metallicize":    Power<PlatingPower>(vname, e.Amount, up); break;
-                        case "artifact":       Power<ArtifactPower>(vname, e.Amount, up); break;
-                        case "buffer":         Power<BufferPower>(vname, e.Amount, up); break;
-                        case "intangible":     Power<IntangiblePower>(vname, e.Amount, up); break;
-                        case "ritual":         Power<RitualPower>(vname, e.Amount, up); break;
-                        case "blur":           Power<BlurPower>(vname, e.Amount, up); break;
-                        case "temp_strength":  Power<ForgedTempStrengthPower>(vname, e.Amount, up); break;
-                        case "temp_dexterity": Power<ForgedTempDexterityPower>(vname, e.Amount, up); break;
-                        case "barricade":      Power<BarricadePower>(vname, e.Amount, up); break;
-                        case "focus":          Power<FocusPower>(vname, e.Amount, up); break;
-                        case "temp_thorns":    Power<ForgedTempThornsPower>(vname, e.Amount, up); break; // Phase AN (v44)
-                        case "temp_focus":     Power<ForgedTempFocusPower>(vname, e.Amount, up); break;  // Phase AN (v44)
-                        // Phase BF (v60, gap #54): the base game's own next-attack amplifiers — sealed, concrete powers
-                        // (unlike the abstract TemporaryStrengthPower that crashed temp_strength), with shipped loc/icons.
-                        case "vigor":          Power<VigorPower>(vname, e.Amount, up); break;         // +N to your next Attack, then consumed
-                        case "double_damage":  Power<DoubleDamagePower>(vname, e.Amount, up); break;  // your Attacks deal double this turn (N turns)
-                        // Phase BM (v65, gaps #68/#69): the self-drawbacks + Echo Form (EffectRunner applies them LITERALLY to the
-                        // player). The real powers declare a PowerVar for the hover tip (+ the {NoBlockTurns} / {DexDecay} /
-                        // {FocusDecay} text vars); the permanent stat losses declare a NAMED var only — a Power<StrengthPower> var
-                        // would read positive and collide with a `strength` gain on the same card (the BL strength_down rule).
-                        case "no_draw":        Power<NoDrawPower>(vname, e.Amount, up); break;
-                        case "no_energy_gain": Power<NoEnergyGainPower>(vname, e.Amount, up); break;
-                        case "no_block_gain":       Power<NoBlockPower>(vname ?? "NoBlockTurns", e.Amount, up); break;
-                        case "dex_decay":      Power<WraithFormPower>(vname ?? "DexDecay", e.Amount, up); break;
-                        case "focus_decay":    Power<BiasedCognitionPower>(vname ?? "FocusDecay", e.Amount, up); break;
+                        // Phase BM (v65, gaps #68/#69): the permanent self stat losses declare a NAMED var only — a
+                        // Power<StrengthPower> var would read positive and collide with a `strength` gain on the same card
+                        // (the BL strength_down rule). The other BM self statuses (no_draw ... loop) are in the table: their
+                        // real powers declare a PowerVar for the hover tip (+ the {NoBlockTurns} / {DexDecay} / {FocusDecay}
+                        // text vars, the table's explicit names).
                         case "lose_strength":  WithVar("SelfStrengthLoss", e.Amount, up); break;
                         case "lose_dexterity": WithVar("SelfDexterityLoss", e.Amount, up); break;
                         case "lose_focus":     WithVar("SelfFocusLoss", e.Amount, up); break;
-                        case "echo_form":      Power<EchoFormPower>(vname, e.Amount, up); break;
-                        case "loop":           Power<LoopPower>(vname, e.Amount, up); break; // Phase BQ (v68, gap #78): the hover tip
+                        // GitHub #2 (2b): every other status is a plain Power<T>(name, amount, up) driven by the ONE shared
+                        // table ForgedCards.StatusPowerVars, which Describe also uses for the {PoisonPower} text placeholder.
                         default:
-                            throw new NotSupportedException($"DataCard: unsupported status '{e.Status}'");
+                            if (e.Status == null || !ForgedCards.StatusPowerVars.TryGetValue(e.Status, out var pv))
+                                throw new NotSupportedException($"DataCard: unsupported status '{e.Status}'");
+                            DeclarePower(pv.Power, vname ?? pv.Var, e.Amount, up);
+                            break;
                     }
                     break;
                 }
@@ -410,6 +384,24 @@ public abstract class DataCard : ConstructedCardModel
     {
         if (varName == null) WithPower<T>(amount, up);
         else WithPower<T>(varName, amount, up);
+    }
+
+    private static readonly System.Reflection.MethodInfo PowerGeneric =
+        typeof(DataCard).GetMethod(nameof(Power), System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+    private static readonly Dictionary<Type, System.Reflection.MethodInfo> PowerClosed = new();
+
+    /// <summary>GitHub #2 (2b): <see cref="Power{T}"/> for a power TYPE from ForgedCards.StatusPowerVars (the closed
+    /// generic method is cached per type). Same var, same hover tip as the old per-status switch.</summary>
+    private void DeclarePower(Type power, string? varName, int amount, int up)
+    {
+        System.Reflection.MethodInfo m;
+        lock (PowerClosed)
+            if (!PowerClosed.TryGetValue(power, out m!)) PowerClosed[power] = m = PowerGeneric.MakeGenericMethod(power);
+        try { m.Invoke(this, [varName, amount, up]); }
+        catch (System.Reflection.TargetInvocationException tie) when (tie.InnerException != null)
+        {
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(tie.InnerException).Throw();
+        }
     }
 
     /// <summary>Phase AX (v53): the BaseLib UpgradeType for a keyword flag-op present in the BASE effect list —

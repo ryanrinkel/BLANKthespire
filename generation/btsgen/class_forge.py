@@ -3361,9 +3361,16 @@ _QA_VARS = {"Damage": "damage", "Block": "block", "Cards": "draw", "Energy": "ga
 
 def _card_text(card: dict) -> str:
     try:
-        from .cardgen import describe
+        from .cardgen import describe, _status_var_ref
         text = describe(card.get("effects") or [], card.get("target"))
         effs = [e for e in (card.get("effects") or []) if isinstance(e, dict)]
+        # GitHub #2 (2026-11-05): the describe mirror now reads "Apply {PoisonPower} Poison." (the game resolves
+        # the var); the judge gets the literal amount, like the {Damage} fill below.
+        for i, e in enumerate(effs):
+            if e.get("op") == "apply_status" and e.get("amount") is not None:
+                ref = _status_var_ref(effs, i)
+                if ref:
+                    text = text.replace(ref, str(e.get("amount")))
         for var, op in _QA_VARS.items():
             amt = next((e.get("amount") for e in effs if e.get("op") == op and e.get("amount") is not None), None)
             if amt is not None:

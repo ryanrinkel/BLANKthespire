@@ -1,4 +1,6 @@
 using MegaCrit.Sts2.Core.Entities.Cards;
+using MegaCrit.Sts2.Core.Models.Powers; // GitHub #2 (2b): StatusPowerVars
+using BlankTheSpire.BlankTheSpireCode.Powers; // GitHub #2 (2b): the Forged* temp powers in StatusPowerVars
 
 namespace BlankTheSpire.BlankTheSpireCode.Engine;
 
@@ -2849,6 +2851,67 @@ public static class ForgedCards
         return StatusDisplay(effects[i].Status) + (occ > 0 ? (occ + 1).ToString() : "");
     }
 
+    /// <summary>GitHub #2 (2b): the ONE status -> PowerVar table. <c>Power</c> is the power type DataCard declares the
+    /// card's <c>PowerVar&lt;T&gt;</c> for (and so the hover tip); <c>Var</c> is an explicit var NAME, null for the
+    /// canonical unnamed var (keyed <c>typeof(T).Name</c> by the base-game PowerVar ctor, the key
+    /// EffectRunner.ApplyPower reads). Statuses that declare NO PowerVar are absent: strength_down ("StrengthLoss")
+    /// and lose_strength / lose_dexterity / lose_focus (plain vars). The scaled Blight-Strike doom declares none
+    /// either; that is per-effect, so DataCard and <see cref="StatusVarRef"/> check it. Lockstep with
+    /// cardgen.STATUS_POWER_VAR.</summary>
+    internal static readonly IReadOnlyDictionary<string, (Type Power, string? Var)> StatusPowerVars =
+        new Dictionary<string, (Type Power, string? Var)>(StringComparer.Ordinal)
+        {
+            ["vulnerable"]         = (typeof(VulnerablePower), null),
+            ["weak"]               = (typeof(WeakPower), null),
+            ["frail"]              = (typeof(FrailPower), null),
+            ["poison"]             = (typeof(PoisonPower), null),
+            ["doom"]               = (typeof(DoomPower), null),
+            ["temp_strength_down"] = (typeof(ForgedTempStrengthDownPower), null),
+            ["strength"]           = (typeof(StrengthPower), null),
+            ["dexterity"]          = (typeof(DexterityPower), null),
+            ["thorns"]             = (typeof(ThornsPower), null),
+            ["regen"]              = (typeof(RegenPower), null),
+            ["metallicize"]        = (typeof(PlatingPower), null),
+            ["artifact"]           = (typeof(ArtifactPower), null),
+            ["buffer"]             = (typeof(BufferPower), null),
+            ["intangible"]         = (typeof(IntangiblePower), null),
+            ["ritual"]             = (typeof(RitualPower), null),
+            ["blur"]               = (typeof(BlurPower), null),
+            ["temp_strength"]      = (typeof(ForgedTempStrengthPower), null),
+            ["temp_dexterity"]     = (typeof(ForgedTempDexterityPower), null),
+            ["barricade"]          = (typeof(BarricadePower), null),
+            ["focus"]              = (typeof(FocusPower), null),
+            ["temp_thorns"]        = (typeof(ForgedTempThornsPower), null),
+            ["temp_focus"]         = (typeof(ForgedTempFocusPower), null),
+            ["vigor"]              = (typeof(VigorPower), null),
+            ["double_damage"]      = (typeof(DoubleDamagePower), null),
+            ["no_draw"]            = (typeof(NoDrawPower), null),
+            ["no_energy_gain"]     = (typeof(NoEnergyGainPower), null),
+            ["no_block_gain"]      = (typeof(NoBlockPower), "NoBlockTurns"),
+            ["dex_decay"]          = (typeof(WraithFormPower), "DexDecay"),
+            ["focus_decay"]        = (typeof(BiasedCognitionPower), "FocusDecay"),
+            ["echo_form"]          = (typeof(EchoFormPower), null),
+            ["loop"]               = (typeof(LoopPower), null),
+        };
+
+    /// <summary>GitHub #2 (2b): the DynamicVar key of a status's canonical PowerVar (<c>PoisonPower</c>,
+    /// <c>ThornsPower</c>, <c>NoBlockTurns</c>), or null when the status declares no PowerVar.</summary>
+    internal static string? StatusPowerVarKey(string? status)
+        => status != null && StatusPowerVars.TryGetValue(status, out var p) ? p.Var ?? p.Power.Name : null;
+
+    /// <summary>GitHub #2 (2b): the card-text placeholder for the i-th apply_status's amount — <c>{PoisonPower}</c>, or
+    /// the suffixed var of a gated second copy (<c>{Weak2}</c>; a space becomes '-' as LocString.AddObj keys it).
+    /// The game resolves it from the card's DynamicVarSet, so the upgraded amount follows. "" when the effect
+    /// declares no PowerVar. Lockstep with cardgen._status_var_ref.</summary>
+    internal static string StatusVarRef(EffectSpec[] effects, int i)
+    {
+        var e = effects[i];
+        string? key = StatusPowerVarKey(e.Status);
+        if (key == null || (e.Status == "doom" && e.IsScaled)) return "";
+        if (StatusOccurrence(effects, i) > 0) key = StatusVarName(effects, i);
+        return "{" + key.Replace(' ', '-') + "}";
+    }
+
     /// <summary>The human phrase for a non-X scalar (F5), e.g. "the cards you retained". Lockstep with cardgen.py.</summary>
     private static string ScalePhrase(string? scale) => Tx("scale." + (scale ?? ""), scale switch
     {
@@ -2946,8 +3009,9 @@ public static class ForgedCards
         // "Deal {Damage} damage for each card Exhausted." Lockstep with cardgen.describe.
         string removed = Tx("removed.discard", "Discarded");
         string Sp(EffectSpec x) => x.Scale == "cards_removed" ? Fx("scale.cards_removed", "the cards {removed}", ("removed", removed)) : ScalePhrase(x);
-        foreach (var e in effects)
+        for (int ei = 0; ei < effects.Length; ei++)
         {
+            var e = effects[ei];
             int before = parts.Count;
             bool woven = false; // add_trigger weaves its own condition (between the head and the payload in some languages)
             switch (e.Op)
@@ -3136,9 +3200,14 @@ public static class ForgedCards
                     // misread a drawback). Lockstep with cardgen._BM_SENTENCES.
                     else if (BmStatusSentence(e.Status) is { } bmLine)
                         parts.Add(bmLine);
+                    // GitHub #2 (2b): the amount is the card's PowerVar ({PoisonPower} / {Weak2}), resolved by the game, so the
+                    // text shows the number and the upgrade preview its upgraded value. A status with no var keeps the bare word.
+                    else if (StatusVarRef(effects, ei) is { Length: > 0 } amount)
+                        parts.Add(buff ? Fx("card.status.gain", "Gain {amount} {status}.", ("amount", amount), ("unit", StatusUnit(e.Status)), ("status", name))
+                                       : Fx("card.status.apply", "Apply {amount} {status}{to}.", ("amount", amount), ("unit", StatusUnit(e.Status)), ("status", name), ("to", dmgSuffix), ("who", who))); // AJ: random_enemy suffix too
                     else
-                        parts.Add(buff ? Fx("card.status.gain", "Gain {status}.", ("status", name))
-                                       : Fx("card.status.apply", "Apply {status}{to}.", ("status", name), ("to", dmgSuffix), ("who", who))); // AJ: random_enemy suffix too
+                        parts.Add(buff ? Fx("card.status.gain.bare", "Gain {status}.", ("status", name))
+                                       : Fx("card.status.apply.bare", "Apply {status}{to}.", ("status", name), ("to", dmgSuffix), ("who", who)));
                     break;
             }
             // Phase H: weave the condition into the gated effect's sentence ("… if your orbs match.").

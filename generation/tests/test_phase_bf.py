@@ -68,7 +68,7 @@ def test_version() -> None:
 
 def _t_engine() -> None:
     print("the engine: base-game powers on every status map, no new power class:")
-    check("<VigorPower>" in _cs("Engine", "DataCard.cs") and "<DoubleDamagePower>" in _cs("Engine", "DataCard.cs"), "DataCard declares both PowerVars")
+    check("(typeof(VigorPower), null)" in _cs("Engine", "ForgedCards.cs") and "(typeof(DoubleDamagePower), null)" in _cs("Engine", "ForgedCards.cs"), "DataCard declares both PowerVars (via ForgedCards.StatusPowerVars, GitHub #2)")
     er = _cs("Engine", "EffectRunner.cs")
     check('"vigor", "double_damage",' in er.split("SelfBuffStatuses =", 1)[1].split("];", 1)[0], "SelfBuffStatuses carries both")
     check(er.count("ApplyPowerLogged<VigorPower>") == 1 and er.count("RelicApplyT<VigorPower>") == 1, "EffectRunner card + relic maps")
@@ -99,8 +99,8 @@ def _t_rules_and_describe() -> None:
     trig = _card([{"op": "add_trigger", "trigger": "on_block_gained", "once_per_turn": True,
                    "effects": [{"op": "apply_status", "status": "vigor", "amount": 2}]}], ctype="power")
     check(not _errs(trig), f"vigor is a legal self-buff payload: {_errs(trig)}")
-    check(cardgen.describe(vig["effects"], "self") == "Gain Vigor.\nDraw {Cards} card(s).", "vigor reads 'Gain Vigor.'")
-    check(cardgen.describe(dd["effects"], "self") == "Gain Double Damage.\nExhaust.", "double_damage reads 'Gain Double Damage.'")
+    check(cardgen.describe(vig["effects"], "self") == "Gain {VigorPower} Vigor.\nDraw {Cards} card(s).", "vigor reads 'Gain Vigor.'")
+    check(cardgen.describe(dd["effects"], "self") == "Gain {DoubleDamagePower} Double Damage.\nExhaust.", "double_damage reads 'Gain Double Damage.'")
     check(cardgen.describe(trig["effects"], "self") == "Whenever you gain Block, gain 2 Vigor (once per turn).", "payload wording")
     v = _V
     check(v.score_card(_card([{"op": "apply_status", "status": "double_damage", "amount": 1}], rarity="rare")) >= 12.0, "double_damage is priced rare-tier")

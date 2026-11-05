@@ -1,14 +1,14 @@
 {
   "BLANKTHESPIRE-BASH.title": "Bash",
-  "BLANKTHESPIRE-BASH.description": "Deal {Damage} damage.\nApply Vulnerable.",
+  "BLANKTHESPIRE-BASH.description": "Deal {Damage} damage.\nApply {VulnerablePower} Vulnerable.",
   "BLANKTHESPIRE-CLEAVE.title": "Cleave",
   "BLANKTHESPIRE-CLEAVE.description": "Deal {Damage} damage to ALL enemies.",
   "BLANKTHESPIRE-CLOTHESLINE.title": "Clothesline",
-  "BLANKTHESPIRE-CLOTHESLINE.description": "Deal {Damage} damage.\nApply Weak.",
+  "BLANKTHESPIRE-CLOTHESLINE.description": "Deal {Damage} damage.\nApply {WeakPower} Weak.",
   "BLANKTHESPIRE-DEFEND.title": "Defend",
   "BLANKTHESPIRE-DEFEND.description": "Gain {Block} Block.",
   "BLANKTHESPIRE-EXPOSE.title": "Expose",
-  "BLANKTHESPIRE-EXPOSE.description": "Apply Vulnerable to ALL enemies.",
+  "BLANKTHESPIRE-EXPOSE.description": "Apply {VulnerablePower} Vulnerable to ALL enemies.",
   "BLANKTHESPIRE-HOLD_THE_LINE.title": "Hold the Line",
   "BLANKTHESPIRE-HOLD_THE_LINE.description": "Gain {Block} Block.\nDraw {Cards} card(s).",
   "BLANKTHESPIRE-IRON_WAVE.title": "Iron Wave",
@@ -24,7 +24,7 @@
   "BLANKTHESPIRE-RAMPART.title": "Rampart",
   "BLANKTHESPIRE-RAMPART.description": "Gain {Block} Block.",
   "BLANKTHESPIRE-RECKONING.title": "Reckoning",
-  "BLANKTHESPIRE-RECKONING.description": "Deal {Damage} damage to ALL enemies.\nApply Vulnerable to ALL enemies.",
+  "BLANKTHESPIRE-RECKONING.description": "Deal {Damage} damage to ALL enemies.\nApply {VulnerablePower} Vulnerable to ALL enemies.",
   "BLANKTHESPIRE-STRIKE.title": "Strike",
   "BLANKTHESPIRE-STRIKE.description": "Deal {Damage} damage."
 }

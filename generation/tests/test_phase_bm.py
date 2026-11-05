@@ -175,16 +175,21 @@ def _t_engine() -> None:
             ('case "lose_strength":  WithVar("SelfStrengthLoss", e.Amount, up); break;', "lose_strength declares a NAMED var"),
             ('case "lose_dexterity": WithVar("SelfDexterityLoss", e.Amount, up); break;', "lose_dexterity declares a NAMED var"),
             ('case "lose_focus":     WithVar("SelfFocusLoss", e.Amount, up); break;', "lose_focus declares a NAMED var"),
-            ('Power<NoBlockPower>(vname ?? "NoBlockTurns", e.Amount, up)', "no_block_gain's {NoBlockTurns} var"),
-            ('Power<WraithFormPower>(vname ?? "DexDecay", e.Amount, up)', "dex_decay's {DexDecay} var"),
-            ('Power<BiasedCognitionPower>(vname ?? "FocusDecay", e.Amount, up)', "focus_decay's {FocusDecay} var"),
+            # GitHub #2 (2b): the named BM PowerVars live in ForgedCards.StatusPowerVars (DataCard declares from it)
+            ('DeclarePower(pv.Power, vname ?? pv.Var, e.Amount, up);', "the table-driven PowerVar declaration"),
             ('if (!e.IsScaled) WithPower<BlockNextTurnPower>("NextTurnBlock", e.Amount, up);', "block_next_turn's {NextTurnBlock} var"),
             ("if (cardPlay.Card == this && cardPlay.PlayIndex > 0)", "BeforeCardPlayed logs only THIS card's replays"),
             ('$"[BM] replay play #{cardPlay.PlayIndex + 1} of \'{Spec.Title ?? Spec.Id}\'', "the [BM] replay play tag"),
             ('$"[BM] decay tick dex_decay -{me.GetPowerAmount<WraithFormPower>()} "', "the [BM] decay tick tag (dex)"),
             ('$"[BM] decay tick focus_decay -{me.GetPowerAmount<BiasedCognitionPower>()} "', "the [BM] decay tick tag (focus)")):
         check(frag in dc, f"DataCard: {why}")
-    check(dc.count("Power<StrengthPower>(") == 1, "Power<StrengthPower> stays the self-buff `strength` only")
+    fc = _cs("Engine", "ForgedCards.cs")
+    for frag, why in (('["no_block_gain"]      = (typeof(NoBlockPower), "NoBlockTurns"),', "no_block_gain's {NoBlockTurns} var"),
+                      ('["dex_decay"]          = (typeof(WraithFormPower), "DexDecay"),', "dex_decay's {DexDecay} var"),
+                      ('["focus_decay"]        = (typeof(BiasedCognitionPower), "FocusDecay"),', "focus_decay's {FocusDecay} var")):
+        check(frag in fc, f"DataCard (ForgedCards.StatusPowerVars): {why}")
+    check("Power<StrengthPower>(" not in dc and fc.count("typeof(StrengthPower)") == 1,
+          "Power<StrengthPower> stays the self-buff `strength` only")
     cs = _cs("Powers", "ForgedCostShiftPower.cs")
     check("if (!cardPlay!.IsFirstInSeries)" in cs and "burns no discount use" in cs,
           "ForgedCostShiftPower: a replay (PlayIndex > 0) burns no budgeted discount use (the BM decision)")

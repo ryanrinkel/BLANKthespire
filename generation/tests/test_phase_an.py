@@ -8,7 +8,7 @@ Exits nonzero on any failure. Covers the v44 card-level mechanics on the generat
   2. the `damage` flag `unblockable:true` — validates, describes with the ", ignoring Block" clause in every damage
      shape (plain / AoE / multi-hit / scaled / grow / X), emits the named `Unblockable: true`; REJECTED on a non-damage
      op and inside a trigger payload; `unblockable:false` is a plain hit;
-  3. the one-turn self-buffs `temp_thorns` / `temp_focus` — validate, word as "Gain Thorns." / "Gain Focus." (like the
+  3. the one-turn self-buffs `temp_thorns` / `temp_focus` — validate, word as "Gain {ForgedTempThornsPower} Thorns." / "Gain {ForgedTempFocusPower} Focus." (like the
      temp stats), emit, are legal as a SELF trigger payload and never as a targeted debuff; census buckets them
      (temp_thorns exotic, temp_focus specialty); class_forge treats temp_focus as an orb-class mechanic like focus.
 Plus: the vocab stamp is >= v44; the schema / vocabulary / statuses dir / relic contract / exemplars / archetypes /
@@ -133,11 +133,11 @@ def _t_temp_statuses(v: CardValidator) -> None:
                   type="skill", target="self", cost=0)
     check(v.validate(flash).ok, f"temp_focus validates: {v.validate(flash).errors}")
     d = cardgen.describe(bristle["effects"], "self")
-    check(d == "Gain Thorns.\nGain {Block} Block.", f"temp_thorns describe: {d!r}")
+    check(d == "Gain {ForgedTempThornsPower} Thorns.\nGain {Block} Block.", f"temp_thorns describe: {d!r}")
     d = cardgen.describe([{"op": "damage", "amount": 6}, {"op": "apply_status", "status": "temp_thorns", "amount": 3}], "all_enemies")
-    check(d == "Deal {Damage} damage to ALL enemies.\nGain Thorns.", f"a self-buff rides an AoE attack without the suffix: {d!r}")
+    check(d == "Deal {Damage} damage to ALL enemies.\nGain {ForgedTempThornsPower} Thorns.", f"a self-buff rides an AoE attack without the suffix: {d!r}")
     d = cardgen.describe(flash["effects"], "self")
-    check(d.startswith("Gain Focus.\n"), f"temp_focus describe: {d!r}")
+    check(d.startswith("Gain {ForgedTempFocusPower} Focus.\n"), f"temp_focus describe: {d!r}")
     _, src = cardgen.gen_class(bristle)
     check('new EffectSpec("apply_status", 4, "temp_thorns")' in src, "emit carries the status name")
     tp = _power("turn_start", [{"op": "apply_status", "status": "temp_thorns", "amount": 3}])

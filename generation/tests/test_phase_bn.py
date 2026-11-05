@@ -244,7 +244,7 @@ CASES = [([{"op": "damage", "amount": 10}, {"op": "gain_max_hp", "amount": 3, "w
          ([{"op": "damage", "amount": 12}, {"op": "gain_energy", "amount": 2, "when": KILLED}], "all_enemies",
           "Deal {Damage} damage to ALL enemies.\nGain {Energy} energy if this kills an enemy."),
          ([{"op": "damage", "amount": 8}, {"op": "apply_status", "status": "weak", "amount": 2, "when": dict(KILLED, negate=True)}],
-          "enemy", "Deal {Damage} damage.\nApply Weak unless this kills the enemy."),
+          "enemy", "Deal {Damage} damage.\nApply {WeakPower} Weak unless this kills the enemy."),
          ([{"op": "add_random_card", "card_type": "attack", "pile": "hand", "free_this_turn": True}, {"op": "exhaust"}], "self",
           "Add a random Attack to your hand. It costs 0 this turn.\nExhaust."),
          ([{"op": "add_random_card", "pile": "discard", "amount": 2}], "self", "Add 2 random cards to your discard pile."),

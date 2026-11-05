@@ -189,7 +189,7 @@ CASES = [
     ([{"op": "block", "amount": 6}, {"op": "draw", "amount": 2, "when": {"kind": "played_cards_last_turn_ge", "value": 4}}], "self",
      "Gain {Block} Block.\nDraw {Cards} card(s) if you played 4+ cards last turn."),
     ([{"op": "damage", "amount": 3}, {"op": "apply_status", "status": "weak", "amount": 1, "when": {"kind": "target_intends_attack"}}],
-     "enemy", "Deal {Damage} damage.\nApply Weak if the enemy intends to attack."),
+     "enemy", "Deal {Damage} damage.\nApply {WeakPower} Weak if the enemy intends to attack."),
     ([{"op": "add_trigger", "trigger": "turn_start", "effects": [_sc("damage", "total_enemy_poison", target="all_enemies")]}], "self",
      "At the start of your turn, deal damage equal to the total Poison on ALL enemies to ALL enemies."),
     ([{"op": "add_trigger", "trigger": "turn_end", "effects": [_sc("block", "exhaust_pile_size")]}], "self",

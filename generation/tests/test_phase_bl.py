@@ -173,11 +173,14 @@ def _t_engine() -> None:
     left = [p.name for p in engine.rglob("*.cs") if "gaptest_enemy_artifact" in p.read_text(encoding="utf-8-sig")]
     check(not left, f"the gaptest_enemy_artifact op is GONE from the C# (still in: {left})")
     dc = _cs("Engine", "DataCard.cs")
-    check('case "doom":           if (!e.IsScaled) Power<DoomPower>(vname, e.Amount, up); break;' in dc, "DataCard: Power<DoomPower>")
-    check('case "temp_strength_down": Power<ForgedTempStrengthDownPower>(vname, e.Amount, up); break;' in dc, "DataCard: the temp shell var")
+    fc = _cs("Engine", "ForgedCards.cs")  # GitHub #2 (2b): the plain Power<T> statuses live in ForgedCards.StatusPowerVars
+    check('case "doom":           if (e.IsScaled) break; goto default;' in dc
+          and '["doom"]               = (typeof(DoomPower), null),' in fc, "DataCard: Power<DoomPower> (unscaled only)")
+    check('["temp_strength_down"] = (typeof(ForgedTempStrengthDownPower), null),' in fc, "DataCard: the temp shell var")
     check('case "strength_down":  WithVar("StrengthLoss", e.Amount, up); break;' in dc,
           "DataCard: the permanent form declares StrengthLoss (NOT Power<StrengthPower>)")
-    check("Power<StrengthPower>(vname, e.Amount, up); break;" in dc and dc.count("Power<StrengthPower>(") == 1,
+    check('["strength"]           = (typeof(StrengthPower), null),' in fc and fc.count("typeof(StrengthPower)") == 1
+          and "Power<StrengthPower>(" not in dc,
           "Power<StrengthPower> stays the self-buff `strength` only")
     for d in ('case "strip_block":', 'case "strip_artifact":'):
         check(d in dc, f"DataCard declares nothing for {d}")
@@ -208,14 +211,14 @@ def _t_engine() -> None:
         check(frag in fc, f"ForgedCards.Validate: {frag[:70]}")
 
 
-CASES = [([_st("temp_strength_down", 6)], "all_enemies", "Apply Strength Down to ALL enemies."),
-         ([_st("temp_strength_down", 9)], "enemy", "Apply Strength Down."),
+CASES = [([_st("temp_strength_down", 6)], "all_enemies", "Apply {ForgedTempStrengthDownPower} Strength Down to ALL enemies."),
+         ([_st("temp_strength_down", 9)], "enemy", "Apply {ForgedTempStrengthDownPower} Strength Down."),
          ([_st("strength_down", 2)], "enemy", "The enemy loses {StrengthLoss} Strength."),
          ([_st("strength_down", 1)], "all_enemies", "ALL enemies lose {StrengthLoss} Strength."),
          ([_st("strength_down", 1)], "random_enemy", "A random enemy loses {StrengthLoss} Strength."),
          ([{"op": "strip_block"}, {"op": "strip_artifact"}, _st("vulnerable", 2)], "enemy",
-          "Remove all of the enemy's Block.\nRemove the enemy's Artifact.\nApply Vulnerable."),
-         ([_st("doom", 7)], "enemy", "Apply Doom."),
+          "Remove all of the enemy's Block.\nRemove the enemy's Artifact.\nApply {VulnerablePower} Vulnerable."),
+         ([_st("doom", 7)], "enemy", "Apply {DoomPower} Doom."),
          ([{"op": "damage", "amount": 6}, _st("doom", 1, scale="damage_dealt_unblocked")], "enemy",
           "Deal {Damage} damage.\nApply Doom equal to the unblocked damage dealt."),
          ([{"op": "damage", "amount": 1, "scale": "target_status_stacks", "status": "doom"}], "enemy",

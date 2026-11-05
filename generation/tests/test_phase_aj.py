@@ -61,11 +61,11 @@ def _t_random_enemy(v: CardValidator) -> None:
     r = v.validate(flask)
     check(r.ok, f"random_enemy damage + debuff should validate: {r.errors}")
     d = cardgen.describe(flask["effects"], "random_enemy")
-    check(d == "Deal {Damage} damage to a random enemy.\nApply Weak to a random enemy.", f"describe: {d!r}")
+    check(d == "Deal {Damage} damage to a random enemy.\nApply {WeakPower} Weak to a random enemy.", f"describe: {d!r}")
     # a self-buff on a random_enemy card still reads "Gain ..." (buffs land on you)
     d2 = cardgen.describe([{"op": "damage", "amount": 6}, {"op": "apply_status", "status": "strength", "amount": 1}],
                           "random_enemy")
-    check(d2 == "Deal {Damage} damage to a random enemy.\nGain Strength.", f"describe (buff): {d2!r}")
+    check(d2 == "Deal {Damage} damage to a random enemy.\nGain {StrengthPower} Strength.", f"describe (buff): {d2!r}")
     # C# emit names the RandomEnemy TargetType
     _, src = cardgen.gen_class(scatter)
     check("TargetType.RandomEnemy" in src, "emitted C# should carry TargetType.RandomEnemy")
