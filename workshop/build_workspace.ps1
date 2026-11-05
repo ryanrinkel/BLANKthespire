@@ -77,11 +77,23 @@ New-Item -ItemType Directory -Force -Path $contentDir | Out-Null
 
 foreach ($f in $runtime) { Copy-Item (Join-Path $srcBlank $f) (Join-Path $contentDir $f) -Force }
 
-# Version-stamp the staged manifest only.
+# Version-stamp the staged manifest only. A text replace of the "version" field (same as
+# mod\tools\package_release.ps1), so the rest - the [{id, min_version}] dependency objects - is never
+# re-serialized by Windows PowerShell 5.1's ConvertTo-Json (which can reformat or unwrap that array).
 $manifestPath = Join-Path $contentDir "BlankTheSpire.json"
-$manifest = Get-Content $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
-$manifest.version = "v$Version"
-$manifest | ConvertTo-Json -Depth 10 | Set-Content $manifestPath -Encoding utf8
+$raw = [System.IO.File]::ReadAllText($manifestPath)
+$stamped = ([regex]'("version"\s*:\s*")[^"]*(")').Replace($raw, "`${1}v$Version`${2}", 1)
+if ($stamped -notmatch "`"version`"\s*:\s*`"v$([regex]::Escape($Version))`"") {
+    throw "Could not stamp the version into $manifestPath"
+}
+[System.IO.File]::WriteAllText($manifestPath, $stamped, (New-Object System.Text.UTF8Encoding($false)))
+# Refuse to stage a stale manifest: the dependency must carry a min_version, or Workshop players can end
+# up on a BaseLib the mod cannot run against.
+$manifest = $stamped | ConvertFrom-Json
+$baseLibDep = @($manifest.dependencies) | Where-Object { $_.id -eq "BaseLib" }
+if (-not $baseLibDep -or -not $baseLibDep.min_version -or $stamped -notmatch '"min_version"\s*:') {
+    throw "Staged manifest $manifestPath must declare {`"id`": `"BaseLib`", `"min_version`": ...} in dependencies (stale deploy? rebuild/redeploy the mod)"
+}
 
 # Refresh workshop.json: description from the canonical BBCode file, changeNote from params.
 $workshopJsonPath = Join-Path $workspace "workshop.json"

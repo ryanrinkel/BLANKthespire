@@ -2478,12 +2478,17 @@ Notes: {version} is stamped server-side as `{{VERSION}}`.
 ### download.manual.one_download
 Where: static/download.html:76 (hint)
 
-    One download (BaseLib is bundled in this zip). Unzip into the game's `mods` folder.
+    The zip holds the mod only (`BlankTheSpire\`) — **BaseLib**, the mod loader, is not in it any more. Get BaseLib first: [subscribe to it on the Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3737335127) (or just use the Workshop route above, which pulls it in for you). Off Steam? Download the same BaseLib version from [Alchyr's GitHub releases](https://github.com/Alchyr/BaseLib-StS2/releases) into `mods\BaseLib\`. Then unzip this into the game's `mods` folder.
+
+### download.manual.old_zip_warning
+Where: static/download.html:82 (hint, right after download.manual.one_download)
+
+    **Installed an earlier zip?** Delete `mods\BaseLib` first — a leftover copy overrides the Workshop BaseLib for every mod and the game will report BaseLib too old.
 
 ### download.manual.install_title
 Where: static/download.html:78 (h3)
 
-    Install (one drop)
+    Install
 
 ### download.manual.step_1
 Where: static/download.html:80-81 (li)
@@ -2497,11 +2502,12 @@ Where: static/download.html:82 (li, followed by download.manual.tree)
 
 ### download.manual.tree
 Where: static/download.html:83-86 (preformatted folder tree)
-Notes: preformatted; keep the folder names and alignment, only "← from the zip" is prose.
+Notes: preformatted; keep the folder names and alignment, only the text after each "←" (and the bracketed line under it) is prose.
 
     Slay the Spire 2\
       mods\
-        BaseLib\        ← from the zip
+        BaseLib\        ← off Steam only: Alchyr's GitHub release
+                          (Workshop users: no BaseLib folder here)
         BlankTheSpire\  ← from the zip
 
 ### download.manual.step_3
@@ -2512,7 +2518,7 @@ Where: static/download.html:88-89 (li)
 ### download.manual.updating
 Where: static/download.html:91 (hint)
 
-    Updating later? Re-unzip a newer version over the same folder, overwriting.
+    Updating later? Re-unzip a newer version over the same folder, overwriting (and keep BaseLib current).
 
 ### download.linux.title
 Where: static/download.html:93 (h3)
@@ -2532,7 +2538,7 @@ Where: static/download.html:96-99 (li)
 ### download.linux.step_2
 Where: static/download.html:100-101 (li)
 
-    **Unzip into it:** `unzip BlankTheSpire-{version}.zip -d "<game dir>/mods"` → you get `mods/BaseLib/` and `mods/BlankTheSpire/`.
+    **BaseLib, then the zip:** subscribe to [BaseLib on the Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3737335127) (Steam on Linux has it too), or download the same version from [Alchyr's GitHub releases](https://github.com/Alchyr/BaseLib-StS2/releases) into `mods/BaseLib/`. Then `unzip BlankTheSpire-{version}.zip -d "<game dir>/mods"` → you get `mods/BlankTheSpire/`.
 
 ### download.linux.step_3
 Where: static/download.html:102-105 (li)

@@ -73,22 +73,30 @@
       <a class="btn dlbtn" href="/static/releases/BlankTheSpire-{{VERSION}}.zip" download data-i18n="download.manual.button" data-i18n-var-version="{{VERSION}}">
         ⬇ Download BlankTheSpire-{{VERSION}}.zip
       </a>
-      <p class="hint" data-i18n-html="download.manual.one_download">One download (BaseLib is bundled in this zip). Unzip into the game's <code>mods</code> folder.</p>
+      <p class="hint" data-i18n-html="download.manual.one_download">The zip holds the mod only (<code>BlankTheSpire\</code>) — <b>BaseLib</b>, the mod
+         loader, is not in it any more. Get BaseLib first:
+         <a href="https://steamcommunity.com/sharedfiles/filedetails/?id=3737335127">subscribe to it on the Steam Workshop</a>
+         (or just use the Workshop route above, which pulls it in for you). Off Steam? Download the same BaseLib version from
+         <a href="https://github.com/Alchyr/BaseLib-StS2/releases">Alchyr's GitHub releases</a> into <code>mods\BaseLib\</code>.
+         Then unzip this into the game's <code>mods</code> folder.</p>
+      <p class="hint" data-i18n-html="download.manual.old_zip_warning"><b>Installed an earlier zip?</b> Delete <code>mods\BaseLib</code> first — a leftover
+         copy overrides the Workshop BaseLib for every mod and the game will report BaseLib too old.</p>
 
-      <h3 data-i18n="download.manual.install_title">Install (one drop)</h3>
+      <h3 data-i18n="download.manual.install_title">Install</h3>
       <ol class="steps">
         <li data-i18n-html="download.manual.step_1"><b>Find your STS2 <code>mods</code> folder.</b> In Steam: right-click <i>Slay the Spire 2</i> →
           <i>Manage</i> → <i>Browse local files</i>. Make a <code>mods</code> folder there if it doesn't exist.</li>
         <li><span data-i18n-html="download.manual.step_2"><b>Unzip the download into that <code>mods</code> folder</b> so it looks like:</span>
           <div class="tree" data-i18n="download.manual.tree">Slay the Spire 2\
   mods\
-    BaseLib\        ← from the zip
+    BaseLib\        ← off Steam only: Alchyr's GitHub release
+                      (Workshop users: no BaseLib folder here)
     BlankTheSpire\  ← from the zip</div>
         </li>
         <li data-i18n-html="download.manual.step_3"><b>Launch the game.</b> It'll start modded. (The log at
           <code>%APPDATA%\SlayTheSpire2\logs\godot.log</code> says <code>RUNNING MODDED</code> if you want to check.)</li>
       </ol>
-      <p class="hint" data-i18n="download.manual.updating">Updating later? Re-unzip a newer version over the same folder, overwriting.</p>
+      <p class="hint" data-i18n="download.manual.updating">Updating later? Re-unzip a newer version over the same folder, overwriting (and keep BaseLib current).</p>
 
       <h3 data-i18n="download.linux.title">On Linux (Ubuntu / Steam, incl. Steam Deck)</h3>
       <p class="muted" data-i18n="download.linux.lede">Same steps — the mod is platform-neutral; only the paths differ. Works natively or via Proton.</p>
@@ -97,8 +105,11 @@
           <i>Browse local files</i> (works for native &amp; Proton). Usually
           <code>~/.steam/steam/steamapps/common/Slay the Spire 2/</code> or
           <code>~/.local/share/Steam/steamapps/common/Slay the Spire 2/</code>. Make a <code>mods</code> folder if needed.</li>
-        <li data-i18n-html="download.linux.step_2" data-i18n-var-version="{{VERSION}}"><b>Unzip into it:</b> <code>unzip BlankTheSpire-{{VERSION}}.zip -d "&lt;game dir&gt;/mods"</code> →
-          you get <code>mods/BaseLib/</code> and <code>mods/BlankTheSpire/</code>.</li>
+        <li data-i18n-html="download.linux.step_2" data-i18n-var-version="{{VERSION}}"><b>BaseLib, then the zip:</b> subscribe to
+          <a href="https://steamcommunity.com/sharedfiles/filedetails/?id=3737335127">BaseLib on the Workshop</a> (Steam on Linux has it too),
+          or download the same version from <a href="https://github.com/Alchyr/BaseLib-StS2/releases">Alchyr's GitHub releases</a> into
+          <code>mods/BaseLib/</code>. Then <code>unzip BlankTheSpire-{{VERSION}}.zip -d "&lt;game dir&gt;/mods"</code> →
+          you get <code>mods/BlankTheSpire/</code>.</li>
         <li data-i18n-html="download.linux.step_3"><b>Launch.</b> The log lives under your user data, not <code>%APPDATA%</code> — fastest way to find it:
           <code>find ~ -name godot.log 2>/dev/null</code>. (Native:
           <code>~/.local/share/Godot/app_userdata/SlayTheSpire2/logs/</code>; Proton: inside

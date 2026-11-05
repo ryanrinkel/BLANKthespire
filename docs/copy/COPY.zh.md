@@ -1833,11 +1833,15 @@ Notes: 游戏内路径统一写作“主菜单 → 模组配置 → BlankTheSpir
 
 ### download.manual.one_download
 
-    只需下载一次（此zip已附带BaseLib）。解压到游戏的`mods`文件夹即可。
+    此zip只包含模组本体（`BlankTheSpire\`），**不再**附带模组加载器**BaseLib**。请先获取BaseLib：[在Steam创意工坊订阅它](https://steamcommunity.com/sharedfiles/filedetails/?id=3737335127)（或者直接走上方的创意工坊安装方式，会自动帮你装上）。不用Steam？从[Alchyr的GitHub发布页](https://github.com/Alchyr/BaseLib-StS2/releases)下载同一版本的BaseLib，放进`mods\BaseLib\`。然后把此zip解压到游戏的`mods`文件夹。
+
+### download.manual.old_zip_warning
+
+    **装过旧版zip？**请先删除`mods\BaseLib`。残留的本地副本会顶替创意工坊的BaseLib，影响你所有的模组，游戏还会报错说BaseLib版本过旧。
 
 ### download.manual.install_title
 
-    安装（一步到位）
+    安装
 
 ### download.manual.step_1
 
@@ -1851,7 +1855,8 @@ Notes: 游戏内路径统一写作“主菜单 → 模组配置 → BlankTheSpir
 
     Slay the Spire 2\
       mods\
-        BaseLib\        ← 来自压缩包
+        BaseLib\        ← 仅限不用Steam：来自Alchyr的GitHub发布页
+                          （创意工坊用户：这里不要有BaseLib文件夹）
         BlankTheSpire\  ← 来自压缩包
 
 ### download.manual.step_3
@@ -1860,7 +1865,7 @@ Notes: 游戏内路径统一写作“主菜单 → 模组配置 → BlankTheSpir
 
 ### download.manual.updating
 
-    以后要更新？把新版本解压到同一个文件夹，覆盖旧文件即可。
+    以后要更新？把新版本解压到同一个文件夹，覆盖旧文件即可（BaseLib也要保持最新）。
 
 ### download.linux.title
 
@@ -1876,7 +1881,7 @@ Notes: 游戏内路径统一写作“主菜单 → 模组配置 → BlankTheSpir
 
 ### download.linux.step_2
 
-    **解压到其中：**`unzip BlankTheSpire-{version}.zip -d "<game dir>/mods"` → 你会得到`mods/BaseLib/`和`mods/BlankTheSpire/`。
+    **先装BaseLib，再解压zip：**[在创意工坊订阅BaseLib](https://steamcommunity.com/sharedfiles/filedetails/?id=3737335127)（Linux版Steam同样支持），或从[Alchyr的GitHub发布页](https://github.com/Alchyr/BaseLib-StS2/releases)下载同一版本放进`mods/BaseLib/`。然后`unzip BlankTheSpire-{version}.zip -d "<game dir>/mods"` → 你会得到`mods/BlankTheSpire/`。
 
 ### download.linux.step_3
 
