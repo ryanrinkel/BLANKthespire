@@ -2196,8 +2196,11 @@ public static class ForgedCards
         if ((effects.Concat(upgrade ?? [])).Any(e => e.Op == "transform_card")
             && (effects.Concat(upgrade ?? [])).Any(e => e.Op == "purge"))
             return "a card can't be both 'transform_card' and 'purge' (transform rewrites the run-deck original; purge deletes it — pick one).";
-        // Phase AH: at most one transform_card per card (a card becomes ONE thing; two targets is ambiguous).
-        if ((effects.Concat(upgrade ?? [])).Count(e => e.Op == "transform_card") > 1)
+        // Phase AH: at most one transform_card per EFFECT LIST (a card becomes ONE thing; two targets is ambiguous).
+        // Base + upgrade are counted INDEPENDENTLY — the upgrade list is a replace-on-upgrade list, so an upgrade
+        // repeating transform_card is the normal shape (the played card runs one list at a time), matching
+        // validator.py. Fixes GitHub #1 (counting the two lists together rejected every such card on import).
+        if (effects.Count(e => e.Op == "transform_card") > 1 || (upgrade ?? []).Count(e => e.Op == "transform_card") > 1)
             return "at most one 'transform_card' effect per card (a card can only become one other card).";
         // Phase AI (gap #7): graft_card ⊥ purge/purge_card. Graft transforms a picked card; purge/purge_card DELETE
         // a card from the run — mixing a transform-the-deck op with a delete-from-the-deck op on one play is a

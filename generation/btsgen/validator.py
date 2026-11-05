@@ -1457,7 +1457,8 @@ class CardValidator:
                 out.append("'transform_card' is not allowed on a BASIC card (a self-rewriting starter would mutate the starting deck).")
             if any(e.get("op") == "purge" for e in effects + up_effects):
                 out.append("a card can't be both 'transform_card' and 'purge' (transform rewrites the run-deck original; purge deletes it — pick one).")
-            if sum(1 for e in effects if e.get("op") == "transform_card") > 1:
+            if (sum(1 for e in effects if e.get("op") == "transform_card") > 1
+                    or sum(1 for e in up_effects if e.get("op") == "transform_card") > 1):
                 out.append("at most one 'transform_card' effect per card (a card can only become one other card).")
         # Phase AI (gap #7): graft_card is the CHOOSE form of transform_card — it transforms a PICKED hand card into
         # a same-class target. Never on a BASIC card (deck-editing shouldn't be in the starting deck); ⊥ purge AND
