@@ -5,7 +5,9 @@ key, From address, BTSWEB_ADMIN_EMAILS / BTSWEB_ALERT_EMAILS):
 
 * Mondays: the digest — one block per live experiment (hypothesis, exposures and the primary metric per arm,
   P(beats control), days left; plus new accounts / forged / donated per arm from users.signup_ab when the
-  database is reachable). Nothing at all when nothing is live.
+  database is reachable), then the dependency watch (dep_watch.py: Workshop BaseLib + the game's public
+  build vs last week; "[DEP]" subject prefix when either moved). With nothing live the digest is just the
+  dependency watch; with BTSWEB_DEP_WATCH=0 as well, nothing at all.
 * Any day: "<name> reached its planned end" once `planned_end` passes on an experiment nobody ended, and
   "<name> has a winner by the rule" once the decision rule names one — each at most once, ever.
 
@@ -82,6 +84,7 @@ def main(argv: list[str] | None = None) -> int:
     _load_env()
     import ab_report  # noqa: E402 — after the env is loaded
     import alerts
+    import dep_watch
 
     traffic_dir = Path(args.traffic_dir)
     state_path = Path(args.state) if args.state else traffic_dir / "experiments_mail.json"
@@ -103,11 +106,26 @@ def main(argv: list[str] | None = None) -> int:
     state["sent"] = sent
 
     outgoing: list[tuple[str | None, str, str]] = []
+    dep_result = None
     digest_due = args.digest or (today_d.weekday() == 0 and state.get("last_digest") != today)
     if digest_due:
         digest = alerts.experiments_digest(payload, today)
+        dep_text = None
+        if dep_watch.enabled():
+            # BaseLib / game-build watch (GITHUB_ISSUES_1_2_FIX_PLAN.md policy step 4). Recorded only once the
+            # digest is sent, so a failed send re-reports a change next run.
+            dep_state = os.environ.get("BTSWEB_DEP_WATCH_STATE") or traffic_dir / "dep_watch.json"
+            dep_text, dep_result = dep_watch.safe_section(state_path=dep_state, now=today_d, write=False)
+        if digest is None and dep_text is not None:   # nothing live: the weekly dependency line still goes out
+            digest = (f"{alerts.EXP_SUBJECT_PREFIX} weekly digest: no experiment live",
+                      f"No page experiment is live on {today} (UTC).\n")
         if digest is not None:
-            outgoing.append((None, *digest))
+            subject, body = digest
+            if dep_text is not None:
+                body = body + "\n" + "-" * 60 + "\nDependency watch:\n" + dep_text + "\n"
+                if dep_watch.any_changed(dep_result):
+                    subject = "[DEP] " + subject
+            outgoing.append((None, subject, body))
         else:
             print(f"{today}: digest due but no experiment is live — nothing to send")
     outgoing.extend(alerts.experiments_due(payload, today, sent))
@@ -121,6 +139,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{today}: sent {key or 'digest'}: {subject}")
             if key is None:
                 state["last_digest"] = today
+                if dep_result is not None:
+                    dep_watch.commit(dep_result)
             else:
                 sent[key] = today
             changed = True

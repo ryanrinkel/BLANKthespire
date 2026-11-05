@@ -52,6 +52,8 @@ for _k in ("BTSWEB_SECRET_KEY", "BTSWEB_ENV", "BTSWEB_SECURE_COOKIES", "BTSWEB_B
 os.environ["BTS_FORGE_LEDGER"] = str(Path(tempfile.mkdtemp(prefix="btsweb-tests-ledger-")) / "forge_ledger.jsonl")
 os.environ["BTSWEB_DATABASE_URL"] = f"sqlite:///{DB_PATH.as_posix()}"
 os.environ["BTSWEB_DEV_AUTH"] = "1"
+os.environ["BTSWEB_DEP_WATCH"] = "0"   # the Monday digest's Steam calls; test_dep_watch.py turns it on with fakes
+os.environ.pop("BTSWEB_DEP_WATCH_STATE", None)
 os.environ.pop("GOOGLE_CLIENT_ID", None)
 os.environ.pop("GOOGLE_CLIENT_SECRET", None)
 os.environ.pop("STRIPE_SECRET_KEY", None)          # billing disabled: routes 503, event handler still testable
