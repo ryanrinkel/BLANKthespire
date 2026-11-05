@@ -2,6 +2,7 @@
 using Godot;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Modding;
+using System.Reflection;
 
 namespace BlankTheSpire.BlankTheSpireCode;
 
@@ -25,6 +26,7 @@ public partial class MainFile : Node
         // Release banner (v0.4.0 prep): one line that says which card vocabulary this DLL reads, so a packaged-DLL
         // smoke (and a player's log) can confirm the build matches the site's codes (BTS1Codec rejects newer ones).
         Logger.Info($"[BTS] BLANK the spire loaded: card vocabulary v{Engine.ForgedCards.VocabVersion}.");
+        LogBaseLibVersion();
 
         // The in-game "forge" screen (appears in the main-menu mod settings list).
         ModConfigRegistry.Register(ModId, new ForgeConfig());
@@ -73,5 +75,32 @@ public partial class MainFile : Node
                 if (po != null && !string.IsNullOrEmpty(po.Emoji))
                     Engine.EmojiIconRenderer.Kick($"potion{k}_{m}", po.Emoji);
             }
+    }
+
+    /// <summary>GitHub #2: one [BOOT] line with the BaseLib actually loaded (version + file path, which proves
+    /// whether it came from the Workshop or a local mods/BaseLib that shadows it) and the BaseLib this DLL was
+    /// compiled against (the csproj's BaseLibBuiltAgainst assembly metadata). BaseLib is not binary-compatible
+    /// across minors, so an older one than we built against is logged as "BaseLib too old". Never throws.</summary>
+    private static void LogBaseLibVersion()
+    {
+        try
+        {
+            var baseLib = typeof(BaseLib.Utils.CommonActions).Assembly;
+            var loaded = baseLib.GetName().Version;
+            string? info = baseLib.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+            string? builtAgainst = typeof(MainFile).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>()
+                .FirstOrDefault(a => a.Key == "BaseLibBuiltAgainst")?.Value;
+            string line = $"[BOOT] BaseLib loaded v{loaded}" + (info != null ? $" ({info})" : "") +
+                          $" from '{baseLib.Location}'; built against v{builtAgainst ?? "?"}.";
+            if (loaded != null && System.Version.TryParse(builtAgainst, out var built) && loaded < built)
+                Logger.Warn(line + " BaseLib too old: update BaseLib (Workshop item 3737335127) and delete any " +
+                            "local mods/BaseLib copy, or statuses and other effects will fail mid-combat.");
+            else
+                Logger.Info(line);
+        }
+        catch (Exception ex)
+        {
+            Logger.Warn($"[BOOT] could not read the BaseLib version: {ex.GetType().Name}: {ex.Message}");
+        }
     }
 }

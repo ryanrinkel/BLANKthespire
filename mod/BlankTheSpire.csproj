@@ -31,8 +31,20 @@
         <Publicize Include="sts2" IncludeVirtualMembers="false" IncludeCompilerGeneratedMembers="false" />
     </ItemGroup>
 
+    <PropertyGroup>
+        <!-- GitHub #2: build against EXACTLY the BaseLib the Steam Workshop serves (item 3737335127). BaseLib is
+             source- but not binary-compatible across minors (3.4 added an optional parameter and a 3.2.1 build
+             hit MissingMethodException). Keep in lockstep with "min_version" in BlankTheSpire.json. -->
+        <BaseLibVersion>3.4.7</BaseLibVersion>
+    </PropertyGroup>
+
     <ItemGroup>
-        <PackageReference Include="Alchyr.Sts2.BaseLib" Version="3.2.1" PrivateAssets="All"/>
+        <!-- Read back at init by MainFile ([BOOT] line) to compare with the BaseLib actually loaded. -->
+        <AssemblyMetadata Include="BaseLibBuiltAgainst" Value="$(BaseLibVersion)"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Alchyr.Sts2.BaseLib" Version="$(BaseLibVersion)" PrivateAssets="All"/>
         <PackageReference Include="Krafs.Publicizer" Version="2.3.0" PrivateAssets="All"/>
         <PackageReference Include="Alchyr.Sts2.ModAnalyzers" Version="*" />
         <!-- Generates a .pck file when building if only using simple assets (PNGs + JSON). -->

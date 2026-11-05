@@ -69,6 +69,49 @@ POLL_S = 3
 TOK_COMPLETED = ("run completed", "runcompleted")
 TOK_FAILED = ("run failed", "runfailed", "autoslaytimeoutexception")
 
+# --- BaseLib shadowing guard (GitHub #2) ---------------------------------------------------------
+# A local <game>/mods/BaseLib makes the game DISABLE the Workshop BaseLib, so every smoke silently ran on a
+# hand-copied 3.2.1 while every Workshop player ran 3.4.7 (MissingMethodException -> hovering cards). Smokes
+# must run on the Workshop copy: refuse to launch while mods/BaseLib exists, and FAIL a run whose godot.log
+# shows the game disabling the Workshop BaseLib. Escape hatch for a deliberate local-BaseLib test:
+ALLOW_LOCAL_BASELIB_ENV = "BTS_SMOKE_ALLOW_LOCAL_BASELIB"
+# godot.log, verbatim: "[WARN] Mod with ID BaseLib is loaded both via Steam and local mods directory.
+# Disabling the Steam workshop version." (the same line for OUR mod is harmless: a dev's own Workshop sub).
+TOK_SHADOW_DISABLE = "disabling the steam workshop version"
+BASELIB_SHADOW_REASON = "local BaseLib shadows the Workshop copy"
+
+
+def _allow_local_baselib() -> bool:
+    return os.environ.get(ALLOW_LOCAL_BASELIB_ENV, "").strip() not in ("", "0")
+
+
+def local_baselib_dir(game_dir: Path | None) -> Path | None:
+    """<game dir>/mods/BaseLib if it exists (the shadowing copy), else None."""
+    if game_dir is None:
+        return None
+    d = game_dir / "mods" / "BaseLib"
+    return d if d.exists() else None
+
+
+def baselib_shadowed(log_text: str) -> bool:
+    """True when godot.log shows the game disabling the Workshop BaseLib in favour of a local copy."""
+    for line in log_text.splitlines():
+        low = line.lower()
+        if TOK_SHADOW_DISABLE in low and "mod with id baselib " in low:
+            return True
+    return False
+
+
+def _baselib_shadow_check(game_log: Path) -> str | None:
+    """The FAIL reason if this launch's godot.log shows BaseLib shadowing, else None."""
+    try:
+        text = game_log.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    if not baselib_shadowed(text):
+        return None
+    return f"{BASELIB_SHADOW_REASON} (godot.log: 'Disabling the Steam workshop version' for BaseLib)"
+
 
 @dataclass
 class RunResult:
@@ -139,7 +182,18 @@ def _log_terminal_state(log_path: Path) -> str | None:
     return None
 
 
-def _classify(seed: str, log_path: Path, timed_out: bool) -> RunResult:
+def _classify(seed: str, log_path: Path, timed_out: bool, game_log: Path | None = None) -> RunResult:
+    result = _classify_autoslay(seed, log_path, timed_out)
+    shadow = _baselib_shadow_check(game_log or GAME_LOG)
+    if shadow:
+        if _allow_local_baselib():
+            print(f"  WARNING: {shadow}; allowed by {ALLOW_LOCAL_BASELIB_ENV}=1.")
+        else:
+            return RunResult(seed, False, f"{shadow}; AutoSlay said: {result.reason}", log_path)
+    return result
+
+
+def _classify_autoslay(seed: str, log_path: Path, timed_out: bool) -> RunResult:
     if timed_out:
         return RunResult(seed, False, "HANG — wall-clock timeout (game never quit on its own)", log_path)
     state = _log_terminal_state(log_path)
@@ -266,6 +320,18 @@ def main(argv: list[str] | None = None) -> int:
         print("ERROR: Slay the Spire 2 is already running. Close it first (one run per launch).",
               file=sys.stderr)
         return 2
+
+    shadow_dir = local_baselib_dir(game_paths.game_install_dir())
+    if shadow_dir is not None:
+        if _allow_local_baselib():
+            print(f"  WARNING: {shadow_dir} exists ({BASELIB_SHADOW_REASON}); allowed by "
+                  f"{ALLOW_LOCAL_BASELIB_ENV}=1.")
+        else:
+            print(f"ERROR: {shadow_dir} exists: a local BaseLib makes the game disable the Workshop BaseLib, so "
+                  "this smoke would not test what players run (GitHub #2). Delete that folder (keep a copy "
+                  f"outside the game dir if needed), or set {ALLOW_LOCAL_BASELIB_ENV}=1 to run anyway.",
+                  file=sys.stderr)
+            return 2
 
     if args.build and not _build():
         return 1

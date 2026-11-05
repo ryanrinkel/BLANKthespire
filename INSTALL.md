@@ -9,46 +9,74 @@ The loop: **describe a class → get an import code → paste it in-game → res
 
 ## 1. What you need
 
-- **Slay the Spire 2** installed on Steam (Windows).
-- The **latest release zip** (`BlankTheSpire-vX.Y.Z.zip`) — download it from
-  [blankthespire.com/download](https://blankthespire.com/download) or this repo's GitHub Releases page.
-  It already includes **BaseLib** (the mod loader BLANK the spire depends on) — you don't have to grab it
-  separately.
+- **Slay the Spire 2** installed on Steam (Windows or Linux).
+- **BaseLib**, the mod library BLANK the spire is built on. It is **not** in the release zip any more:
+  - **Steam (recommended):** subscribe to
+    [BaseLib on the Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3737335127)
+    (item 3737335127). Steam keeps it up to date for you.
+  - **Not on Steam / no Workshop:** download the matching BaseLib release from
+    [github.com/Alchyr/BaseLib-StS2/releases](https://github.com/Alchyr/BaseLib-StS2/releases) and put it in
+    `mods\BaseLib\`. Use the version the mod asks for (`min_version` in `BlankTheSpire.json`, currently
+    **3.4.7**) or newer.
+- **BLANK the spire itself**, either way:
+  - **Steam (recommended):** subscribe to
+    [BLANK the spire on the Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3803255976)
+    (item 3803255976). Nothing to unzip; it updates itself.
+  - **Zip:** the latest `BlankTheSpire-vX.Y.Z.zip` from
+    [blankthespire.com/download](https://blankthespire.com/download) or this repo's GitHub Releases page.
+
+> **If you installed an earlier zip, DELETE `mods\BaseLib\` first.** Older zips bundled their own copy of
+> BaseLib. A leftover local copy overrides the Workshop one for every mod you own, and the mod will refuse
+> to load with a BaseLib-too-old error.
 
 ---
 
-## 2. Install the mod (one drop)
+## 2. Install the mod
 
-1. **Find your STS2 `mods` folder.** In Steam: right-click *Slay the Spire 2* →
+**Workshop route:** subscribe to BaseLib and to BLANK the spire (links above), make sure there is **no**
+`mods\BaseLib\` folder in the game folder (see the warning above), then launch the game. That's it; skip to
+step 3 below.
+
+**Zip route:**
+
+1. **Get BaseLib** (Workshop subscription, or the GitHub download into `mods\BaseLib\`, see section 1).
+2. **Find your STS2 `mods` folder.** In Steam: right-click *Slay the Spire 2* →
    *Manage* → *Browse local files*. You'll land in the game folder
    (default `C:\Program Files (x86)\Steam\steamapps\common\Slay the Spire 2`).
    Make a `mods` folder there if one doesn't already exist.
-2. **Unzip the latest `BlankTheSpire-vX.Y.Z.zip` into that `mods` folder.** When you're done it should look like:
+3. **Unzip the latest `BlankTheSpire-vX.Y.Z.zip` into that `mods` folder.** When you're done it should look like:
 
    ```
    Slay the Spire 2\
      mods\
-       BaseLib\          ← from the zip
        BlankTheSpire\    ← from the zip
+       (BaseLib\         ← ONLY if you are off Steam and downloaded it from GitHub;
+                            Workshop users must NOT have this folder)
    ```
-3. **Launch the game.** If it loaded, the title screen will say it's running modded. (To double-check,
-   the log at `%APPDATA%\SlayTheSpire2\logs\godot.log` prints `RUNNING MODDED` near the top.)
+4. **Launch the game.** If it loaded, the title screen will say it's running modded. (To double-check,
+   the log at `%APPDATA%\SlayTheSpire2\logs\godot.log` prints `RUNNING MODDED` near the top, and a
+   `[BOOT] BaseLib loaded ...` line shows which BaseLib was picked up and from where.)
 
-> Updating later? Just re-unzip a newer `BlankTheSpire-vX.zip` over the same folder, overwriting.
+> Updating later? Workshop items update themselves. For the zip, re-unzip a newer `BlankTheSpire-vX.zip`
+> over the same folder, overwriting (and keep BaseLib current).
 
 ### On Linux (Ubuntu / Steam, incl. Steam Deck)
 
 Same idea — the mod is platform-neutral; only the paths differ. It works whether STS2 runs natively or
-through Proton.
+through Proton. Steam on Linux can use the Workshop too: subscribe to BaseLib and BLANK the spire (section 1)
+and skip to step 4. Otherwise:
 
 1. **Find the `mods` folder the easy way:** right-click *Slay the Spire 2* → *Manage* → *Browse local files*
    (lands you in the game dir regardless of native vs Proton). Make a `mods` folder there if needed. Typical
    locations:
    - `~/.steam/steam/steamapps/common/Slay the Spire 2/`
    - or `~/.local/share/Steam/steamapps/common/Slay the Spire 2/`
-2. **Unzip into `mods/`** so you get `mods/BaseLib/` and `mods/BlankTheSpire/` (same layout as above).
+2. **BaseLib:** subscribe on the Workshop, or (no Workshop) download the matching release from
+   [github.com/Alchyr/BaseLib-StS2/releases](https://github.com/Alchyr/BaseLib-StS2/releases) into
+   `mods/BaseLib/`. With the Workshop copy, make sure **no** `mods/BaseLib/` is left over from an older zip.
+3. **Unzip into `mods/`** so you get `mods/BlankTheSpire/` (same layout as above).
    `unzip BlankTheSpire-vX.Y.Z.zip -d "<game dir>/mods"`.
-3. **Launch.** To check the log, it's under your user data, not `%APPDATA%`:
+4. **Launch.** To check the log, it's under your user data, not `%APPDATA%`:
    - **Native build:** `~/.local/share/Godot/app_userdata/SlayTheSpire2/logs/godot.log`
    - **Proton:** inside the prefix —
      `~/.steam/steam/steamapps/compatdata/2868840/pfx/drive_c/users/steamuser/AppData/Roaming/SlayTheSpire2/logs/godot.log`

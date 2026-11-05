@@ -1,15 +1,20 @@
 <#
 .SYNOPSIS
-    Package a BLANK the spire soft-launch release zip for friends-as-testers.
+    Package a BLANK the spire release zip (GitHub releases / non-Workshop installs).
 
 .DESCRIPTION
-    Produces release\BlankTheSpire-v<Version>.zip containing exactly what a friend drops into the
+    Produces release\BlankTheSpire-v<Version>.zip containing exactly what a player drops into the
     Slay the Spire 2 `mods\` folder:
 
         BlankTheSpire\   (BlankTheSpire.dll, .json, .pck  -- .pdb is dropped)
-        BaseLib\         (BaseLib.dll, .json, .pck         -- bundled; private use only)
 
-    Source of truth is the *deployed* mods folder (the proven-good artifact a friend would install),
+    BaseLib is NOT bundled (GitHub #2, policy 2026-11-05). A local mods\BaseLib makes the game disable
+    the Workshop BaseLib for every mod the player owns, and BaseLib is not binary-compatible across
+    minor versions, so a frozen bundle breaks things. Players get BaseLib from the Steam Workshop
+    (item 3737335127) or, off Steam, from https://github.com/Alchyr/BaseLib-StS2/releases (the
+    version in the manifest's "min_version"). See INSTALL.md.
+
+    Source of truth is the *deployed* mods folder (the proven-good artifact a player would install),
     not the raw build output. The BlankTheSpire manifest is version-stamped into the staged copy
     (the working tree manifest is left untouched).
 
@@ -38,36 +43,37 @@ $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 if (-not $OutDir) { $OutDir = Join-Path $repoRoot "release" }
 
-$srcBlank   = Join-Path $GameMods "BlankTheSpire"
-$srcBaseLib = Join-Path $GameMods "BaseLib"
-
-foreach ($p in @($srcBlank, $srcBaseLib)) {
-    if (-not (Test-Path $p)) {
-        throw "Source mod folder not found: $p  (build/deploy the mod and install BaseLib first, or pass -GameMods)"
-    }
+$srcBlank = Join-Path $GameMods "BlankTheSpire"
+if (-not (Test-Path $srcBlank)) {
+    throw "Source mod folder not found: $srcBlank  (build/deploy the mod first, or pass -GameMods)"
 }
 
 # Required runtime files (must exist in the deployed folder).
-$blankRuntime   = @("BlankTheSpire.dll", "BlankTheSpire.json", "BlankTheSpire.pck")
-$baseLibRuntime = @("BaseLib.dll", "BaseLib.json", "BaseLib.pck")
-foreach ($f in $blankRuntime)   { if (-not (Test-Path (Join-Path $srcBlank $f)))   { throw "Missing $f in $srcBlank" } }
-foreach ($f in $baseLibRuntime) { if (-not (Test-Path (Join-Path $srcBaseLib $f))) { throw "Missing $f in $srcBaseLib" } }
+$blankRuntime = @("BlankTheSpire.dll", "BlankTheSpire.json", "BlankTheSpire.pck")
+foreach ($f in $blankRuntime) { if (-not (Test-Path (Join-Path $srcBlank $f))) { throw "Missing $f in $srcBlank" } }
 
 # Fresh staging dir.
 $stage = Join-Path ([System.IO.Path]::GetTempPath()) "bts-release-$Version"
 if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
-$stageBlank   = New-Item -ItemType Directory -Force -Path (Join-Path $stage "BlankTheSpire")   | ForEach-Object FullName
-$stageBaseLib = New-Item -ItemType Directory -Force -Path (Join-Path $stage "BaseLib")         | ForEach-Object FullName
+$stageBlank = New-Item -ItemType Directory -Force -Path (Join-Path $stage "BlankTheSpire") | ForEach-Object FullName
 
 # Copy runtime files only (drops .pdb and anything else).
-foreach ($f in $blankRuntime)   { Copy-Item (Join-Path $srcBlank $f)   (Join-Path $stageBlank $f)   -Force }
-foreach ($f in $baseLibRuntime) { Copy-Item (Join-Path $srcBaseLib $f) (Join-Path $stageBaseLib $f) -Force }
+foreach ($f in $blankRuntime) { Copy-Item (Join-Path $srcBlank $f) (Join-Path $stageBlank $f) -Force }
 
-# Version-stamp the staged BlankTheSpire manifest (working tree manifest is untouched).
+# Version-stamp the staged BlankTheSpire manifest (working tree manifest is untouched). A text replace of the
+# "version" field only, so the rest (the {id, min_version} dependency objects) is never re-serialized.
 $manifestPath = Join-Path $stageBlank "BlankTheSpire.json"
-$manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
-$manifest.version = "v$Version"
-$manifest | ConvertTo-Json -Depth 10 | Set-Content $manifestPath -Encoding utf8
+$raw = [System.IO.File]::ReadAllText($manifestPath)
+$stamped = ([regex]'("version"\s*:\s*")[^"]*(")').Replace($raw, "`${1}v$Version`${2}", 1)
+if ($stamped -notmatch "`"version`"\s*:\s*`"v$([regex]::Escape($Version))`"") {
+    throw "Could not stamp the version into $manifestPath"
+}
+[System.IO.File]::WriteAllText($manifestPath, $stamped, (New-Object System.Text.UTF8Encoding($false)))
+$manifest = $stamped | ConvertFrom-Json
+$baseLibDep = @($manifest.dependencies) | Where-Object { $_.id -eq "BaseLib" }
+if (-not $baseLibDep -or -not $baseLibDep.min_version) {
+    throw "Manifest must declare {`"id`": `"BaseLib`", `"min_version`": ...} in dependencies"
+}
 
 # Zip it.
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
@@ -81,4 +87,4 @@ $size = [math]::Round((Get-Item $zipPath).Length / 1KB, 1)
 Write-Host ""
 Write-Host "Packaged $zipPath ($size KB)" -ForegroundColor Green
 Write-Host "  BlankTheSpire/  $($blankRuntime -join ', ')  [version v$Version]"
-Write-Host "  BaseLib/        $($baseLibRuntime -join ', ')"
+Write-Host "  (BaseLib not bundled; requires BaseLib >= $($baseLibDep.min_version) from the Workshop or its GitHub releases)"

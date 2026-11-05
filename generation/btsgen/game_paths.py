@@ -37,6 +37,27 @@ def dotnet_appdata_dir() -> Path:
     return (Path(xdg) if xdg else Path.home() / ".config") / "SlayTheSpire2"
 
 
+def game_install_dir() -> Path | None:
+    """The STS2 install dir (holds mods/), or None if not found. Mirrors mod/Sts2PathDiscovery.props:
+    BTS_STS2_GAMEDIR override, then Steam's own path (Windows registry), then the default library."""
+    override = os.environ.get("BTS_STS2_GAMEDIR")
+    if override:
+        return Path(override)
+    candidates: list[Path] = []
+    if IS_WINDOWS:
+        try:
+            import winreg  # Windows-only stdlib
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Valve\Steam") as k:
+                steam = winreg.QueryValueEx(k, "SteamPath")[0]
+            candidates.append(Path(steam) / "steamapps" / "common" / "Slay the Spire 2")
+        except OSError:
+            pass
+        candidates.append(Path("C:/Program Files (x86)/Steam/steamapps/common/Slay the Spire 2"))
+    else:
+        candidates.append(Path.home() / ".local" / "share" / "Steam" / "steamapps" / "common" / "Slay the Spire 2")
+    return next((c for c in candidates if c.is_dir()), None)
+
+
 def autoslay_request_dirs() -> list[Path]:
     """Every dir the in-game hook might watch for request.json. One on Windows; on Linux both
     candidates (the hook reads .NET ApplicationData, but write to the game dir too so a runtime that

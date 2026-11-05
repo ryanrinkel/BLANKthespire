@@ -2036,10 +2036,32 @@ public static class EffectRunner
     }
 
     /// <summary>Apply N stacks of power <typeparamref name="T"/> — to the player if <paramref name="self"/>
-    /// (self-buff), else to the card's target(s) (debuff). Reads the card's <c>PowerVar&lt;T&gt;</c>.</summary>
+    /// (self-buff), else to the card's target(s) (debuff). Reads the card's <c>PowerVar&lt;T&gt;</c>.
+    /// GitHub #2 (2026-11-05): this calls the base-game <c>PowerCmd.Apply</c> DIRECTLY instead of BaseLib's
+    /// <c>CommonActions.Apply/ApplySelf</c>. BaseLib 3.4 added an optional <c>bool silent</c> parameter to
+    /// <c>Apply(ctx, card, cardPlay)</c>; C# binds optional parameters at compile time, so a DLL built against
+    /// 3.2.1 referenced a 3-parameter overload the Workshop BaseLib no longer has -> MissingMethodException on
+    /// the first debuff -> the card hovered and every later effect was skipped. PowerCmd is what the game's own
+    /// cards call (Bash: <c>PowerCmd.Apply&lt;VulnerablePower&gt;(ctx, target, amount, owner, this)</c>), so this
+    /// path no longer depends on BaseLib's binary surface. Semantics match BaseLib 3.4.7 exactly: debuff = the
+    /// chosen target if any, else the card's resolved targets (<see cref="CustomStatusTargets"/>); self = the
+    /// owner's creature; applier = owner creature, cardSource = this card.</summary>
     private static Task ApplyPower<T>(bool self, ConstructedCardModel card, PlayerChoiceContext ctx, CardPlay play)
         where T : PowerModel
-        => self ? CommonActions.ApplySelf<T>(ctx, card) : CommonActions.Apply<T>(ctx, card, play);
+    {
+        // The var key BaseLib's DynamicVars.Power<T>() reads: an unnamed PowerVar<T> (WithPower<T>(n, up)) is keyed
+        // typeof(T).Name by the base-game PowerVar ctor. Read it through the base-game DynamicVarSet directly.
+        if (!card.DynamicVars.TryGetValue(typeof(T).Name, out var powerVar))
+        {
+            MainFile.Logger.Error($"[APPLY] '{card.Id}' has no {typeof(T).Name} var; status not applied.");
+            return Task.CompletedTask;
+        }
+        decimal amount = powerVar.BaseValue;
+        Creature owner = card.Owner.Creature;
+        if (self) return PowerCmd.Apply<T>(ctx, owner, amount, owner, card);
+        if (play?.Target != null) return PowerCmd.Apply<T>(ctx, play.Target, amount, owner, card);
+        return PowerCmd.Apply<T>(ctx, card.GetTargets(), amount, owner, card);
+    }
 
     /// <summary>Phase BF (v60): <see cref="ApplyPower{T}"/> plus the smoke's apply proof (the stack count after).</summary>
     private static async Task ApplyPowerLogged<T>(bool self, ConstructedCardModel card, PlayerChoiceContext ctx, CardPlay play)
