@@ -101,7 +101,7 @@ $descPath         = Join-Path $PSScriptRoot "DESCRIPTION.bbcode"
 # -Encoding UTF8 everywhere: these files are BOM-less UTF-8 with real em-dashes, and
 # Windows PowerShell 5.1 otherwise decodes BOM-less files as ANSI and mangles them.
 $workshopJson = Get-Content $workshopJsonPath -Raw -Encoding UTF8 | ConvertFrom-Json
-$workshopJson.description = (Get-Content $descPath -Raw -Encoding UTF8).Trim()
+$workshopJson.description = ((Get-Content $descPath -Raw -Encoding UTF8) -replace "`r`n", "`n").Trim()  # LF only: a CRLF checkout must not leak  into the Steam description
 $workshopJson.changeNote  = "v$Version - $ChangeNote"
 $workshopJson | ConvertTo-Json -Depth 10 | Set-Content $workshopJsonPath -Encoding utf8
 
