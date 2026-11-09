@@ -386,6 +386,12 @@ class ForgeJob(Base):
     error: Mapped[str] = mapped_column(String(500), default="")
     started_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, default=None, nullable=True)
+    # The picker's forge-time projection for a BYOK forge, when the browser sent one (WALK_AWAY_FORGE_PLAN.md
+    # 4.6): projected_s is the probe's midpoint seconds, probe_json the measured {projected_s, tps, multiplier,
+    # first_token_s}. Calibration data only (projected vs actual); never a key. Added after the table existed
+    # => patched in by db._ensure_forge_job_columns.
+    projected_s: Mapped[int | None] = mapped_column(Integer, default=None, nullable=True)
+    probe_json: Mapped[str | None] = mapped_column(Text, default=None, nullable=True)
 
 
 class AdminAction(Base):

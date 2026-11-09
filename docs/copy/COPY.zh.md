@@ -907,6 +907,34 @@ Notes: 英文版以空格开头；中文不需要空格。
 
     预估费用：此模型未知。
 
+### app.pick.probing
+
+    正在测量该模型的速度（在你的密钥上发送一个很小的测试请求，不到一美分）…
+
+### app.pick.projection
+
+    测得约 {tps} tokens/秒{reasoning}。用这个模型锻造大约需要 {lo}-{hi} 分钟。开始后可以关闭页面，完成后会出现在“我的角色”里。
+
+### app.pick.reasoning_note
+
+    ，而且它回答前会思考很久
+
+### app.pick.history
+
+    最近 {n} 次用这个模型锻造大约花了 {min} 分钟。
+
+### app.pick.measure_anyway
+
+    仍然测量
+
+### app.pick.timed_out
+
+    这个模型 45 秒内没有回应一个很小的测试。锻造会非常慢，或无法完成。
+
+### app.pick.confirm
+
+    这个模型预计需要约 {min} 分钟。关闭页面后锻造仍会继续，完成后会出现在“我的角色”里。仍要锻造吗？
+
 ### app.console.requested
 
     • 已请求：{mode}{interactive}
@@ -2581,6 +2609,10 @@ Notes: 英文版以空格开头；中文不需要空格。
 ### server.byok.list_unreachable
 
     无法连接端点：{e.reason}
+
+### server.probe.failed
+
+    无法测量这个模型：{detail}
 
 ### server.forge.concept_empty
 

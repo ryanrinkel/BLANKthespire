@@ -157,6 +157,9 @@
               <label class="lbl small" for="card_model" data-i18n="app.byok.card_label">Card coding</label>
               <select id="card_model" class="in" disabled><option value="" data-i18n="app.byok.card_same">Same as design</option></select>
               <p class="hint" data-i18n="app.byok.card_hint">Writes every card in strict JSON — most of the cost. A reliable coder is enough.</p>
+              <!-- Forge-time projection for the card model (app.js pickProjection): past forges first, else a
+                   tiny timed probe on the user's key. Filled by script; empty and hidden until then. -->
+              <p id="byok-pick" class="hint pick-line hidden" aria-live="polite"></p>
             </div>
           </div>
 
@@ -520,8 +523,8 @@
 
   <!-- ?v= busts the 1-hour static cache on deploy: bump all three whenever any file changes. i18n.js loads first (BTS_I18N); render.js holds
        the class renderers shared with the public /deck page and must load first. -->
-  <script src="/static/i18n.js?v=20261105a"></script>
+  <script src="/static/i18n.js?v=20261109a"></script>
   <script src="/static/render.js?v=20261029a"></script>
-  <script src="/static/app.js?v=20261103a"></script>
+  <script src="/static/app.js?v=20261109a"></script>
 </body>
 </html>

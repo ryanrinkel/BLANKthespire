@@ -184,6 +184,22 @@ def _ensure_forge_usage_columns() -> None:
             conn.execute(text("ALTER TABLE forge_usage ADD COLUMN metered_cost_micros INTEGER"))
 
 
+def _ensure_forge_job_columns() -> None:
+    """Same forward-only migration for `forge_jobs`: add the picker projection columns (ForgeJob.projected_s,
+    probe_json; WALK_AWAY_FORGE_PLAN.md 4.6) to databases made before them. Both nullable, no default: older
+    rows simply had no projection. Idempotent; SQLite + MySQL."""
+    insp = inspect(engine)
+    if "forge_jobs" not in insp.get_table_names():
+        return  # create_all will make it fresh with the columns already present
+    cols = {c["name"] for c in insp.get_columns("forge_jobs")}
+    if "projected_s" not in cols:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE forge_jobs ADD COLUMN projected_s INTEGER"))
+    if "probe_json" not in cols:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE forge_jobs ADD COLUMN probe_json TEXT"))
+
+
 def _ensure_login_link_columns() -> None:
     """Same forward-only migration for `login_links`: add the sign-in code columns (LoginLink.code_hash,
     code_attempts) to databases made before codes existed. Old rows get NULL / 0, so their codes never match
@@ -238,6 +254,7 @@ def init_db() -> None:
     _ensure_class_columns()
     _ensure_purchase_columns()
     _ensure_forge_usage_columns()
+    _ensure_forge_job_columns()
     _ensure_admin_action_columns()
     _ensure_login_link_columns()
     _backfill_slugs()  # rows inserted by code paths that predate the slug (belt and braces)

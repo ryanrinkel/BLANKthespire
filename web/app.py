@@ -1050,6 +1050,121 @@ def api_models():
     return jsonify(listing)
 
 
+# --- forge-time projection for the BYOK picker (WALK_AWAY_FORGE_PLAN.md section 4) ------------------------
+MODEL_HISTORY_TTL_S = 600.0
+_model_history_cache: dict[tuple[str, str], tuple[float, dict]] = {}
+
+
+def _provider_host(base_url: str) -> str:
+    """The bare lowercased hostname of a BYOK base_url — exactly what forge_class_route books as
+    forge_usage.provider. "" when it can't be parsed."""
+    try:
+        return (urllib.parse.urlsplit((base_url or "").strip()).hostname or "").lower()
+    except ValueError:
+        return ""
+
+
+def _median(xs: list[float]) -> float:
+    xs = sorted(xs)
+    n = len(xs)
+    return xs[n // 2] if n % 2 else (xs[n // 2 - 1] + xs[n // 2]) / 2
+
+
+def _p90(xs: list[float]) -> float:
+    xs = sorted(xs)
+    return xs[min(len(xs) - 1, int(round(0.9 * (len(xs) - 1))))]
+
+
+def model_history(host: str, model: str) -> dict:
+    """How long past forges whose CARDS ran on (host, model) took: {n, median_s, p90_s, median_output_tokens}
+    or {n: 0}. Any account's forges count; only timings leave the server. Wall = finished_at - started_at,
+    except a job settled by the wall-clock cap that landed anyway (failed + class_id): its finished_at is the
+    watchdog's, so the class row's created_at is the real finish (plan 0.1)."""
+    rows: dict[str, dict] = {}
+    with session_scope() as s:
+        q = (s.query(ForgeUsage.forge_id, ForgeUsage.output_tokens, ForgeJob.status, ForgeJob.class_id,
+                     ForgeJob.started_at, ForgeJob.finished_at, ForgedClass.created_at)
+             .join(ForgeJob, ForgeJob.id == ForgeUsage.forge_id)
+             .outerjoin(ForgedClass, ForgedClass.id == ForgeJob.class_id)
+             .filter(ForgeUsage.role == "cards", ForgeUsage.provider == host, ForgeUsage.model == model))
+        for fid, out_tok, status, class_id, started, finished, class_created in q.all():
+            if started is None:
+                continue
+            if status == "done" and finished is not None:
+                end = finished
+            elif status == "failed" and class_id is not None and class_created is not None:
+                end = class_created
+            else:
+                continue  # running, or a failure with no class: no finish to measure
+            wall = (end - started).total_seconds()
+            if wall <= 0:
+                continue
+            r = rows.setdefault(fid, {"wall": wall, "out": 0})
+            r["out"] += int(out_tok or 0)
+    if not rows:
+        return {"n": 0}
+    walls = [r["wall"] for r in rows.values()]
+    outs = [r["out"] for r in rows.values()]
+    return {"n": len(rows), "median_s": int(round(_median(walls))), "p90_s": int(round(_p90(walls))),
+            "median_output_tokens": int(round(_median(outs)))}
+
+
+@app.route("/api/model-history")
+@require_login
+def api_model_history():
+    """GET ?base_url=&model= — the past-forge timings for this provider + card model (see model_history).
+    Cached in-process for MODEL_HISTORY_TTL_S per (host, model)."""
+    host = _provider_host(request.args.get("base_url") or "")
+    model = (request.args.get("model") or "").strip()
+    if not (host and model):
+        return jsonify({"n": 0})
+    ck = (host, model)
+    hit = _model_history_cache.get(ck)
+    now = time.monotonic()
+    if hit and hit[0] > now:
+        return jsonify(hit[1])
+    out = model_history(host, model)
+    _model_history_cache[ck] = (now + MODEL_HISTORY_TTL_S, out)
+    return jsonify(out)
+
+
+@app.route("/api/model-probe", methods=["POST"])
+@require_login
+def api_model_probe():
+    """POST {base_url, api_key, model}: time one tiny forge-shaped call on the user's key and project the
+    forge's duration (forge.probe_model). The key is used once here and never stored or logged."""
+    from forge import probe_model
+    body = request.get_json(silent=True) or {}
+    try:
+        out = probe_model((body.get("base_url") or "").strip(), (body.get("api_key") or "").strip(),
+                          (body.get("model") or "").strip())
+    except ForgeError as e:
+        return jsonify(i18n.with_code({"error": str(e)})), 400
+    return jsonify(out)
+
+
+def _store_projection(forge_id: str, projection) -> None:
+    """Write the picker's projection (plan 4.6: {projected_s, tps, multiplier, first_token_s}) onto the job
+    row for later calibration. Whitelisted numeric fields only; a malformed one is ignored. Never raises."""
+    if not isinstance(projection, dict):
+        return
+    clean = {}
+    for k in ("projected_s", "tps", "multiplier", "first_token_s"):
+        v = projection.get(k)
+        if isinstance(v, (int, float)) and not isinstance(v, bool) and 0 <= v < 1e7:
+            clean[k] = v
+    if not clean:
+        return
+    try:
+        with session_scope() as s:
+            job = s.query(ForgeJob).filter_by(id=forge_id).one_or_none()
+            if job is not None:
+                job.projected_s = int(clean["projected_s"]) if "projected_s" in clean else None
+                job.probe_json = json.dumps(clean, separators=(",", ":"))
+    except Exception as e:  # noqa: BLE001 — calibration telemetry must never break a forge
+        app.logger.warning("projection write failed (forge %s): %s", forge_id, e)
+
+
 def _token_state(u: User) -> dict:
     """What the browser shows: the spendable balance, and nothing else — there is no free token to report."""
     return {"token_balance": int(u.token_balance)}
@@ -1396,6 +1511,8 @@ def forge_class_route():
         provider = "fake"
     _open_forge_job(forge_id, user["id"], mode=usage_mode, token_kind=token_kind, token_day=token_day,
                     concept=concept)
+    if mode == "byok":  # the picker's forge-time projection, for calibration (plan 4.6); timings only
+        _store_projection(forge_id, body.get("projection"))
 
     # Everything that MUST happen (save the class, refund the token, record usage) happens on the worker
     # thread via settle()/finish_*(), never in the SSE generator: the generator only runs while the browser is

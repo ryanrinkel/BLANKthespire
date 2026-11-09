@@ -785,6 +785,143 @@ def verify_byok_models(base_url: str, api_key: str, model: str, card_model: str 
     return None
 
 
+# --- BYOK model probe (WALK_AWAY_FORGE_PLAN.md section 4.2) -----------------------------------------------
+# One tiny, forge-shaped streamed call on the user's key, timed, turned into a forge-time projection for the
+# picker. Duration model (plan 0.1, fitted to the 2026-09..11 ledger): seconds ≈ calls × first-token latency
+# + V × M / S, where V = visible output a forge needs, M = the model's completion-to-visible multiplier
+# (1.0 for a plain model, 4-8 for a reasoning model that streams/bills its thinking) and S = tok/s. Speed
+# barely varies across providers (39-56 tok/s); M is what turned three forges into hour-long ones.
+PROBE_CALLS = 43          # median LLM calls per BYOK forge (plan 0.1)
+PROBE_VISIBLE = 25000     # visible output tokens a forge needs: the OpenAI/hosted median (plan 0.1)
+PROBE_MAX_TOKENS = 2000   # a reasoning model must be allowed to think — that IS the measurement
+PROBE_TIMEOUT_S = 45.0    # total wall cap; past it the verdict is "very slow or unreachable"
+PROBE_LO, PROBE_HI = 0.7, 1.4      # the reported range around the point projection (deliberately wide, 4.6)
+PROBE_CACHE_S = 3600.0             # a measured projection is good for an hour per (host, model)
+PROBE_TIMEOUT_CACHE_S = 600.0      # a timeout verdict only for 10 min (a provider blip must not stick)
+# A reasoning model can spend the whole budget thinking and answer nothing; M is then measured against what
+# a one-card answer normally is (~120 tokens of JSON), not against a zero.
+PROBE_ANSWER_TOKENS = 120
+
+_PROBE_SYSTEM = ("You design cards for Slay the Spire. Reply with ONE JSON object only, no prose, no code "
+                 "fences.")
+_PROBE_USER = ("Design one new Slay the Spire card for a necromancer class as a short JSON object with the "
+               "keys name, cost (0-3), type (Attack, Skill or Power), rarity (Common, Uncommon or Rare) and "
+               "description (about 40 words of card text). Return only the JSON object.")
+
+# (host, model) -> (expires monotonic, result). Holds timings only: the key is neither a cache key nor stored.
+_probe_cache: dict[tuple[str, str], tuple[float, dict]] = {}
+
+
+class _ProbeContract:
+    """The minimal contract OpenAICompatGenerator reads at construction (system_prompt only; no vocab gate)."""
+
+    @staticmethod
+    def system_prompt() -> str:
+        return _PROBE_SYSTEM
+
+
+def _probe_cache_key(base_url: str, model: str) -> tuple[str, str]:
+    from urllib.parse import urlsplit
+    try:
+        host = (urlsplit((base_url or "").strip()).hostname or "").lower()
+    except ValueError:
+        host = ""
+    return host, (model or "").strip()
+
+
+def project_from_timing(t: dict) -> dict:
+    """The projection for one probe call's `last_timing` (see OpenAICompatGenerator._post). Pure arithmetic,
+    exposed for tests. `first_token_s` is the first streamed token of ANY kind (content or reasoning), so a
+    model that streams its thinking is charged for that thinking in V×M/S, not twice via the latency term."""
+    first = float(t.get("first_token_s") or t.get("first_content_s") or 0.0)
+    stream_s = max(float(t.get("stream_s") or 0.0), 0.05)
+    content_chars = int(t.get("content_chars") or 0)
+    reasoning_chars = int(t.get("reasoning_chars") or 0)
+    visible = max(1.0, content_chars / 4)
+    completion = t.get("completion_tokens")
+    if not isinstance(completion, (int, float)) or isinstance(completion, bool) or completion <= 0:
+        # No usage chunk: count what streamed, including any reasoning text the provider showed us.
+        completion = max(visible, (content_chars + reasoning_chars) / 4)
+    completion = float(completion)
+    speed = completion / stream_s
+    if content_chars < 40:  # answered (almost) nothing: compare against a normal answer, not against zero
+        visible = float(PROBE_ANSWER_TOKENS)
+    mult = max(1.0, completion / visible)
+    seconds = PROBE_CALLS * first + PROBE_VISIBLE * mult / max(speed, 0.01)
+    return {"tps": int(round(speed)), "multiplier": round(mult, 1), "first_token_s": round(first, 2),
+            "projected_s": int(round(seconds)), "lo_s": int(round(seconds * PROBE_LO)),
+            "hi_s": int(round(seconds * PROBE_HI)), "reasoning": mult > 2, "timed_out": False}
+
+
+def probe_model(base_url: str, api_key: str, model: str) -> dict:
+    """Time one forge-shaped call on a BYOK model and project how long a forge would take with it (plan 4.2).
+    Returns project_from_timing's dict, or {"timed_out": True, "projected_s": None} when nothing finished in
+    PROBE_TIMEOUT_S. Raises ForgeError("Couldn't measure this model: ...") on a bad request / HTTP error.
+
+    The key is used for this one call and never stored, cached or logged; the cache is keyed by (host, model).
+    The call runs on a daemon thread joined for PROBE_TIMEOUT_S: the generator's own `timeout` only bounds the
+    silence between chunks, so the join is what enforces the total wall cap. A thread still running past the
+    cap is abandoned (it ends on its own within the silence timeout / max_tokens)."""
+    import threading
+    import time
+
+    base_url, api_key, model = (base_url or "").strip(), (api_key or "").strip(), (model or "").strip()
+    if not (base_url and api_key and model):
+        raise ForgeError("Couldn't measure this model: base URL, API key and model are all required.")
+    ck = _probe_cache_key(base_url, model)
+    hit = _probe_cache.get(ck)
+    if hit and hit[0] > time.monotonic():
+        return dict(hit[1])
+    try:
+        _guard_outbound_url(base_url)
+    except ForgeError as e:
+        raise ForgeError(f"Couldn't measure this model: {e}") from e
+
+    from btsgen.generator import EndpointHTTPError, OpenAICompatGenerator
+    prof = _byok_profile(base_url)
+    # Same request shape as the forge's card stage: the host's extra_body / json_object discipline, and
+    # provider_blocklist=False exactly like every BYOK generator (the user's own routing). on_usage is set so
+    # the generator asks for the streamed usage chunk (completion_tokens incl. hidden reasoning).
+    gen = OpenAICompatGenerator(base_url, api_key, model, contract_mod=_ProbeContract(),
+                                max_tokens=PROBE_MAX_TOKENS, timeout=max(1, int(PROBE_TIMEOUT_S + 0.999)),
+                                on_usage=lambda _u: None, extra_body=prof["extra_body"] or None,
+                                response_format=_JSON_OBJECT if prof.get("json_roles") else None,
+                                overload_retries=0, provider_blocklist=False)
+    box: dict = {}
+
+    def run() -> None:
+        try:
+            gen._complete([{"role": "user", "content": _PROBE_USER}])
+            box["timing"] = dict(gen.last_timing)
+        except BaseException as e:  # noqa: BLE001 — surfaced below as a ForgeError
+            box["error"] = e
+
+    th = threading.Thread(target=run, name="model-probe", daemon=True)
+    th.start()
+    th.join(PROBE_TIMEOUT_S)
+    if th.is_alive() or ("timing" not in box and "error" not in box):
+        out = {"timed_out": True, "projected_s": None}
+        _probe_cache[ck] = (time.monotonic() + PROBE_TIMEOUT_CACHE_S, dict(out))
+        _log.info("model probe timed out: %s / %s", ck[0], ck[1])
+        return out
+    err = box.get("error")
+    if err is not None:
+        if isinstance(err, EndpointHTTPError):
+            # Status code only — never reflect a provider body (same rule as /api/models).
+            raise ForgeError(f"Couldn't measure this model: endpoint returned HTTP {err.code} — "
+                             "check the key, URL, and model access.") from err
+        if isinstance(err, (TimeoutError, OSError)) or "sent no data" in str(err):
+            out = {"timed_out": True, "projected_s": None}
+            _probe_cache[ck] = (time.monotonic() + PROBE_TIMEOUT_CACHE_S, dict(out))
+            return out
+        raise ForgeError(f"Couldn't measure this model: {str(err)[:200]}") from err
+    out = project_from_timing(box["timing"])
+    _probe_cache[ck] = (time.monotonic() + PROBE_CACHE_S, dict(out))
+    _log.info("model probe %s / %s: %s tok/s, x%s, ~%ss", ck[0], ck[1], out["tps"], out["multiplier"],
+              out["projected_s"])
+    return out
+
+
 def forge_to_bundle(concept: str, *, key: dict | None = None, hosted: bool = False,
                     fake: bool = False, model: str | None = None, pool_per_archetype: int = 4,
                     staged: bool = True, ollama_mix: bool = False, on_event=None,

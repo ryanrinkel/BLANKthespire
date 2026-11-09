@@ -512,7 +512,8 @@ function renderEstimate() {
         + `<td class="est-cost">${cost(r.cost)}</td></tr>`).join("")}`
       + `<tr class="est-total"><th>${appH("app.estimate.total")}</th><td></td><td class="est-cost">${total == null ? "?" : "≈ " + usd(total)}</td></tr>`
       + `</table>` : "")
-    + (note ? `<p class="est-note">${esc(note)}</p>` : "");
+    + (note ? `<p class="est-note">${esc(note)}</p>` : "")
+    + (PICK_LINE ? `<p class="est-note">${esc(PICK_LINE)}</p>` : "");  // the card model's forge-time line
 }
 
 function show(id) {
@@ -670,10 +671,96 @@ function setModelControl(kind) {
   wireModelFields();
 }
 
+// --- forge-time projection for the card model (WALK_AWAY_FORGE_PLAN.md section 4) --------------------------
+// Picking a card model asks /api/model-history first (past forges on this provider + model, any account); two
+// or more win. Otherwise a tiny timed call on the user's key (/api/model-probe) projects a range. Only the
+// model that codes the cards is measured (the design model is ~3% of a forge's tokens). A list load (no pick
+// yet) asks history only: a probe spends the user's money, so it waits for a deliberate pick.
+const PICK_CONFIRM_MIN = 60;  // Forge asks once when the projection's upper end is over this many minutes
+let PICK_PROJECTION = null;   // {id, probed, min, upper_min, range, projected_s, tps, multiplier, first_token_s}
+let PICK_CONFIRMED = null;    // the projection the user already said "Forge anyway" to
+let PICK_GEN = 0;             // cancels a slower, older pick's answer
+let PICK_LINE = "";           // the text under the card model, mirrored in the estimate panel
+
+function pickTarget() {
+  if (currentProvider().mode !== "byok" || !modelsReady()) return null;
+  const base_url = resolvedBaseUrl(), api_key = el("api_key").value.trim(), model = byokModels().cards;
+  if (!base_url || !api_key || !model) return null;
+  return { base_url, api_key, model, id: base_url + "\n" + model };
+}
+
+function setPickLine(text, measureLink) {
+  PICK_LINE = text || "";
+  const p = el("byok-pick");
+  if (!p) return;
+  p.textContent = PICK_LINE;
+  if (PICK_LINE && measureLink) {
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "linkish"; b.id = "pick-measure";
+    b.textContent = appT("app.pick.measure_anyway");
+    b.onclick = () => pickProjection({ force: true });
+    p.append(" ", b);
+  }
+  p.classList.toggle("hidden", !PICK_LINE);
+  if (ESTIMATE_SHOWN) renderEstimate();
+}
+
+function clearPick() { PICK_GEN++; PICK_PROJECTION = null; setPickLine(""); }
+
+async function pickProjection({ probe = true, force = false } = {}) {
+  const t = pickTarget();
+  if (!t) { clearPick(); return; }
+  const have = PICK_PROJECTION;
+  if (!force && have && have.id === t.id && (have.probed || !probe)) return;  // already shown for this model
+  const gen = ++PICK_GEN;
+  PICK_PROJECTION = null;
+  setPickLine("");
+  if (!force) {
+    let h = null;
+    try {
+      const r = await fetch("/api/model-history?" + new URLSearchParams({ base_url: t.base_url, model: t.model }));
+      if (r.ok) h = await r.json();
+    } catch (_) { /* no history is just no history */ }
+    if (gen !== PICK_GEN) return;
+    if (h && h.n >= 2 && h.median_s) {
+      const min = Math.max(1, Math.round(h.median_s / 60));
+      PICK_PROJECTION = { id: t.id, probed: true, min, range: String(min), projected_s: h.median_s,
+                          upper_min: Math.round(1.4 * h.median_s / 60) };  // same 1.4x upper as the probe
+      setPickLine(appT("app.pick.history", { n: h.n, min }), true);
+      return;
+    }
+    if (!probe) { PICK_PROJECTION = { id: t.id, probed: false }; return; }
+  }
+  setPickLine(appT("app.pick.probing"));
+  let d = null, err = "";
+  try {
+    const r = await fetch("/api/model-probe", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ base_url: t.base_url, api_key: t.api_key, model: t.model }),
+    });
+    d = await r.json().catch(() => ({}));
+    if (!r.ok) err = appErr(d, r.status);
+  } catch (e) { err = e.message; }
+  if (gen !== PICK_GEN) return;
+  if (err) { setPickLine(err); return; }
+  if (d.timed_out || d.projected_s == null) {
+    PICK_PROJECTION = { id: t.id, probed: true, timed_out: true };
+    setPickLine(appT("app.pick.timed_out"));
+    return;
+  }
+  const lo = Math.max(1, Math.round(d.lo_s / 60)), hi = Math.max(lo, Math.round(d.hi_s / 60));
+  PICK_PROJECTION = { id: t.id, probed: true, min: Math.max(1, Math.round(d.projected_s / 60)),
+                      range: lo + "-" + hi, upper_min: hi, projected_s: d.projected_s, tps: d.tps,
+                      multiplier: d.multiplier, first_token_s: d.first_token_s };
+  setPickLine(appT("app.pick.projection", { tps: d.tps, lo, hi,
+    reasoning: d.reasoning ? appT("app.pick.reasoning_note") : "" }));
+}
+
 function wireModelFields() {
   const onPick = () => {
     SAVED_MODELS = { model: el("model").value.trim(), card_model: el("card_model").value.trim() };
     saveByok(); showEstimate(false); renderForgeButton();
+    pickProjection();
   };
   el("model").onchange = onPick;
   el("card_model").onchange = onPick;
@@ -685,6 +772,7 @@ function wireModelFields() {
 function resetModelPickers(p) {
   setModelControl("select");
   MODELS_LOADED_FOR = "";
+  clearPick();
   const m = el("model"), c = el("card_model");
   m.innerHTML = ""; c.innerHTML = "";
   c.appendChild(newOption("", appT("app.byok.card_same")));
@@ -735,6 +823,7 @@ function populateModels(d) {
   saveByok();
   showEstimate(false);
   renderForgeButton();
+  pickProjection({ probe: false });  // history only until the user picks (a probe costs them a request)
   return gone;  // saved ids this list no longer offers (the caller toasts the first)
 }
 
@@ -860,8 +949,20 @@ async function forge() {
     } else {
       const base_url = resolvedBaseUrl();
       if (!base_url) { toast(appT("app.forge.toast_need_base_url")); return; }
+      // The picker's projection for THIS card model: over an hour at its upper end, ask once (plan 4.3).
+      const proj = PICK_PROJECTION && PICK_PROJECTION.id === base_url + "\n" + byokModels().cards
+        ? PICK_PROJECTION : null;
+      if (proj && proj.upper_min > PICK_CONFIRM_MIN && PICK_CONFIRMED !== proj) {
+        if (!confirm(appT("app.pick.confirm", { min: proj.range }))) return;
+        PICK_CONFIRMED = proj;
+      }
       body.mode = "byok";
       body.key = { base_url, api_key, model, card_model };
+      // Calibration (plan 4.6): the measured projection rides along; timings only, never the key.
+      if (proj && proj.tps != null) {
+        body.projection = { projected_s: proj.projected_s, tps: proj.tps, multiplier: proj.multiplier,
+                            first_token_s: proj.first_token_s };
+      }
     }
     saveByok();
   }
