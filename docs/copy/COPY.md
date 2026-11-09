@@ -1241,6 +1241,46 @@ Where: static/app.js:473 (second line of the BYOK confirm dialog)
 
     Estimated cost: unknown for this model.
 
+### app.pick.probing
+Where: static/app.js (BYOK card-model line under the Card coding picker, while the probe runs)
+Notes: WALK_AWAY_FORGE_PLAN.md 4.3. Shown while /api/model-probe times one tiny call on the user's key.
+
+    Measuring this model's speed (a tiny test request on your key, under a cent)…
+
+### app.pick.projection
+Where: static/app.js (BYOK card-model line; also a note in the cost estimate panel)
+Notes: {tps} = measured tokens/s; {reasoning} = app.pick.reasoning_note or empty; {lo}/{hi} = whole minutes.
+
+    Measured ~{tps} tokens/s{reasoning}. A forge with this model should take roughly {lo}-{hi} min. You can close the tab once it starts; it will be in My Classes.
+
+### app.pick.reasoning_note
+Where: static/app.js ({reasoning} in app.pick.projection)
+Notes: fragment, starts with a space.
+
+     and it thinks a lot before answering
+
+### app.pick.history
+Where: static/app.js (BYOK card-model line, when two or more past forges used this provider + model)
+Notes: {n} = number of past forges; {min} = their median duration in whole minutes.
+
+    The last {n} forges with this model took about {min} min.
+
+### app.pick.measure_anyway
+Where: static/app.js (link after app.pick.history: run the speed probe anyway)
+
+    measure anyway
+
+### app.pick.timed_out
+Where: static/app.js (BYOK card-model line, the probe got no answer in 45 s)
+
+    This model didn't answer a tiny test in 45 s. A forge would take a very long time or not finish.
+
+### app.pick.confirm
+Where: static/app.js (confirm dialog on Forge when the projection is over 60 min)
+Notes: {min} = projected minutes (the range's midpoint, or the history median).
+
+    This model is projected to take about {min} min. The forge keeps running if you close the tab, and the class will be in My Classes. Forge anyway?
+
 ### app.console.requested
 Where: static/app.js:860 (first console line, printed by the browser)
 Notes: {mode} = the raw wire mode (token, byok, anthropic, fake), not translated; {interactive} = app.console.requested_interactive or empty. Console glyphs: "•" progress, "✗" error, "✓" done; the server's own lines are printed as "• {message}" and errors as "✗ {error}".
@@ -3494,6 +3534,12 @@ Where: web/forge.py:647 (JSON error from /api/models)
 Where: web/forge.py:649 (JSON error from /api/models)
 
     could not reach the endpoint: {e.reason}
+
+### server.probe.failed
+Where: web/forge.py probe_model (JSON error from /api/model-probe)
+Notes: {detail} = why, in English (HTTP status, unreachable endpoint, missing field).
+
+    Couldn't measure this model: {detail}
 
 ### server.forge.concept_empty
 Where: web/forge.py:719

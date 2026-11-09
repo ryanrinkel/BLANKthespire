@@ -157,6 +157,9 @@
               <label class="lbl small" for="card_model" data-i18n="app.byok.card_label">Card coding</label>
               <select id="card_model" class="in" disabled><option value="" data-i18n="app.byok.card_same">Same as design</option></select>
               <p class="hint" data-i18n="app.byok.card_hint">Writes every card in strict JSON — most of the cost. A reliable coder is enough.</p>
+              <!-- Forge-time projection for the card model (app.js pickProjection): past forges first, else a
+                   tiny timed probe on the user's key. Filled by script; empty and hidden until then. -->
+              <p id="byok-pick" class="hint pick-line hidden" aria-live="polite"></p>
             </div>
           </div>
 

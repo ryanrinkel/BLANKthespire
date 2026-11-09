@@ -4,7 +4,7 @@
 //     STRIPE_SECRET_KEY=sk_test_smoke PORT=5077 uv run --project ../generation python app.py
 // (the dummy Stripe key only flips /api/billing to {enabled:true} so the donate tiers + custom-amount row
 //  render; nothing in these scenarios ever hits Stripe)
-// then, from web/tools:  node ui_smoke.mjs http://127.0.0.1:5077 <outdir> forge|v3|byok-narrow|byok-models|library|account|pages|art|lost|archive|featured|webview|phone|events|lang|forge-zh|signin-code|ab
+// then, from web/tools:  node ui_smoke.mjs http://127.0.0.1:5077 <outdir> forge|v3|byok-narrow|byok-models|library|account|pages|art|lost|archive|featured|webview|phone|events|lang|forge-zh|signin-code|ab|slow-pick
 // (`signin-code`: the 6-digit sign-in code; with no mail provider the dev server returns the link + code in
 //  the /api/auth/email/start JSON, which the scenario reads as its mailbox — no extra dev endpoint)
 // (`archive` needs BTSWEB_ADMIN_EMAILS=unlimited@example.com and is best run first on a fresh DB: it puts a class
@@ -1977,6 +1977,79 @@ if (scenario === "forge") {
   const expected = exps.filter((e) => e.page === "/").map((e) => `${e.name}:${e.arm}`).join(" ");
   check(seen.every((s) => s === seen[0]) && seen[0].length > 0, "(5) three plain loads of / draw the same arm", JSON.stringify(seen));
   check(seen[0] === expected, "(5) ...and it is the arm /api/me computed for this IP + UA", `${seen[0]} vs ${expected}`);
+} else if (scenario === "slow-pick") {
+  // The BYOK card-model projection (WALK_AWAY_FORGE_PLAN.md 4.3): every network call the picker makes is
+  // stubbed in the page — the listing, /api/model-history ({n:0}: no past forges), /api/model-probe (a
+  // configurable window.__probe) and /api/forge-class (counted, answered 503 so nothing forges). confirm() is
+  // stubbed to record every prompt and say no only to the slow-model one (the cost confirm says yes).
+  await send("Page.addScriptToEvaluateOnNewDocument", { source: `(() => {
+    const real = window.fetch.bind(window);
+    const ok = (d, status = 200) => Promise.resolve(new Response(JSON.stringify(d), {status, headers: {'Content-Type': 'application/json'}}));
+    window.__probe = {tps: 45, multiplier: 5, first_token_s: 2, projected_s: 3300, lo_s: 2310, hi_s: 4620, reasoning: true, timed_out: false};
+    window.__calls = {history: 0, probe: 0, forge: 0}; window.__forgeBodies = []; window.__confirms = [];
+    window.confirm = (msg) => { window.__confirms.push(String(msg)); return !/projected to take/.test(String(msg)); };
+    window.fetch = (u, o) => {
+      const s = String(u);
+      if (s.includes('/api/models')) return ok({models: ['quick-one', 'slow-thinker'], recommended: ['quick-one'], hidden: 0});
+      if (s.includes('/api/model-history')) { window.__calls.history++; return ok({n: 0}); }
+      if (s.includes('/api/model-probe')) { window.__calls.probe++; return ok(window.__probe); }
+      if (s.includes('/api/forge-class')) { window.__calls.forge++; window.__forgeBodies.push(JSON.parse(o.body)); return ok({error: 'stubbed'}, 503); }
+      return real(u, o);
+    };
+  })()` });
+  await nav(`${base}/dev-login?email=smoke-slow-pick@example.com`);
+  await nav(`${base}/app`);
+  await evaluate(`localStorage.clear()`);
+  await nav(`${base}/app`);
+  const pickState = `({line: document.getElementById('byok-pick').textContent,
+    hidden: document.getElementById('byok-pick').classList.contains('hidden'), calls: window.__calls,
+    confirms: window.__confirms, bodies: window.__forgeBodies})`;
+  await evaluate(`(() => { document.getElementById('forge-byok').open = true;
+    const p = document.getElementById('provider'); p.value = 'openai'; p.dispatchEvent(new Event('change'));
+    const k = document.getElementById('api_key'); k.value = 'sk-smoke-slow';
+    k.dispatchEvent(new Event('input')); k.dispatchEvent(new Event('change')); })()`);
+  await sleep(1200);
+  const loaded = await json(pickState);
+  check(loaded.hidden && loaded.calls.probe === 0 && loaded.calls.history >= 1,
+        "(a) list loaded: history asked, no probe before a pick, no line", JSON.stringify(loaded));
+
+  // (b) pick the reasoning model for the cards: probe -> projection line, ~39-77 min, "thinks a lot"
+  await evaluate(`(() => { const c = document.getElementById('card_model'); c.value = 'slow-thinker'; c.dispatchEvent(new Event('change')); })()`);
+  await sleep(800);
+  const slow = await json(pickState);
+  check(!slow.hidden && slow.calls.probe === 1
+        && slow.line.includes("Measured ~45 tokens/s and it thinks a lot before answering")
+        && slow.line.includes("roughly 39-77 min"),
+        "(b) slow-thinker: the projection line says ~45 tok/s, thinks a lot, 39-77 min", JSON.stringify(slow));
+  await evaluate(`(() => { document.getElementById('pay-step').classList.remove('hidden');
+    document.getElementById('forge-byok').scrollIntoView(); })()`);
+  await shot("slow-pick-projection", false);
+
+  // (c) Forge: the slow-model confirm appears, "cancel" stops it before any request
+  await evaluate(`(() => { document.getElementById('concept').value = 'a smoke test class'; window.__confirms.length = 0;
+    document.getElementById('forge-btn').click(); })()`);
+  await sleep(800);
+  const c1 = await json(pickState);
+  check(c1.confirms.some((m) => m.includes("projected to take about 39-77 min")) && c1.calls.forge === 0,
+        "(c) over an hour: Forge asks, and cancelling sends no /api/forge-class", JSON.stringify(c1));
+
+  // (d) a plain model (M=1, ~10 min): no slow-model confirm, the forge request goes out with the projection
+  await evaluate(`window.__probe = {tps: 45, multiplier: 1, first_token_s: 1, projected_s: 600, lo_s: 420, hi_s: 840, reasoning: false, timed_out: false}`);
+  await evaluate(`(() => { const c = document.getElementById('card_model'); c.value = ''; c.dispatchEvent(new Event('change')); })()`);
+  await sleep(800);
+  const quick = await json(pickState);
+  check(quick.calls.probe === 2 && quick.line.includes("roughly 7-14 min") && !quick.line.includes("thinks"),
+        "(d) quick-one: projection 7-14 min, no reasoning note", JSON.stringify(quick));
+  await evaluate(`(() => { window.__confirms.length = 0; document.getElementById('forge-btn').click(); })()`);
+  await sleep(1200);
+  const c2 = await json(pickState);
+  const sent = c2.bodies[0] || {};
+  check(!c2.confirms.some((m) => m.includes("projected to take")) && c2.calls.forge === 1
+        && sent.projection && sent.projection.projected_s === 600 && sent.projection.tps === 45
+        && !JSON.stringify(sent.projection).includes("sk-"),
+        "(d) under an hour: no slow-model confirm, the forge is requested with the projection (no key in it)",
+        JSON.stringify({ confirms: c2.confirms, forge: c2.calls.forge, projection: sent.projection }));
+  await evaluate(`localStorage.clear()`);
 }
 console.log(errors.length ? "CONSOLE ERRORS:\n" + errors.join("\n") : "no console errors");
 ws.close(); chrome.kill();

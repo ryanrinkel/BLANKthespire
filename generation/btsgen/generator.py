@@ -415,6 +415,11 @@ class OpenAICompatGenerator:
         # Diagnostics from the LAST completed call: {"finish_reason", "content_chars", "reasoning_chars"}.
         # Callers use this to explain an unparseable response (truncated by max_tokens vs reasoning-only).
         self.last_meta: dict = {}
+        # Stream timing of the LAST completed call (the web model probe reads it; nothing else does):
+        # {"first_token_s": request sent -> first streamed token (content OR reasoning delta),
+        #  "first_content_s": request sent -> first content delta, "stream_s": first -> last token,
+        #  "completion_tokens": the usage chunk's figure or None, "content_chars", "reasoning_chars"}.
+        self.last_timing: dict = {}
 
     def _is_openrouter(self) -> bool:
         return OPENROUTER_HOST in self.base_url
@@ -468,9 +473,23 @@ class OpenAICompatGenerator:
         reasoning_chars = 0
         finish_reason: str | None = None
         provider: str | None = None  # OpenRouter names the upstream that served the call (per chunk)
+        t_sent = time.monotonic()
+        t_first: float | None = None      # first streamed token of any kind (content or reasoning)
+        t_first_content: float | None = None
+        t_last: float | None = None
         with urllib.request.urlopen(req, timeout=self.timeout) as resp:
             if "text/event-stream" not in (resp.headers.get("Content-Type") or ""):
                 data = json.loads(resp.read().decode("utf-8"))
+                t_done = time.monotonic() - t_sent
+                u = data.get("usage") if isinstance(data, dict) else None
+                try:
+                    chars = len(data["choices"][0]["message"].get("content") or "")
+                except (KeyError, IndexError, TypeError, AttributeError):
+                    chars = 0
+                self.last_timing = {"first_token_s": t_done, "first_content_s": t_done, "stream_s": 0.0,
+                                    "completion_tokens": u.get("completion_tokens") if isinstance(u, dict)
+                                    else None,
+                                    "content_chars": chars, "reasoning_chars": 0}
                 try:
                     msg = data["choices"][0]
                     self.last_meta = {"finish_reason": msg.get("finish_reason"),
@@ -501,16 +520,29 @@ class OpenAICompatGenerator:
                     piece = delta.get("content")
                     if isinstance(piece, str):
                         parts.append(piece)
+                        if piece:
+                            t_last = time.monotonic()
+                            t_first = t_first if t_first is not None else t_last
+                            t_first_content = t_first_content if t_first_content is not None else t_last
                     # Hidden thinking from hybrid-reasoning models (glm-5.2, kimi-k3, deepseek…). We never
                     # parse it, but its VOLUME is the diagnostic: it bills against max_tokens before any
                     # content, so heavy thinking + finish_reason "length" = the answer was truncated.
                     for k in ("reasoning", "reasoning_content", "thinking"):
                         if isinstance(delta.get(k), str):
                             reasoning_chars += len(delta[k])
+                            if delta[k]:
+                                t_last = time.monotonic()
+                                t_first = t_first if t_first is not None else t_last
                     if (choice or {}).get("finish_reason"):
                         finish_reason = choice["finish_reason"]
         self.last_meta = {"finish_reason": finish_reason, "content_chars": len("".join(parts)),
                           "reasoning_chars": reasoning_chars, "provider": provider}
+        self.last_timing = {
+            "first_token_s": (t_first - t_sent) if t_first is not None else None,
+            "first_content_s": (t_first_content - t_sent) if t_first_content is not None else None,
+            "stream_s": (t_last - t_first) if t_first is not None and t_last is not None else 0.0,
+            "completion_tokens": usage.get("completion_tokens") if isinstance(usage, dict) else None,
+            "content_chars": len("".join(parts)), "reasoning_chars": reasoning_chars}
         return {"choices": [{"message": {"content": "".join(parts)}}], "usage": usage}
 
     def _post_with_retry(self, payload: dict) -> dict:
