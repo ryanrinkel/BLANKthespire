@@ -23,8 +23,10 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 import re
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -3417,6 +3419,35 @@ def jev_card_qa(card: dict, theme: str = "", *, on_usage=None) -> dict | None:
         return None
 
 
+# --- Pace line (WALK_AWAY_FORGE_PLAN.md section 3) -------------------------------------------------------------------
+# 2026-11-08: three BYOK reasoning-model forges (Doubao x2, DeepSeek) took 46-60 min, the browser called them failed, and
+# the user left; the forge now announces its own pace in the log so a slow run reads as a wait, not a failure.
+# The card loop times each LLM-designed card and, after the 3rd timed card and every 10th after it (3, 13, 23, ...),
+# emits ONE line when the projected remainder exceeds PACE_WARN_MIN minutes:
+#     pace: 75s/card, ~40 min to go (32 cards left)
+# CONTRACT: web/app.py parses `~(\d+) min to go` out of this line to compute the browser ETA, and the website's console
+# i18n rule translates lines starting with "pace:". Do not change the prefix or the "~N min to go" fragment without
+# updating web/app.py and that rule. PACE_WARN_MIN (minutes; the hosted median forge is ~5) is read at CALL time via
+# _pace_warn_min(): $BTSGEN_PACE_WARN_MIN wins when set to a number, else this module constant — tests set the env var.
+PACE_WARN_MIN = 10
+
+
+def _pace_warn_min() -> float:
+    raw = os.environ.get("BTSGEN_PACE_WARN_MIN", "").strip()
+    if raw:
+        try:
+            return float(raw)
+        except ValueError:
+            pass
+    return float(PACE_WARN_MIN)
+
+
+def _pace_line(mean_s: float, cards_left: int) -> str:
+    """The machine-parseable pace line (shape is a contract with web/app.py — see the block above)."""
+    remaining_min = max(1, math.ceil(mean_s * cards_left / 60))
+    return f"pace: {mean_s:.0f}s/card, ~{remaining_min} min to go ({cards_left} cards left)"
+
+
 def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen=None, fake: bool = False,
                 on_event=None, front_end=None, triad: bool | None = None,
                 gap_log_append=None) -> ClassResult:
@@ -3616,6 +3647,10 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
             vg["jev_cost"] = round(vg["jev_cost"] + float(g.get("jev_cost") or 0.0), 6)
     vocab_demand: list[dict] = []  # missing-vocab reaches mined from card validation errors (see docstring)
     total = len(bp["cards"])
+    # Pace (plan section 3): time only the LLM-designed cards of this main pass (basics/blade are synthesized).
+    _pace_left = sum(1 for p in bp["cards"] if p.get("role") not in _BASIC_ROLES and p.get("role") != _BLADE_ROLE)
+    _pace_secs = 0.0
+    _pace_timed = 0
     for i, plan in enumerate(bp["cards"]):
         if plan.get("role") in _BASIC_ROLES:
             card = _synthesize_basic(plan)
@@ -3640,7 +3675,15 @@ def forge_class(brief: ClassBrief, *, blueprint_gen, card_gen_factory, relic_gen
         note(f"card {i+1}/{total}: designing '{plan.get('name_hint', '?')}' - "
              f"{plan.get('rarity', '?')} {plan.get('type', '?')}, cost {plan.get('cost', '?')}"
              + (f" - {str(plan.get('theme'))[:90]}" if plan.get("theme") else ""))
+        _t0 = time.monotonic()
         pres = generate_card(cbrief, gen=card_gen, validator=validator)
+        _pace_secs += time.monotonic() - _t0
+        _pace_timed += 1
+        _pace_left -= 1
+        if _pace_left > 0 and _pace_timed % 10 == 3:
+            _mean = _pace_secs / _pace_timed
+            if _mean * _pace_left > _pace_warn_min() * 60:
+                note(_pace_line(_mean, _pace_left))
         _count(pres)
         _misses = vocab_misses(pres.all_errors)
         # Jev slot "vocab" (plan 3b): typo / synonym / genuinely new, one batched request per card. Advisory:
