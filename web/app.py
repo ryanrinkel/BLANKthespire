@@ -167,46 +167,68 @@ def _client_ip() -> str:
     return pages.client_ip()
 
 
-# --- forge admission control: bounded concurrency + a FIFO wait line -----------------------------
+# --- forge admission control: bounded concurrency + a FIFO wait line per pool -------------------------
 # Each in-flight forge holds one gunicorn thread (its SSE stream) plus a daemon worker thread, and
 # burns provider capacity — unbounded simultaneous forges would starve page loads and trip provider
 # rate limits in a traffic spike. Admission is process-local (like HostedLimiter — revisit both
-# before going multi-worker): at most FORGE_MAX_CONCURRENT forges run at once, the next
-# FORGE_MAX_QUEUE wait in line (their SSE stream shows live queue position), and beyond that
-# /api/forge-class turns the forge away up front, BEFORE any token is reserved.
+# before going multi-worker) and split into TWO independent pools:
+#   - token pool: "Use a token" forges on OUR hosted route. At most FORGE_MAX_CONCURRENT run at once; this
+#     is the limit that protects the hosted route.
+#   - BYOK pool: every other mode (byok / anthropic / fake). A BYOK forge is a thread waiting on someone
+#     else's API, so it gets its own FORGE_MAX_CONCURRENT_BYOK slots and can never hold a token forge's slot.
+# Each pool has its own FIFO line and only ever waits on its own slots (its SSE stream shows live queue
+# position within that line). FORGE_MAX_QUEUE caps the two lines COMBINED; beyond it /api/forge-class turns
+# the forge away up front, BEFORE any token is reserved.
 FORGE_MAX_CONCURRENT = int(os.environ.get("BTSWEB_FORGE_MAX_CONCURRENT", "3"))
+FORGE_MAX_CONCURRENT_BYOK = int(os.environ.get("BTSWEB_FORGE_MAX_CONCURRENT_BYOK", "4"))
 FORGE_MAX_QUEUE = int(os.environ.get("BTSWEB_FORGE_MAX_QUEUE", "12"))
 FORGE_QUEUE_TIMEOUT_S = int(os.environ.get("BTSWEB_FORGE_QUEUE_TIMEOUT_S", "1800"))
-# Wall-clock cap on a RUNNING forge. Past it the job is settled as failed (token refunded, user slot freed)
-# and the stream told; the worker thread finishes on its own and, if it succeeds late, still saves the class.
+# Wall-clock cap on a RUNNING token forge. Past it the job is settled as failed (token refunded, user slot
+# freed) and the stream told; the worker thread finishes on its own and, if it succeeds late, still saves the
+# class. A reserved token is what this 20-minute cap protects.
 FORGE_MAX_SECONDS = float(os.environ.get("BTSWEB_FORGE_MAX_SECONDS", "1200"))
+# The same watchdog for every NON-token forge (BYOK). This is a stuck-job sanity ceiling, NOT a product limit:
+# on 2026-11-08 three Doubao / DeepSeek BYOK forges took 46-60 min (reasoning models stream 4-8x the output
+# tokens), were "abandoned" by the old shared 1200 s cap, and then finished and saved anyway — the user saw a
+# failure for a class that landed. Slow on the user's own key is a wait, not a failure; four hours only catches
+# a forge that is genuinely stuck. Nothing is refunded (nothing was reserved).
+FORGE_MAX_SECONDS_BYOK = float(os.environ.get("BTSWEB_FORGE_MAX_SECONDS_BYOK", "14400"))
 
 _forge_admit_lock = threading.Lock()
-_forge_running = 0
-# Two FIFO lines, served token-first: paying (token-path) forges never wait behind free BYOK forges. Each entry
-# is one queued forge's turn signal.
+# Per pool: how many forges hold a slot, and the FIFO line of queued forges' turn signals.
+_forge_running_token = 0
+_forge_running_byok = 0
 _forge_waiting_token: list[threading.Event] = []
 _forge_waiting_byok: list[threading.Event] = []
-_forge_priority: dict[int, bool] = {}  # id(ticket) -> in the token line?
 
 
 def _waiting_total() -> int:
     return len(_forge_waiting_token) + len(_forge_waiting_byok)
 
 
-def _forge_enqueue(priority: bool = False) -> threading.Event:
-    """Join the forge line (`priority` = the token line, dequeued first). The returned Event is set once this
-    forge may run (immediately when a slot is free and nobody is ahead). Once it IS set, the holder owes
-    exactly one _forge_release()."""
-    global _forge_running
+def _running_total() -> int:
+    return _forge_running_token + _forge_running_byok
+
+
+def _forge_enqueue(token: bool = False) -> threading.Event:
+    """Join a forge pool's line (`token` = the token pool, else the BYOK pool). The returned Event is set once
+    this forge may run (immediately when its pool has a free slot and nobody in its line is ahead). Once it IS
+    set, the holder owes exactly one _forge_release(token) with the same `token`."""
+    global _forge_running_token, _forge_running_byok
     ticket = threading.Event()
     with _forge_admit_lock:
-        if _forge_running < FORGE_MAX_CONCURRENT and not _waiting_total():
-            _forge_running += 1
-            ticket.set()
+        if token:
+            if _forge_running_token < FORGE_MAX_CONCURRENT and not _forge_waiting_token:
+                _forge_running_token += 1
+                ticket.set()
+            else:
+                _forge_waiting_token.append(ticket)
         else:
-            (_forge_waiting_token if priority else _forge_waiting_byok).append(ticket)
-            _forge_priority[id(ticket)] = priority
+            if _forge_running_byok < FORGE_MAX_CONCURRENT_BYOK and not _forge_waiting_byok:
+                _forge_running_byok += 1
+                ticket.set()
+            else:
+                _forge_waiting_byok.append(ticket)
     return ticket
 
 
@@ -217,43 +239,42 @@ def _forge_abandon(ticket: threading.Event) -> bool:
         for line in (_forge_waiting_token, _forge_waiting_byok):
             if ticket in line:
                 line.remove(ticket)
-                _forge_priority.pop(id(ticket), None)
                 return True
     return False
 
 
-def _forge_release() -> None:
-    """Free a slot: hand it straight to the head of the token line, else the BYOK line (running count
-    unchanged), or if nobody waits, decrement the running count."""
-    global _forge_running
+def _forge_release(token: bool = False) -> None:
+    """Free a slot in one pool (`token` as passed to _forge_enqueue): hand it straight to the head of that
+    pool's line (running count unchanged), or if nobody waits there, decrement that pool's running count.
+    The other pool is never touched."""
+    global _forge_running_token, _forge_running_byok
     with _forge_admit_lock:
-        if _forge_waiting_token:
-            t = _forge_waiting_token.pop(0)
-        elif _forge_waiting_byok:
-            t = _forge_waiting_byok.pop(0)
+        line = _forge_waiting_token if token else _forge_waiting_byok
+        if line:
+            line.pop(0).set()
+        elif token:
+            _forge_running_token -= 1
         else:
-            _forge_running -= 1
-            return
-        _forge_priority.pop(id(t), None)
-        t.set()
+            _forge_running_byok -= 1
 
 
 def _forge_position(ticket: threading.Event) -> int:
-    """1-based place in the overall wait line (token line first); 0 = not queued (running/granted)."""
+    """1-based place in this forge's OWN pool's wait line; 0 = not queued (running/granted)."""
     with _forge_admit_lock:
-        if ticket in _forge_waiting_token:
-            return _forge_waiting_token.index(ticket) + 1
-        if ticket in _forge_waiting_byok:
-            return len(_forge_waiting_token) + _forge_waiting_byok.index(ticket) + 1
+        for line in (_forge_waiting_token, _forge_waiting_byok):
+            if ticket in line:
+                return line.index(ticket) + 1
         return 0
 
 
 # Per-user concurrency: ONE forge (running or queued) per account across all modes. Without it, one BYOK user
 # on a slow endpoint can hold every forge slot. Entries carry their start time so a forge whose worker never
-# ran (client vanished before the stream started) can't lock the account forever.
+# ran (client vanished before the stream started) can't lock the account forever. The stale horizon must
+# outlive the longest a legitimate forge can be in flight — queued, or running up to its wall-clock cap
+# (the BYOK ceiling is hours) — or a slow forge would let the same account start a second one mid-run.
 _user_active: dict[int, float] = {}
 _user_active_lock = threading.Lock()
-USER_ACTIVE_STALE_S = FORGE_QUEUE_TIMEOUT_S + 900
+USER_ACTIVE_STALE_S = max(FORGE_QUEUE_TIMEOUT_S, FORGE_MAX_SECONDS, FORGE_MAX_SECONDS_BYOK) + 900
 
 
 def _user_begin(user_id: int) -> bool:
@@ -429,9 +450,10 @@ def healthz():
     503 when the database is unreachable (nginx keeps serving static, but forging and sign-in are down)."""
     ok = db_ping()
     with _forge_admit_lock:
-        running, waiting = _forge_running, _waiting_total()
+        running, waiting = _running_total(), _waiting_total()
     body = {"ok": ok, "db": ok, "forge_running": running, "forge_waiting": waiting,
-            "forge_max_concurrent": FORGE_MAX_CONCURRENT}
+            "forge_max_concurrent": FORGE_MAX_CONCURRENT,
+            "forge_max_concurrent_byok": FORGE_MAX_CONCURRENT_BYOK}
     return jsonify(body), (200 if ok else 503)
 
 
@@ -1326,6 +1348,9 @@ def forge_class_route():
     # unless the account is unlimited. Reserve it up front so we can 402 BEFORE streaming; a
     # forge that then fails is refunded by the worker (see finish_failed).
     ollama_mix = mode == "token"
+    # Wall-clock watchdog for THIS forge: the 20-minute cap guards a reserved token; anything else (BYOK) gets
+    # the hours-long stuck-job ceiling, because slow on the user's own key is a wait, not a failure.
+    max_seconds = FORGE_MAX_SECONDS if ollama_mix else FORGE_MAX_SECONDS_BYOK
     # Unlimited is env list OR the operator-granted users.unlimited_tokens flag, so it needs the row — read
     # it together with the balance pre-check below rather than in a query of its own.
     unlimited = False
@@ -1444,13 +1469,13 @@ def forge_class_route():
         q.put(("result", saved))
 
     def on_wall_clock() -> None:
-        """Watchdog: the forge has run past FORGE_MAX_SECONDS. Refund now and free the user's slot; the worker
-        keeps going and a late success still lands in the library."""
+        """Watchdog: the forge has run past its wall-clock cap (max_seconds). Refund (token forges) now and free
+        the user's slot; the worker keeps going and a late success still lands in the library."""
         transitioned, state = _settle_forge_job(
             forge_id, ok=False, error=i18n.get_text("en", "server.forge.too_long_job",
-                                                    max_seconds=int(FORGE_MAX_SECONDS)))
+                                                    max_seconds=int(max_seconds)))
         if transitioned:
-            data = i18n.error_body("server.forge.too_long")
+            data = i18n.error_body("server.forge.too_long" if ollama_mix else "server.forge.too_long_byok")
             if reserved:
                 data.update(refund_state(state))
             _user_end(user["id"])
@@ -1481,7 +1506,7 @@ def forge_class_route():
         # Admission: wait for a forge slot, narrating queue position over SSE. (If the player closes the tab
         # while queued, this thread still waits its turn and the forge runs to completion unseen — the class
         # is saved to their library regardless — bounded by the queue timeout.)
-        ticket = _forge_enqueue(priority=ollama_mix)
+        ticket = _forge_enqueue(token=ollama_mix)
         if not ticket.is_set():
             last_pos = _forge_position(ticket)
             q.put(("progress", i18n.get_text("en", "console.queue.busy", last_pos=last_pos)))
@@ -1498,7 +1523,7 @@ def forge_class_route():
                     last_pos = pos
                     q.put(("progress", i18n.get_text("en", "console.queue.position", pos=pos)))
             q.put(("progress", i18n.get_text("en", "console.queue.turn")))
-        watchdog = threading.Timer(FORGE_MAX_SECONDS, on_wall_clock)
+        watchdog = threading.Timer(max_seconds, on_wall_clock)
         watchdog.daemon = True
         watchdog.start()
         try:
@@ -1518,7 +1543,7 @@ def forge_class_route():
             finish_done(out)
         finally:
             _forge_progress.pop(forge_id, None)
-            _forge_release()
+            _forge_release(token=ollama_mix)
             _user_end(user["id"])
 
     threading.Thread(target=worker, daemon=True).start()

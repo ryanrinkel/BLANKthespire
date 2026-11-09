@@ -3164,13 +3164,19 @@ Notes: {e} = the exception text.
     forged, but saving failed: {e}
 
 ### server.forge.too_long
-Where: web/app.py:1427-1428 (forge error event)
+Where: web/app.py:1478 (forge error event, token forge past BTSWEB_FORGE_MAX_SECONDS)
 
     this forge is taking far too long — it's been abandoned and your token refunded. If it does finish, the class will appear in My Classes.
 
+### server.forge.too_long_byok
+Where: web/app.py:1478 (forge error event, BYOK forge past BTSWEB_FORGE_MAX_SECONDS_BYOK)
+Notes: BYOK has no token to refund, and its ceiling is hours (a stuck-job guard, not a product limit), so this never mentions a refund or a number of minutes.
+
+    this forge has run for hours without finishing — the page has stopped waiting. If your provider does finish it, the class will appear in My Classes.
+
 ### server.forge.too_long_job
-Where: web/app.py:1425 (stored job error, shown when a lost browser polls)
-Notes: {max_seconds} = the cap in whole seconds (BTSWEB_FORGE_MAX_SECONDS).
+Where: web/app.py:1475 (stored job error, shown when a lost browser polls)
+Notes: {max_seconds} = the cap in whole seconds (BTSWEB_FORGE_MAX_SECONDS for a token forge, BTSWEB_FORGE_MAX_SECONDS_BYOK otherwise).
 
     the forge ran past {max_seconds}s and was abandoned
 

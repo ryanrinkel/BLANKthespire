@@ -761,6 +761,7 @@
   "server.forge.restarted": "锻造途中服务器重启了，锻造券已退还",
   "server.forge.saving_failed": "已锻造，但保存失败：{e}",
   "server.forge.too_long": "这次锻造耗时太久，已被放弃，锻造券已退还。如果它最终完成了，角色会出现在“我的角色”里。",
+  "server.forge.too_long_byok": "这次锻造已运行数小时仍未完成，页面已停止等待。如果你的服务商最终完成了它，角色会出现在“我的角色”里。",
   "server.forge.too_long_job": "锻造运行超过{max_seconds}秒，已被放弃",
   "server.forge.unexpected": "意外错误：{e}",
   "server.forge.unknown_mode": "未知的锻造模式。",

@@ -761,6 +761,7 @@
   "server.forge.restarted": "the server restarted mid-forge — token refunded",
   "server.forge.saving_failed": "forged, but saving failed: {e}",
   "server.forge.too_long": "this forge is taking far too long — it's been abandoned and your token refunded. If it does finish, the class will appear in My Classes.",
+  "server.forge.too_long_byok": "this forge has run for hours without finishing — the page has stopped waiting. If your provider does finish it, the class will appear in My Classes.",
   "server.forge.too_long_job": "the forge ran past {max_seconds}s and was abandoned",
   "server.forge.unexpected": "unexpected error: {e}",
   "server.forge.unknown_mode": "unknown forge mode.",

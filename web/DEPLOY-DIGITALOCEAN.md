@@ -261,23 +261,37 @@ branch in `auth.py`'s `login_provider` to `auth_provider_callback` and drop the 
 - Updating: `git pull`, `pip install -r web/requirements.txt` (if changed), `sudo systemctl restart btsweb`.
   If generation/ was installed non-editable (plain `pip install ./generation`), also re-run the install so
   the new btsgen lands in site-packages; an **editable** (`-e`) install skips that — `git pull` is enough.
-- Forge admission: at most `BTSWEB_FORGE_MAX_CONCURRENT` (3) forges run at once; the next
-  `BTSWEB_FORGE_MAX_QUEUE` (12) wait in a FIFO line with live queue-position progress in the stream;
-  beyond that `/api/forge-class` answers 503 up front (no token spent). Process-local — keep
-  gunicorn at 1 worker or the limits silently double and the line splits.
+- Forge admission is two independent pools, each with its own slots and its own FIFO line (live
+  queue-position progress in the stream, counted within that line): token forges (our hosted route) run at
+  most `BTSWEB_FORGE_MAX_CONCURRENT` (3) at once; every other mode (BYOK) runs at most
+  `BTSWEB_FORGE_MAX_CONCURRENT_BYOK` (4) at once. A BYOK forge is a thread waiting on the user's own API, so
+  a full BYOK pool never delays a token forge and vice versa. `BTSWEB_FORGE_MAX_QUEUE` (12) caps the two
+  lines combined; beyond that `/api/forge-class` answers 503 up front (no token spent). Process-local — keep
+  gunicorn at 1 worker or the limits silently double and the lines split.
 - Token-path guards: there is no free token — accounts start with 0 tokens, and tokens only ever arrive as
   a thank-you for a donation. There is deliberately NO global daily cap on hosted forges (removed
   2026-09-22): a busy day must not turn donors away. The spend backstop is the provider key's own limit
   (set it on the Ollama / OpenRouter account), not the app. One forge per account at a time, across all
-  modes; token forges dequeue ahead of BYOK forges. All of it is process-local — keep gunicorn at one worker.
+  modes (the per-account lock lasts as long as the longest forge can legitimately run: the largest of the
+  queue timeout and the two wall-clock caps, plus 15 min). All of it is process-local — keep gunicorn at one
+  worker.
 - A forge can never cost a token without delivering a class: every attempt is a `forge_jobs` row settled
   exactly once by the worker thread (not the browser stream), so a closed tab still gets its class saved or
-  its token refunded; jobs left running by a restart are refunded at boot; a forge running past
+  its token refunded; jobs left running by a restart are refunded at boot; a token forge running past
   `BTSWEB_FORGE_MAX_SECONDS` (default 1200) is abandoned and refunded, and if it finishes late the class
-  still lands in the library.
+  still lands in the library. BYOK forges have their own ceiling, `BTSWEB_FORGE_MAX_SECONDS_BYOK` (default
+  14400 = 4 h): a stuck-job sanity guard, not a product limit — reasoning models on the user's own key
+  routinely take 45-60 min (2026-11-08 Doubao / DeepSeek forges), and slow there is a wait, not a failure.
+  Past it the stream gets the BYOK-worded `forge.too_long_byok` (nothing to refund) and a late finish still
+  lands in My Classes.
 - `mode=hosted` (our Anthropic key) is retired and answers 410 — nothing can spend that key any more.
 - Deploy with `web/deploy/deploy.sh` (pull, install if requirements changed, run web tests, restart, curl
   `/healthz`). `/healthz` returns 503 when the DB is unreachable — point the uptime monitor at it.
+  Before the restart it **drains**: `web/deploy/running_forges.py` (read-only, never imports the app) counts
+  `forge_jobs` still `running` in the live DB; if any, the script prints each one's age/mode/concept and
+  re-checks every 30 s until none are left or `BTSWEB_DEPLOY_DRAIN_MAX_S` (default 5400) passes, then
+  restarts anyway (boot reconciliation refunds what is left). A slow BYOK forge can hold a deploy for up to
+  90 min; `deploy.sh --now` skips the wait (flags combine: `--no-test --now`).
 - Nightly backups of the un-versioned server data (forged art, feedback + gap logs): `web/deploy/backup.sh`
   + `btsweb-backup.timer` sync them to a DO Space via rclone. Managed MySQL keeps its own daily backups —
   verify the retention setting in the DO console.

@@ -2,6 +2,7 @@
 regardless of whether the browser is still listening, a restart killed the process, or the forge overran."""
 from __future__ import annotations
 
+import json
 import threading
 import time
 
@@ -139,6 +140,131 @@ def test_wall_clock_cap_refunds_and_frees_the_slot(client, app_module, stub_forg
     names = [c["concept"] for c in client.get("/api/classes").get_json()["classes"]]
     assert "slow one" in names
     assert _me(client)["token_balance"] == 1
+    stub_forge.gate = None
+
+
+# --- BYOK: slow is a wait, not a failure (WALK_AWAY_FORGE_PLAN section 1) --------------------------------
+# A provider with no art backend of ours, so a BYOK forge in these tests never builds an image client.
+BYOK_BODY = {"mode": "byok", "key": {"base_url": "https://api.deepseek.com/v1", "api_key": "k", "model": "m"}}
+
+
+def _release_after(gate: threading.Event, seconds: float) -> None:
+    t = threading.Timer(seconds, gate.set)
+    t.daemon = True
+    t.start()
+
+
+def test_byok_ceiling_is_separate(client, app_module, stub_forge, monkeypatch):
+    """The 20-minute cap is the TOKEN forge's; a BYOK forge running past it is just slow and still finishes."""
+    login(client, "byokslow@example.com")
+    seed_tokens(app_module, "byokslow@example.com", 1)
+    monkeypatch.setattr(app_module, "FORGE_MAX_SECONDS", 0.3)
+    monkeypatch.setattr(app_module, "FORGE_MAX_SECONDS_BYOK", 5)
+    stub_forge.gate = threading.Event()
+    _release_after(stub_forge.gate, 1.0)
+    ev = sse_events(client.post("/api/forge-class", json={"concept": "slow byok", **BYOK_BODY}, headers=H))
+    assert ev[-1][0] == "result"
+    assert not any(e == "error" for e, _ in ev)
+    j = _jobs_for(app_module, "byokslow@example.com")[-1]
+    assert (j.mode, j.status, j.class_id) == ("byok", "done", ev[-1][1]["id"])
+    # the same one-second stall on a token forge still trips the 0.3 s token cap
+    stub_forge.gate = threading.Event()
+    _release_after(stub_forge.gate, 1.0)
+    ev = sse_events(client.post("/api/forge-class", json={"concept": "slow token", "mode": "token"}, headers=H))
+    assert ev[-1][0] == "error" and ev[-1][1]["code"] == "forge.too_long"
+    assert _wait(lambda: _jobs_for(app_module, "byokslow@example.com")[-1].class_id is not None)
+    stub_forge.gate = None
+
+
+def test_byok_ceiling_copy(client, app_module, stub_forge, monkeypatch):
+    """A BYOK forge that does hit its (hours-long) ceiling gets BYOK wording: nothing refunded, no balance."""
+    login(client, "byokstuck@example.com")
+    monkeypatch.setattr(app_module, "FORGE_MAX_SECONDS_BYOK", 0.3)
+    stub_forge.gate = threading.Event()
+    ev = sse_events(client.post("/api/forge-class", json={"concept": "stuck byok", **BYOK_BODY}, headers=H))
+    assert ev[-1][0] == "error"
+    data = ev[-1][1]
+    assert data["code"] == "forge.too_long_byok" and "token" not in data["error"]
+    assert "token_balance" not in data
+    j = _jobs_for(app_module, "byokstuck@example.com")[-1]
+    assert j.status == "failed" and j.refunded == 0
+    with app_module._user_active_lock:
+        assert not app_module._user_active                    # the page stopped waiting: the account is free
+    # the provider does finish in the end: the class is still saved
+    stub_forge.gate.set()
+    assert _wait(lambda: _jobs_for(app_module, "byokstuck@example.com")[-1].class_id is not None)
+    names = [c["concept"] for c in client.get("/api/classes").get_json()["classes"]]
+    assert "stuck byok" in names
+    stub_forge.gate = None
+
+
+def test_byok_pool_does_not_block_token(app_module, stub_forge, monkeypatch):
+    """BYOK forges have their own slots: a full BYOK pool queues the next BYOK forge (with a position line)
+    while a token forge runs straight away."""
+    monkeypatch.setattr(app_module, "FORGE_MAX_CONCURRENT_BYOK", 1)
+    gate = threading.Event()
+    stub_forge.gate = gate
+    out: dict = {}
+
+    def byok(name):
+        c = app_module.app.test_client()
+        login(c, f"{name}@example.com")
+        out[name] = sse_events(c.post("/api/forge-class", json={"concept": name, **BYOK_BODY}, headers=H))
+
+    t1 = threading.Thread(target=byok, args=("pool-b1",), daemon=True)
+    t1.start()
+    assert _wait(lambda: len(stub_forge.calls) == 1)          # b1 holds the only BYOK slot, blocked in the forge
+    t2 = threading.Thread(target=byok, args=("pool-b2",), daemon=True)
+    t2.start()
+    assert _wait(lambda: len(app_module._forge_waiting_byok) == 1)   # b2 waits in the BYOK line
+    stub_forge.gate = None                                    # forges that START from now on don't block
+    c3 = app_module.app.test_client()
+    login(c3, "pool-tok@example.com")
+    seed_tokens(app_module, "pool-tok@example.com", 1)
+    ev = sse_events(c3.post("/api/forge-class", json={"concept": "tok", "mode": "token"}, headers=H))
+    assert ev[-1][0] == "result"                              # never waited on the BYOK pool
+    assert not any("console.queue" in json.dumps(d) or "in line" in json.dumps(d) for _, d in ev)
+    assert len(app_module._forge_waiting_byok) == 1 and t2.is_alive()
+    gate.set()                                                # b1 finishes -> its slot goes to b2
+    t1.join(timeout=30)
+    t2.join(timeout=30)
+    assert out["pool-b1"][-1][0] == "result" and out["pool-b2"][-1][0] == "result"
+    # the second BYOK forge narrated its wait. (i18n.get_text has no console.* table on the server, so today the
+    # line goes out as the bare key; accept that or the rendered English text.)
+    b2_lines = [str(d.get("message")) for e, d in out["pool-b2"] if e == "progress"]
+    assert any(m.startswith("console.queue.busy") or "in line at position 1" in m for m in b2_lines)
+    with app_module._forge_admit_lock:
+        assert app_module._waiting_total() == 0
+        assert (app_module._forge_running_token, app_module._forge_running_byok) == (0, 0)
+
+
+def test_user_lock_outlives_cap(client, app_module, stub_forge, monkeypatch):
+    """With the watchdog no longer freeing a BYOK forge at 20 min, the per-account lock has to hold for as long
+    as the forge may legitimately run — past the OLD stale horizon (queue timeout + 15 min)."""
+    assert app_module.USER_ACTIVE_STALE_S > app_module.FORGE_MAX_SECONDS_BYOK
+    assert app_module.USER_ACTIVE_STALE_S > app_module.FORGE_QUEUE_TIMEOUT_S
+    me = login(client, "longbyok@example.com")
+    monkeypatch.setattr(app_module, "FORGE_MAX_SECONDS_BYOK", 5)
+    stub_forge.gate = threading.Event()
+    collected: dict = {}
+
+    def run_first():
+        collected["events"] = sse_events(
+            client.post("/api/forge-class", json={"concept": "long one", **BYOK_BODY}, headers=H))
+
+    t = threading.Thread(target=run_first, daemon=True)
+    t.start()
+    assert _wait(lambda: len(stub_forge.calls) == 1)
+    # pretend the forge has been running for longer than the old 45-minute horizon
+    with app_module._user_active_lock:
+        app_module._user_active[me["id"]] -= app_module.FORGE_QUEUE_TIMEOUT_S + 900 + 60
+    c2 = app_module.app.test_client()
+    login(c2, "longbyok@example.com")
+    r = c2.post("/api/forge-class", json={"concept": "second", **BYOK_BODY}, headers=H)
+    assert r.status_code == 429 and r.get_json()["code"] == "forge.already_running"
+    stub_forge.gate.set()
+    t.join(timeout=30)
+    assert collected["events"][-1][0] == "result"
     stub_forge.gate = None
 
 

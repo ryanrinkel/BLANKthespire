@@ -1,4 +1,5 @@
-"""Forge admission: token-first dequeue across the two wait lines, and one forge per account at a time."""
+"""Forge admission: two independent pools (token / BYOK), each with its own slots and FIFO line, and one forge
+per account at a time."""
 from __future__ import annotations
 
 import threading
@@ -11,30 +12,45 @@ def _drain_queues(app_module):
     with app_module._forge_admit_lock:
         app_module._forge_waiting_token.clear()
         app_module._forge_waiting_byok.clear()
-        app_module._forge_priority.clear()
-        app_module._forge_running = 0
+        app_module._forge_running_token = 0
+        app_module._forge_running_byok = 0
 
 
-def test_token_forges_dequeue_before_byok(app_module, monkeypatch):
+def test_token_and_byok_pools_are_independent(app_module, monkeypatch):
+    """A full BYOK pool never delays a token forge (and vice versa); each pool admits up to its own limit and
+    hands a freed slot to the head of its OWN line."""
     _drain_queues(app_module)
     monkeypatch.setattr(app_module, "FORGE_MAX_CONCURRENT", 1)
-    running = app_module._forge_enqueue(priority=False)
-    assert running.is_set()
-    byok1 = app_module._forge_enqueue(priority=False)
-    tok1 = app_module._forge_enqueue(priority=True)
-    byok2 = app_module._forge_enqueue(priority=False)
-    assert not byok1.is_set() and not tok1.is_set()
-    # positions: the token line is served first, so it reports ahead of BYOK forges that arrived earlier
-    assert app_module._forge_position(tok1) == 1
-    assert app_module._forge_position(byok1) == 2 and app_module._forge_position(byok2) == 3
-    app_module._forge_release()                    # slot frees -> token forge runs first
-    assert tok1.is_set() and not byok1.is_set()
-    app_module._forge_release()
-    assert byok1.is_set() and not byok2.is_set()
-    assert app_module._forge_abandon(byok2) is True  # leave the line while queued
-    app_module._forge_release()                    # nobody waits: running count drops
+    monkeypatch.setattr(app_module, "FORGE_MAX_CONCURRENT_BYOK", 2)
+    b1 = app_module._forge_enqueue(token=False)
+    b2 = app_module._forge_enqueue(token=False)
+    assert b1.is_set() and b2.is_set()             # the BYOK pool admits up to ITS limit (2)
+    b3 = app_module._forge_enqueue(token=False)
+    b4 = app_module._forge_enqueue(token=False)
+    assert not b3.is_set() and not b4.is_set()
+    t1 = app_module._forge_enqueue(token=True)
+    assert t1.is_set()                             # a queued BYOK line never delays a token forge
+    t2 = app_module._forge_enqueue(token=True)
+    assert not t2.is_set()                         # ...but the token pool has its own limit (1)
+    # positions are per line
+    assert app_module._forge_position(b3) == 1 and app_module._forge_position(b4) == 2
+    assert app_module._forge_position(t2) == 1
+    assert app_module._forge_position(t1) == 0
     with app_module._forge_admit_lock:
-        assert app_module._forge_running == 0
+        assert app_module._waiting_total() == 3    # the up-front 503 check still sees both lines
+        assert (app_module._forge_running_token, app_module._forge_running_byok) == (1, 2)
+    app_module._forge_release(token=True)          # a token slot frees -> the token line's head, not BYOK
+    assert t2.is_set() and not b3.is_set()
+    app_module._forge_release(token=False)         # a BYOK slot frees -> the BYOK line's head
+    assert b3.is_set() and not b4.is_set()
+    assert app_module._forge_abandon(b4) is True   # leave the line while queued
+    assert app_module._forge_abandon(b4) is False
+    app_module._forge_release(token=True)          # nobody waits: each pool's running count drops
+    app_module._forge_release(token=False)
+    app_module._forge_release(token=False)
+    with app_module._forge_admit_lock:
+        assert (app_module._forge_running_token, app_module._forge_running_byok) == (0, 0)
+        assert app_module._waiting_total() == 0
     _drain_queues(app_module)
 
 
