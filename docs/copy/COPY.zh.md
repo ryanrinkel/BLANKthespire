@@ -999,6 +999,38 @@ Notes: 英文版以空格开头；中文不需要空格。
 
     仍然没有锻造的消息。如果它完成了，会出现在“我的角色”里；如果失败，锻造券会自动退还。
 
+### app.resume.banner
+
+    仍在锻造：{concept} — 开始于{age}前{eta}。你可以关闭此页，完成后角色会出现在“我的角色”里。
+
+### app.resume.eta
+
+    ，大约还需{min}分钟
+
+### app.resume.one_at_a_time
+
+    一次只能锻造一个 — 当前的还在进行。
+
+### app.late.banner
+
+    你的服务商比较慢，页面已停止等待，但锻造仍在进行。如果完成了，角色会出现在这里和“我的角色”里。
+
+### app.console.done_late
+
+    ✓ 迟到但完成了 — 就在这里
+
+### app.console.pace_hint
+
+    可以关闭此页，角色完成后会出现在“我的角色”里。
+
+### app.time.min
+
+    {n} 分钟
+
+### app.time.h_min
+
+    {h} 小时 {m} 分钟
+
 ### app.choice.requested_badge
 
     你点名要的
@@ -1152,6 +1184,18 @@ Notes: 英文版以空格开头；中文不需要空格。
 ### app.library.delete
 
     删除
+
+### app.library.in_progress
+
+    进行中
+
+### app.library.watch
+
+    查看进度
+
+### app.library.started_ago
+
+    开始于{age}前
 
 ### app.library.splash_alt
 
@@ -2856,6 +2900,10 @@ Notes: BaseLib按钮宽度固定为324px，文字要非常短。
 ### console.queue.turn
 
     轮到你了，正在锻造……
+
+### console.pace
+
+    速度：每张卡约 {secs} 秒，大约还需 {min} 分钟（还剩 {left} 张卡）
 
 ### console.stage.harness
 Notes: 版本标记；条件后缀“ [creative harness v2]”由{rest}原样带过。

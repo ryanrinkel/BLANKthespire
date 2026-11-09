@@ -478,6 +478,11 @@ _choices_lock = threading.Lock()
 # a browser whose SSE stream died (phone locked, network hop) and is polling instead. Written by the worker's
 # on_event, dropped when the worker exits; single dict assignments, so no lock.
 _forge_progress: dict[str, str] = {}
+# When each running forge expects to finish (absolute epoch seconds), parsed from the card pass's
+# "pace: Ns/card, ~M min to go (K cards left)" progress line (docs/plans/WALK_AWAY_FORGE_PLAN.md 3.3). The
+# status endpoint and /api/classes turn it into eta_s. Same lifetime as _forge_progress.
+_forge_eta: dict[str, float] = {}
+_PACE_RE = re.compile(r"^pace: .*~(\d+) min to go")
 # How recent the newest job must be for GET /api/forge-jobs/latest to call it "the forge you just started" —
 # the fallback for a browser whose POST died before the first event (so it never learned the id).
 FORGE_LATEST_WINDOW_S = 300
@@ -1500,6 +1505,9 @@ def forge_class_route():
 
     def on_event(msg: str) -> None:
         _forge_progress[forge_id] = msg
+        pace = _PACE_RE.match(str(msg or ""))
+        if pace:  # the card pass's own projection: what the status endpoint reports as eta_s
+            _forge_eta[forge_id] = time.time() + int(pace.group(1)) * 60
         q.put(("progress", msg))
 
     def worker() -> None:
@@ -1526,6 +1534,9 @@ def forge_class_route():
         watchdog = threading.Timer(max_seconds, on_wall_clock)
         watchdog.daemon = True
         watchdog.start()
+        # Present for exactly as long as this worker runs (popped in the finally below): a job the cap
+        # already settled is still "being forged" only while its id is here (_forge_alive).
+        _forge_progress.setdefault(forge_id, "")
         try:
             out = forge_to_bundle(
                 concept, key=key, hosted=hosted, fake=fake, model=model,
@@ -1543,6 +1554,7 @@ def forge_class_route():
             finish_done(out)
         finally:
             _forge_progress.pop(forge_id, None)
+            _forge_eta.pop(forge_id, None)
             _forge_release(token=ollama_mix)
             _user_end(user["id"])
 
@@ -1582,6 +1594,33 @@ def forge_class_route():
     return Response(stream(), mimetype="text/event-stream", headers=headers)
 
 
+def _forge_alive(forge_id: str) -> bool:
+    """Is this process's worker thread still forging `forge_id`? (Its id sits in _forge_progress from the
+    moment it leaves the queue until its finally.)"""
+    return forge_id in _forge_progress
+
+
+def _forge_eta_s(forge_id: str) -> int | None:
+    deadline = _forge_eta.get(forge_id)
+    return None if deadline is None else max(0, int(deadline - time.time()))
+
+
+def _forge_capped(job) -> bool:
+    """Settled as failed by the wall-clock cap (the stored too_long_job text) with no class yet — the worker
+    may still be running and save it late."""
+    if job.status != "failed" or job.class_id is not None:
+        return False
+    hit = i18n.match_error(job.error or "")
+    return hit is not None and hit[0] == "forge.too_long_job"
+
+
+def _iso_utc(dt) -> str | None:
+    from datetime import timezone
+    if dt is None:
+        return None
+    return (dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)).isoformat()
+
+
 @app.route("/api/forge-jobs/<forge_id>")
 @require_login
 def forge_job_status(forge_id: str):
@@ -1600,17 +1639,32 @@ def forge_job_status(forge_id: str):
             job = q.filter_by(id=forge_id).one_or_none()
         now = datetime.now(timezone.utc).replace(tzinfo=None)
         age = (now - job.started_at).total_seconds() if job is not None and job.started_at else None
+        capped = job is not None and _forge_capped(job)
         if job is None or (forge_id == "latest" and job.status != "running"
+                           and not (capped and _forge_alive(job.id))
                            and (age is None or age > FORGE_LATEST_WINDOW_S)):
+            if forge_id == "latest" and request.args.get("quiet") == "1":
+                # the page-load reattach probe (app.js resumeForge): "nothing to follow" is the normal
+                # answer there, so no 404 for the browser console to report
+                return "", 204
             return jsonify(i18n.error_body("server.forge.no_such_forge")), 404
         out = i18n.with_code({"forge_id": job.id, "status": job.status, "class_id": job.class_id,
                               "error": job.error or "", "refunded": bool(job.refunded),
-                              "age_s": int(age) if age is not None else None})
+                              "age_s": int(age) if age is not None else None,
+                              # walk-away fields (WALK_AWAY_FORGE_PLAN.md 2.1): `late` = the cap settled it
+                              # but the class was saved anyway; `still_running` = a capped job's worker is
+                              # still going in this process (a follower keeps waiting only while it is)
+                              "late": job.status == "failed" and job.class_id is not None,
+                              "still_running": job.status == "running" or (capped and _forge_alive(job.id)),
+                              "concept": (job.concept or "")[:120],
+                              "started_at": _iso_utc(job.started_at),
+                              "eta_s": _forge_eta_s(job.id)})
         u = s.query(User).filter_by(id=user["id"]).one_or_none()
         if u is not None and not user_is_unlimited(u):
             out.update(_token_state(u))  # a failed forge's refund shows up in the header chip
-    if out["status"] == "running":
+    if out["still_running"]:
         out["message"] = _forge_progress.get(out["forge_id"], "")
+    if out["status"] == "running":
         with _choices_lock:
             entry = _pending_choices.get(out["forge_id"])
             if entry is not None and entry["user_id"] == user["id"] and not entry["event"].is_set():
@@ -1853,7 +1907,19 @@ def list_classes():
                 .filter_by(user_id=user["id"])
                 .order_by(ForgedClass.updated_at.desc())
                 .all())
-        return jsonify({"classes": [{**c.summary(), **_art_fields(c, f"/api/classes/{c.id}")} for c in rows]})
+        classes = [{**c.summary(), **_art_fields(c, f"/api/classes/{c.id}")} for c in rows]
+        # Forges still running for this account: the library's "in progress" cards (WALK_AWAY_FORGE_PLAN 2.2)
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        running = []
+        for job in (s.query(ForgeJob).filter_by(user_id=user["id"], status="running")
+                    .order_by(ForgeJob.started_at.desc()).all()):
+            age = (now - job.started_at).total_seconds() if job.started_at else None
+            running.append({"forge_id": job.id, "concept": (job.concept or "")[:120],
+                            "started_at": _iso_utc(job.started_at),
+                            "age_s": int(max(0, age)) if age is not None else None,
+                            "message": _forge_progress.get(job.id, ""), "eta_s": _forge_eta_s(job.id)})
+        return jsonify({"classes": classes, "running": running})
 
 
 @app.route("/api/classes/<int:class_id>")

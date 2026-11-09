@@ -1363,6 +1363,50 @@ Where: static/app.js:974-975 (lost-connection banner, token path)
 
     Still no word from your forge. If it finishes, it'll appear in My Classes; if it fails, your token is refunded automatically.
 
+### app.resume.banner
+Where: static/app.js resumeForge() (forge banner on page load while a forge is still running)
+Notes: {concept} = the forge's concept (first 120 chars); {age} = app.time.min or app.time.h_min; {eta} = "" or app.resume.eta.
+
+    Still forging: {concept} — started {age} ago{eta}. You can close this tab; the class will be in My Classes when it's done.
+
+### app.resume.eta
+Where: static/app.js (fragment glued into app.resume.banner and the library's in-progress card)
+Notes: fragment, starts with a comma; {min} = whole minutes left, from the forge's own pace line.
+
+    , about {min} min to go
+
+### app.resume.one_at_a_time
+Where: static/app.js renderForgeButton() (Forge button tooltip while a running forge is being followed)
+
+    One forge at a time — this one is still running.
+
+### app.late.banner
+Where: static/app.js followJob() (forge banner after the wall-clock cap stopped the stream; the forge goes on)
+
+    Your provider is slow, so the page stopped waiting — but the forge is still running. If it finishes, the class will appear here and in My Classes.
+
+### app.console.done_late
+Where: static/app.js followJob() (console line when a capped forge saved its class anyway)
+
+    ✓ finished late — here it is
+
+### app.console.pace_hint
+Where: static/app.js (glued after the translated console.pace line, after a space)
+
+    Safe to close this tab; the class lands in My Classes.
+
+### app.time.min
+Where: static/app.js fmtAge() (a duration under an hour)
+Notes: {n} = whole minutes.
+
+    {n} min
+
+### app.time.h_min
+Where: static/app.js fmtAge() (a duration of an hour or more)
+Notes: {h} = hours, {m} = minutes.
+
+    {h} h {m} min
+
 ### app.choice.requested_badge
 Where: static/app.js:1213 (badge on an engine option)
 
@@ -1569,6 +1613,22 @@ Where: static/app.js:1314 (library row button)
 Where: static/app.js:1315 (library row button)
 
     Delete
+
+### app.library.in_progress
+Where: static/app.js runningRow() (label on a library card for a forge still running)
+
+    In progress
+
+### app.library.watch
+Where: static/app.js runningRow() (button: open the forge view and follow that forge)
+
+    Watch
+
+### app.library.started_ago
+Where: static/app.js runningRow() (in-progress card meta line, followed by app.resume.eta when known)
+Notes: {age} = app.time.min or app.time.h_min.
+
+    started {age} ago
 
 ### app.library.splash_alt
 Where: static/app.js:1321 (img alt); static/render.js:88 (img alt)
@@ -3792,6 +3852,12 @@ Where: web/app.py:1476
 Where: web/app.py:1477
 
     it's your turn — forging now…
+
+### console.pace
+Where: generation/btsgen/class_forge.py _pace_line (card pass, after the 3rd card and every 10th, when the rest will take over 10 min)
+Notes: a fixed machine shape that web/app.py also parses for the ETA; the browser appends app.console.pace_hint.
+
+    pace: {secs}s/card, ~{min} min to go ({left} cards left)
 
 ### console.stage.harness
 Where: generation/btsgen/class_forge.py:3462 (first line the generator writes)

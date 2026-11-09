@@ -44,6 +44,23 @@ def normalize_lang(value) -> str:
     return DEFAULT_LANG
 
 
+def _console_strings(console) -> dict:
+    """The json's `console` table as plain lookups: console.* key -> its template with the build's trailing
+    {rest} dropped, HTML-escaped so it reads like every other `strings` value (get_text unescapes it). The
+    server sends progress lines in ENGLISH from these (app.py: console.start, console.queue.*); the browser's
+    BTS_I18N.console() then matches them against the same table's `re` and translates."""
+    out: dict = {}
+    if not isinstance(console, dict):
+        return out
+    for key, entry in console.items():
+        text = entry.get("text") if isinstance(entry, dict) else None
+        if isinstance(text, str):
+            if text.endswith("{rest}"):
+                text = text[: -len("{rest}")]
+            out[key] = _html.escape(text, quote=False)
+    return out
+
+
 def _build_english() -> dict:
     """en strings built in memory from docs/copy/COPY.md, for a checkout where en.json was not written yet."""
     global _built_en
@@ -53,7 +70,9 @@ def _build_english() -> dict:
             mod = importlib.util.module_from_spec(spec)
             assert spec.loader is not None
             spec.loader.exec_module(mod)
-            _built_en = dict(mod.build().outputs["en"]["strings"])
+            built = mod.build().outputs["en"]
+            _built_en = dict(built["strings"])
+            _built_en.update(_console_strings(built.get("console")))
         except Exception:  # noqa: BLE001 - no copy source at all: every lookup returns its key
             _built_en = {}
     return _built_en
@@ -72,8 +91,11 @@ def _load(lang: str) -> dict:
     strings: dict = {}
     if mtime is not None:
         try:
-            strings = dict((json.loads(path.read_text(encoding="utf-8")) or {}).get("strings") or {})
-        except (OSError, ValueError):
+            document = json.loads(path.read_text(encoding="utf-8")) or {}
+            strings = dict(document.get("strings") or {})
+            for key, value in _console_strings(document.get("console")).items():
+                strings.setdefault(key, value)
+        except (OSError, ValueError, AttributeError):
             strings = {}
     if not strings and lang == DEFAULT_LANG:
         strings = _build_english()

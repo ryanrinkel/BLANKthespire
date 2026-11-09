@@ -83,6 +83,7 @@ async function boot() {
   // #account is where a finished "link another sign-in" comes back to (auth._landing), so honour the hash.
   selectTab(location.hash === "#account" ? "account" : "forge");
   handlePurchaseReturn();
+  resumeForge();  // a forge still running from an earlier visit: reattach (WALK_AWAY_FORGE_PLAN.md 2.4)
 }
 
 // The concept draft that survives a trip to Stripe (FORGE_FIRST_PLAN.md 3.3): donate() / donateCustom() stash
@@ -201,6 +202,9 @@ function onPayBoxToggle(openedId, otherId, mode) {
 // True while a forge is in flight: the button stays disabled no matter what re-renders underneath it
 // (token events arrive mid-forge and call renderTokens -> renderForgeButton).
 let FORGING = false;
+// A running forge this page did NOT start is being followed (followJob: resume / watch): the button is off
+// too (the server would say already_running), titled app.resume.one_at_a_time, until the follow ends.
+let FOLLOW_RUNNING = false;
 
 // Can the open pay box pay for a forge right now? The offline demo always can; a token box needs an unlimited
 // account or a token to spend; a key box needs a key and a selected model.
@@ -239,7 +243,9 @@ function renderForgeButton() {
     why = appT("app.forge.why_no_mode");
   }
   btn.textContent = label;
-  btn.disabled = FORGING;
+  btn.disabled = FORGING || FOLLOW_RUNNING;
+  // One forge per account: while a running forge this page did not start is followed, say why it's off
+  if (FOLLOW_RUNNING && !FORGING) why = appT("app.resume.one_at_a_time");
   if (why) btn.title = why; else btn.removeAttribute("title");
 }
 
@@ -867,6 +873,8 @@ async function forge() {
   }
 
   FORGING = true;
+  followGen++;              // a follower of an earlier forge (resume / watch / late) stops at its next poll
+  FOLLOW_RUNNING = false;
   renderForgeButton();
   el("result").classList.add("hidden");
   el("progress").classList.remove("hidden");
@@ -876,7 +884,7 @@ async function forge() {
     appendLog(BTS_I18N.has("app.console.log_in_english") ? appT("app.console.log_in_english")
       : "The forge log below is in English; only the stage headers are translated.");
   }
-  el("forge-lost").classList.add("hidden");
+  hideFollowNote();
   resetChoice();  // clear any choice panel left over from a previous forge
   // Echo what we asked for, so a mode mishap (e.g. a stale page) is visible in the log immediately.
   appendLog(appT("app.console.requested", { mode: body.mode,
@@ -884,7 +892,12 @@ async function forge() {
 
   // started = the server answered, so the forge exists (and a token is reserved); settled = the stream
   // reached its result/error. Started but not settled means the CONNECTION died, not the forge.
-  const run = { started: false, settled: false, forgeId: null };
+  // capped = the stream ended on the wall-clock cap (forge.too_long*): the server freed the slot but the
+  // forge goes on, so a "late" follower takes over once FORGING is off (2.5). handoff = the same, seen by
+  // the lost-stream follower.
+  const run = { started: false, settled: false, forgeId: null, capped: false };
+  const token = body.mode === "token";
+  let handoff = null;
   try {
     const resp = await fetch("/api/forge-class", {
       method: "POST",
@@ -907,12 +920,16 @@ async function forge() {
     await consumeSSE(resp, (event, data) => {
       if (event === "result" || event === "error") run.settled = true;
       if (data && data.forge_id) run.forgeId = data.forge_id;
-      onForgeEvent(event, data);
+      onForgeEvent(event, data, run);
     });
     if (!run.settled) throw new TypeError(appT("app.forge.err_stream_ended"));
   } catch (e) {
-    if (e instanceof TypeError && !run.settled) await recoverForge(body, run, e.message);
-    else {
+    if (e instanceof TypeError && !run.settled) {
+      // The browser lost the stream: the forge runs on regardless. Awaited, so the button stays off and the
+      // spinner spins until the job settles (or the cap lets go of it: handed to a "late" follower below).
+      handoff = await followJob(run.forgeId, { token, reason: run.started ? "lost" : "unreachable",
+        errText: e.message, started: run.started, detachOnCap: true });
+    } else {
       appendLog("✗ " + e.message);
       toast(e.message);
     }
@@ -922,78 +939,250 @@ async function forge() {
     el("spinner").classList.add("hidden");
     resetChoice();
   }
+  // Not awaited: FORGING is already false (the server freed this account's slot when the cap fired).
+  if (handoff && handoff.capped) followJob(handoff.job.forge_id, { token, reason: "late", job: handoff.job });
+  else if (run.capped && run.forgeId) followJob(run.forgeId, { token, reason: "late" });
 }
 
-// The browser lost the forge's progress stream (a phone locking its screen or hopping networks is the usual
-// cause — Chrome reports it as a bare "network error"). The forge runs on the server regardless, so instead
-// of reading as a failure the page says so and polls /api/forge-jobs/<id> until the job settles, then shows
-// the class (or the failure) exactly as the stream would have. Awaited inside forge()'s try, so the button
-// stays disabled and the spinner spins until then.
-const RECOVER_POLL_MS = 5000;
-const RECOVER_GIVE_UP_MS = 30 * 60 * 1000;  // past the server's 20-minute cap plus art; My Classes has it anyway
-const RECOVER_NOT_FOUND = 3;                // 404s in a row before "no forge started" (POST never landed)
+// --- following a forge (WALK_AWAY_FORGE_PLAN.md 2.3) ---------------------------------------------
+// The forge runs on the server whether or not a page watches it, so every way of watching one WITHOUT its
+// progress stream goes through followJob(), the only poller of /api/forge-jobs/*: a stream that died
+// (phone locked, network hop: reason "lost" / "unreachable", awaited inside forge()), a page loaded while a
+// forge runs ("resume"), the library's Watch button ("watch") and a forge the wall-clock cap stopped
+// streaming that is still going ("late"). It owns the #forge-lost banner, polls until the job settles, then
+// shows the class (or the failure) exactly as the stream would have. followGen cancels an older follower
+// when a new forge or a new follow starts. Poll timings are window-overridable for the smoke.
+const FOLLOW_FAST_FOR_MS = 60 * 1000;       // poll every FOLLOW_POLL_MS for the first minute, then the slow rate
+const FOLLOW_NOT_FOUND = 3;                 // 404s in a row before "no forge started" (POST never landed)
+// Codes of a job the cap settled while its worker keeps going: the stream's forge.too_long(_byok) and the
+// stored job error's forge.too_long_job (what the status endpoint's `code` says).
+const CAPPED_CODES = new Set(["forge.too_long", "forge.too_long_byok", "forge.too_long_job"]);
+let followGen = 0;
+// What the #forge-lost banner shows while it shows the resume text, so a pace line can refresh its ETA.
+let followBanner = null;  // {concept, startedMs, etaAtMs} | null
 
-async function recoverForge(body, run, reason) {
-  const token = body.mode === "token";
-  const note = (text) => { el("forge-lost-text").textContent = text; el("forge-lost").classList.remove("hidden"); };
-  const stillRunning = () => note(appT("app.lost.still_running")
-    + (token ? appT("app.lost.refund_note") : ""));
-  if (run.started) {
+function followMs(name, fallback) {
+  const v = window[name];
+  return typeof v === "number" && v >= 0 ? v : fallback;
+}
+
+// A human duration from seconds: "34 min" / "1 h 10 min" (Chinese via app.time.*).
+function fmtAge(seconds) {
+  const total = Math.max(1, Math.round(Number(seconds || 0) / 60));
+  if (total < 60) return appT("app.time.min", { n: total });
+  return appT("app.time.h_min", { h: Math.floor(total / 60), m: total % 60 });
+}
+
+// ", about N min to go" or "" (N from an absolute ms deadline).
+function etaFragment(etaAtMs) {
+  if (!etaAtMs) return "";
+  return appT("app.resume.eta", { min: Math.max(1, Math.round((etaAtMs - Date.now()) / 60000)) });
+}
+
+function showFollowNote(text) {
+  el("forge-lost-text").textContent = text;
+  el("forge-lost").classList.remove("hidden");
+}
+
+function paintResumeBanner() {
+  if (!followBanner) return;
+  showFollowNote(appT("app.resume.banner", {
+    concept: followBanner.concept || "",
+    age: fmtAge((Date.now() - followBanner.startedMs) / 1000),
+    eta: etaFragment(followBanner.etaAtMs),
+  }));
+}
+
+function hideFollowNote() {
+  followBanner = null;
+  el("forge-lost").classList.add("hidden");
+}
+
+// One forge progress line into the log (stream or poll). A card-pass pace line ("pace: 75s/card, ~40 min to
+// go (32 cards left)") also gets the walk-away hint and refreshes the resume banner's ETA.
+function logProgress(message) {
+  const raw = String(message || "");
+  const pace = /^pace: .*~(\d+) min to go/.exec(raw);
+  appendLog("• " + BTS_I18N.console(raw) + (pace ? " " + appT("app.console.pace_hint") : ""));
+  if (pace && followBanner && !el("forge-lost").classList.contains("hidden")) {
+    followBanner.etaAtMs = Date.now() + Number(pace[1]) * 60000;
+    paintResumeBanner();
+  }
+}
+
+function isCapped(job) {
+  return !!job && job.status === "failed" && !job.class_id && CAPPED_CODES.has(job.code)
+    && job.still_running !== false;
+}
+
+// opts: token (a token forge: the refund wording), reason (see above), errText (the browser's error text for
+// lost/unreachable), started (false = the POST may never have landed: 404s mean "no forge"), job (a status
+// payload already in hand: handled before the first poll), detachOnCap (resolve {capped, job} as soon as the
+// cap settles the job, so forge() can let go of FORGING and hand over to a "late" follower).
+async function followJob(forgeId, opts = {}) {
+  const { token = false, reason = "resume", errText = "", started = true, detachOnCap = false } = opts;
+  const gen = ++followGen;
+  const live = () => gen === followGen;
+  const stillRunning = () => { followBanner = null; showFollowNote(appT("app.lost.still_running") + (token ? appT("app.lost.refund_note") : "")); };
+  const setFollowRunning = (on) => {
+    if (!live() || FOLLOW_RUNNING === on) return;
+    FOLLOW_RUNNING = on && !FORGING;
+    renderForgeButton();
+  };
+
+  if (reason === "lost") {
     stillRunning();
-    appendLog(appT("app.console.lost", { reason }));
+    appendLog(appT("app.console.lost", { reason: errText }));
     toast(appT("app.lost.toast_reconnecting"));
-  } else {
-    note(appT("app.lost.unreachable", { reason }));
-    appendLog(appT("app.console.unreachable", { reason }));
+  } else if (reason === "unreachable") {
+    followBanner = null;
+    showFollowNote(appT("app.lost.unreachable", { reason: errText }));
+    appendLog(appT("app.console.unreachable", { reason: errText }));
     toast(appT("app.lost.toast_unreachable"));
+  } else {
+    // resume / watch / late: this page shows the forge view's progress card for it
+    el("progress").classList.remove("hidden");
+    el("spinner").classList.remove("hidden");
+    if (reason === "late") { followBanner = null; showFollowNote(appT("app.late.banner")); }
   }
 
-  let id = run.forgeId || "latest";
-  let notFound = 0, lastMsg = "", found = run.started;
-  const deadline = Date.now() + RECOVER_GIVE_UP_MS;
-  while (Date.now() < deadline) {
-    await pollPause(RECOVER_POLL_MS);
-    let job;
-    try {
-      const r = await fetch(`/api/forge-jobs/${encodeURIComponent(id)}`);
-      if (r.status === 404) {
-        if (!found && ++notFound >= RECOVER_NOT_FOUND) {
-          note(appT("app.lost.never_started"));
-          appendLog(appT("app.console.never_started"));
-          return;
-        }
-        continue;
-      }
-      if (!r.ok) continue;
-      job = await r.json();
-    } catch (_) { continue; }  // still offline: keep trying until the deadline
+  let id = forgeId || "latest";
+  let notFound = 0, lastMsg = "", found = started, lateShown = reason === "late";
+  const t0 = Date.now();
+  const deadline = t0 + followMs("__FOLLOW_GIVE_UP_MS", 5 * 60 * 60 * 1000);  // above the 4 h BYOK ceiling
+
+  // One status payload: "wait" (keep polling), "end" (settled and shown) or {capped, job} (detachOnCap).
+  const handle = async (job) => {
     if (!found) { found = true; stillRunning(); }
-    id = job.forge_id;  // a "latest" lookup pins to the job it found
+    id = job.forge_id || id;  // a "latest" lookup pins to the job it found
     if (applyTokenState(job)) renderTokens();
+    if (job.message && job.message !== lastMsg) { lastMsg = job.message; logProgress(job.message); }
     if (job.status === "running") {
-      if (job.message && job.message !== lastMsg) { lastMsg = job.message; appendLog("• " + BTS_I18N.console(job.message)); }
+      setFollowRunning(true);
+      if (reason === "resume" || reason === "watch") {
+        if (!followBanner) followBanner = { concept: job.concept || "", startedMs: Date.now() - 1000 * Number(job.age_s || 0), etaAtMs: 0 };
+        if (typeof job.eta_s === "number") followBanner.etaAtMs = Date.now() + job.eta_s * 1000;
+        paintResumeBanner();
+      }
       // An engine pick the stream never delivered (or delivered before it died): show it again. The answer
       // goes back on /api/forge/answer as usual, independent of the stream.
       if (job.choice && (!choiceState || choiceState.forgeId !== job.choice.forge_id)) renderChoice(job.choice);
-      continue;
+      return "wait";
     }
-    el("forge-lost").classList.add("hidden");
-    if (job.status === "done" && job.class_id) {
+    if (isCapped(job)) {
+      // The cap stopped waiting (and freed the account's forge slot) but the worker is still going.
+      setFollowRunning(false);
+      if (detachOnCap) return { capped: true, job };
+      if (!lateShown) { lateShown = true; followBanner = null; showFollowNote(appT("app.late.banner")); }
+      return "wait";
+    }
+    hideFollowNote();
+    el("spinner").classList.add("hidden");
+    if (job.class_id) {
       try {
         const r = await fetch(`/api/classes/${job.class_id}`);
-        if (r.ok) { appendLog(appT("app.console.done_reconnected")); renderResult(await r.json()); return; }
+        if (r.ok) {
+          const cls = await r.json();
+          if (!live()) return "end";
+          appendLog(job.late ? appT("app.console.done_late")
+            : reason === "lost" || reason === "unreachable" ? appT("app.console.done_reconnected") : appT("app.console.done"));
+          renderResult(cls);
+          toast(appT("app.lost.toast_ready"));
+          if (!el("view-library").classList.contains("hidden")) loadLibrary();
+          return "end";
+        }
       } catch (_) { /* fall through to the pointer */ }
       appendLog(appT("app.console.done_open_library"));
       toast(appT("app.lost.toast_ready"));
-      return;
+      return "end";
+    }
+    if (job.status === "done") {
+      appendLog(appT("app.console.done_open_library"));
+      toast(appT("app.lost.toast_ready"));
+      return "end";
     }
     const msg = (BTS_I18N.err(job, "") || appT("app.lost.failed_fallback"))
       + (job.refunded ? appT("app.lost.refunded_suffix") : "");
     appendLog("✗ " + msg);
     toast(msg);
-    return;
+    return "end";
+  };
+
+  try {
+    let first = opts.job || null;
+    // resume / watch have nothing on screen yet: ask at once; the others already said what happened
+    let immediate = !first && (reason === "resume" || reason === "watch");
+    while (Date.now() < deadline) {
+      let job = first;
+      first = null;
+      if (!job) {
+        if (!immediate) {
+          const fast = followMs("__FOLLOW_POLL_MS", 5000);
+          await pollPause(Date.now() - t0 < FOLLOW_FAST_FOR_MS ? fast : followMs("__FOLLOW_SLOW_POLL_MS", 20000));
+        }
+        immediate = false;
+        if (!live()) return null;
+        try {
+          const r = await fetch(`/api/forge-jobs/${encodeURIComponent(id)}`);
+          if (!live()) return null;
+          if (r.status === 404) {
+            if (!found && ++notFound >= FOLLOW_NOT_FOUND) {
+              if (reason === "lost" || reason === "unreachable") {
+                followBanner = null;
+                showFollowNote(appT("app.lost.never_started"));
+                appendLog(appT("app.console.never_started"));
+              } else {
+                hideFollowNote();
+                el("spinner").classList.add("hidden");
+              }
+              return null;
+            }
+            continue;
+          }
+          if (!r.ok) continue;
+          job = await r.json();
+        } catch (_) { continue; }  // still offline: keep trying until the deadline
+      }
+      if (!live()) return null;
+      const out = await handle(job);
+      if (out === "end") return null;
+      if (out !== "wait") return out;
+    }
+    if (live()) {
+      followBanner = null;
+      showFollowNote(token ? appT("app.lost.gave_up_token") : appT("app.lost.gave_up"));
+      el("spinner").classList.add("hidden");
+    }
+    return null;
+  } finally {
+    if (live() && FOLLOW_RUNNING) { FOLLOW_RUNNING = false; renderForgeButton(); }
   }
-  note(token ? appT("app.lost.gave_up_token") : appT("app.lost.gave_up"));
+}
+
+// Page load (2.4): a forge of this account still running (or stopped by the cap but still going) is picked
+// back up: the resume banner, the log from its latest line on, and the class when it lands.
+async function resumeForge() {
+  let job;
+  try {
+    const r = await fetch("/api/forge-jobs/latest?quiet=1");  // 204 = nothing to follow (no console 404)
+    if (!r.ok || r.status === 204) return;
+    job = await r.json();
+  } catch (_) { return; }
+  if (FORGING || !job || !job.forge_id) return;
+  if (job.status === "running" || isCapped(job)) {
+    el("log").textContent = "";
+    followJob(job.forge_id, { reason: isCapped(job) ? "late" : "resume", job });
+  }
+}
+
+// The library's Watch button: the forge view, following that forge.
+function watchForge(forgeId) {
+  if (FORGING) { selectTab("forge"); return; }
+  selectTab("forge");
+  el("result").classList.add("hidden");
+  el("log").textContent = "";
+  resetChoice();
+  followJob(forgeId, { reason: "watch" });
 }
 
 // Wait `ms`, but wake as soon as the tab is visible again or the network comes back: a phone that slept
@@ -1039,13 +1228,19 @@ async function consumeSSE(resp, handler) {
   }
 }
 
-function onForgeEvent(event, data) {
+function onForgeEvent(event, data, run) {
   // Any event may carry an updated token_balance (charged on success, refunded on failure) — keep the
   // header chip in lockstep with the server.
   if (applyTokenState(data)) renderTokens();
-  if (event === "progress") appendLog("• " + BTS_I18N.console(data.message));
+  if (event === "progress") logProgress(data.message);
   else if (event === "choice") renderChoice(data);
-  else if (event === "error") { const m = BTS_I18N.err(data, ""); appendLog("✗ " + m); toast(m); }
+  else if (event === "error") {
+    const m = BTS_I18N.err(data, "");
+    appendLog("✗ " + m);
+    toast(m);
+    // The wall-clock cap: the page stops waiting, the forge does not (forge() hands over to followJob)
+    if (run && data && CAPPED_CODES.has(data.code)) run.capped = true;
+  }
   else if (event === "result") { appendLog(appT("app.console.done")); renderResult(data); }
 }
 
@@ -1303,26 +1498,44 @@ function appendLog(line) {
 // --- library -------------------------------------------------------------------------------------
 
 let libClasses = [];  // the last /api/classes payload, so the art toggle can repaint without a refetch
+let libRunning = [];  // its `running` forges (WALK_AWAY_FORGE_PLAN.md 2.2): one "in progress" card each, on top
 
 async function loadLibrary() {
-  let classes;
+  let classes, running;
   try {
     const r = await fetch("/api/classes");
-    ({ classes } = await r.json());
+    ({ classes, running } = await r.json());
   } catch (_) {
     toast(appT("app.library.toast_load_failed"));
     return;
   }
   libClasses = classes;
+  libRunning = Array.isArray(running) ? running : [];
   paintLibrary();
 }
 
 function paintLibrary() {
   const list = el("lib-list");
   list.innerHTML = "";
-  el("lib-empty").classList.toggle("hidden", libClasses.length > 0);
+  el("lib-empty").classList.toggle("hidden", libClasses.length > 0 || libRunning.length > 0);
   el("lib-show-art").checked = artEnabled();
+  for (const j of libRunning) list.appendChild(runningRow(j));
   for (const c of libClasses) list.appendChild(libRow(c));
+}
+
+// A forge still running: its concept, how long ago it started, its latest progress line and the ETA when the
+// card pass has announced one, and Watch (the forge view, following it).
+function runningRow(j) {
+  const li = document.createElement("li");
+  li.className = "lib-row lib-running";
+  const eta = typeof j.eta_s === "number" ? etaFragment(Date.now() + j.eta_s * 1000) : "";
+  li.innerHTML = `<div class="lr-main"><span class="lr-name">${appH("app.library.in_progress")}</span>`
+    + `<span class="lr-meta">${appH("app.library.started_ago", { age: fmtAge(j.age_s) })}${esc(eta)}</span>`
+    + `<div class="lr-concept muted">${esc(j.concept || "")}</div>`
+    + (j.message ? `<div class="lr-progress muted">${esc("• " + BTS_I18N.console(j.message))}</div>` : "")
+    + `</div><div class="lr-actions"><button data-act="watch">${appH("app.library.watch")}</button></div>`;
+  li.querySelector('[data-act="watch"]').onclick = () => watchForge(j.forge_id);
+  return li;
 }
 
 function libRow(c) {

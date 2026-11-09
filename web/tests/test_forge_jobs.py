@@ -360,3 +360,99 @@ def test_poll_surfaces_a_pending_engine_pick(client, app_module, stub_forge, mon
                        headers=H).status_code == 200
     assert _wait(lambda: client.get(f"/api/forge-jobs/{fid}").get_json()["status"] == "done")
     assert picked == [["poison"]]
+
+
+# --- walk-away fields (WALK_AWAY_FORGE_PLAN.md 2.1, 2.2, 3.3) -----------------------------------------------
+
+def test_status_carries_concept_started_at_and_pace_eta(client, app_module, stub_forge, monkeypatch):
+    """A `pace:` progress line from the card pass becomes eta_s on the status endpoint (and is dropped with the
+    worker); the status also carries the concept (120 chars), started_at and late=False while running."""
+    login(client, "pace@example.com")
+    gate = threading.Event()
+
+    def forge_with_pace(concept, **kw):
+        kw["on_event"]("card 3/35: Plague Lance ready…")
+        kw["on_event"]("pace: 75s/card, ~40 min to go (32 cards left)")
+        gate.wait(timeout=30)
+        return dict(stub_forge.result)
+    monkeypatch.setattr(app_module, "forge_to_bundle", forge_with_pace)
+    concept = "a very slow provider " * 10
+    fid = _first_event(_post_and_disconnect(client, {"concept": concept, **BYOK_BODY}))["forge_id"]
+    assert _wait(lambda: client.get(f"/api/forge-jobs/{fid}").get_json().get("eta_s") is not None)
+    j = client.get(f"/api/forge-jobs/{fid}").get_json()
+    assert j["status"] == "running" and j["late"] is False and j["still_running"] is True
+    assert 39 * 60 <= j["eta_s"] <= 40 * 60
+    assert j["message"].startswith("pace: 75s/card")
+    assert j["concept"] == concept[:120] and len(j["concept"]) == 120
+    assert j["started_at"] and j["started_at"].endswith("+00:00")
+    # the same forge is the library's in-progress row
+    running = client.get("/api/classes").get_json()["running"]
+    assert [r["forge_id"] for r in running] == [fid]
+    assert running[0]["concept"] == concept[:120] and running[0]["message"].startswith("pace:")
+    assert 39 * 60 <= running[0]["eta_s"] <= 40 * 60 and running[0]["age_s"] >= 0 and running[0]["started_at"]
+    gate.set()
+    assert _wait(lambda: client.get(f"/api/forge-jobs/{fid}").get_json()["status"] == "done")
+    done = client.get(f"/api/forge-jobs/{fid}").get_json()
+    assert done["eta_s"] is None and done["late"] is False and done["still_running"] is False
+    assert fid not in app_module._forge_eta
+    assert client.get("/api/classes").get_json()["running"] == []
+
+
+def test_capped_job_is_followable_and_lands_late(client, app_module, stub_forge, monkeypatch):
+    """After the ceiling settles a job (no class yet), `latest` still returns it past FORGE_LATEST_WINDOW_S
+    while its worker runs; once the class is saved the status says late=True with the class id."""
+    login(client, "capfollow@example.com")
+    monkeypatch.setattr(app_module, "FORGE_MAX_SECONDS_BYOK", 0.3)
+    monkeypatch.setattr(app_module, "FORGE_LATEST_WINDOW_S", -1)   # "recent" never applies: only the cap rule
+    stub_forge.gate = threading.Event()
+    ev = sse_events(client.post("/api/forge-class", json={"concept": "capped one", **BYOK_BODY}, headers=H))
+    assert ev[-1][0] == "error" and ev[-1][1]["code"] == "forge.too_long_byok"
+    j = client.get("/api/forge-jobs/latest").get_json()
+    assert j["status"] == "failed" and j["class_id"] is None and j["late"] is False
+    assert j["code"] == "forge.too_long_job" and "abandoned" in j["error"]
+    assert j["still_running"] is True and "message" in j
+    assert client.get("/api/classes").get_json()["running"] == []     # settled: no longer a running row
+    stub_forge.gate.set()
+    assert _wait(lambda: client.get(f"/api/forge-jobs/{j['forge_id']}").get_json()["class_id"] is not None)
+    late = client.get(f"/api/forge-jobs/{j['forge_id']}").get_json()
+    assert late["late"] is True and late["status"] == "failed" and late["still_running"] is False
+    assert client.get(f"/api/classes/{late['class_id']}").status_code == 200
+    # the worker is gone and the job has its class: past the window `latest` no longer offers it
+    assert client.get("/api/forge-jobs/latest").status_code == 404
+    stub_forge.gate = None
+
+
+def test_capped_job_whose_worker_died_is_not_offered(client, app_module):
+    """A cap-settled job with no live worker (a restart, or a forge that failed after the cap) is not
+    'the forge still running': `latest` keeps its recent-only rule for it and still_running is False."""
+    from datetime import datetime, timedelta, timezone
+    import i18n
+    from models import ForgeJob, User
+    login(client, "capdead@example.com")
+    err = i18n.get_text("en", "server.forge.too_long_job", max_seconds=14400)
+    with app_module.session_scope() as s:
+        uid = s.query(User).filter_by(email="capdead@example.com").one().id
+        s.add(ForgeJob(id="c" * 32, user_id=uid, mode="byok", status="failed", error=err,
+                       started_at=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=5)))
+    assert client.get("/api/forge-jobs/latest").status_code == 404
+    assert client.get("/api/forge-jobs/latest?quiet=1").status_code == 204   # the page-load probe: no console 404
+    j = client.get("/api/forge-jobs/" + "c" * 32).get_json()
+    assert j["code"] == "forge.too_long_job" and j["still_running"] is False and j["late"] is False
+
+
+def test_classes_running_is_own_running_jobs_only(client, app_module):
+    from models import ForgeJob, User
+    login(client, "runrows@example.com")
+    with app_module.session_scope() as s:
+        uid = s.query(User).filter_by(email="runrows@example.com").one().id
+        s.add(ForgeJob(id="r" * 32, user_id=uid, mode="byok", status="running", concept="a goose knight"))
+        s.add(ForgeJob(id="d" * 32, user_id=uid, mode="byok", status="done", concept="done one", class_id=7))
+    login(client, "otherrun@example.com")
+    with app_module.session_scope() as s:
+        oid = s.query(User).filter_by(email="otherrun@example.com").one().id
+        s.add(ForgeJob(id="o" * 32, user_id=oid, mode="token", status="running", concept="not yours"))
+    login(client, "runrows@example.com")
+    body = client.get("/api/classes").get_json()
+    assert body["classes"] == []
+    assert [(r["forge_id"], r["concept"], r["message"], r["eta_s"]) for r in body["running"]] == [
+        ("r" * 32, "a goose knight", "", None)]

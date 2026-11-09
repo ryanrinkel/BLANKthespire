@@ -505,7 +505,7 @@ if (scenario === "forge") {
   // read as "still forging", then recover on its own by polling /api/forge-jobs/<id>. window.fetch is stubbed
   // per case: /api/forge-class plays the scripted stream, /api/forge-jobs/* answers from a scripted list of
   // job states (404 = the number 404), everything else (the finished class) goes to the real server. Each
-  // poll waits RECOVER_POLL_MS (5 s), so this scenario takes ~a minute.
+  // poll waits followJob's 5 s (window.__FOLLOW_POLL_MS unset here), so this scenario takes ~a minute.
   await nav(`${base}/app`);
   // A real class for the "done" polls to point at: the dev-only offline forge makes one in seconds.
   const classId = await evaluate(`(async () => {
@@ -605,6 +605,152 @@ if (scenario === "forge") {
       c.enqueue(e.encode('${sse("error", {error: "blueprint failed"})}')); c.close(); } }), {status: 200});`, [404]);
   const d6 = await finish();
   check(!d6.lost && /blueprint failed/.test(d6.log) && d6.polled.length === 0, "a real forge error does not poll", JSON.stringify(d6));
+} else if (scenario === "resume" || scenario === "late" || scenario === "library-running") {
+  // WALK_AWAY_FORGE_PLAN.md 2.7: a forge outlives the page. /api/forge-jobs/* (and, for library-running,
+  // the `running` half of /api/classes) is stubbed in the page from the first script on (so boot's reattach
+  // sees it): answers come from window.__jobs (shift while more than one, then repeat the last; 404 = the
+  // number 404). The follower's poll timings are shortened through window.__FOLLOW_*.
+  await nav(`${base}/app`);
+  // A real class for the "done" answers to point at: the dev-only offline forge makes one in seconds.
+  const classId = await evaluate(`(async () => {
+    await (await fetch('/api/forge-class', {method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({concept: 'walk-away seed', mode: 'fake'})})).text();
+    return (await (await fetch('/api/classes')).json()).classes[0].id; })()`);
+  const stub = await send("Page.addScriptToEvaluateOnNewDocument", { source: `(() => {
+    window.__FOLLOW_POLL_MS = 400; window.__FOLLOW_SLOW_POLL_MS = 400;
+    window.__jobs = window.__jobs || [404]; window.__jobUrls = []; window.__running = null;
+    const real = window.fetch.bind(window);
+    window.__realFetch = real;
+    const ok = (body) => new Response(JSON.stringify(body), {status: 200, headers: {'content-type': 'application/json'}});
+    window.fetch = async (u, o) => {
+      const url = String(u);
+      if (url.startsWith('/api/forge-jobs/')) {
+        window.__jobUrls.push(url);
+        const j = window.__jobs.length > 1 ? window.__jobs.shift() : window.__jobs[0];
+        return j === 404 ? new Response('{"error":"no such forge."}', {status: 404, headers: {'content-type': 'application/json'}}) : ok(j);
+      }
+      if (url === '/api/classes' && window.__running) {
+        const d = await (await real(u, o)).json();
+        return ok({...d, running: window.__running});
+      }
+      if (url === '/api/forge-class' && window.__forgeBody) return window.__forgeBody();
+      return real(u, o);
+    };
+  })()` });
+  if (scenario !== "resume") await nav(`${base}/app`);  // the stub is in from this load on
+  const state = () => json(`({banner: !document.getElementById('forge-lost').classList.contains('hidden'),
+    text: document.getElementById('forge-lost-text').textContent,
+    log: document.getElementById('log').textContent,
+    progress: !document.getElementById('progress').classList.contains('hidden'),
+    result: !document.getElementById('result').classList.contains('hidden'),
+    name: document.getElementById('r-name') ? document.getElementById('r-name').textContent : null,
+    btn_disabled: document.getElementById('forge-btn').disabled, btn_title: document.getElementById('forge-btn').title,
+    forge_view: !document.getElementById('view-forge').classList.contains('hidden'),
+    forging: FORGING, following: FOLLOW_RUNNING, polled: window.__jobUrls})`);
+  const waitFor = async (expr, ms = 8000) => {
+    const t = Date.now();
+    while (Date.now() - t < ms) { if (await evaluate(expr)) return true; await sleep(200); }
+    return false;
+  };
+  const running = (extra = {}) => ({forge_id: "r1", status: "running", class_id: null, error: "", refunded: false,
+    late: false, still_running: true, concept: "An evil lemon", started_at: "2026-11-09T10:00:00+00:00",
+    age_s: 34 * 60, eta_s: 12 * 60, message: "card 5/35: Sour Jab ready…", ...extra});
+
+  if (scenario === "resume") {
+    // (1) load /app while a forge runs: the resume banner (concept, age, ETA), its latest line in the log and
+    // the Forge button off with the one-at-a-time title.
+    await evaluate(`localStorage.setItem('bts_smoke_jobs', ${JSON.stringify(JSON.stringify([running()]))})`);
+    await send("Page.addScriptToEvaluateOnNewDocument", { source:
+      `window.__jobs = JSON.parse(localStorage.getItem('bts_smoke_jobs') || '[404]');` });
+    await nav(`${base}/app`);
+    await sleep(800);
+    const s1 = await state();
+    check(s1.banner && s1.text === "Still forging: An evil lemon — started 34 min ago, about 12 min to go. You can close this tab; the class will be in My Classes when it's done."
+          && s1.progress && /Sour Jab ready/.test(s1.log) && s1.btn_disabled && /One forge at a time/.test(s1.btn_title)
+          && s1.following && !s1.forging && s1.polled[0].endsWith("/latest?quiet=1"),
+          "resume: banner + latest line + Forge off while it runs", JSON.stringify(s1));
+    await shot("resume-banner");
+    // (2) a pace line arrives on a poll: the walk-away hint in the log, the banner's ETA follows it
+    await evaluate(`window.__jobs = [${JSON.stringify(running({message: "pace: 75s/card, ~40 min to go (32 cards left)", eta_s: 40 * 60}))}]`);
+    await waitFor(`document.getElementById('log').textContent.includes('pace:')`);
+    const s2 = await state();
+    check(/pace: 75s\/card, ~40 min to go \(32 cards left\) Safe to close this tab; the class lands in My Classes\./.test(s2.log)
+          && /about 40 min to go/.test(s2.text) && s2.polled.slice(1).every((u) => u.endsWith("/r1")),
+          "resume: pace line + hint, banner ETA refreshed, polls pinned to the job", JSON.stringify(s2));
+    // (3) it lands: the class renders, the banner goes, the button comes back
+    await evaluate(`window.__jobs = [${JSON.stringify({forge_id: "r1", status: "done", class_id: classId, error: "", refunded: false, late: false, still_running: false})}]`);
+    await waitFor(`!document.getElementById('result').classList.contains('hidden')`);
+    await sleep(300);
+    const s3 = await state();
+    check(s3.result && !s3.banner && !s3.btn_disabled && !s3.following && /✓ done/.test(s3.log),
+          "resume: the finished class renders, banner hidden, Forge back on", JSON.stringify(s3));
+    await shot("resume-done");
+    await evaluate(`localStorage.removeItem('bts_smoke_jobs')`);
+  } else if (scenario === "late") {
+    // The stream ends on the BYOK ceiling (error forge.too_long_byok): FORGING goes false at once, the late
+    // banner shows, and the page keeps following until the class lands late.
+    await nav(`${base}/app`);
+    await sleep(500);
+    const sse = (ev, data) => `event: ${ev}\\ndata: ${JSON.stringify(data)}\\n\\n`;
+    const capped = {forge_id: "L1", status: "failed", class_id: null, refunded: false, late: false, still_running: true,
+      error: "forge abandoned: exceeded 14400s — the class may still land in your library if it finishes",
+      code: "forge.too_long_job", concept: "An evil lemon", age_s: 14400, eta_s: null, message: "card 30/35: Zest ready…"};
+    await evaluate(`(() => {
+      document.getElementById('result').classList.add('hidden');
+      document.getElementById('concept').value = 'An evil lemon';
+      currentMode = () => 'token'; window.confirm = () => true;
+      window.__jobs = ${JSON.stringify([capped, capped, {...capped, late: true, still_running: false, class_id: classId}])};
+      window.__jobUrls = [];
+      window.__forgeBody = () => { const e = new TextEncoder(); return new Response(new ReadableStream({ start(c) {
+        c.enqueue(e.encode('${sse("progress", {message: "starting…", forge_id: "L1"})}'));
+        c.enqueue(e.encode('${sse("error", {error: "this forge has run for hours without finishing — the page has stopped waiting. If your provider does finish it, the class will appear in My Classes.", code: "forge.too_long_byok"})}'));
+        c.close(); } }), {status: 200, headers: {'content-type': 'text/event-stream'}}); };
+      window.__forgeP = forge();
+    })()`);
+    await evaluate(`window.__forgeP`);
+    const s1 = await state();
+    check(!s1.forging && s1.banner && /^Your provider is slow, so the page stopped waiting/.test(s1.text)
+          && /run for hours/.test(s1.log) && !s1.btn_disabled,
+          "late: stream ends on the ceiling -> FORGING false, late banner, Forge usable", JSON.stringify(s1));
+    await shot("late-banner");
+    await waitFor(`!document.getElementById('result').classList.contains('hidden')`);
+    await sleep(300);
+    const s2 = await state();
+    check(s2.result && !s2.banner && /✓ finished late — here it is/.test(s2.log) && s2.polled.length >= 3
+          && s2.polled.every((u) => u.endsWith("/L1")) && /Zest ready/.test(s2.log),
+          "late: keeps following, then renders the class with done_late", JSON.stringify(s2));
+    await shot("late-done");
+  } else {
+    // library-running: one in-progress card on top of the real classes, and Watch follows it in the forge view
+    await evaluate(`window.__running = [{forge_id: "w1", concept: "A slow goose", started_at: "2026-11-09T09:00:00+00:00",
+      age_s: 70 * 60, message: "pace: 75s/card, ~40 min to go (32 cards left)", eta_s: 40 * 60}]`);
+    await evaluate(`document.getElementById('nav-library').click()`);
+    await waitFor(`document.querySelectorAll('#lib-list li').length > 1`);
+    const lib = await json(`(() => { const lis = [...document.querySelectorAll('#lib-list li')];
+      const top = lis[0];
+      return {n: lis.length, top_running: top.classList.contains('lib-running'), text: top.textContent,
+        watch: !!top.querySelector('[data-act=watch]'), others_running: lis.slice(1).filter(l => l.classList.contains('lib-running')).length,
+        second_is_class: !!(lis[1] && lis[1].querySelector('[data-act=open]')),
+        empty_hidden: document.getElementById('lib-empty').classList.contains('hidden')}; })()`);
+    check(lib.top_running && lib.watch && lib.others_running === 0 && lib.second_is_class && lib.empty_hidden
+          && /In progress/.test(lib.text) && /started 1 h 10 min ago, about 40 min to go/.test(lib.text)
+          && /A slow goose/.test(lib.text) && /pace: 75s\/card/.test(lib.text),
+          "library-running: an in-progress card on top (concept, age, ETA, line, Watch)", JSON.stringify(lib));
+    await shotEl("library-running", "#lib-list");
+    await evaluate(`window.__jobs = ${JSON.stringify([running({forge_id: "w1", concept: "A slow goose", age_s: 70 * 60, eta_s: 40 * 60}),
+      {forge_id: "w1", status: "done", class_id: classId, error: "", refunded: false, late: false, still_running: false}])};
+      window.__jobUrls = []; document.querySelector('#lib-list [data-act=watch]').click()`);
+    await sleep(250);
+    const w1 = await state();
+    check(w1.forge_view && w1.progress && w1.banner && /^Still forging: A slow goose — started 1 h 10 min ago, about 40 min to go\./.test(w1.text),
+          "library-running: Watch opens the forge view with the resume banner", JSON.stringify(w1));
+    await waitFor(`!document.getElementById('result').classList.contains('hidden')`);
+    await sleep(300);
+    const w2 = await state();
+    check(w2.result && !w2.banner && w2.polled.every((u) => u.endsWith("/w1")) && !w2.following,
+          "library-running: Watch follows it to the finished class", JSON.stringify(w2));
+  }
+  await send("Page.removeScriptToEvaluateOnNewDocument", { identifier: stub.identifier });
 } else if (scenario === "library") {
   await nav(`${base}/app`);
   await evaluate(`document.getElementById('nav-library').click()`); await sleep(800);

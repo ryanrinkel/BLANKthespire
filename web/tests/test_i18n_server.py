@@ -58,6 +58,36 @@ def test_per_key_english_fallback_and_escaping(i18n_dir):
     assert i18n.get_text("en", "email.class.subject", name="<b>x</b>").endswith("<b>x</b>")
 
 
+def test_console_keys_give_the_english_template():
+    """app.py sends forge-console lines in English via get_text("en", "console.*"): those live in the json's
+    `console` table (not `strings`), and must come back as their English text, never the bare key (the
+    2026-10-27..2026-11-09 bug: the browser log said "• console.start")."""
+    import i18n
+    i18n.clear_cache()
+    assert i18n.get_text("en", "console.start") == "starting…"
+    assert i18n.get_text("en", "console.queue.busy", last_pos=2) == (
+        "the forge is busy — you're in line at position 2 (your spot is held, hang tight)…")
+    assert i18n.get_text("en", "console.queue.position", pos=3) == "in line: position 3…"
+    assert i18n.get_text("en", "console.start_interactive").startswith("starting… (interactive forge")
+    assert "{rest}" not in i18n.get_text("en", "console.queue.turn")
+    # the browser's own rule (built from the same English template) matches what the server sends
+    import json
+    import re
+    en = json.loads((i18n.I18N_DIR / "en.json").read_text(encoding="utf-8"))
+    rx = en["console"]["console.queue.busy"]["re"].replace("(?<", "(?P<")
+    m = re.match(rx, i18n.get_text("en", "console.queue.busy", last_pos=2))
+    assert m and m.group("last_pos") == "2" and m.group("rest") == ""
+
+
+def test_console_lines_on_the_forge_stream(client, app_module, stub_forge):
+    """The first SSE event of a forge is the English console.start text, not its key."""
+    from conftest import seed_tokens, sse_events
+    login(client, "consolestart@example.com")
+    seed_tokens(app_module, "consolestart@example.com", 1)
+    ev = sse_events(client.post("/api/forge-class", json={"concept": "x", "mode": "token"}, headers=H))
+    assert ev[0] == ("progress", ev[0][1]) and ev[0][1]["message"] == "starting…"
+
+
 def test_error_body_and_match_error():
     import i18n
     body = i18n.error_body("server.forge.out_of_tokens")

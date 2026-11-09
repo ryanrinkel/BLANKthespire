@@ -177,6 +177,26 @@ def test_console_regex_matches_english_lines(tmp_path):
     assert m.groupdict() == {"relicgetname": "Plague Mask, relic 'x'", "rest": ""}
 
 
+def test_console_pace_rule_matches_the_generators_line():
+    """console.pace (WALK_AWAY_FORGE_PLAN.md 3.4) is a contract with btsgen's _pace_line: the real en/zh json's
+    rule must match a line the generator actually writes and translate every number into Chinese."""
+    from btsgen.class_forge import _pace_line
+    line = _pace_line(75.0, 32)
+    assert line == "pace: 75s/card, ~40 min to go (32 cards left)"
+    docs = {lang: json.loads((REPO / "web" / "static" / "i18n" / f"{lang}.json").read_text(encoding="utf-8"))
+            for lang in ("en", "zh")}
+    rule = docs["en"]["console"]["console.pace"]
+    assert rule["text"] == "pace: {secs}s/card, ~{min} min to go ({left} cards left){rest}"
+    m = re.match(js_to_py(rule["re"]), line)
+    assert m and m.groupdict() == {"secs": "75", "min": "40", "left": "32", "rest": ""}
+    zh = docs["zh"]["console"]["console.pace"]
+    assert zh["re"] == rule["re"]                                   # always built from the English template
+    out = re.sub(r"\{(\w+)\}", lambda g: m.groupdict()[g.group(1)], zh["text"])
+    assert out == "速度：每张卡约 75 秒，大约还需 40 分钟（还剩 32 张卡）"
+    # app.py's ETA parser reads the same line
+    assert re.match(r"^pace: .*~(\d+) min to go", line).group(1) == "40"
+
+
 def test_derive_name_rule():
     assert bi.derive_name("count") == "count"
     assert bi.derive_name("_harness") == "_harness"
