@@ -78,19 +78,51 @@ def stub(monkeypatch):
     forge._probe_cache.clear()
 
 
-def test_projection_brackets_the_analytic_value(stub):
+def test_project_from_timing_formula():
+    # The plan's worked examples (WALK_AWAY_FORGE_PLAN.md 0.1): 43 calls x 2 s first token + 25K visible x M / S.
+    # Doubao-like: 1000 visible tokens (4000 chars) but 4600 completion tokens (M = 4.6) streamed at 45 tok/s.
+    doubao = forge.project_from_timing({"first_token_s": 2.0, "stream_s": 4600 / 45, "content_chars": 4000,
+                                        "reasoning_chars": 0, "completion_tokens": 4600})
+    expect = forge.PROBE_CALLS * 2.0 + forge.PROBE_VISIBLE * 4.6 / 45
+    assert doubao["projected_s"] == round(expect) and 43 <= expect / 60 <= 45  # ≈ 44 min
+    assert doubao["multiplier"] == 4.6 and doubao["tps"] == 45 and doubao["reasoning"] is True
+    assert doubao["lo_s"] == round(expect * forge.PROBE_LO) and doubao["hi_s"] == round(expect * forge.PROBE_HI)
+    # OpenAI-like: same speed and latency, nothing hidden (M = 1).
+    plain = forge.project_from_timing({"first_token_s": 2.0, "stream_s": 1000 / 45, "content_chars": 4000,
+                                       "reasoning_chars": 0, "completion_tokens": 1000})
+    expect = forge.PROBE_CALLS * 2.0 + forge.PROBE_VISIBLE * 1.0 / 45
+    assert plain["projected_s"] == round(expect) and 10.5 <= expect / 60 <= 11.5  # ≈ 11 min
+    assert plain["multiplier"] == 1.0 and plain["reasoning"] is False and plain["timed_out"] is False
+    # No usage chunk: the streamed reasoning text stands in for the hidden tokens.
+    shown = forge.project_from_timing({"first_token_s": 2.0, "stream_s": 4600 / 45, "content_chars": 4000,
+                                       "reasoning_chars": 14400, "completion_tokens": None})
+    assert shown["multiplier"] == 4.6 and shown["projected_s"] == doubao["projected_s"]
+
+
+def test_projection_brackets_the_analytic_value(stub, monkeypatch):
     # 50 visible tokens at 0.03 s apart, 200 hidden tokens reported only in usage, 0.3 s to the first token.
     stub.cfg.update(visible=50, delay=0.03, ttft=0.3, hidden=200)
+    seen: list[dict] = []
+    real = forge.project_from_timing
+    monkeypatch.setattr(forge, "project_from_timing", lambda t: seen.append(dict(t)) or real(t))
     out = forge.probe_model(stub.base_url, KEY, "deep-thinker")
+    assert out["timed_out"] is False
+    # Exact: the result IS the formula applied to the probe's own recorded timing (formula itself is pinned by
+    # test_project_from_timing_formula), and the count-based facts don't depend on the clock.
+    assert len(seen) == 1 and out == real(seen[0])
+    assert seen[0]["completion_tokens"] == 250 and seen[0]["content_chars"] == 200
+    assert out["multiplier"] == pytest.approx(5.0, abs=0.05)
+    assert out["reasoning"] is True
+    # lo/hi come from the UNROUNDED seconds (e.g. 771.4 s -> hi 1080, but round(771 * 1.4) = 1079): within 1.
+    assert abs(out["lo_s"] - out["projected_s"] * 0.7) <= 1 and abs(out["hi_s"] - out["projected_s"] * 1.4) <= 1
+    # Loose: the timing-based projection against the stub's NOMINAL pace. Sleep-based streaming runs slower
+    # than 0.03 s/token on a loaded Windows box (full suite), which lowers the measured tok/s and inflates the
+    # projection, so only a factor-of-3 sanity bound is asserted here — not the 0.7x-1.4x range.
     stream_s = 49 * 0.03
     completion = 50 + 200
     speed, mult = completion / stream_s, completion / 50
     analytic = forge.PROBE_CALLS * 0.3 + forge.PROBE_VISIBLE * mult / speed
-    assert out["timed_out"] is False
-    assert out["lo_s"] <= analytic <= out["hi_s"], (out, analytic)
-    assert out["multiplier"] == pytest.approx(5.0, abs=0.05)
-    assert out["reasoning"] is True
-    assert out["lo_s"] == round(out["projected_s"] * 0.7) and out["hi_s"] == round(out["projected_s"] * 1.4)
+    assert analytic / 3 <= out["projected_s"] <= analytic * 3, (out, analytic)
     # the call was forge-shaped and on the user's key
     req = stub.requests[0]
     assert req["auth"] == f"Bearer {KEY}"

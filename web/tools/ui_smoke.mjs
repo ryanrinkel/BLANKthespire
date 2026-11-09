@@ -396,11 +396,19 @@ if (scenario === "forge") {
 } else if (scenario === "byok-models") {
   // 2026-10-23: the model fields are selects filled from the provider's own listing. /api/models is
   // stubbed in the page (window.fetch, installed before app.js on every load): "nolist" URLs 404 like an
-  // endpoint without /models, everything else returns two models, one of them tested.
+  // endpoint without /models, everything else returns two models, one of them tested. Picking a card model
+  // asks /api/model-history + /api/model-probe (WALK_AWAY_FORGE_PLAN.md 4.3): both are stubbed too (no past
+  // forges, a plain fast model) so the scenario never makes a real probe call on a key.
   await send("Page.addScriptToEvaluateOnNewDocument", { source: `(() => {
     const real = window.fetch.bind(window);
-    window.__modelCalls = 0;
+    const ok = (d) => Promise.resolve(new Response(JSON.stringify(d), {status: 200, headers: {'Content-Type': 'application/json'}}));
+    window.__modelCalls = 0; window.__probeCalls = 0;
     window.fetch = (u, o) => {
+      if (String(u).includes('/api/model-history')) return ok({n: 0});
+      if (String(u).includes('/api/model-probe')) {
+        window.__probeCalls++;
+        return ok({tps: 120, multiplier: 1.0, first_token_s: 0.5, projected_s: 400, lo_s: 280, hi_s: 560, reasoning: false, timed_out: false});
+      }
       if (String(u).includes('/api/models')) {
         window.__modelCalls++;
         const body = JSON.parse((o && o.body) || '{}');
