@@ -223,8 +223,8 @@ def _experiment_block(e: dict) -> list[str]:
     return lines
 
 
-def _mail_footer() -> list[str]:
-    return ["", ab_report.rule_sentence(), "", f"The card: {public_base_url()}/app#account (Experiments)",
+def _mail_footer(entries: list[dict] | None = None) -> list[str]:
+    return ["", ab_report.rules_text(entries), "", f"The card: {public_base_url()}/app#account (Experiments)",
             "Record: docs/experiments/LOG.md"]
 
 
@@ -240,7 +240,7 @@ def experiments_digest(payload: list[dict], today: str) -> tuple[str, str] | Non
         if i:
             lines += ["", "-" * 60, ""]
         lines += _experiment_block(e)
-    lines += _mail_footer()
+    lines += _mail_footer(live)
     return subject, "\n".join(lines) + "\n"
 
 
@@ -256,21 +256,27 @@ def experiments_due(payload: list[dict], today: str, already_sent: dict | None =
         name = e.get("name")
         d = e.get("decision") or {}
         pp = ab_report.p_phrase(e, " = ")
+        worse_rule = e.get("rule") == "ship_unless_worse"
         if today >= (e.get("planned_end") or "9999") and f"end:{name}" not in sent:
             head = f"{name} reached its planned end — {pp}."
-            body = [head + " Decide: set winner or keep control.", "",
+            ask = (f" The rule says ship {d.get('winner_by_rule') or 'b'}: {d.get('status', '')}."
+                   if worse_rule else " Decide: set winner or keep control.")
+            body = [head + ask, "",
                     "To end it: set ended + winner in web/experiments.py (winner \"a\" keeps the control), "
                     "deploy, then remove the losing arm's markers and i18n keys and fill in the LOG row.", ""]
             out.append((f"end:{name}", f"{EXP_SUBJECT_PREFIX} {head}",
-                        "\n".join(body + _experiment_block(e) + _mail_footer()) + "\n"))
+                        "\n".join(body + _experiment_block(e) + _mail_footer([e])) + "\n"))
         w = d.get("winner_by_rule")
+        if worse_rule and w == "b":
+            w = None   # ship-unless-worse names b only AT the planned end: the end mail above already says so
         if w and f"winner:{name}" not in sent:
-            head = f"{name} has a winner by the rule: {w}"
+            head = (f"{name} stops by the rule: B is worse — keep the control" if worse_rule
+                    else f"{name} has a winner by the rule: {w}")
             body = [f"{head} ({pp}, {d.get('days_running')} days, every arm ≥ the minimum exposures).",
                     "Nothing changes for visitors until you end it: set ended + winner in web/experiments.py and "
                     "deploy.", ""]
             out.append((f"winner:{name}", f"{EXP_SUBJECT_PREFIX} {head}",
-                        "\n".join(body + _experiment_block(e) + _mail_footer()) + "\n"))
+                        "\n".join(body + _experiment_block(e) + _mail_footer([e])) + "\n"))
     return out
 
 

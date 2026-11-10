@@ -237,6 +237,27 @@ a p-value does — but the minimum n and minimum days are what keep a lucky firs
 New accounts, first forge and donations come from the database (3.6); the rest from the log. The card
 is honest when one side is missing ("no traffic summary yet" / "account attribution starts with Phase 2").
 
+#### 3.5.1 Rule variant: "ship unless worse" (added 2026-11-10 for `skin`)
+
+An experiment may set `rule="ship_unless_worse"` in the registry (two arms only; the default stays
+`rule="must_win"`, the rule above, unchanged). Used when B is the direction the owner already wants and the
+test exists to catch harm, not to prove a gain (first user: the sitewide `skin` experiment):
+
+- Once every arm has `MIN_EXPOSURES` (200) exposures AND the run is `MIN_DAYS` (14) days old, if
+  `P(b beats a) <= P_WORSE` (0.10, i.e. at least 90% sure B is worse) the rule stops it: `winner_by_rule = "a"`,
+  status "stop: B is worse — keep the control".
+- Otherwise it runs to `planned_end`; from then on `winner_by_rule = "b"`, status "decision due — ship B (not
+  shown to be worse)", or "decision due — ship B (thin data)" when the minimum exposures / days were never met
+  (B still ships: nothing showed it to be worse, and the owner chose this rule knowing the traffic is thin).
+- Nothing changes for visitors until someone sets `ended` + `winner` (as with every experiment). The card, the
+  Monday digest and the planned-end / early-stop mails print the rule sentence of each experiment shown
+  (`ab_report.rule_sentence(rule)`), and `deploy.sh`'s summary line says "rule: ship B unless worse".
+
+A `sitewide=True` experiment (also new for `skin`) draws its arm on every page that goes through
+`pages.py` (every HTML page, `/app` included), so a visitor sees one arm everywhere; exposure and the
+metrics are still read on its `page` exactly as for any other experiment, and the one-live-experiment-per-page
+rule counts it against its `page` only.
+
 ### 3.6 Account attribution (Phase 2) — a label, not an identifier
 
 The log can say "signed in" per arm but cannot say "this NEW account came from arm b" or "arm b's
@@ -269,6 +290,13 @@ have shown, which for a splash-only experiment is still the right label in the v
    the next commit remove the markers and the losing arm from the HTML and the losing i18n keys from the
    copy docs, so the page never accumulates dead arms. Fill in the LOG row.
 5. The card keeps showing ended experiments for 30 days, then they drop off (the LOG is the archive).
+6. The `skin` experiment also has a share link, `/?look=board`: a neutral alias of `?ab=skin:b` for that
+   request (pages.LOOK_ALIASES), with nothing stored on the visitor's device. board.js appends `look=board` to
+   same-origin links on a page that was opened with it, so the look holds while browsing; it is lost across
+   sign-in (the auth redirects land on a bare `/app`). Like `?ab=`, it works from the deploy day and is ignored
+   once the experiment has ended (the winner is served). The report drops an IP that sent `look=` that day
+   from the experiment numbers, like an `?ab=` preview. When `skin` ends, remove `LOOK_ALIASES`' entry, the
+   board.js carrier and the report's `has_look_override` with the losing arm.
 
 ### 3.8 Verification
 

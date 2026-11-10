@@ -323,10 +323,11 @@ def favicon():
 @app.route("/app")
 def app_view():
     """The Forge a Class single-page app. Auth-gated server-side: unauthenticated users are bounced
-    back to the splash to sign in, so the forge screen is never served without a session."""
+    back to the splash to sign in, so the forge screen is never served without a session. Served through
+    pages.serve_page so a sitewide experiment (a whole-site skin) keeps its arm after sign-in."""
     if current_user() is None:
         return redirect("/")
-    return send_from_directory(app.static_folder, "index.html")
+    return pages.serve_page("index.html", page="/app")
 
 
 # Where the mod actually comes from. The Workshop listing is the headline install path (subscribers get
@@ -2747,9 +2748,10 @@ def admin_experiments():
     # Phase 2 (plan 3.6): new accounts / first forge / donated per arm from users.signup_ab. {} on a DB error,
     # which leaves each entry's accounts None with an accounts_reason — the log side still renders.
     accounts = ab_accounts.accounts_payload(ab_report.shown_experiments(today), today)
+    payload = ab_report.build_experiments_payload(data, today, accounts=accounts)
     return jsonify({"available": data is not None, "reason": reason, "today": today,
-                    "rule": ab_report.rule(), "rule_text": ab_report.rule_sentence(),
-                    "experiments": ab_report.build_experiments_payload(data, today, accounts=accounts)})
+                    "rule": ab_report.rule(), "rule_text": ab_report.rules_text(payload),
+                    "experiments": payload})
 
 
 @app.route("/admin/traffic")

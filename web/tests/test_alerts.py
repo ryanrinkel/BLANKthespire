@@ -255,3 +255,27 @@ def test_cli_without_traffic_json(mailbox, mail_cli, tmp_path):
     (tmp_path / "traffic.json").unlink()
     assert run("--today", "2026-11-09") == 0
     assert len(mailbox) == 1 and "No exposures yet" in mailbox[0][2]
+
+
+# --- the "ship unless worse" rule (experiments.RULE_SHIP_UNLESS_WORSE): the mails say what the rule says --------
+
+def test_ship_unless_worse_mails():
+    suw = _x(rule=experiments.RULE_SHIP_UNLESS_WORSE)
+    # B clearly worse after 14+ days and 200+ per arm: one early "stops by the rule" mail, the rule in the footer
+    worse = _traffic(a=(400, 40), b=(400, 12))
+    due = alerts.experiments_due(_payload("2026-11-20", worse, [suw]), "2026-11-20", {})
+    assert [k for k, _s, _b in due] == ["winner:hero"]
+    assert "stops by the rule: B is worse — keep the control" in due[0][1]
+    assert "Decision rule (ship unless worse)" in due[0][2]
+    # not worse: nothing early; at the planned end ONE mail that says the rule ships B (no separate winner mail)
+    same = _traffic(a=(400, 30), b=(400, 29))
+    assert alerts.experiments_due(_payload("2026-11-20", same, [suw]), "2026-11-20", {}) == []
+    due = alerts.experiments_due(_payload("2026-12-15", same, [suw]), "2026-12-15", {})
+    assert [k for k, _s, _b in due] == ["end:hero"]
+    assert "The rule says ship b: decision due — ship B (not shown to be worse)." in due[0][2]
+    # the card readout says the same
+    [e] = _payload("2026-12-15", same, [suw])
+    assert "the rule says ship B" in e["readout"] and e["status_kind"] == "due"
+    assert e["rule"] == "ship_unless_worse" and e["rule_text"].startswith("Decision rule (ship unless worse)")
+    # a must_win experiment alone keeps today's single rule sentence
+    assert ab_report.rules_text(_payload("2026-11-20")) == ab_report.rule_sentence()

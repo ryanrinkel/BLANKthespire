@@ -614,3 +614,37 @@ def test_cli_json_has_experiments(logs, tmp_path, monkeypatch, capsys):
     data = json.loads((out / "traffic.json").read_text())
     assert data["experiments"] == {}     # the Sep sample predates every experiment
     assert "experiments=0" in capsys.readouterr().out
+
+
+def test_sitewide_experiment_is_counted_on_its_page_exactly_like_a_page_experiment():
+    """`sitewide` changes who SEES an arm (every page), not how the report reads it: exposures + metrics are
+    still the GETs of exp.page, so the same log gives the same numbers with or without the flag."""
+    site = dataclasses.replace(HERO, sitewide=True)
+    a1, a2 = ips_in("a", 2)
+    (b1,) = ips_in("b", 1)
+    lines = [line(a1, NOV4, "/"), line(a1, NOV4, "/login", time="09:01:00"),
+             line(a2, NOV4, "/help"),                      # a sitewide arm-a page view, but never saw `/`
+             line(b1, NOV4, "/"), line(b1, NOV4, "/archive", time="09:02:00"),
+             line("80.0.0.9", NOV4, "/download")]
+    plain = tally(lines, (HERO,)).experiments_out("2026-11-04")["hero"]
+    wide = tally(lines, (site,)).experiments_out("2026-11-04")["hero"]
+    assert wide == plain
+    assert plain["per_arm"]["a"]["exposures"] == 1 and plain["per_arm"]["b"]["exposures"] == 1
+
+
+def test_look_board_visitors_are_dropped_from_that_days_experiment_counts():
+    """?look=board (the share link, an alias of ?ab=skin:b) marks a visitor who CHOSE the look: like an operator's
+    ?ab= preview, the IP is out of that day's experiment counts; the next day without it, it counts again."""
+    site = dataclasses.replace(HERO, sitewide=True)
+    (p1,) = ips_in("a", 1, prefix=63)
+    (v,) = ips_in("b", 1, prefix=65)
+    t = tally([
+        line(p1, NOV4, "/?look=board"), line(p1, NOV4, "/login?look=board"), line(p1, NOV4, "/"),
+        line(v, NOV4, "/"), line(v, NOV4, "/login"),
+        line(p1, "05/Nov/2026", "/"),
+    ], (site,))
+    e = t.experiments_out("2026-11-05")["hero"]
+    assert e["per_arm"]["b"]["exposures"] == 1 and e["per_arm"]["b"]["login"] == 1
+    assert e["per_arm"]["a"]["exposures"] == 1 and e["per_arm"]["a"]["login"] == 0   # p1 counted on the 5th only
+    assert tr.has_look_override("/?look=board") and tr.has_look_override("/help?x=1&look=board#a")
+    assert not tr.has_look_override("/?looks=board") and not tr.has_look_override("/")

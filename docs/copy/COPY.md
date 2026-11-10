@@ -191,17 +191,23 @@ Where: static/landing.html:33 (p.splash-tag)
 
     How will you fill in the Blank?
 
+### landing.hero.tagline_lead
+Where: static/landing.html (p.splash-tag at the top of the hero, arm b of the `<!--ab skin:b-->` block)
+Notes: arm b of experiment "skin" (web/experiments.py, sitewide; the "departure board" skin). The flip board right under it finishes the sentence, so it ends on an ellipsis, not a question mark. Goes away with the experiment.
+
+    How will you fill in the…
+
+### landing.hero.subtitle_full
+Where: static/landing.html (p.splash-sub under the board, arm b of the `<!--ab skin:b-->` block)
+Notes: arm b of experiment "skin". The product name set large under the board (arm a shows just "the Spire" there). Goes away with the experiment.
+
+    Blank the Spire
+
 ### landing.hero.cta
 Where: static/landing.html:38 (primary button)
 Notes: button label, keep short.
 
     Create Your Own Class
-
-### landing.hero.cta_b
-Where: static/landing.html (primary button, arm b of the `<!--ab hero:b-->` block)
-Notes: arm b of experiment "hero" (web/experiments.py); goes away with the experiment (the losing arm's key is removed when it ends).
-
-    Forge a class — free with your own API key
 
 ### landing.hero.signin_note
 Where: static/landing.html:42 (p#splash-note under the button)

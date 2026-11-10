@@ -2191,7 +2191,13 @@ function fmtDayShort(s) {
 function renderExperiments(d) {
   const list = d.experiments || [];
   el("experiments-today").textContent = d.today ? `today ${d.today} (UTC)` : "";
-  el("experiments-rule").textContent = d.rule_text || "";
+  // One sentence per decision rule in use (ab_report.rules_text joins them with a blank line).
+  const ruleEl = el("experiments-rule");
+  ruleEl.textContent = "";
+  (d.rule_text || "").split("\n\n").forEach((line, i) => {
+    if (i) { ruleEl.appendChild(document.createElement("br")); ruleEl.appendChild(document.createElement("br")); }
+    ruleEl.appendChild(document.createTextNode(line));
+  });
   el("experiments-note").textContent = d.available ? ""
     : `${d.reason || "No traffic summary yet."} The experiments below come from the registry; their numbers appear once the traffic timer has run.`;
   el("experiments-list").innerHTML = list.length ? list.map(experimentBlock).join("")

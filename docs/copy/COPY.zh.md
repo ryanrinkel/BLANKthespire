@@ -128,13 +128,19 @@ Notes: 与上方英文翻牌板连读成“_____ the Spire”，保持英文。
 
     你会在空白处填上什么？
 
+### landing.hero.tagline_lead
+Notes: 页面顶部的问句，下方的英文翻牌板接着把句子说完，所以以省略号结尾。机器初稿，待母语审校。
+
+    你会在空白处填上……
+
+### landing.hero.subtitle_full
+Notes: 产品名，保持英文（GLOSSARY）。
+
+    Blank the Spire
+
 ### landing.hero.cta
 
     创造你的角色
-
-### landing.hero.cta_b
-
-    锻造一个角色 — 用你自己的 API 密钥免费
 
 ### landing.hero.signin_note
 
