@@ -29,7 +29,8 @@ PRIMARY_LABELS = {
 }
 
 # The registry fields copied onto every entry (the card and the mail print them in words first).
-_REG_FIELDS = ("name", "page", "started", "planned_end", "ended", "winner", "primary", "hypothesis")
+_REG_FIELDS = ("name", "page", "started", "planned_end", "ended", "winner", "primary", "hypothesis", "sitewide",
+               "rule")
 # What the traffic summary contributes when it has the experiment.
 _TRAFFIC_FIELDS = ("daily", "exposure_rate_7d", "control_rate", "days_to_decision", "sample_size_per_arm")
 
@@ -38,12 +39,28 @@ def rule() -> dict:
     return {"p_threshold": _exp.P_THRESHOLD, "min_exposures": _exp.MIN_EXPOSURES, "min_days": _exp.MIN_DAYS}
 
 
-def rule_sentence() -> str:
-    """The decision rule, printed once under the card and in every mail so it is not re-litigated."""
+def rule_sentence(rule_name: str = _exp.RULE_MUST_WIN) -> str:
+    """A decision rule in words, printed under the card and in every mail so it is not re-litigated."""
+    if rule_name == _exp.RULE_SHIP_UNLESS_WORSE:
+        return (f"Decision rule (ship unless worse): B ships unless it is shown to be worse. Once every arm has "
+                f"at least {_exp.MIN_EXPOSURES} exposures AND it has run at least {_exp.MIN_DAYS} days, "
+                f"P(b beats a) <= {_exp.P_WORSE} stops it and keeps the control; otherwise it runs to the planned "
+                "end and the rule says ship B. Secondary metrics are for understanding, not for deciding.")
     return (f"Decision rule: call a winner when P(beats control) >= {_exp.P_THRESHOLD} AND every arm has at "
             f"least {_exp.MIN_EXPOSURES} exposures AND the experiment has run at least {_exp.MIN_DAYS} days; "
             "otherwise, at the planned end, keep the control. Secondary metrics are for understanding, not "
             "for deciding. Peeking is fine; the minimum n and days are what stop a lucky first week.")
+
+
+def rules_text(entries: list | None) -> str:
+    """The rule sentences the shown experiments use, once each: the default alone when every experiment uses it
+    (today's wording, unchanged), otherwise one paragraph per rule naming its experiments."""
+    by_rule: dict[str, list[str]] = {}
+    for e in entries or []:
+        by_rule.setdefault(e.get("rule") or _exp.RULE_MUST_WIN, []).append(str(e.get("name")))
+    if set(by_rule) <= {_exp.RULE_MUST_WIN}:
+        return rule_sentence()
+    return "\n\n".join(f"{', '.join(names)}: {rule_sentence(r)}" for r, names in by_rule.items())
 
 
 def _shown(exp, today: str) -> bool:
@@ -60,7 +77,7 @@ def status_kind(status: str) -> str:
         return "ended"
     if s.startswith("winner"):
         return "winner"
-    if s.startswith("decision due"):
+    if s.startswith("decision due") or s.startswith("stop"):
         return "due"
     if s.startswith("not started"):
         return "pending"
@@ -93,8 +110,19 @@ def readout(entry: dict) -> str:
     label = entry.get("primary_label") or entry.get("primary") or "?"
     parts = [f"{p_phrase(entry, ': ')} on {label}"]
     ended = entry.get("status_kind") == "ended"
+    worse_rule = entry.get("rule") == _exp.RULE_SHIP_UNLESS_WORSE
     if ended:
         verdict = f"ended {entry['ended']}, winner {entry.get('winner')}."
+    elif worse_rule and d.get("winner_by_rule") == "a":
+        verdict = (f"B is worse (P ≤ {_exp.P_WORSE} with ≥{_exp.MIN_EXPOSURES} exposures per arm and "
+                   f"≥{_exp.MIN_DAYS} days), so the rule says stop and keep the control.")
+    elif worse_rule and d.get("winner_by_rule") == "b":
+        thin = "thin data" in (d.get("status") or "")
+        verdict = ("planned end reached and B was not shown to be worse, so the rule says ship B"
+                   + (" (thin data: the minimum exposures / days were not met)." if thin else "."))
+    elif worse_rule:
+        verdict = (f"not yet (stops early only if P ≤ {_exp.P_WORSE} with ≥{_exp.MIN_EXPOSURES} exposures per "
+                   f"arm and ≥{_exp.MIN_DAYS} days; otherwise B ships at the planned end).")
     elif d.get("winner_by_rule"):
         verdict = f"winner by the rule: {d['winner_by_rule']}."
     elif entry.get("status_kind") == "due":
@@ -147,7 +175,7 @@ def build_experiments_payload(traffic_data: dict | None, today: str | None = Non
     for exp in shown_experiments(today, experiments):
         entry = {k: getattr(exp, k) for k in _REG_FIELDS}
         entry.update(arms=list(exp.arms), weights=list(exp.weights), arms_text=dict(exp.arms_text),
-                     describe=_exp.describe(exp, today),
+                     describe=_exp.describe(exp, today), rule_text=rule_sentence(exp.rule),
                      primary_label=PRIMARY_LABELS.get(exp.primary, exp.primary))
         t = block.get(exp.name)
         t = t if isinstance(t, dict) else {}

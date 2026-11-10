@@ -1923,6 +1923,11 @@ if (scenario === "forge") {
           if (want) check(st.text === want, `${tag}: hero CTA reads "${want}"`, st.text);
         }
       }
+      if (e.name === "skin") {   // sitewide skin (2026-11-12): arm b = board.css loaded + the menu built, arm a = neither
+        const sk = await json(`({css: !!document.querySelector('link[href*="/static/board.css"]'),
+          menu: !!document.querySelector('.board-burger'), font: document.fonts.check('16px "Barlow"')})`);
+        check(sk.css === (arm === "b") && sk.menu === (arm === "b"), `${tag}: skin assets only in arm b`, JSON.stringify(sk));
+      }
       if (e.name === "hero" && (arm === "a" || arm === "b")) await shot(`ab-${arm}`, false);
       else await shot(`ab-${e.name}-${arm}`, false);
     }

@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
 import requests
-from flask import has_request_context, jsonify, redirect, request, send_from_directory, session, url_for
+from flask import has_request_context, jsonify, redirect, request, session, url_for
 from sqlalchemy import update
 
 import experiments
@@ -742,9 +742,10 @@ def init_auth(app) -> None:
         asked for the link, and only if the attacker already holds the token (which only the inbox has)."""
         email = _claim_link(token, consume=request.method == "POST")
         if email is None:
-            return send_from_directory(app.static_folder, "signin-expired.html"), 410
+            # Through pages.serve_page like every other page, so a sitewide experiment (a skin) resolves here too.
+            return pages.serve_page("signin-expired.html", page="/auth/email", status=410)
         if request.method == "GET":
-            return send_from_directory(app.static_folder, "signin-continue.html")
+            return pages.serve_page("signin-continue.html", page="/auth/email")
         # A clicked link is proof of the address (that is the whole point), so email_verified=True — which
         # lets rule 3 hand this person their existing Google/Discord account. current_user_id is the
         # "link while signed in" path (rule 2), and lands on the Account tab when it attached there.

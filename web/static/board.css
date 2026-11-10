@@ -1,0 +1,565 @@
+/* board.css: the "departure board" look for the whole site. Linked after style.css (and after any page's inline
+   <style>); it overrides style.css's :root tokens and restyles components. board.js adds the menu.
+
+   Direction: an airport / rail split-flap board. Warm black, Solari amber, hairline rules, square corners,
+   flat surfaces (no gradients, glows or soft shadows). Barlow for reading, Barlow Condensed for short
+   uppercase labels, B612 Mono for flaps, chips, codes and numbers. Fonts are self-hosted, latin subset
+   (vendor/NOTICES.md); every stack falls back to the system UI and CJK fonts for the Chinese toggle. */
+
+/* --- fonts ------------------------------------------------------------------------------------------ */
+@font-face { font-family: "Barlow"; font-style: normal; font-weight: 400; font-display: swap;
+  src: url("/static/vendor/fonts/barlow-latin-400-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Barlow"; font-style: normal; font-weight: 600; font-display: swap;
+  src: url("/static/vendor/fonts/barlow-latin-600-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Barlow Condensed"; font-style: normal; font-weight: 600; font-display: swap;
+  src: url("/static/vendor/fonts/barlow-condensed-latin-600-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Barlow Condensed"; font-style: normal; font-weight: 700; font-display: swap;
+  src: url("/static/vendor/fonts/barlow-condensed-latin-700-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "B612 Mono"; font-style: normal; font-weight: 400; font-display: swap;
+  src: url("/static/vendor/fonts/b612-mono-latin-400-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "B612 Mono"; font-style: normal; font-weight: 700; font-display: swap;
+  src: url("/static/vendor/fonts/b612-mono-latin-700-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+
+/* --- tokens ----------------------------------------------------------------------------------------- */
+:root {
+  /* Palette: neutral warm black, Solari amber. No purple anywhere. */
+  --bg: #111110; --panel: #1a1a18; --panel2: #232320; --line: #35342e;
+  --ink: #f2eee3; --muted: #9d998c; --accent: #ffb81c; --accent2: #d99a00; --danger: #ff5a4d;
+  /* Rarity. Uncommon stays the base-game green. Rare is a pale champagne gold, well clear of the UI amber
+     (and it gets a double rule on card chips, see "cards"); common/basic lose their violet cast. */
+  --basic: #8f8c82; --common: #d9d6cc; --uncommon: #5fd0a8; --rare: #eadba8;
+  --ink-soft: #cfcabd; --log-ink: #cfcabd; --log-bg: #0a0a09;
+  --board: #0a0a09;                         /* flap tiles, header strip, code wells */
+  --tile-edge: #3a3932;                     /* hairline round a flap tile */
+  --on-accent: #111110; --badge-ink: var(--accent);
+  --danger-line: #5a2a25;
+  --accent-tint-12: rgba(255,184,28,.06); --accent-tint-14: rgba(255,184,28,.07); --accent-tint-18: rgba(255,184,28,.09);
+  --uncommon-line: rgba(95,208,168,.45); --uncommon-line-50: rgba(95,208,168,.5);
+  --rare-tint: transparent; --rare-line-50: rgba(234,219,168,.5);
+  /* Warnings go signal-orange so a caution never reads as the ordinary amber accent. */
+  --warn: #ff8a3d; --warn-ink: #ffd0ae; --warn-link: #ffe2cc; --warn-tint: transparent;
+  --landing-glow: #111110;
+  --tile-top: #0a0a09; --tile-bottom: #0a0a09; --tile-bg: #0a0a09;
+  --tile-shadow: none; --seam: #000; --seam-shadow: 0 1px 0 #2b2a25; --flap-shadow: none;
+  --shadow-lift: none; --shadow-toast: none; --shadow-modal: none; --shadow-badge: none;
+  --overlay: rgba(0,0,0,.74);
+  --ab-badge-bg: #0a0a09; --ab-badge-ink: #f2eee3;
+  --btn-primary-bg: var(--accent); --btn-primary-ink: #111110;
+  /* Shape: square. Pills become 2px rectangles; only the board tiles keep a 3px corner. */
+  --radius-card: 2px; --radius-panel: 2px; --radius-ctl: 2px; --radius-tile: 3px;
+  --radius-sm: 2px; --radius-xs: 2px; --radius-chip: 2px; --radius-pill: 2px;
+  /* Type. */
+  --font-cjk: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC";
+  --font-body: "Barlow", system-ui, -apple-system, "Segoe UI", Roboto, var(--font-cjk), sans-serif;
+  --font-display: "Barlow Condensed", "Barlow", system-ui, -apple-system, "Segoe UI", Roboto, var(--font-cjk), sans-serif;
+  --font-sub: var(--font-display);
+  --font-mono: "B612 Mono", ui-monospace, "Cascadia Mono", Consolas, Menlo, var(--font-cjk), monospace;
+  --font-mono-tile: var(--font-mono); --font-code: var(--font-mono);
+  --track: .07em;                           /* letter-spacing for short uppercase labels */
+}
+
+/* --- base ------------------------------------------------------------------------------------------- */
+body { font: 16px/1.55 var(--font-body); }
+h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 700; line-height: 1.2; }
+h1 { font-size: 32px; text-transform: uppercase; letter-spacing: .03em; }
+h2 { font-size: 22px; text-transform: uppercase; letter-spacing: .05em; }
+h3 { font-weight: 600; font-size: 19px; }
+h4 { font-weight: 600; text-transform: uppercase; letter-spacing: var(--track); }
+code, kbd, pre, .codebox textarea, code.codeish, .tree { font-family: var(--font-mono); }
+/* B612 Mono runs wider than the system mono: let long paths and codes break instead of widening a phone page */
+code { overflow-wrap: anywhere; }
+.codebox textarea, .play-row .codebox textarea { font-size: 12px; background: var(--board); }
+a { text-underline-offset: 3px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+::selection { background: var(--accent); color: #111110; }
+
+/* --- header: a board header strip ------------------------------------------------------------------- */
+header { background: var(--board); border-bottom: 1px solid var(--line); padding: 14px 22px 0; }
+.brand { font-family: var(--font-display); font-size: 21px; text-transform: uppercase; letter-spacing: .05em; }
+.brand strong { font-weight: 700; }
+.brand .sub { font: 400 12px/1 var(--font-mono); letter-spacing: .08em; margin-left: 10px; color: var(--muted); }
+nav { gap: 2px 18px; margin-top: 10px; }
+.tab {
+  font: 600 14px/1 var(--font-display); text-transform: uppercase; letter-spacing: var(--track);
+  padding: 10px 0 9px; border-radius: 0; border-bottom: 2px solid transparent; text-decoration: none;
+}
+.tab:hover { color: var(--ink); }
+.tab.active { background: none; color: var(--accent); border-bottom-color: var(--accent); }
+.who { font: 12px/1 var(--font-mono); }
+nav .ghost { margin-top: 0; padding: 6px 12px; }
+.tokens { font: 700 12px/1 var(--font-mono); letter-spacing: .04em; padding: 6px 10px; background: var(--panel);
+  border-color: var(--accent2); }
+
+/* --- surfaces --------------------------------------------------------------------------------------- */
+.card { border-radius: 2px; }
+.lbl { font: 600 15px/1.3 var(--font-display); text-transform: uppercase; letter-spacing: var(--track); }
+.lbl.small { font: 600 12px/1.3 var(--font-display); letter-spacing: .09em; }
+.hint { font-size: 13px; }
+textarea, .in { background: var(--board); border-color: var(--line); }
+textarea:focus, .in:focus { outline: none; border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+select.in option, select.in optgroup { background: var(--panel2); }
+
+/* --- buttons ---------------------------------------------------------------------------------------- */
+.btn, .ghost {
+  font: 600 15px/1.2 var(--font-display); text-transform: uppercase; letter-spacing: var(--track);
+  background: transparent; border: 1px solid var(--line); color: var(--ink); padding: 11px 20px;
+}
+.btn:hover:not(:disabled), .ghost:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.btn.primary, a.btn.primary {
+  background: var(--accent); border: 1px solid var(--accent); color: #111110; font-weight: 700;
+}
+.btn.primary:hover:not(:disabled), a.btn.primary:hover { background: var(--ink); border-color: var(--ink); color: #111110; }
+.btn:focus-visible, .ghost:focus-visible, .btn.primary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.danger, .btn.danger { color: var(--danger); border-color: var(--danger-line); }
+.btn.danger:hover:not(:disabled) { color: var(--danger); border-color: var(--danger); }
+.linkish { font-weight: 600; text-underline-offset: 3px; }
+.view-bar .btn { padding: 7px 12px; font-size: 13px; }
+
+/* --- forge screen: pay step, BYOK, chips, log ------------------------------------------------------- */
+.settings.pay[open] { background: var(--panel2); }
+.settings.pay > summary { font-family: var(--font-display); font-size: 16px; text-transform: uppercase;
+  letter-spacing: .05em; }
+.settings.pay > summary::before { border-radius: 2px; width: 14px; height: 14px; }
+.settings.pay[open] > summary::before { background: var(--accent); box-shadow: inset 0 0 0 2px var(--panel2); }
+.settings.pay[open] > summary::after { font: 700 10px/1.6 var(--font-mono); letter-spacing: .08em; }
+.hint.pay-reason { font-family: var(--font-display); font-size: 16px; letter-spacing: .02em; }
+.advanced > summary { font: 600 13px/1.4 var(--font-display); text-transform: uppercase; letter-spacing: var(--track); }
+.chip { font: 11px/1.5 var(--font-mono); padding: 2px 8px; }
+.log { background: var(--board); font: 12.5px/1.6 var(--font-mono); }
+.estimate { background: var(--board); }
+.est-cost, .stat-tile .v, .stats-table td.num, .acct-balance, .pack-price, .tier-label { font-family: var(--font-mono); }
+
+/* mid-forge archetype pick */
+.choice { border-color: var(--line); border-left: 3px solid var(--accent); }
+.choice-opt:hover { border-color: var(--accent); }
+.choice-opt strong { font: 700 16px/1.25 var(--font-display); text-transform: uppercase; letter-spacing: .04em; }
+
+/* --- class view: card chips, relic, mechanics ------------------------------------------------------- */
+.cardchip { background: var(--panel); }
+.cardchip.r-rare { border-left: 4px double var(--rare); }
+.cc-top { font-family: var(--font-display); font-size: 16px; line-height: 1.25; }
+.cc-cost { font: 700 15px/1.25 var(--font-mono); }
+.cc-meta { font: 11px/1.4 var(--font-mono); text-transform: uppercase; letter-spacing: .04em; }
+.cc-art { border-radius: 0; }
+.relic { background: var(--panel); border: 1px solid var(--line); border-left: 4px double var(--rare); }
+.relic-badge, .mech-badge { font: 700 10px/1.4 var(--font-mono); letter-spacing: .1em; }
+.relic-name { font: 700 19px/1.2 var(--font-display); text-transform: uppercase; letter-spacing: .04em; }
+.mech { background: var(--panel); border-left-color: var(--accent); }
+.mech-badge { color: var(--accent); }
+.mech-name { font-family: var(--font-display); font-size: 16px; }
+.mech-eff li::before { color: var(--accent); }
+.mech-head { font: 11px/1.4 var(--font-mono); text-transform: uppercase; letter-spacing: .08em; }
+.arch { background: var(--panel); }
+.r-splash, .r-sprite { border-radius: 0; }
+#result .play-how { background: var(--panel); border-left: 3px solid var(--accent); }
+#result .play-title, .play-title { font: 700 15px/1.3 var(--font-display); text-transform: uppercase; letter-spacing: var(--track); }
+#result ol.play-steps li::marker, ol.play-steps li::marker { font-family: var(--font-mono); }
+.handoff { background: var(--panel); border-color: var(--line); border-left: 3px solid var(--accent); }
+
+/* --- library ---------------------------------------------------------------------------------------- */
+.lib-row { background: var(--panel); }
+.lr-name { font: 700 18px/1.25 var(--font-display); text-transform: uppercase; letter-spacing: .03em; }
+.lr-meta { font: 11px/1.5 var(--font-mono); letter-spacing: .02em; }
+.lr-actions button { font: 600 12px/1.2 var(--font-display); text-transform: uppercase; letter-spacing: var(--track);
+  background: transparent; padding: 7px 10px; }
+.lr-actions button:hover { border-color: var(--accent); color: var(--accent); }
+.lr-splash, .lr-sprite { background: var(--board); }
+
+/* --- account: balance, tiers, packs ----------------------------------------------------------------- */
+.acct-balance { font-weight: 700; }
+.pack, .donate-tier { border-color: var(--line); background: var(--panel); }
+.pack:hover:not(:disabled), .donate-tier:hover:not(:disabled) { border-color: var(--accent); color: var(--ink); }
+.tier-label { font-size: 17px; letter-spacing: 0; text-transform: none; }
+.tier-fee, .pack-per { font: 11px/1.4 var(--font-body); text-transform: none; letter-spacing: 0; }
+.pack-tokens { font-family: var(--font-display); text-transform: uppercase; letter-spacing: .04em; }
+
+/* --- notices: banners, toast, ribbon, modal --------------------------------------------------------- */
+.banner, .event-ribbon { background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--accent); }
+.banner.warn { background: var(--panel); border-color: var(--line); border-left-color: var(--warn); }
+.toast { background: var(--accent); color: #111110; font-weight: 600; border: 1px solid #111110; }
+.fb-panel { border-top: 3px solid var(--accent); }
+.fb-panel h3 { text-transform: uppercase; letter-spacing: .04em; }
+.fb-cat { border-radius: 2px; font: 600 13px/1.2 var(--font-display); text-transform: uppercase; letter-spacing: .05em; }
+.fb-cat.selected { border: 1px solid var(--accent); }
+.fb-detail { background: var(--panel2); }
+.webview-box { border-color: var(--line); border-left: 3px solid var(--accent); background: var(--panel); }
+.signin-or { font: 600 12px/1 var(--font-display); letter-spacing: .14em; }
+
+/* --- landing: the board ----------------------------------------------------------------------------- */
+body.landing { background: var(--bg); }
+.tile { border: 1px solid var(--tile-edge); border-bottom: 3px solid var(--accent); }
+.tile::after { left: 0; right: 0; height: 2px; }
+.flap { font-family: var(--font-mono); font-weight: 700; letter-spacing: 0; }
+.splash-sub { font: 600 clamp(17px, 2.6vw, 24px)/1 var(--font-display); text-transform: uppercase; letter-spacing: .38em;
+  margin-right: -.38em; /* the tracking after the last letter would push the centred word off-centre */ }
+.splash-go { padding: 15px 40px; font-size: 18px; }
+.splash-pc { font-size: 16px; }
+.splash-tag { font: 600 15px/1.3 var(--font-display); text-transform: uppercase; letter-spacing: .1em; }
+
+/* --- landing: sections as board columns ------------------------------------------------------------- */
+.how::before { display: none; }
+/* every landing section shares The Archive's 1100px column so the left-aligned titles line up */
+.how { max-width: 1100px; padding-bottom: 64px; }
+.how-title { font: 700 clamp(20px, 3.2vw, 28px)/1.15 var(--font-display); text-transform: uppercase; letter-spacing: .08em;
+  text-align: left; margin: 44px 0 6px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.how-sub { text-align: left; margin-bottom: 8px; }
+.how-sub + .steps, .how-sub + .featured-grid { margin-top: 18px; }
+/* the three steps: rows split by hairlines, each led by a flap-tile numeral */
+body.landing .steps { gap: 0; }
+body.landing .step { background: none; border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
+  padding: 20px 0; gap: 20px; }
+.step-num { position: relative; width: 40px; height: 46px; border-radius: 3px; background: var(--board);
+  border: 1px solid var(--tile-edge); border-bottom: 2px solid var(--accent); color: var(--accent);
+  font: 700 24px/1 var(--font-mono); }
+.step-num::after, .pricing-section .pricing li::after { content: ""; position: absolute; left: 0; right: 0; top: 50%;
+  height: 1px; background: rgba(0,0,0,.45); }   /* a faint seam: the digit must stay readable */
+.step-body h3 { font-size: 20px; margin-top: 2px; }
+.step-body p { font-size: 15px; }
+.fill { font-family: var(--font-mono); font-weight: 700; }
+/* pricing: the same rows */
+.pricing-section .pricing { gap: 0; font-size: 15px; }
+.pricing-section .pricing li { background: none; border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
+  padding: 20px 0 20px 62px; min-height: 46px; }
+.pricing-section .pricing li::before { left: 0; top: 20px; width: 40px; height: 46px; border-radius: 3px;
+  background: var(--board); border: 1px solid var(--tile-edge); border-bottom: 2px solid var(--accent); color: var(--accent);
+  font: 700 18px/1 var(--font-mono); box-sizing: border-box; }
+.pricing-section .pricing li::after { left: 0; right: auto; width: 40px; top: 43px; }
+.pricing-section .pricing strong { font: 700 19px/1.3 var(--font-display); color: var(--ink); }
+.pricing-section .how-title { margin-bottom: 8px; }
+@media (max-width: 520px) {
+  .splash { padding-top: 60px; }           /* clear the floating EN | 中文 toggle */
+  .pricing-section .pricing li { padding-left: 58px; }
+  .pricing-section .pricing li::before { left: 0; }
+  .how-title { margin-top: 32px; }
+}
+
+/* --- featured / Archive tiles ----------------------------------------------------------------------- */
+.featured-tile { border-radius: 2px; transition: border-color .12s ease; }
+.featured-tile:hover, .featured-tile:focus-visible { transform: none; border-color: var(--accent); box-shadow: none; }
+.featured-art { border-radius: 0; }
+.featured-word { background: var(--board); border-color: var(--tile-edge); border-bottom-color: var(--accent); letter-spacing: 2px;
+  padding: 4px 6px 3px; }
+.featured-name { font: 700 19px/1.2 var(--font-display); text-transform: uppercase; letter-spacing: .03em; }
+.featured-meta { font: 11px/1.4 var(--font-mono); text-transform: uppercase; letter-spacing: .06em; }
+.featured-more { font: 600 15px/1.3 var(--font-display); text-transform: uppercase; letter-spacing: var(--track); }
+.featured-more a { text-decoration: none; border-bottom: 1px solid var(--accent); }
+
+/* --- language toggle -------------------------------------------------------------------------------- */
+.lang-toggle { font: 600 13px/1 var(--font-display); letter-spacing: .06em; }
+.lang-toggle .lang-opt { padding: 6px 6px 5px; border-bottom: 2px solid transparent; }
+.lang-toggle .lang-opt.active { background: none; color: var(--accent); border-bottom-color: var(--accent); }
+.lang-toggle.floating { background: var(--board); border: 1px solid var(--line); padding: 2px 6px; }
+
+/* --- footer ----------------------------------------------------------------------------------------- */
+.foot { font: 13.5px/1.7 var(--font-mono); letter-spacing: .02em; border-top: 1px solid var(--line); margin-top: 24px; }
+
+/* --- secondary pages: help / download / deck (their own inline <style> and deck.css) ----------------- */
+.callout { border-radius: 0; background: var(--panel2); }
+.shot img { border-radius: 0; }
+.tree { background: var(--board); font-family: var(--font-mono); font-size: 12.5px; }
+.starter textarea { font-family: var(--font-mono); }
+details.card > summary { font-family: var(--font-display); font-size: 18px; letter-spacing: .03em; }
+.play-row { border-radius: 2px; background: var(--panel); }
+.dlbtn { font-size: 17px; }
+
+/* --- admin / operator cards ------------------------------------------------------------------------- */
+.stat-tile { background: var(--panel); }
+.stat-tile .k, .stats-table th, .stats-tables h4, .admin-log-head { font-family: var(--font-display); text-transform: uppercase;
+  letter-spacing: .06em; }
+.ev-pill, .exp-pill { font-family: var(--font-mono); font-weight: 700; letter-spacing: .04em; }
+.ab-badge { font-family: var(--font-mono); font-size: 11px; }
+#experiments .exp-head code { background: var(--board); }
+
+/* --- Simplified Chinese: no forced case, no wide tracking on CJK ------------------------------------ */
+:lang(zh) h1, :lang(zh) h2, :lang(zh) h4, :lang(zh) .btn, :lang(zh) .ghost, :lang(zh) .tab, :lang(zh) .lbl,
+:lang(zh) .how-title, :lang(zh) .splash-sub, :lang(zh) .splash-tag, :lang(zh) .featured-more, :lang(zh) .brand,
+:lang(zh) .lr-name, :lang(zh) .fb-cat, :lang(zh) .advanced > summary, :lang(zh) .settings.pay > summary,
+:lang(zh) .lr-actions button, :lang(zh) .play-title, :lang(zh) .signin-or, :lang(zh) .stat-tile .k {
+  letter-spacing: .02em; }
+:lang(zh) .splash-sub { margin-right: 0; }
+
+/* ===================================================================================================== */
+/* Round 2: use the width. Wide screens get a wider column, a dominant board and bigger, bolder type.     */
+/* Phones (<= 520px) keep the layout above; only type that scales with clamp() changes there.             */
+/* ===================================================================================================== */
+
+/* --- every width: the section titles, subs and the forge card's padding ----------------------------- */
+.how-title { font: 700 clamp(28px, 3.4vw, 56px)/1.05 var(--font-display); letter-spacing: .04em; }
+.how-sub { font-size: 18px; max-width: 80ch; }
+/* style.css's `main, section.card` rule zeroes a section card's vertical padding (labels hugged the top). */
+section.card { padding: 22px 24px 24px; }
+@media (max-width: 520px) { section.card { padding: 18px 16px 20px; } }
+/* ♥ is not in the latin subset of B612 Mono: set that one badge glyph in a symbol font, sized to match. */
+.pricing-section .pricing li:nth-child(3)::before {
+  font-family: "Segoe UI Symbol", "Apple Symbols", "DejaVu Sans", "Noto Sans Symbols 2", system-ui, sans-serif;
+  font-size: 22px; font-weight: 400; }
+
+/* --- landing, >= 900px: wide column, three-across steps and pricing --------------------------------- */
+@media (min-width: 900px) {
+  .how, .featured { max-width: min(92vw, 1560px); padding-left: 0; padding-right: 0; padding-bottom: 56px; }
+  .how-title { margin-top: 48px; padding-bottom: 16px; }
+  .how-sub { margin-top: 12px; }
+
+  /* The Archive: four across, bigger names and word chips */
+  .featured-grid { gap: 20px; }
+  .featured-body { padding: 16px 18px 18px; gap: 6px; }
+  .featured-word { font-size: 17px; padding: 6px 9px 5px; letter-spacing: 3px; }
+  .featured-cap { font-size: 15px; }
+  .featured-name { font-size: 24px; }
+  .featured-desc { font-size: 15px; }
+  .featured-meta { font-size: 13px; }
+  .featured-more { font-size: 19px; margin-top: 26px; }
+
+  /* "What is going on here??": three equal columns split by vertical hairlines */
+  body.landing .steps { grid-template-columns: repeat(3, minmax(0, 1fr)); border-bottom: 1px solid var(--line); }
+  body.landing .step { flex-direction: column; gap: 22px; border-bottom: 0; border-left: 1px solid var(--line);
+    padding: 32px 36px 36px; }
+  body.landing .step:first-child { border-left: 0; padding-left: 0; }
+  .step-num { width: 72px; height: 84px; font-size: 44px; border-bottom-width: 3px; }
+  .step-body h3 { font-size: 26px; line-height: 1.15; margin: 0 0 10px; }
+  .step-body p { font-size: 17px; line-height: 1.6; max-width: 60ch; }
+
+  /* "What does it cost?": the same three columns; the badge tile sits on top of each column */
+  .pricing-section .pricing { grid-template-columns: repeat(3, minmax(0, 1fr)); border-bottom: 1px solid var(--line);
+    font-size: 17px; line-height: 1.6; }
+  .pricing-section .pricing li { border-bottom: 0; border-left: 1px solid var(--line); padding: 138px 36px 36px; min-height: 0; }
+  .pricing-section .pricing li:first-child { border-left: 0; padding-left: 0; }
+  .pricing-section .pricing li::before { top: 32px; left: 36px; width: 72px; height: 84px; font-size: 32px; border-bottom-width: 3px; }
+  .pricing-section .pricing li:nth-child(2)::before { font-size: 40px; }
+  .pricing-section .pricing li:nth-child(3)::before { font-size: 40px; }
+  .pricing-section .pricing li:first-child::before, .pricing-section .pricing li:first-child::after { left: 0; }
+  .pricing-section .pricing li::after { left: 36px; width: 72px; top: 74px; }
+  .pricing-section .pricing strong { display: block; font-size: 26px; line-height: 1.15; margin-bottom: 10px; }
+  .pricing-section .how-title { margin-bottom: 0; }
+}
+
+/* --- landing hero, >= 1000px: the board spans the column, then a two-column band -------------------- */
+@media (min-width: 1000px) {
+  .splash {
+    /* five tiles + four 16px gaps fill the column exactly, flush with the section edges below */
+    --tile-w: min(calc((min(92vw, 1560px) - 64px) / 5), 300px);
+    max-width: min(92vw, 1560px); min-height: 0; padding: 60px 0 8px;   /* clear the floating EN | 中文 toggle */
+    display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); column-gap: clamp(40px, 5vw, 110px);
+    align-items: start; text-align: left;
+  }
+  .splash > * { grid-column: 2; }           /* anything signup-event.js adds lands in the right column */
+  .splash > #board { grid-column: 1 / -1; grid-row: 1; }
+  .board { gap: 16px; }
+  .tile { width: var(--tile-w); border-bottom-width: 5px; }
+  .flap { font-size: calc(var(--tile-w) * .78); }
+  .splash > .splash-sub { grid-column: 1; grid-row: 2; }
+  .splash > .splash-tag { grid-column: 1; grid-row: 3; }
+  .splash > .splash-pc { grid-row: 2; }
+  .splash > .splash-actions { grid-row: 3; }
+  .splash > .splash-note { grid-row: 4; }
+  .splash-sub { margin: 36px 0 0; font: 700 clamp(56px, 6.2vw, 112px)/.9 var(--font-display); color: var(--ink);
+    letter-spacing: .005em; margin-right: 0; }
+  .splash-tag { margin: 16px 0 0; font: 700 clamp(26px, 2.4vw, 42px)/1.1 var(--font-display); color: var(--accent);
+    letter-spacing: .02em; }
+  .splash-pc { margin: 44px 0 0; max-width: 38ch; font-size: 21px; line-height: 1.5; }
+  .splash-actions { justify-content: flex-start; margin-top: 26px; }
+  .splash-go { width: 100%; max-width: 460px; padding: 20px 44px; font-size: 22px; letter-spacing: .08em; text-align: center; }
+  .splash-note { margin: 16px 0 0; max-width: 46ch; font-size: 15px; }
+  .event-ribbon { margin-left: 0; }
+}
+
+/* --- other pages and /app, >= 1200px: a 1100px column, bigger reading type ---------------------------- */
+@media (min-width: 1200px) {
+  body:not(.landing) { font-size: 17px; }
+  main, section.card, #gate { max-width: 1100px; }
+  main section.card { max-width: none; }    /* a card inside main fills main (main carries the gutters) */
+  main.archive { max-width: 1100px; }       /* matches the header's 1100px column */
+  header { padding-left: calc((100vw - 1100px) / 2 + 18px); padding-right: calc((100vw - 1100px) / 2 + 18px); }
+  h1 { font-size: 40px; }
+  h2 { font-size: 26px; }
+  .hint { font-size: 14px; }
+  .lbl { font-size: 17px; }
+  .card > p:not([class]), .card li, .archive-lede, .callout, .lr-concept, #result > p:not([class]) { max-width: 80ch; }
+  /* forge card: a roomier concept box and a bigger Forge button */
+  #forge-input .lbl { font-size: 19px; margin-bottom: 10px; }
+  #concept { min-height: 150px; font-size: 19px; padding: 16px 18px; }
+  .forge-actions .btn { font-size: 20px; padding: 17px 48px; }
+  /* class view: the extra width becomes more card columns, not wider cards */
+  .cards { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+  .cc-top { font-size: 17px; }
+  .cc-meta { font-size: 11.5px; }
+  .cc-eff { font-size: 14px; }
+  #result h2 { font-size: 36px; }
+  #forge-input .banner { font-size: 15px; }
+  .brand { font-size: 24px; }
+  .tab { font-size: 16px; }
+  .mech-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+  .lr-name { font-size: 21px; }
+  .lr-concept { font-size: 15px; }
+  .lr-meta { font-size: 12px; }
+  /* /archive tiles match the landing strip */
+  .archive .featured-grid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 20px; }
+  .archive .featured-name { font-size: 24px; }
+  .archive .featured-word { font-size: 17px; padding: 6px 9px 5px; letter-spacing: 3px; }
+  .archive .featured-body { padding: 16px 18px 18px; }
+}
+
+/* ===================================================================================================== */
+/* Round 3 (landing): the sentence "How will you fill in the… [BOARD]" opens the page; "Blank the Spire"   */
+/* sits under the board; the numeral tiles stand beside their text, as tall as it.                       */
+/* ===================================================================================================== */
+
+/* --- hero copy ----------------------------------------------------------------------------------------
+   The hero's question and the "Blank the Spire" line are real copy in landing.html (landing.hero.tagline_lead,
+   placed before the board in the markup, and landing.hero.subtitle_full). The sign-in note stays in the markup
+   because landing.js writes the in-app-browser text into #splash-note without a null check; it is never shown. */
+#splash-note { display: none !important; }
+
+/* --- hero, every width: tagline first, board right under it ------------------------------------------ */
+.splash-tag { order: -2; margin: 0 0 14px; color: var(--accent); text-transform: uppercase;
+  font: 700 clamp(30px, 4.6vw, 84px)/1 var(--font-display); letter-spacing: .01em; }
+.splash > #board { order: -1; }
+/* phones and the narrow centred stack: "BLANK THE SPIRE" big and white under the board */
+.splash-sub { color: var(--ink); font: 700 clamp(34px, 6vw, 56px)/1 var(--font-display); letter-spacing: .01em;
+  margin: 22px 0 0; }
+:lang(zh) .splash-tag { letter-spacing: .02em; }
+
+@media (min-width: 1000px) {
+  .splash { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); padding-top: 64px; }
+  .splash > .splash-tag { grid-column: 1 / -1; grid-row: 1; text-align: left; margin: 0 0 18px; }
+  .splash > #board { grid-column: 1 / -1; grid-row: 2; }
+  /* the band: BLANK THE SPIRE on the left, centred against the PC note + CTA on the right */
+  .splash > .splash-sub { grid-column: 1; grid-row: 3 / span 2; align-self: center; margin: 40px 0 0;
+    font-size: clamp(56px, 6.2vw, 112px); line-height: .92; }
+  .splash > .splash-pc { grid-row: 3; margin-top: 40px; }
+  .splash > .splash-actions { grid-row: 4; }
+  .splash > .event-ribbon { grid-row: 5; }
+}
+
+/* --- steps + pricing: [flap tile | title + body], the tile as tall as the text ------------------------ */
+.step-num, .pricing-section .pricing li::before {
+  height: auto; min-height: 72px; width: 64px; border-radius: 3px; box-sizing: border-box;
+  background: var(--board); border: 1px solid var(--tile-edge); border-bottom: 3px solid var(--accent);
+  color: var(--accent); font: 700 36px/1 var(--font-mono); display: grid; place-items: center; }
+body.landing .step { flex-direction: row; align-items: stretch; gap: 18px; padding: 22px 0; }
+.step-num { align-self: stretch; }
+.step-body { flex: 1; min-width: 0; align-self: flex-start; }   /* titles share a top line */
+.step-body h3 { margin: 0 0 6px; }
+.pricing-section .pricing li { padding: 22px 0 22px 82px; min-height: 116px; }
+.pricing-section .pricing li::before { top: 22px; bottom: 22px; left: 0; }
+.pricing-section .pricing li::after { left: 0; right: auto; width: 64px; top: 50%; }
+.pricing-section .pricing li:nth-child(1)::before { font-size: 30px; }
+.pricing-section .pricing li:nth-child(2)::before { font-size: 36px; }
+.pricing-section .pricing li:nth-child(3)::before { font-family: "Segoe UI Symbol", "Apple Symbols", "DejaVu Sans",
+  "Noto Sans Symbols 2", system-ui, sans-serif; font-weight: 400; font-size: 36px; }
+.pricing-section .pricing strong { display: block; margin-bottom: 4px; }
+
+@media (min-width: 900px) {
+  .step-num, .pricing-section .pricing li::before {
+    width: clamp(84px, 6.8vw, 132px); min-height: 130px; font-size: clamp(52px, 4.5vw, 84px); border-bottom-width: 4px; }
+  body.landing .step { flex-direction: row; gap: clamp(20px, 1.8vw, 32px); padding: 34px 36px; }
+  body.landing .step:first-child { padding-left: 0; }
+  .step-body h3 { margin-bottom: 10px; }
+  .pricing-section .pricing li { padding: 34px 36px 34px calc(36px + clamp(84px, 6.8vw, 132px) + clamp(20px, 1.8vw, 32px));
+    min-height: 198px; }
+  .pricing-section .pricing li:first-child { padding-left: calc(clamp(84px, 6.8vw, 132px) + clamp(20px, 1.8vw, 32px)); }
+  .pricing-section .pricing li::before { top: 34px; bottom: 34px; left: 36px; }
+  .pricing-section .pricing li::after { left: 36px; width: clamp(84px, 6.8vw, 132px); top: 50%; }
+  .pricing-section .pricing li:first-child::before, .pricing-section .pricing li:first-child::after { left: 0; }
+  .pricing-section .pricing li:nth-child(1)::before { font-size: clamp(40px, 3.4vw, 64px); }
+  .pricing-section .pricing li:nth-child(2)::before { font-size: clamp(52px, 4.5vw, 84px); }
+  .pricing-section .pricing li:nth-child(3)::before { font-size: clamp(48px, 4.2vw, 80px); }
+  .pricing-section .pricing strong { margin-bottom: 10px; }
+}
+
+/* ===================================================================================================== */
+/* Round 4/5: the burger menu (board.js) and the language toggle beside it, top right.                    */
+/* Public pages: at every width the corner holds the EN | 中文 toggle + the burger; the page's own header  */
+/* links are folded into the menu and hidden here in CSS (never painted). /app: the tab strip stays as it   */
+/* is from 820px up; below that the burger stands in for it and the toggle sits beside it.                 */
+/* The toggle is i18n.js's own element, styled where it is (AUTO_DETECT is off, so it must stay visible).  */
+/* ===================================================================================================== */
+:root { --board-gutter: 16px; --board-ctl: 46px; --board-corner: 168px; }  /* gutter; control size; reserved width */
+body.landing { --board-gutter: 12px; }
+@media (min-width: 1000px) { body.landing { --board-gutter: calc((100vw - min(92vw, 1560px)) / 2); } }  /* column edge */
+@media (min-width: 1200px) { body > header { --board-gutter: calc((100vw - 1100px) / 2 + 18px); } }
+body > header { position: relative; }
+
+/* public pages: the header links live in the menu; the nav box only still holds the toggle */
+body > header:not(:has(#nav-forge)) > nav { display: contents; }
+body > header:not(:has(#nav-forge)) > nav .tab { display: none; }
+body > header:not(:has(#nav-forge)) { padding-top: 12px; padding-bottom: 12px; }
+/* the brand line keeps clear of toggle + burger, and is as tall as them so nothing jumps when the menu loads */
+body > header:not(:has(#nav-forge)) .brand { min-height: var(--board-ctl); display: flex; align-items: center; gap: 0 8px;
+  flex-wrap: wrap; margin-right: var(--board-corner); }
+
+/* the toggle as a corner tile: public headers, the landing's floating one, and /app below 820px */
+body > header:not(:has(#nav-forge)) .lang-toggle, body > .lang-toggle.floating {
+  position: absolute; top: 12px; right: calc(var(--board-gutter) + var(--board-ctl) + 8px); z-index: 90; margin: 0;
+  height: var(--board-ctl); display: inline-flex; align-items: center; gap: 2px; padding: 0 8px;
+  background: var(--board); border: 1px solid var(--line); border-radius: 2px; font-size: 15px; }
+body > header:not(:has(#nav-forge)) .lang-toggle .lang-opt, body > .lang-toggle.floating .lang-opt { padding: 6px 6px 4px; }
+
+.board-nav { position: absolute; top: 12px; right: var(--board-gutter); z-index: 90; }
+@media (min-width: 1200px) { body > header .board-nav .board-menu { width: 340px; } }
+.board-burger {
+  display: grid; place-items: center; width: var(--board-ctl); height: var(--board-ctl); padding: 0; cursor: pointer;
+  background: var(--board); border: 1px solid var(--line); border-bottom: 2px solid var(--accent); border-radius: 2px;
+}
+.board-burger-bars { display: grid; gap: 5px; width: 20px; }
+.board-burger-bars i { display: block; height: 2px; background: var(--accent); }
+.board-burger:hover, .board-nav.is-open .board-burger { border-color: var(--accent); background: var(--panel); }
+.board-burger:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+.board-menu {
+  position: absolute; top: calc(100% + 6px); right: 0; width: min(340px, calc(100vw - 2 * var(--board-gutter)));
+  background: var(--board); border: 1px solid var(--line); border-top: 3px solid var(--accent); border-radius: 2px;
+  text-align: left; display: block; margin: 0; gap: 0;   /* it is a <nav>: undo style.css's flex nav row */
+}
+.board-menu[hidden] { display: none; }
+.board-menu:not([hidden]) { animation: board-menu-in .12s ease-out; }
+@keyframes board-menu-in { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .board-menu:not([hidden]) { animation: none; } }
+.board-menu-list { list-style: none; margin: 0; padding: 0; }
+.board-menu-list li { border-bottom: 1px solid var(--line); }
+.board-menu-item {
+  display: block; width: 100%; margin: 0; padding: 14px 20px 13px; border: 0; border-radius: 0; background: none;
+  color: var(--ink); text-align: left; text-decoration: none; cursor: pointer;
+  font: 700 19px/1.2 var(--font-display); text-transform: uppercase; letter-spacing: .07em;
+}
+.board-menu-item:hover, .board-menu-item:focus-visible { color: var(--accent); background: var(--panel); outline: none; }
+.board-menu-item:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+.board-menu-item.is-current { color: var(--accent); box-shadow: inset 4px 0 0 var(--accent); }
+.board-menu-item.is-current:focus-visible { box-shadow: inset 4px 0 0 var(--accent), inset 0 0 0 2px var(--accent); }
+.board-menu-legal { padding: 12px 20px 14px; font: 13px/1.4 var(--font-mono); color: var(--muted); }
+.board-menu-legal a { color: var(--muted); }
+.board-menu-legal a:hover, .board-menu-legal a[aria-current] { color: var(--accent); }
+:lang(zh) .board-menu-item { letter-spacing: .02em; }
+
+/* /app below 820px: the burger replaces the tab strip; the toggle sits beside it in the corner; tokens, who
+   and sign-out stay on the nav row, which starts below the burger so nothing peeks over the open panel. */
+@media (min-width: 820px) { .board-nav.is-app { display: none; } }
+@media (max-width: 819px) {
+  body > header:has(#nav-forge) { padding-top: 12px; }
+  body > header:has(#nav-forge) .brand { min-height: var(--board-ctl); display: flex; align-items: center; gap: 0 8px;
+    flex-wrap: wrap; margin-right: var(--board-corner); }
+  body > header:has(#nav-forge) > nav .tab { display: none; }
+  body > header:has(#nav-forge) > nav { margin-top: 12px; padding-bottom: 12px; }
+  body > header:has(#nav-forge) .lang-toggle {
+    position: absolute; top: 12px; right: calc(var(--board-gutter) + var(--board-ctl) + 8px); z-index: 90; margin: 0;
+    height: var(--board-ctl); display: inline-flex; align-items: center; gap: 2px; padding: 0 8px;
+    background: var(--board); border: 1px solid var(--line); border-radius: 2px; font-size: 15px; }
+}
+/* phones: the header subtitle would wrap beside the corner controls (/app, /deck, ...): drop it */
+@media (max-width: 600px) { body > header .brand .sub { display: none; } }
+@media (max-width: 520px) {
+  .board-menu { width: calc(100vw - 2 * var(--board-gutter)); }
+  .splash { padding-top: 76px; }           /* the opening line sits clear of the toggle + burger */
+}

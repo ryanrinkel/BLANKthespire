@@ -20,10 +20,16 @@ Lifecycle (docs/plans/AB_TESTING_PLAN.md 3.7):
    (:func:`served_arms`). In the same or the next commit remove the markers, the losing arm and its
    i18n keys from the HTML / copy docs, and fill in the LOG row.
 
-Decision rule (plan 3.5), applied by :func:`decide`: call a winner when ``P(arm beats control) >=
-P_THRESHOLD`` AND every arm has at least ``MIN_EXPOSURES`` exposures AND the experiment has run at least
-``MIN_DAYS`` days; otherwise, at ``planned_end``, keep the control. Secondary metrics are for understanding,
-not for deciding.
+Decision rules (plan 3.5), applied by :func:`decide`, chosen per experiment by ``Experiment.rule``:
+
+* ``"must_win"`` (the default): call a winner when ``P(arm beats control) >= P_THRESHOLD`` AND every arm has
+  at least ``MIN_EXPOSURES`` exposures AND the experiment has run at least ``MIN_DAYS`` days; otherwise, at
+  ``planned_end``, keep the control.
+* ``"ship_unless_worse"`` (two arms only): B ships unless it is shown to be worse. Once the minimum exposures
+  and days are met, ``P(b beats a) <= P_WORSE`` stops it early with the control kept; otherwise it runs to
+  ``planned_end`` and the rule says ship B (with "thin data" in the status when the minimums were not met).
+
+Secondary metrics are for understanding, not for deciding.
 
 Importing this module never raises; :func:`validate` is an explicit call (app.py runs it at import so a
 bad registry fails the deploy's test step).
@@ -39,7 +45,11 @@ from dataclasses import dataclass
 
 MIN_EXPOSURES = 200     # per arm, decision rule (plan 3.5)
 MIN_DAYS = 14
-P_THRESHOLD = 0.95
+P_THRESHOLD = 0.95      # must_win: P(arm beats control) needed to call that arm the winner
+P_WORSE = 0.10          # ship_unless_worse: P(b beats a) at or under this = at least 90% sure B is worse
+RULE_MUST_WIN = "must_win"
+RULE_SHIP_UNLESS_WORSE = "ship_unless_worse"
+RULES = (RULE_MUST_WIN, RULE_SHIP_UNLESS_WORSE)
 NAME_RE = re.compile(r"^[a-z0-9_]+$")   # experiment names AND arm names
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
@@ -65,6 +75,11 @@ class Experiment:
     arms_text: dict[str, str] # REQUIRED: one non-empty line per arm
     ended: str | None = None  # "YYYY-MM-DD"; set together with winner
     winner: str | None = None
+    # True: the arm applies on EVERY page that carries `<!--ab name:arm-->` blocks (a whole-site skin), so a
+    # visitor sees one consistent arm everywhere. Exposure and metrics are still read on `page` only (the
+    # report counts GET <page>), and the one-live-experiment-per-page rule counts it against `page` only.
+    sitewide: bool = False
+    rule: str = RULE_MUST_WIN  # the decision rule decide() applies (RULES; see the module docstring)
 
     # dict fields make the generated __hash__ fail; experiments are identified by name.
     def __hash__(self) -> int:
@@ -83,6 +98,24 @@ EXPERIMENTS: list[Experiment] = [
                     "question stops people before the pricing section far below the fold."),
         arms_text={"a": "Button says 'Create Your Own Class' (today's page)",
                    "b": "Button says 'Forge a class — free with your own API key'"},
+        # Ended early by the owner (2026-11-10 read: a 19/278 /login, b 15/304, P(b beats a) 0.165, no winner
+        # by rule) to free `/` for the sitewide skin test; control kept. Stays here so the card shows it for 30
+        # days and any stray ?ab=hero:* resolves to the winner; the markers and cta_b are gone from the HTML.
+        ended="2026-11-11", winner="a",
+    ),
+    Experiment(
+        name="skin", page="/", arms=("a", "b"), weights=(50, 50),
+        # sitewide: the arm applies on every page (pages.py), exposure + /login are read on `/` as usual.
+        # salt / started / planned_end assume the deploy on 2026-11-11: if it slips, move all three together
+        # (salt = deploy day, started = the day after, planned_end = started + 42 days).
+        salt="2026-11-11", started="2026-11-12", planned_end="2026-12-24",
+        primary="login", sitewide=True, rule=RULE_SHIP_UNLESS_WORSE,
+        hypothesis=("The departure-board look (flat black and amber, a sentence-style hero that opens with "
+                    "'How will you fill in the…', a top-right menu) gets visitors to open /login at least as "
+                    "often as today's look."),
+        arms_text={"a": "Today's look",
+                   "b": ("Departure-board skin on every page: new hero order, 'Blank the Spire' under the board, "
+                         "no sign-in note, menu button, tiles beside the steps")},
     ),
 ]
 
@@ -157,6 +190,12 @@ def _validate_one(exp: Experiment) -> None:
         raise ValueError(f"{where}: primary {exp.primary!r} must be one of {PRIMARY_METRICS}")
     if not isinstance(exp.hypothesis, str) or not exp.hypothesis.strip():
         raise ValueError(f"{where}: hypothesis is required (one sentence)")
+    if not isinstance(exp.sitewide, bool):
+        raise ValueError(f"{where}: sitewide must be True or False, got {exp.sitewide!r}")
+    if exp.rule not in RULES:
+        raise ValueError(f"{where}: rule {exp.rule!r} must be one of {RULES}")
+    if exp.rule == RULE_SHIP_UNLESS_WORSE and arms != ("a", "b"):
+        raise ValueError(f"{where}: rule {exp.rule!r} needs exactly the arms ('a', 'b'), got {arms}")
     text = exp.arms_text if isinstance(exp.arms_text, dict) else {}
     for a in arms:
         line = text.get(a)
@@ -186,6 +225,11 @@ def validate(experiments: list[Experiment] | None = None) -> None:
 def is_live(exp: Experiment, day: str | None = None) -> bool:
     day = day or today_utc()
     return exp.started <= day and (exp.ended is None or day < exp.ended)
+
+
+def applies_to(exp: Experiment, page: str) -> bool:
+    """Does ``exp`` draw an arm for a request to ``page``? Its own page always; every page when sitewide."""
+    return exp.page == page or exp.sitewide
 
 
 def live_experiments(page: str | None = None, day: str | None = None, experiments=None) -> list[Experiment]:
@@ -223,13 +267,14 @@ def parse_override(raw: str | None, experiments=None) -> dict[str, str]:
 
 def served_arms(ip: str, ua: str, page: str, override: dict[str, str] | None = None,
                 day: str | None = None, experiments=None) -> dict[str, str]:
-    """Arm per registry experiment on ``page``: live -> override or hash; ended -> winner; not started yet ->
-    override or a (so the operator can preview the arms before the start day)."""
+    """Arm per registry experiment that applies to ``page`` (its own page, or any page when ``sitewide``):
+    live -> override or hash; ended -> winner; not started yet -> override or a (so the operator can preview
+    the arms before the start day)."""
     day = day or today_utc()
     override = override or {}
     out: dict[str, str] = {}
     for exp in _reg(experiments):
-        if exp.page != page:
+        if not applies_to(exp, page):
             continue
         forced = override.get(exp.name)
         if day < exp.started:
@@ -326,7 +371,16 @@ def decide(exp: Experiment, per_arm: dict[str, dict], today: str | None = None) 
     min_exposures_met = all(counts(a)[0] >= MIN_EXPOSURES for a in exp.arms)
     min_days_met = days_running >= MIN_DAYS
     winner_by_rule = None
-    if min_exposures_met and min_days_met:
+    due_status = "decision due"
+    if exp.rule == RULE_SHIP_UNLESS_WORSE:
+        pb = p.get("b")
+        if min_exposures_met and min_days_met and pb is not None and pb <= P_WORSE:
+            winner_by_rule = "a"
+        elif today >= exp.started and today >= exp.planned_end:
+            winner_by_rule = "b"
+            due_status = ("decision due — ship B (not shown to be worse)" if min_exposures_met and min_days_met
+                          else "decision due — ship B (thin data)")
+    elif min_exposures_met and min_days_met:
         best = None
         for arm, val in p.items():
             if val is not None and val >= P_THRESHOLD and (best is None or val > p[best]):
@@ -337,6 +391,10 @@ def decide(exp: Experiment, per_arm: dict[str, dict], today: str | None = None) 
         status = "ended — control kept" if exp.winner == "a" else f"ended — winner {exp.winner}"
     elif today < exp.started:
         status = "not started"
+    elif exp.rule == RULE_SHIP_UNLESS_WORSE and winner_by_rule == "a":
+        status = "stop: B is worse — keep the control"
+    elif exp.rule == RULE_SHIP_UNLESS_WORSE and winner_by_rule == "b":
+        status = due_status
     elif winner_by_rule is not None:
         status = f"winner by rule: {winner_by_rule}"
     elif today >= exp.planned_end:
@@ -358,8 +416,10 @@ def decide(exp: Experiment, per_arm: dict[str, dict], today: str | None = None) 
 def describe(exp: Experiment, today: str | None = None) -> str:
     if exp.ended is not None:
         return f"{exp.name} on {exp.page} (ended {exp.ended}, winner {exp.winner})"
+    extra = "".join([", sitewide" if exp.sitewide else "",
+                     ", rule: ship B unless worse" if exp.rule == RULE_SHIP_UNLESS_WORSE else ""])
     return (f"{exp.name} on {exp.page} ({'/'.join(exp.arms)}, since {exp.started}, "
-            f"decision due {exp.planned_end})")
+            f"decision due {exp.planned_end}{extra})")
 
 
 def summary_line(today: str | None = None, experiments=None) -> str:

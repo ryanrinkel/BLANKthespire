@@ -83,7 +83,9 @@ How a visitor is counted (all per UTC day, by client IP, so every number here is
                    /api/auth/email/start 200), download (GET /download 200), plus the existing depth
                    buckets, workshop, deck and archive. An IP that sent any ?ab= override that day is the
                    operator previewing an arm: it is dropped from that day's experiment counts (never from
-                   the ordinary numbers). Per experiment live today or ended within EXPERIMENT_KEEP_DAYS,
+                   the ordinary numbers). The same goes for the share link ?look=board (an alias of
+                   ?ab=skin:b that board.js carries along on internal links): that visitor chose the look,
+                   so it is not a hashed arm and is dropped the same way. Per experiment live today or ended within EXPERIMENT_KEEP_DAYS,
                    traffic.json["experiments"][name] holds per-arm unique IPs at their deepest across the
                    run (an IP is counted once, under the arm of its first exposure day), the device split,
                    a daily series, and the decision read (experiments.decide / days_to_decision). Only
@@ -244,6 +246,13 @@ def campaign_key(target: str) -> str | None:
     return f"{src}/{camp}" if camp else src
 
 
+def has_look_override(target: str) -> bool:
+    """True when the URL carries ``look=`` (``/?look=board``, pages.LOOK_PARAM): a chosen look, not a hashed arm."""
+    if "?" not in target:
+        return False
+    return "look" in parse_qs(target.split("?", 1)[1], keep_blank_values=True)
+
+
 def has_ab_override(target: str) -> bool:
     """True when the URL carries an ``ab=`` parameter (``/?ab=hero:b``): the operator previewing an arm."""
     if "?" not in target:
@@ -336,8 +345,8 @@ class Tally:
         if ip not in self.device[day]:
             self.device[day][ip] = device_class(ua)
             self.first_ua[day][ip] = ua
-        if has_ab_override(target):
-            self.operator[day].add(ip)
+        if has_ab_override(target) or has_look_override(target):
+            self.operator[day].add(ip)   # previews and chosen looks: out of that day's experiment counts
         if method == "POST" and path == EMAIL_START_PATH and status == "200":
             self.provider[day].add(ip)
         if method != "GET":

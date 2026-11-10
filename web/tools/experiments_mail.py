@@ -9,7 +9,9 @@ key, From address, BTSWEB_ADMIN_EMAILS / BTSWEB_ALERT_EMAILS):
   build vs last week; "[DEP]" subject prefix when either moved). With nothing live the digest is just the
   dependency watch; with BTSWEB_DEP_WATCH=0 as well, nothing at all.
 * Any day: "<name> reached its planned end" once `planned_end` passes on an experiment nobody ended, and
-  "<name> has a winner by the rule" once the decision rule names one — each at most once, ever.
+  "<name> has a winner by the rule" once the decision rule names one — each at most once, ever. Under the
+  "ship_unless_worse" rule (experiments.Experiment.rule) the early mail is "<name> stops by the rule: B is
+  worse" and the planned-end mail says the rule ships B; every mail's footer states the rules in use.
 
 The numbers come from traffic.json (tools/traffic_report.py, every 15 min) through the same
 ab_report.build_experiments_payload the admin card uses; a missing traffic.json still lists the registry's
