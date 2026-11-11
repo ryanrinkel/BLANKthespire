@@ -22,6 +22,10 @@
   // Rewritten at the moment of use (pointerdown / focus / click, delegated on the document), so links other
   // scripts add or repoint later (Archive tiles, the CTA landing.js repoints, menu rows) are covered too.
   // Left alone: other origins, hash-only links, mailto/tel, downloads and file URLs, the auth/API hops.
+  // Script navigations (location.href = ..., location.replace) can use window.BTS_LOOK(url), the same rewrite.
+  // Anything that still drops it is caught by the server (pages.py): a page requested without ?look= from a
+  // same-origin page that had it (its Referer) is redirected to itself plus ?look=board, and the server's own
+  // redirects, the OAuth state, the emailed sign-in link and Stripe's return URLs carry it too.
   var LOOK = "board";
   var CARRY = new URLSearchParams(window.location.search).get("look") === LOOK;
   var SKIP_PATH = /^\/(?:api|auth|logout|dev-login|webhook|static|admin)(?:\/|$)|^\/login\/|\.[a-z0-9]{2,5}$/i;
@@ -41,6 +45,7 @@
     var next = withLook(href);
     if (next !== href) a.setAttribute("href", next);
   }
+  window.BTS_LOOK = withLook;  // a no-op unless this page was opened with ?look=board
   if (CARRY) {
     ["pointerdown", "focusin", "click", "auxclick"].forEach(function (type) {
       document.addEventListener(type, carry, true);

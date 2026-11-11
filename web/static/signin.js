@@ -201,7 +201,7 @@ function wireEmailForm() {
     EV.ribbon(me, (node) => el("lede").after(node));
   }
 
-  if (me && me.user && !LINKING) { window.location.replace("/app"); return; }
+  if (me && me.user && !LINKING) { window.location.replace(window.BTS_LOOK ? window.BTS_LOOK("/app") : "/app"); return; }
 
   const owned = new Set(((me && me.user && me.user.identities) || []).map((i) => i.provider));
   if (me && me.user) {

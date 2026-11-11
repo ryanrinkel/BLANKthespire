@@ -292,11 +292,14 @@ have shown, which for a splash-only experiment is still the right label in the v
 5. The card keeps showing ended experiments for 30 days, then they drop off (the LOG is the archive).
 6. The `skin` experiment also has a share link, `/?look=board`: a neutral alias of `?ab=skin:b` for that
    request (pages.LOOK_ALIASES), with nothing stored on the visitor's device. board.js appends `look=board` to
-   same-origin links on a page that was opened with it, so the look holds while browsing; it is lost across
-   sign-in (the auth redirects land on a bare `/app`). Like `?ab=`, it works from the deploy day and is ignored
-   once the experiment has ended (the winner is served). The report drops an IP that sent `look=` that day
-   from the experiment numbers, like an `?ab=` preview. When `skin` ends, remove `LOOK_ALIASES`' entry, the
-   board.js carrier and the report's `has_look_override` with the losing arm.
+   same-origin links on a page that was opened with it, so the look holds while browsing. Other hops are
+   caught server-side (pages.carried_look / with_look): a GET page without `look` whose same-origin Referer
+   has it is 302'd to itself plus `look=board`; the server redirects (/app, /login), the OAuth state
+   (`<random>.board`), the emailed sign-in link and Stripe's return URLs carry it, so it survives sign-in.
+   Like `?ab=`, it works from the deploy day and is ignored once the experiment has ended (the winner is
+   served, and nothing redirects). The report drops an IP that sent `look=` that day from the experiment
+   numbers, like an `?ab=` preview. When `skin` ends, remove `LOOK_ALIASES`' entry, the board.js carrier and
+   the report's `has_look_override` with the losing arm.
 
 ### 3.8 Verification
 

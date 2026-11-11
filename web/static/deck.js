@@ -84,7 +84,7 @@
       from: root.dataset.slug || "",
     };
     try { localStorage.setItem("bts_prefill", JSON.stringify(prefill)); } catch (_) { /* no store */ }
-    location.href = "/login";
+    location.href = window.BTS_LOOK ? window.BTS_LOOK("/login") : "/login";  // board.js: keep ?look=board
   }
 
   // Every string (render.js included) comes from i18n.js, so the page renders once its json is in.

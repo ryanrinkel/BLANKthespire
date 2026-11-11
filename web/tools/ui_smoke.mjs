@@ -4,7 +4,7 @@
 //     STRIPE_SECRET_KEY=sk_test_smoke PORT=5077 uv run --project ../generation python app.py
 // (the dummy Stripe key only flips /api/billing to {enabled:true} so the donate tiers + custom-amount row
 //  render; nothing in these scenarios ever hits Stripe)
-// then, from web/tools:  node ui_smoke.mjs http://127.0.0.1:5077 <outdir> forge|v3|byok-narrow|byok-models|library|account|pages|art|lost|archive|featured|webview|phone|events|lang|forge-zh|signin-code|ab|slow-pick
+// then, from web/tools:  node ui_smoke.mjs http://127.0.0.1:5077 <outdir> forge|v3|byok-narrow|byok-models|library|account|pages|art|lost|archive|featured|webview|phone|events|lang|forge-zh|signin-code|ab|look|slow-pick
 // (`signin-code`: the 6-digit sign-in code; with no mail provider the dev server returns the link + code in
 //  the /api/auth/email/start JSON, which the scenario reads as its mailbox — no extra dev endpoint)
 // (`archive` needs BTSWEB_ADMIN_EMAILS=unlimited@example.com and is best run first on a fresh DB: it puts a class
@@ -13,6 +13,8 @@
 // (`ab`: page experiments (AB_TESTING_PLAN.md 3.8). Needs BTSWEB_ADMIN_EMAILS=unlimited@example.com — it reads the
 //  live registry from the admin's /api/me, forces every arm with ?ab=name:arm, checks the admin badge (also at
 //  390 px, clear of the CTA), a plain user's page and that the unforced arm is stable for one IP + UA)
+// (`look`: the ?look=board share link across script navigations, the deck remix and email sign-in; an optional
+//  5th argument is a /deck slug for the remix check)
 // (`forge-zh`: the class-language selector + a fake forge in 中文, checked on the result, library and /deck)
 // (needs a package.json with {"type":"module"} next to it, or rename to .mjs — it is already .mjs).
 
@@ -1990,6 +1992,68 @@ if (scenario === "forge") {
   const expected = exps.filter((e) => e.page === "/").map((e) => `${e.name}:${e.arm}`).join(" ");
   check(seen.every((s) => s === seen[0]) && seen[0].length > 0, "(5) three plain loads of / draw the same arm", JSON.stringify(seen));
   check(seen[0] === expected, "(5) ...and it is the arm /api/me computed for this IP + UA", `${seen[0]} vs ${expected}`);
+} else if (scenario === "look") {
+  // The ?look=board share link survives hops that are not plain links (pages.py's Referer net + the server-built
+  // URLs): a script navigation, the deck page's remix button, and the email sign-in (start -> emailed link ->
+  // Continue POST -> /app). Signed out (the shared prelude signs in, so cookies are cleared first). Optional
+  // argv[5]: a /deck slug for the remix check. Look b = board.css linked on the page.
+  await send("Network.enable");
+  await send("Network.setCacheDisabled", { cacheDisabled: true });
+  const state = `JSON.stringify({path: location.pathname, search: location.search,
+    board: !!document.querySelector('link[href^="/static/board.css"]')})`;
+  const at = async () => JSON.parse(await evaluate(state));
+  const hasLook = (s) => new URLSearchParams(s.search).get("look") === "board";
+  await send("Network.clearBrowserCookies");
+
+  // (1) a script navigation with no parameter, from a look page: the server redirects it back into look b
+  await nav(`${base}/help?look=board`);
+  check((await at()).board, "(1) /help?look=board is look b");
+  await evaluate(`(() => { window.BTS_LOOK = undefined; location.href = "/archive?x=1"; })()`);
+  await sleep(1500);
+  const s1 = await at();
+  check(s1.path === "/archive" && hasLook(s1) && s1.search.includes("x=1") && s1.board,
+        "(1) location.href without look lands on /archive?x=1&look=board in look b (Referer net)", JSON.stringify(s1));
+
+  // (2) the hash-assigned path is untouched: no look anywhere, no parameter appears
+  await nav(`${base}/help`);
+  await evaluate(`location.href = "/archive"`);
+  await sleep(1500);
+  const s2 = await at();
+  check(s2.path === "/archive" && !hasLook(s2), "(2) no look: no redirect, no parameter", JSON.stringify(s2));
+
+  // (3) the deck page's "Forge your own twist" button (deck.js -> /login)
+  const slug = process.argv[5];
+  if (slug) {
+    await nav(`${base}/deck/${slug}?look=board`);
+    await sleep(1000);
+    await evaluate(`document.getElementById('remix').click()`);
+    await sleep(1800);
+    const s3 = await at();
+    check(s3.path === "/login" && hasLook(s3) && s3.board, "(3) deck remix -> /login?look=board in look b", JSON.stringify(s3));
+  } else {
+    console.log("SKIP (3) deck remix: no slug given");
+  }
+
+  // (4) email sign-in: the link comes back (dev mailbox) with the look, Continue lands on /app?look=board
+  await nav(`${base}/login?look=board`);
+  const start = JSON.parse(await evaluate(`fetch('/api/auth/email/start', {method: 'POST',
+    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'fetch'},
+    body: JSON.stringify({email: 'lookflow@example.com'})}).then((r) => r.json()).then(JSON.stringify)`));
+  check(typeof start.link === "string" && start.link.endsWith("?look=board"), "(4) emailed link carries ?look=board", start.link);
+  if (start.link) {
+    await send("Network.clearBrowserCookies");
+    await nav(start.link.replace(/^https?:\/\/[^/]+/, base));   // as if opened from the inbox (no Referer)
+    check((await at()).board, "(4) the inbox page is look b");
+    await evaluate(`document.querySelector('form.signin-options').submit()`);
+    await sleep(2000);
+    const s4 = await at();
+    check(s4.path === "/app" && hasLook(s4) && s4.board, "(4) Continue lands on /app?look=board in look b", JSON.stringify(s4));
+    // (5) signing out from there (fetch POST /logout, then location.href) keeps the look on the splash
+    await evaluate(`document.getElementById('signout').click()`);
+    await sleep(2000);
+    const s5 = await at();
+    check(s5.path === "/" && hasLook(s5) && s5.board, "(5) sign-out lands on /?look=board in look b", JSON.stringify(s5));
+  }
 } else if (scenario === "slow-pick") {
   // The BYOK card-model projection (WALK_AWAY_FORGE_PLAN.md 4.3): every network call the picker makes is
   // stubbed in the page — the listing, /api/model-history ({n:0}: no past forges), /api/model-probe (a

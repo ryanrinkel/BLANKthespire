@@ -1991,7 +1991,8 @@ async function handlePurchaseReturn() {
   const outcome = params.get("purchase");
   if (!outcome) return;
   const sessionId = params.get("session_id") || "";
-  history.replaceState(null, "", "/app");
+  const look = params.get("look");  // the ?look= share link (pages.py) stays in the URL
+  history.replaceState(null, "", look ? `/app?look=${encodeURIComponent(look)}` : "/app");
   if (outcome === "cancel") { toast(appT("app.checkout.toast_canceled")); return; }
   if (outcome !== "success" || !sessionId) return;
 
@@ -2357,7 +2358,10 @@ el("view-back").onclick = () => selectTab("forge");
 // "Show art" repaints the list in place; an open class view follows via the body.no-art CSS rule, and
 // the next render (open / forge) skips the art entirely.
 el("lib-show-art").onchange = (ev) => { setArtEnabled(ev.target.checked); paintLibrary(); };
-el("signout").onclick = async () => { await fetch("/logout", { method: "POST" }); location.href = "/"; };
+el("signout").onclick = async () => {
+  await fetch("/logout", { method: "POST" });
+  location.href = window.BTS_LOOK ? window.BTS_LOOK("/") : "/";  // board.js: keep ?look=board
+};
 el("load-models").onclick = () => loadModels();
 el("pay-open").onclick = () => revealPayStep("");
 el("v3-banner-x").onclick = () => { lsSet("bts_tutorial_banner_dismissed", "1"); renderBanner(); };

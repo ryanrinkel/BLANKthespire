@@ -43,6 +43,7 @@ from flask import jsonify, request
 from sqlalchemy.exc import IntegrityError
 
 import i18n
+import pages
 from auth import current_user, require_login
 from db import session_scope
 from models import Purchase, User
@@ -270,6 +271,7 @@ def init_billing(app) -> None:
         # hosted-page locale. English sends no locale at all, exactly as before (Stripe picks one itself).
         lang = i18n.normalize_lang(body.get("lang"))
         extra = {"locale": "zh"} if lang == "zh" else {}
+        look = pages.carried_look()
         try:
             sess = _stripe.checkout.Session.create(
                 mode="payment",
@@ -295,8 +297,10 @@ def init_billing(app) -> None:
                 metadata={"user_id": str(user["id"]), "tokens": str(tokens), "price_id": price_id,
                           "net_cents": str(net)},
                 customer_email=user.get("email") or None,
-                success_url=f"{public_base}/app?purchase=success&session_id={{CHECKOUT_SESSION_ID}}",
-                cancel_url=f"{public_base}/app?purchase=cancel",
+                # A ?look= share link (the /app page's Referer) comes back from Stripe on both return URLs.
+                success_url=pages.with_look(
+                    f"{public_base}/app?purchase=success&session_id={{CHECKOUT_SESSION_ID}}", look),
+                cancel_url=pages.with_look(f"{public_base}/app?purchase=cancel", look),
                 **extra,
             )
         except Exception as e:

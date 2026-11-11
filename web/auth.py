@@ -266,6 +266,20 @@ def _landing(user: dict, signed_in_as: int | None) -> str:
     return "/app#account" if signed_in_as is not None and user["id"] == signed_in_as else "/app"
 
 
+def _oauth_state(look: str | None) -> str:
+    """The OAuth ``state`` for one provider hop: random as always, plus ``.<look>`` when the visitor carries a
+    ?look= share link, so the look survives the trip through the provider without anything on the device.
+    token_urlsafe never contains a dot, so the suffix is unambiguous."""
+    state = secrets.token_urlsafe(30)
+    return f"{state}.{look}" if look else state
+
+
+def _state_look(state: str | None) -> str | None:
+    """The look suffix of a state that Authlib has ALREADY validated against the session, if still live."""
+    _, dot, look = (state or "").rpartition(".")
+    return look if dot and look in pages.LOOK_ALIASES and pages.look_live(look) else None
+
+
 def current_user() -> dict | None:
     """The signed-in user as {id, email, name}, or None."""
     uid = session.get("user_id")
@@ -615,7 +629,7 @@ def init_auth(app) -> None:
         sign-in", where the point is to run a provider flow while signed in so the new identity attaches to
         this account (_resolve_identity rule 2). signin.js renders that case as "Link another sign-in"."""
         if current_user() is not None and request.args.get("link") != "1":
-            return redirect("/app")
+            return redirect(pages.with_look("/app", pages.carried_look()))
         # Through the shared page helper so a /login experiment's arms are drawn server-side (pages.py).
         return pages.serve_page("signin.html", page="/login")
 
@@ -629,10 +643,14 @@ def init_auth(app) -> None:
         # Google still returns to the legacy /auth/callback: that is the only URI the Google console lists,
         # and a redirect_uri it does not know is a hard "redirect_uri_mismatch" for every Google sign-in. Point
         # this at auth_provider_callback once the console also lists /auth/google/callback (DEPLOY §7).
+        # A ?look= share link (pages.carried_look: here it arrives in the Referer, the /login page) rides the
+        # provider round trip inside the OAuth state, never on the device: "<random>.<look>". Authlib stores
+        # and checks the whole string as usual, and the callback reads the suffix only after that check.
+        state = _oauth_state(pages.carried_look())
         if provider == "google":
-            return client.authorize_redirect(url_for("auth_callback", _external=True))
+            return client.authorize_redirect(url_for("auth_callback", _external=True), state=state)
         return client.authorize_redirect(
-            url_for("auth_provider_callback", provider=provider, _external=True))
+            url_for("auth_provider_callback", provider=provider, _external=True), state=state)
 
     @app.route("/auth/<provider>/callback")
     def auth_provider_callback(provider):
@@ -650,7 +668,7 @@ def init_auth(app) -> None:
         signed_in_as = (current_user() or {}).get("id")
         user = _resolve_identity(profile, current_user_id=signed_in_as)
         _login_session(user)
-        return redirect(_landing(user, signed_in_as))
+        return redirect(pages.with_look(_landing(user, signed_in_as), _state_look(request.args.get("state"))))
 
     @app.route("/auth/callback")
     def auth_callback():
@@ -690,7 +708,9 @@ def init_auth(app) -> None:
             s.add(LoginLink(email=email, token_hash=_token_hash(token), ip=ip,
                             code_hash=_code_hash(_token_hash(token), code), code_attempts=0,
                             created_at=_utc_naive(now), expires_at=_utc_naive(now + LINK_TTL)))
-        url = f"{_public_url()}/auth/email/{token}"
+        # A ?look= share link (here: the /login page's Referer) goes into the emailed URL, so the page opened
+        # from the inbox, which has no Referer, keeps the look; its Continue form posts back to that same URL.
+        url = pages.with_look(f"{_public_url()}/auth/email/{token}", pages.carried_look())
 
         if mail_configured():
             try:
@@ -729,7 +749,7 @@ def init_auth(app) -> None:
         user = _resolve_identity(Profile("email", email, email, True, email.split("@")[0]),
                                  current_user_id=signed_in_as)
         _login_session(user)
-        return jsonify({"ok": True, "next": _landing(user, signed_in_as)})
+        return jsonify({"ok": True, "next": pages.with_look(_landing(user, signed_in_as), pages.carried_look())})
 
     @app.route("/auth/email/<token>", methods=["GET", "POST"])
     def auth_email(token):
@@ -753,13 +773,14 @@ def init_auth(app) -> None:
         user = _resolve_identity(Profile("email", email, email, True, email.split("@")[0]),
                                  current_user_id=signed_in_as)
         _login_session(user)
-        return redirect(_landing(user, signed_in_as))
+        # The Continue form posts to the page's own URL, so a ?look= on the emailed link is in request.args.
+        return redirect(pages.with_look(_landing(user, signed_in_as), pages.carried_look()))
 
     @app.route("/logout", methods=["POST"])
     def logout():
         """POST-only: a GET link on a third-party page must not be able to sign someone out (CSRF)."""
         session.clear()
-        return redirect("/")
+        return redirect(pages.with_look("/", pages.carried_look()))
 
     @app.route("/api/me")
     def api_me():
@@ -808,4 +829,4 @@ def init_auth(app) -> None:
             name = request.args.get("name", email.split("@")[0])
             user = _resolve_identity(Profile("dev", email, email, True, name))
             _login_session(user)
-            return redirect("/app")
+            return redirect(pages.with_look("/app", pages.carried_look()))

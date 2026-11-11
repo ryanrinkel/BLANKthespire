@@ -326,7 +326,7 @@ def app_view():
     back to the splash to sign in, so the forge screen is never served without a session. Served through
     pages.serve_page so a sitewide experiment (a whole-site skin) keeps its arm after sign-in."""
     if current_user() is None:
-        return redirect("/")
+        return redirect(pages.with_look("/", pages.carried_look()))   # a ?look= share link survives the bounce
     return pages.serve_page("index.html", page="/app")
 
 
