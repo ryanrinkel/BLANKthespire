@@ -7,7 +7,7 @@
   <link rel="icon" href="/favicon.ico" sizes="any" />
   <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32.png" />
   <link rel="apple-touch-icon" href="/static/img/apple-touch-icon.png" />
-  <link rel="stylesheet" href="/static/style.css?v=20261110a" /><!--ab skin:b-->
+  <link rel="stylesheet" href="/static/style.css?v=20261113a" /><!--ab skin:b-->
   <link rel="stylesheet" href="/static/board.css?v=20261110b" /><!--/ab-->
 </head>
 <body>
@@ -403,6 +403,27 @@
       <p id="traffic-note" class="hint"></p>
     </section>
 
+    <!-- Admin-only, same gate as the stats card: every failed forge, classified by web/forge_failures.py into
+         "needs attention" (our hosted route, generation, capacity, unknown) or not (a BYOK player's own
+         provider account, a deploy restart). Built by app.js loadAdminFailures() from /api/admin/failures. -->
+    <section id="admin-failures" class="card hidden">
+      <div class="stats-head">
+        <h2>Failed forges</h2>
+        <span class="spacer"></span>
+        <select id="admin-failures-days" class="in small" aria-label="Failed forges window">
+          <option value="7">Last 7 days</option>
+          <option value="30" selected>Last 30 days</option>
+          <option value="90">Last 90 days</option>
+          <option value="0">All time</option>
+        </select>
+      </div>
+      <p id="admin-failures-summary" class="failures-summary"></p>
+      <p id="admin-failures-kinds" class="hint"></p>
+      <label class="failures-toggle hint"><input id="admin-failures-all" type="checkbox" /> Show all (including the ones that don't need you)</label>
+      <div class="table-scroll"><table id="admin-failures-table" class="stats-table admin-users-table admin-failures-table"></table></div>
+      <p id="admin-failures-note" class="hint"></p>
+    </section>
+
     <!-- Admin-only (users.admin from /api/me), same gate as the stats card above: adjust an account's token
          balance or grant it unlimited hosted forging. Rows and the audit trail are built by app.js
          loadAdminUsers(); the card stays hidden and nothing is fetched for everyone else. Admin itself is
@@ -526,7 +547,7 @@
        the class renderers shared with the public /deck page and must load first. -->
   <script src="/static/i18n.js?v=20261110a"></script>
   <script src="/static/render.js?v=20261029a"></script>
-  <script src="/static/app.js?v=20261110c"></script><!--ab skin:b-->
+  <script src="/static/app.js?v=20261113a"></script><!--ab skin:b-->
   <script src="/static/board.js?v=20261110c" defer></script><!--/ab-->
 </body>
 </html>

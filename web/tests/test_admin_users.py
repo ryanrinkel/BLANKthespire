@@ -492,3 +492,22 @@ def test_failed_attempts_are_counted_apart_from_forges(client, app_module, stub_
     assert "rejected the API key" in row["last_failed"]["error"]
     assert row["last_failed"]["at"]
     assert row["token_balance"] == 2   # the two failures were refunded
+    # A key refusal on a TOKEN forge is our hosted key: it needs the operator.
+    assert row["last_failed"]["kind"] == "hosted_key" and row["last_failed"]["attention"] is True
+    assert row["last_failed"]["label"]
+    assert row["forges_failed_attention"] == 2
+
+
+def test_byok_failures_on_the_players_own_account_need_no_attention(client, app_module):
+    """A BYOK player whose provider account is out of credits failed on THEIR account, not ours."""
+    from models import ForgeJob
+    uid = _make(client, app_module, "broke-byok@example.com")
+    with app_module.session_scope() as s:
+        s.add(ForgeJob(id="broke1".ljust(32, "x"), user_id=uid, mode="byok", status="failed", concept="secret",
+                       error=('unexpected error: endpoint returned HTTP 429: { "error": { "message": "You have '
+                              'no credits remaining.", "type": "insufficient_quota" } }')))
+    row = client.get("/api/admin/users?q=broke-byok@example.com").get_json()["users"][0]
+    assert row["forges_failed"] == 1 and row["forges_failed_attention"] == 0
+    lf = row["last_failed"]
+    assert lf["kind"] == "user_credits" and lf["attention"] is False
+    assert lf["label"] == "User's key: out of credits"

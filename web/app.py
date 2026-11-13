@@ -40,6 +40,7 @@ import ab_accounts  # noqa: E402
 import ab_report  # noqa: E402
 import alerts as _alerts  # noqa: E402
 import experiments  # noqa: E402
+import forge_failures  # noqa: E402
 import i18n  # noqa: E402
 import pages  # noqa: E402
 import auth as _auth  # noqa: E402  (module attrs: tests swap the mailer / mail_configured)
@@ -2521,7 +2522,7 @@ def admin_stats():
 
     with session_scope() as s:
         jq = s.query(ForgeJob.user_id, ForgeJob.mode, ForgeJob.token_kind, ForgeJob.status,
-                     ForgeJob.refunded, ForgeJob.started_at)
+                     ForgeJob.refunded, ForgeJob.started_at, ForgeJob.error, ForgeJob.class_id)
         uq = s.query(ForgeUsage.forge_id, ForgeUsage.mode, ForgeUsage.provider, ForgeUsage.model,
                      ForgeUsage.role, ForgeUsage.calls, ForgeUsage.input_tokens, ForgeUsage.output_tokens,
                      ForgeUsage.cached_tokens, ForgeUsage.est_cost_micros,
@@ -2543,6 +2544,7 @@ def admin_stats():
     daily: dict[str, dict] = {}
     forgers: set[int] = set()
     ok_n = failed_n = refunded_n = 0
+    failed_tags: list[dict] = []   # each failed job classified (forge_failures): what it was, does it need us
     for j in jobs:
         if j.mode in by_mode:
             by_mode[j.mode] += 1
@@ -2550,6 +2552,8 @@ def admin_stats():
             by_token_kind[j.token_kind] += 1
         ok_n += int(j.status == "done")
         failed_n += int(j.status == "failed")
+        if j.status == "failed":
+            failed_tags.append(forge_failures.classify(j.error, j.mode, j.class_id))
         refunded_n += int(bool(j.refunded))
         forgers.add(j.user_id)
         if j.started_at is not None:
@@ -2599,10 +2603,15 @@ def admin_stats():
     provider_rows = sorted(({"provider": p, "forges": len(ids)} for p, ids in providers.items()),
                            key=lambda d: (-d["forges"], d["provider"]))
 
+    failed_summary = forge_failures.summarize(failed_tags)
     return jsonify({
         "days": days,
         "since": since.strftime("%Y-%m-%d") if since is not None else None,
         "forges": {"total": len(jobs), "ok": ok_n, "failed": failed_n, "refunded": refunded_n,
+                   # failed_attention: the failures that are the operator's problem (not a BYOK player's own
+                   # provider account, not a deploy restart); failed_by_kind: [{kind,label,attention,n}].
+                   "failed_attention": failed_summary["attention"],
+                   "failed_by_kind": failed_summary["by_kind"],
                    "by_mode": by_mode, "by_token_kind": by_token_kind},
         "users": {"forgers": len(forgers), "accounts": accounts},
         "daily": [daily[k] for k in sorted(daily)],
@@ -2809,6 +2818,7 @@ def admin_users():
         forges: dict[int, int] = {}          # finished forges (status done) — what "forged N times" should mean
         failed: dict[int, int] = {}          # attempts that died (status failed); running rows count in neither
         last_failed: dict[int, dict] = {}    # the newest failed attempt per account: when + why
+        failed_attention: dict[int, int] = {}  # failed attempts classified as the operator's problem
         donated: dict[int, int] = {}
         idents: dict[int, list[str]] = {}
         # Which of each account's classes the game has fetched art for (= the code was imported). Joined
@@ -2841,13 +2851,17 @@ def admin_users():
                     forges[uid] = int(n or 0)
                 elif status == "failed":
                     failed[uid] = int(n or 0)
-            for j in (s.query(ForgeJob.user_id, ForgeJob.mode, ForgeJob.error, ForgeJob.started_at)
+            for j in (s.query(ForgeJob.user_id, ForgeJob.mode, ForgeJob.error, ForgeJob.started_at,
+                              ForgeJob.class_id)
                       .filter(ForgeJob.user_id.in_(ids), ForgeJob.status == "failed")
                       .order_by(ForgeJob.started_at.desc()).all()):
+                tag = forge_failures.classify(j.error, j.mode, j.class_id)
+                if tag["attention"]:
+                    failed_attention[j.user_id] = failed_attention.get(j.user_id, 0) + 1
                 if j.user_id not in last_failed:
                     last_failed[j.user_id] = {
                         "mode": j.mode or "", "error": (j.error or "")[:300],
-                        "at": j.started_at.isoformat() if j.started_at else None}
+                        "at": j.started_at.isoformat() if j.started_at else None, **tag}
             for uid, cents in (s.query(Purchase.user_id, sa_func.sum(Purchase.amount_cents))
                                .filter(Purchase.user_id.in_(ids), Purchase.status == "paid")
                                .group_by(Purchase.user_id).all()):
@@ -2869,7 +2883,8 @@ def admin_users():
             "admin": is_admin(u.email or ""),
             "forges": forges.get(u.id, 0),
             "forges_failed": failed.get(u.id, 0),
-            "last_failed": last_failed.get(u.id),   # {mode, error, at} or None
+            "forges_failed_attention": failed_attention.get(u.id, 0),
+            "last_failed": last_failed.get(u.id),   # {mode, error, at, kind, label, attention} or None
             "classes": classes_n.get(u.id, 0),
             # Classes of theirs the game has fetched art for (the code was imported), newest import first.
             # Empty means "none seen" — or "no traffic summary yet"; `imports_known` tells those apart.
@@ -2883,6 +2898,59 @@ def admin_users():
 
     return jsonify({"users": users, "total": total, "limit": limit, "q": q,
                     "imports_known": bool(imports_by_class) or (TRAFFIC_DIR / "traffic.json").is_file()})
+
+
+ADMIN_FAILURES_LIMIT = 500      # rows one failures listing may return
+
+
+@app.route("/api/admin/failures")
+@require_login
+def admin_failures():
+    """The Failed forges card: newest-first failed jobs over ?days= (7|30|90|0, default 30), each classified
+    by forge_failures (kind, label, attention) so the operator sees at a glance which ones are theirs to fix
+    and which died on a BYOK player's own provider account. ?limit= caps rows (<= 500); the window totals
+    (total, attention, by_kind) always cover every failed job in the window, not just the rows returned.
+
+    Read-only, same gate as the other admin cards. The error text is trimmed to 300 chars; concept text and
+    class contents never leave here."""
+    denied = _admin_or_403()
+    if denied:
+        return denied
+    from datetime import datetime, timedelta, timezone
+    try:
+        days = int(request.args.get("days", 30))
+    except (TypeError, ValueError):
+        days = 30
+    if days not in ADMIN_STATS_WINDOWS:
+        days = 30
+    try:
+        limit = int(request.args.get("limit", 100))
+    except (TypeError, ValueError):
+        limit = 100
+    limit = max(1, min(limit, ADMIN_FAILURES_LIMIT))
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    since = now - timedelta(days=days) if days else None
+
+    with session_scope() as s:
+        fq = (s.query(ForgeJob.id, ForgeJob.user_id, ForgeJob.mode, ForgeJob.error, ForgeJob.class_id,
+                      ForgeJob.refunded, ForgeJob.started_at, ForgeJob.finished_at, User.email)
+              .outerjoin(User, User.id == ForgeJob.user_id)
+              .filter(ForgeJob.status == "failed"))
+        if since is not None:
+            fq = fq.filter(ForgeJob.started_at >= since)
+        jobs = fq.order_by(ForgeJob.started_at.desc(), ForgeJob.id).all()
+
+    rows = []
+    for j in jobs:
+        tag = forge_failures.classify(j.error, j.mode, j.class_id)
+        at = j.started_at or j.finished_at
+        rows.append({"id": j.id, "at": at.isoformat() if at else None, "user_id": j.user_id,
+                     "email": j.email or "", "mode": j.mode or "", **tag,
+                     "error": (j.error or "")[:300], "landed": j.class_id is not None,
+                     "refunded": bool(j.refunded)})
+    summary = forge_failures.summarize(rows)
+    return jsonify({"days": days, "since": since.strftime("%Y-%m-%d") if since is not None else None,
+                    "limit": limit, **summary, "failures": rows[:limit]})
 
 
 @app.route("/api/admin/users/<int:user_id>/tokens", methods=["POST"])
