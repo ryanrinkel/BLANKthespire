@@ -718,6 +718,24 @@ main.archive { max-width: 1100px; }
 .admin-archive-table .flags { font-variant-numeric: tabular-nums; letter-spacing: 1px; }
 .admin-archive-table .row-actions { display: flex; flex-direction: column; gap: 4px; }
 .admin-archive-table .row-actions .btn { margin: 0; }
+/* Failed forges card (#admin-failures) + the Users card's "· N failed": rows/counts that need the operator
+   take the warning accent; the rest stay muted. Colors are the shared tokens, so both skins restyle them. */
+.admin-users-table .failed-n.attention { color: var(--warn); font-size: 12px; }
+.failures-summary { margin: 12px 0 4px; font-size: 15px; }
+.failures-attn { color: var(--warn); font-weight: 600; }
+.failures-ok { color: var(--accent); font-weight: 600; }
+#admin-failures-kinds { margin: 0 0 8px; }
+#admin-failures-kinds span { white-space: nowrap; }
+#admin-failures-kinds .kind-attn { color: var(--warn); }
+.failures-toggle { display: inline-flex; align-items: center; gap: 6px; margin: 0; cursor: pointer; }
+.failures-toggle input { margin: 0; }
+.admin-failures-table .label-cell { white-space: normal; min-width: 150px; max-width: 220px; }
+.admin-failures-table .err-cell { white-space: normal; min-width: 160px; max-width: 260px; overflow-wrap: anywhere;
+                                  font-size: 12px; color: var(--muted); }
+.admin-failures-table tr.fail-attn td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
+.admin-failures-table tr.fail-calm td { color: var(--muted); }
+.attn-badge { display: inline-block; padding: 0 6px; border: 1px solid var(--warn); border-radius: 3px; color: var(--warn);
+              font-size: 11px; font-weight: 600; line-height: 1.5; white-space: nowrap; }
 /* Phones: the operator tables scroll sideways, so pin the first column (account / class) in place. */
 @media (max-width: 700px) {
   .table-scroll .admin-users-table th:first-child,

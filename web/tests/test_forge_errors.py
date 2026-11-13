@@ -51,6 +51,18 @@ def test_request_over_the_per_minute_cap_says_upgrade_not_retry():
     assert "Wait a minute" not in why
 
 
+OPENROUTER_402 = ('front-end failed: endpoint returned HTTP 402: {"error":{"message":"This request requires more '
+                  'credits, or fewer max_tokens. You requested up to 48000 tokens, but can only afford 8784. To '
+                  'increase, visit https://openrouter.ai/workspaces/default/keys","code":402}}')
+
+
+def test_openrouter_low_balance_402_is_explained_as_credits():
+    # 37 BYOK forges died on this by 2026-11-13 and every player got the raw JSON.
+    why = forge.explain_provider_error(OPENROUTER_402)
+    assert why and "credits" in why and "rate-limited" not in why
+    assert "credits" in forge.explain_provider_error("front-end failed: endpoint returned HTTP 402: {}")
+
+
 def test_bare_http_status_lines_match():
     # The \bHTTP 4xx\b alternatives were literal backspace bytes from 2026-10-11 to 2026-10-27 and never
     # matched; a bare status with no recognised code in the body must still get a sentence.

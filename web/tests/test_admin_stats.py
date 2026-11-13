@@ -22,13 +22,14 @@ def _user_id(app_module, email: str) -> int:
 
 def _seed(app_module, user_id: int, forge_id: str, *, mode="token", status="done", token_kind="free",
           refunded=0, age_days=0.0, provider="hosted", model="glm-5.2", ok=1, cost=None,
-          calls=3, inp=1000, out=200, cached=300):
+          calls=3, inp=1000, out=200, cached=300, error="", class_id=None):
     """One forge attempt + its usage row, written straight through the session (no forge required)."""
     from models import ForgeJob, ForgeUsage
     when = _naive_utc(age_days)
     with app_module.session_scope() as s:
         s.add(ForgeJob(id=forge_id, user_id=user_id, mode=mode, token_kind=token_kind, status=status,
-                       refunded=refunded, concept="seeded", started_at=when))
+                       refunded=refunded, concept="seeded", started_at=when, error=error,
+                       class_id=class_id))
         s.add(ForgeUsage(user_id=user_id, forge_id=forge_id, mode=mode, provider=provider, model=model,
                          role="cards", calls=calls, input_tokens=inp, output_tokens=out,
                          cached_tokens=cached, est_cost_micros=cost, ok=ok, token_kind=token_kind,
@@ -70,7 +71,8 @@ def test_admin_gets_the_documented_shape(client, app_module):
                          "donations", "archive"}
     assert set(body["archive"]) == {"pending", "featured"}
     assert body["days"] == 30 and isinstance(body["since"], str)
-    assert set(body["forges"]) == {"total", "ok", "failed", "refunded", "by_mode", "by_token_kind"}
+    assert set(body["forges"]) == {"total", "ok", "failed", "refunded", "failed_attention", "failed_by_kind",
+                                   "by_mode", "by_token_kind"}
     assert set(body["forges"]["by_mode"]) == {"token", "byok", "fake"}
     assert set(body["forges"]["by_token_kind"]) == {"free", "paid", "unlimited"}
     assert set(body["users"]) == {"forgers", "accounts"} and body["users"]["accounts"] >= 1
@@ -233,3 +235,34 @@ def test_usage_rows_and_result_carry_the_provider_and_totals(client, app_module,
     with app_module.session_scope() as s:
         rows = s.query(ForgeUsage).filter_by(class_id=ev[-1][1]["id"]).all()
     assert rows and all(r.provider == "hosted" for r in rows)
+
+
+def test_failed_forges_are_split_by_whether_they_need_the_operator(client, app_module):
+    """A BYOK player's own empty provider account is not our problem; the same refusal on a token forge (our
+    hosted key) and a generation failure are. failed_by_kind groups them, most frequent first."""
+    login(client, ADMIN)
+    _clear(app_module)
+    uid = _user_id(app_module, ADMIN)
+    credits = ('class did not generate: front-end failed: endpoint returned HTTP 402: {"error":{"message":'
+               '"This request requires more credits, or fewer max_tokens. You requested up to 48000 tokens, '
+               'but can only afford 8784."}}')
+    for i in range(3):
+        _seed(app_module, uid, f"byok{i}".ljust(32, "x"), mode="byok", status="failed", ok=0, error=credits)
+    _seed(app_module, uid, "tok1".ljust(32, "x"), mode="token", status="failed", ok=0, error=credits)
+    _seed(app_module, uid, "gen1".ljust(32, "x"), mode="token", status="failed", ok=0,
+          error="class did not generate: front-end failed: blueprint failed: missing 'name'")
+    _seed(app_module, uid, "rst1".ljust(32, "x"), mode="token", status="failed", ok=0,
+          error="the server restarted mid-forge — token refunded")
+    _seed(app_module, uid, "old1".ljust(32, "x"), mode="token", status="failed", ok=0, age_days=120,
+          error="class did not generate: front-end failed: blueprint failed: missing 'name'")
+    _seed(app_module, uid, "ok01".ljust(32, "x"), mode="token")
+
+    f = client.get("/api/admin/stats?days=30").get_json()["forges"]
+    assert f["failed"] == 6
+    assert f["failed_attention"] == 2          # the hosted 402 + the generation failure
+    by = {k["kind"]: k for k in f["failed_by_kind"]}
+    assert by["user_credits"]["n"] == 3 and by["user_credits"]["attention"] is False
+    assert by["hosted_credits"]["n"] == 1 and by["hosted_credits"]["attention"] is True
+    assert by["generation"]["n"] == 1 and by["restart"]["attention"] is False
+    assert f["failed_by_kind"][0]["kind"] == "user_credits"        # sorted by n desc
+    assert all(set(k) == {"kind", "label", "attention", "n"} for k in f["failed_by_kind"])

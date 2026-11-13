@@ -1047,62 +1047,11 @@ def _archetypes_of(res) -> list:
         return []
 
 
-# (pattern, one-sentence explanation) for the provider refusals a BYOK forge dies on at its FIRST call. Order
-# matters: the first match wins, so the specific "no credits" 429 sits above the generic 429.
-_PROVIDER_REFUSALS: list[tuple[re.Pattern, str]] = [
-    (re.compile(r"model_not_found|does not exist or you do not have access|not_found_error|unknown model|"
-                r"no such model|model .{0,80}? (?:is )?not found|models?/?[\w./:-]{0,80} (?:is )?not found",
-                re.I),
-     "Your provider doesn't offer a model called “{model}” on this key. Open “Bring your own key”, "
-     "click “Reload model list” and pick one from the list (check the provider matches the key, too)."),
-    # OpenRouter's routing refusals (the account's provider allow/ignore lists; free models without
-    # data-sharing providers enabled): above the generic 403/404 so they get their own explanation.
-    (re.compile(r"All providers have been ignored|No allowed providers are available|"
-                r"not in your account's allowed-providers", re.I),
-     "OpenRouter has no provider it is allowed to route this model to on your account. Check Settings → "
-     "Privacy on openrouter.ai (free models need data-sharing providers enabled) or pick another model."),
-    (re.compile(r"insufficient_quota|credit_balance_exhausted|no credits remaining|exceeded your current quota|"
-                r"insufficient[_ ]credits|billing_hard_limit", re.I),
-     "Your provider account has no credits left, so it refused the request. Add credits on your provider's "
-     "billing page, then forge again — nothing was charged here."),
-    (re.compile(r"invalid_api_key|authentication_error|invalid x-api-key|incorrect api key|invalid api key|"
-                r"\bHTTP 401\b|Error code: 401|\b401\b.{0,40}unauthorized", re.I),
-     "Your provider rejected the API key. Paste a current key from your provider's dashboard (and check the "
-     "provider dropdown matches where the key came from)."),
-    (re.compile(r"\bHTTP 403\b|permission_denied|forbidden", re.I),
-     "Your provider says this key isn't allowed to use that model or endpoint. Check the key's permissions "
-     "on your provider's dashboard, or pick another model."),
-    # A SINGLE request bigger than the key's per-minute token cap (Groq free plan: 8K TPM on gpt-oss-120b,
-    # HTTP 413 "Request too large ... Limit 8000, Requested 10549", 2026-10-27). Waiting a minute can't help:
-    # the forge's front-end prompt alone is over the cap and the card prompts are bigger still, so it sits
-    # above the generic 429 wording that tells the player to retry.
-    (re.compile(r"request too large|\bHTTP 413\b|Error code: 413|tokens per minute \(TPM\)|"
-                r"reduce (?:your|the) (?:message|prompt|request) size", re.I),
-     "Your provider's plan caps how many tokens one request may send per minute, and a single forge prompt "
-     "is larger than that cap, so retrying won't help. Upgrade the plan on your provider account (Groq: "
-     "Settings → Billing → Plans → Developer) or forge with a key from another provider."),
-    (re.compile(r"\bHTTP 429\b|rate[_ ]limit|too many requests", re.I),
-     "Your provider rate-limited the key. Wait a minute and forge again, or raise the limit on your "
-     "provider account."),
-]
-
-_MODEL_IN_ERROR = re.compile(r"[Tt]he model [`'\"‘“]([^`'\"’”]+)[`'\"’”]")
-
-
-def explain_provider_error(detail: str, model: str | None = None) -> str | None:
-    """One plain sentence for a BYOK refusal the player's PROVIDER sent back, or None when the failure isn't
-    one we recognise. On 2026-10-11 a new account's 11 forges all died in under two seconds on the user's own
-    key (a mistyped model, an Anthropic model id sent to OpenAI, a key with no credits, a placeholder key)
-    and every one surfaced as the raw JSON error body, which reads like OUR outage. The raw text still
-    follows the sentence so an operator can see what the provider actually said."""
-    if not detail:
-        return None
-    for pat, text in _PROVIDER_REFUSALS:
-        if pat.search(detail):
-            m = _MODEL_IN_ERROR.search(detail)
-            name = (m.group(1) if m else None) or model or "that"
-            return text.format(model=name)
-    return None
+# The provider-refusal table and its sentences live in forge_failures (pure, cheap to import) so the admin
+# panel's failed-forge triage reads the same patterns the player's explanation does.
+from forge_failures import MODEL_IN_ERROR as _MODEL_IN_ERROR  # noqa: E402,F401
+from forge_failures import PROVIDER_REFUSALS as _PROVIDER_REFUSALS  # noqa: E402,F401
+from forge_failures import explain_provider_error  # noqa: E402
 
 
 def _bundle_result(res, model: str | None = None) -> dict:

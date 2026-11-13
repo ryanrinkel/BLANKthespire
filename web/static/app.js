@@ -1740,6 +1740,7 @@ async function loadAccount() {
   loadStats();
   loadExperiments();
   loadTraffic();
+  loadAdminFailures();
   loadAdminUsers();
   loadAdminArchive();
   loadAdminEvents();
@@ -2501,16 +2502,89 @@ function renderAdminUsers(d) {
 // Finished forges, then the attempts that died as a muted "· N failed" whose hover carries the newest error
 // (mode, UTC time, the provider's words). Failed attempts used to be folded into one number, which made an
 // account whose every forge died on its own API key read as a prolific forger who never imported.
+// The failures are classified server-side (web/forge_failures.py): "· N failed" stays muted when none of them
+// needs the operator (e.g. a BYOK player's own key out of credits) and takes the warning accent, with how
+// many do, when some do.
 function forgesCell(u) {
   const done = fmtInt(u.forges);
   const failed = Number(u.forges_failed || 0);
   if (!failed) return done;
+  const attention = Number(u.forges_failed_attention || 0);
   const lf = u.last_failed || {};
   const when = lf.at ? String(lf.at).slice(0, 16).replace("T", " ") + " UTC" : "";
-  const tip = `${failed} attempt${failed === 1 ? "" : "s"} failed. Latest`
+  const tip = `${failed} attempt${failed === 1 ? "" : "s"} failed`
+    + (attention ? `, ${attention} need${attention === 1 ? "s" : ""} attention` : ", none need attention")
+    + `. Latest`
     + (lf.mode ? ` (${lf.mode}` + (when ? `, ${when}` : "") + `)` : when ? ` (${when})` : "")
+    + (lf.label ? ` — ${lf.label}` : "")
     + `: ${lf.error || "no detail recorded"}`;
-  return `${done} <span class="sub failed-n" title="${esc(tip)}">· ${failed} failed</span>`;
+  if (!attention) return `${done} <span class="sub failed-n" title="${esc(tip)}">· ${failed} failed</span>`;
+  return `${done} <span class="failed-n attention" title="${esc(tip)}">· ${failed} failed`
+    + ` <b>(${attention} ⚠)</b></span>`;
+}
+
+// --- admin: failed forges ----------------------------------------------------------------------------
+// Same gate as the Users card. /api/admin/failures?days=N -> every failed forge in the window, classified by
+// web/forge_failures.py (kind, label, attention). The default view lists only the ones that need the
+// operator; "Show all" adds the rest (muted). Rendered from the last payload so the toggle needs no refetch.
+let ADMIN_FAILURES = null;
+
+async function loadAdminFailures() {
+  const card = el("admin-failures");
+  if (!card) return;
+  if (!ME || !ME.admin) { card.classList.add("hidden"); return; }
+  card.classList.remove("hidden");
+  const days = el("admin-failures-days").value;
+  try {
+    const r = await fetch(`/api/admin/failures?days=${encodeURIComponent(days)}&limit=200`);
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    ADMIN_FAILURES = await r.json();
+    renderAdminFailures();
+  } catch (e) {
+    el("admin-failures-note").textContent = "Couldn't load failed forges: " + e.message;
+  }
+}
+
+function renderAdminFailures() {
+  const d = ADMIN_FAILURES;
+  if (!d) return;
+  const total = Number(d.total || 0);
+  const attention = Number(d.attention || 0);
+  const calm = total - attention;
+  const summary = el("admin-failures-summary");
+  if (!total) {
+    summary.innerHTML = `<span class="failures-ok">No failed forges in this window.</span>`;
+  } else if (!attention) {
+    summary.innerHTML = `<span class="failures-ok">Nothing needs you.</span>`
+      + ` <span class="muted">${fmtInt(calm)} failed on the player's side (their own key, a restart…).</span>`;
+  } else {
+    summary.innerHTML = `<span class="failures-attn">${fmtInt(attention)} need${attention === 1 ? "s" : ""} attention</span>`
+      + ` <span class="muted">· ${fmtInt(calm)} don't</span>`;
+  }
+  el("admin-failures-kinds").innerHTML = (d.by_kind || []).map((k) =>
+    `<span class="${k.attention ? "kind-attn" : "kind-calm"}">${esc(k.label)} ${fmtInt(k.n)}</span>`).join(" · ");
+
+  const showAll = el("admin-failures-all").checked;
+  const rows = (d.failures || []).filter((f) => showAll || f.attention);
+  const head = `<tr><th>When (UTC)</th><th class="who-cell">Account</th><th>Mode</th><th>What</th><th>Error</th></tr>`;
+  const body = rows.map((f) => {
+    const when = f.at ? String(f.at).slice(0, 16).replace("T", " ") : "—";
+    // "landed late" is already in the label (the only kinds where a class can land after the failure).
+    const flags = f.refunded ? "refunded" : "";
+    const err = String(f.error || "");
+    return `<tr class="${f.attention ? "fail-attn" : "fail-calm"}">`
+      + `<td class="joined">${esc(when)}</td>`
+      + `<td class="who-cell">${esc(f.email || ("user " + f.user_id))}</td>`
+      + `<td>${esc(f.mode || "—")}</td>`
+      + `<td class="label-cell">${f.attention ? `<span class="attn-badge">Needs you</span> ` : ""}${esc(f.label)}`
+      + (flags ? `<div class="sub">${esc(flags)}</div>` : "") + `</td>`
+      + `<td class="err-cell" title="${esc(err)}">${esc(err.length > 90 ? err.slice(0, 90) + "…" : err)}</td></tr>`;
+  }).join("");
+  const empty = showAll ? "No failed forges in this window." : "Nothing needs you.";
+  el("admin-failures-table").innerHTML = head + (body || `<tr><td colspan="5" class="muted">${empty}</td></tr>`);
+  const shown = (d.failures || []).length;
+  el("admin-failures-note").textContent = (shown < total ? `Newest ${shown} of ${total} listed. ` : "")
+    + "Labels are computed from the stored error each time (web/forge_failures.py); hover an error for the full text.";
 }
 
 // "2 / 3" classes imported, with a hover listing each imported class, its first/last fetch (UTC) and
@@ -2928,6 +3002,8 @@ el("admin-events-new").onclick = () => openEventForm(null);
 el("admin-event-cancel").onclick = closeEventForm;
 el("admin-event-form").onsubmit = saveAdminEvent;
 el("traffic-days").onchange = loadTraffic;
+el("admin-failures-days").onchange = loadAdminFailures;
+el("admin-failures-all").onchange = renderAdminFailures;
 // Debounced so typing an address doesn't fire a query per keystroke.
 el("admin-users-q").oninput = () => {
   clearTimeout(ADMIN_Q_TIMER);
